@@ -1,0 +1,926 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  SUPERVISOR
+  INTERVIEWER
+  ANALYST
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum StudyStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum RotationAssignmentModeAllowed {
+  MANUAL
+  AUTOMATIC
+  BOTH
+}
+
+enum RotationPlanStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum RotationAssignmentMode {
+  MANUAL_COVER_CODE
+  AUTOMATIC
+}
+
+enum ParticipantProfileStatus {
+  ACTIVE
+  INACTIVE
+  MERGED
+}
+
+enum StudyParticipantOperationalStatus {
+  CREATED
+  SCREENING_STARTED
+  SCREENING_PASSED
+  SCREENING_TERMINATED
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  WITHDRAWN
+}
+
+enum ScreeningStatus {
+  NOT_STARTED
+  STARTED
+  PASSED
+  TERMINATED
+  INCOMPLETE
+}
+
+enum ApplicationTimeEventType {
+  REGISTERED
+  CORRECTED
+}
+
+enum ActivityStateAtEvent {
+  NONE_STARTED
+  SOME_STARTED
+  COMPLETED_EXISTS
+}
+
+enum ParticipantAccessTokenStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum ParticipantAccessTokenExpiryPolicy {
+  SEVEN_DAYS_AFTER_LAST_SCHEDULED_ACTIVITY
+}
+
+enum ParticipantAccessTokenRevocationReason {
+  REGENERATED
+  MANUAL
+  EXPIRED
+}
+
+enum QuestionnairePurpose {
+  SCREENER
+  MEASUREMENT
+  FOLLOWUP
+  ADMIN
+}
+
+enum QuestionnaireDraftStatus {
+  DRAFT
+  READY
+}
+
+enum QuestionnaireVersionStatus {
+  ACTIVE
+  RETIRED
+}
+
+enum LibraryItemType {
+  QUESTION
+  OPTION_SET
+  SCALE
+  ATTRIBUTE
+  MATRIX
+  BLOCK_TEMPLATE
+}
+
+enum LibraryItemStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum QuotaCountingStage {
+  SCREENING_PASSED
+  PARTICIPANT_ASSIGNED
+  FIRST_MEASUREMENT_COMPLETED
+  STUDY_COMPLETED
+}
+
+enum QuotaStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ActivityType {
+  QUESTIONNAIRE_MEASUREMENT
+  VIDEO_EVIDENCE
+  INTERNAL_FOLLOWUP
+}
+
+enum ActivityAnchorEvent {
+  APPLICATION_STARTED
+}
+
+enum ActivityScheduleStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ParticipantActivityStatus {
+  PENDING
+  AVAILABLE
+  STARTED
+  INCOMPLETE
+  COMPLETED
+  EXPIRED
+  REOPENED
+}
+
+enum ReminderChannel {
+  INTERNAL_FOLLOWUP
+}
+
+enum ReminderStatus {
+  PLANNED
+  COMPLETED
+  CANCELLED
+}
+
+enum ResearchResponseContextType {
+  NONE
+  PRODUCT
+  ARM
+}
+
+enum ResponseValidationStatus {
+  VALID
+  INVALID
+  PARTIAL
+}
+
+enum AttributeOrderContextType {
+  SHARED
+  PRODUCT
+  ARM
+}
+
+enum MediaEvidenceType {
+  VIDEO
+}
+
+enum MediaEvidenceStatus {
+  EXPECTED
+  PENDING_UPLOAD
+  UPLOADED
+  REJECTED
+  DELETED
+}
+
+enum MediaConsentStatus {
+  NOT_REQUESTED
+  GRANTED
+  DENIED
+  REVOKED
+}
+
+enum MediaReviewStatus {
+  NOT_REVIEWED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum RetentionPolicyStatus {
+  PENDING
+  SCHEDULED
+  COMPLETED
+}
+
+enum ExportJobType {
+  SCREENING_BASE
+  PARTICIPANT_TRACKING
+  QUOTAS
+  RESPONSES_WIDE
+  RESPONSES_LONG
+  FULL_INITIAL_PACKAGE
+}
+
+enum ExportFormat {
+  CSV
+  XLSX
+}
+
+enum ExportPrivacyMode {
+  PII_ALLOWED
+  ANONYMIZED
+}
+
+enum ExportJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum AuditAction {
+  QUESTIONNAIRE_PUBLISHED
+  QUESTIONNAIRE_RETIRED
+  APPLICATION_TIME_CORRECTED
+  PARTICIPANT_MODIFIED
+  ACCESS_TOKEN_REGENERATED
+  ACCESS_TOKEN_REVOKED
+  ACTIVITY_REOPENED
+  ROTATION_CHANGED
+  QUOTA_CHANGED
+}
+
+model InternalUser {
+  id           String     @id @default(uuid()) @db.Uuid
+  name         String
+  email        String     @unique
+  passwordHash String?
+  role         UserRole
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  createdStudies              Study[]                         @relation("StudyCreatedBy")
+  createdParticipantProfiles  ParticipantProfile[]            @relation("ParticipantProfileCreatedBy")
+  createdStudyParticipants    StudyParticipant[]              @relation("StudyParticipantCreatedBy")
+  registeredApplicationTimes  StudyParticipant[]              @relation("ApplicationTimeRegisteredBy")
+  applicationTimeEvents       ApplicationTimeEvent[]           @relation("ApplicationTimeEventCreatedBy")
+  createdAccessTokens         ParticipantAccessToken[]         @relation("ParticipantAccessTokenCreatedBy")
+  revokedAccessTokens         ParticipantAccessToken[]         @relation("ParticipantAccessTokenRevokedBy")
+  createdQuestionnaireDrafts  QuestionnaireDraft[]             @relation("QuestionnaireDraftCreatedBy")
+  updatedQuestionnaireDrafts  QuestionnaireDraft[]             @relation("QuestionnaireDraftUpdatedBy")
+  publishedQuestionnaires     QuestionnaireVersion[]           @relation("QuestionnaireVersionPublishedBy")
+  retiredQuestionnaires       QuestionnaireVersion[]           @relation("QuestionnaireVersionRetiredBy")
+  createdLibraryItems         LibraryItem[]                    @relation("LibraryItemCreatedBy")
+  createdLibraryRevisions     LibraryItemRevision[]            @relation("LibraryItemRevisionCreatedBy")
+  screeningAttempts           ScreeningAttempt[]               @relation("ScreeningAttemptFieldUser")
+  rotationAssignments         ParticipantRotationAssignment[]  @relation("ParticipantRotationAssignedBy")
+  reopenedActivities          ParticipantActivity[]            @relation("ParticipantActivityReopenedBy")
+  reviewedMediaEvidence       MediaEvidencePlaceholder[]       @relation("MediaEvidenceReviewedBy")
+  exportJobs                  ExportJob[]                      @relation("ExportJobRequestedBy")
+  auditLogs                   AuditLog[]                       @relation("AuditLogActor")
+
+  @@map("internal_users")
+}
+
+model Study {
+  id              String      @id @default(uuid()) @db.Uuid
+  name            String
+  description     String?
+  status          StudyStatus @default(DRAFT)
+  timeZoneIana    String
+  startsAt        DateTime?
+  endsAt          DateTime?
+  createdByUserId String      @db.Uuid
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  createdBy           InternalUser          @relation("StudyCreatedBy", fields: [createdByUserId], references: [id])
+  products            StudyProduct[]
+  arms                StudyArm[]
+  rotationPlans       RotationPlan[]
+  participants        StudyParticipant[]
+  questionnaireDrafts QuestionnaireDraft[]
+  questionnaireVersions QuestionnaireVersion[]
+  libraryItems        LibraryItem[]
+  quotaDefinitions    QuotaDefinition[]
+  activitySchedules   ActivitySchedule[]
+  exportJobs          ExportJob[]
+
+  @@index([status])
+  @@index([createdByUserId])
+  @@map("studies")
+}
+
+model StudyProduct {
+  id           String   @id @default(uuid()) @db.Uuid
+  studyId      String   @db.Uuid
+  internalCode String
+  displayLabel String
+  realName     String
+  isSensitive  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  study                  Study                   @relation(fields: [studyId], references: [id])
+  rotationPlanArms       RotationPlanArm[]
+  participantArmAssignments ParticipantArmAssignment[]
+  researchResponses      ResearchResponse[]      @relation("ResearchResponseProductContext")
+  attributeOrders        ParticipantAttributeOrder[] @relation("AttributeOrderProductContext")
+
+  @@unique([studyId, internalCode])
+  @@index([studyId])
+  @@map("study_products")
+}
+
+model StudyArm {
+  id        String   @id @default(uuid()) @db.Uuid
+  studyId   String   @db.Uuid
+  code      String
+  label     String
+  sortOrder Int
+  createdAt DateTime @default(now())
+
+  study                     Study                    @relation(fields: [studyId], references: [id])
+  rotationPlanArms          RotationPlanArm[]
+  participantArmAssignments ParticipantArmAssignment[]
+  researchResponses         ResearchResponse[]       @relation("ResearchResponseArmContext")
+  attributeOrders           ParticipantAttributeOrder[] @relation("AttributeOrderArmContext")
+
+  @@unique([studyId, code])
+  @@unique([studyId, sortOrder])
+  @@map("study_arms")
+}
+
+model RotationPlan {
+  id                    String                        @id @default(uuid()) @db.Uuid
+  studyId               String                        @db.Uuid
+  rotationCode          String
+  name                  String
+  assignmentModeAllowed RotationAssignmentModeAllowed @default(MANUAL)
+  status                RotationPlanStatus            @default(ACTIVE)
+  createdAt             DateTime                      @default(now())
+
+  study       Study                           @relation(fields: [studyId], references: [id])
+  arms        RotationPlanArm[]
+  assignments ParticipantRotationAssignment[]
+
+  @@unique([studyId, rotationCode])
+  @@index([studyId, status])
+  @@map("rotation_plans")
+}
+
+model RotationPlanArm {
+  id                      String @id @default(uuid()) @db.Uuid
+  rotationPlanId          String @db.Uuid
+  studyArmId              String @db.Uuid
+  studyProductId          String @db.Uuid
+  applicationOrder        Int
+  participantVisibleLabel String
+
+  rotationPlan RotationPlan @relation(fields: [rotationPlanId], references: [id])
+  studyArm     StudyArm     @relation(fields: [studyArmId], references: [id])
+  studyProduct StudyProduct @relation(fields: [studyProductId], references: [id])
+
+  @@unique([rotationPlanId, studyArmId])
+  @@unique([rotationPlanId, applicationOrder])
+  @@index([studyProductId])
+  @@map("rotation_plan_arms")
+}
+
+model ParticipantProfile {
+  id                String                   @id @default(uuid()) @db.Uuid
+  externalReference String?
+  name              String
+  phone             String?
+  email             String?
+  address           String?
+  city              String?
+  age               Int?
+  gender            String?
+  status            ParticipantProfileStatus @default(ACTIVE)
+  createdByUserId   String                   @db.Uuid
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  createdBy      InternalUser       @relation("ParticipantProfileCreatedBy", fields: [createdByUserId], references: [id])
+  participations StudyParticipant[]
+
+  @@index([externalReference])
+  @@index([email])
+  @@index([phone])
+  @@index([createdByUserId])
+  @@map("participant_profiles")
+}
+
+model StudyParticipant {
+  id                                     String                            @id @default(uuid()) @db.Uuid
+  participantProfileId                   String                            @db.Uuid
+  studyId                                String                            @db.Uuid
+  operationalStatus                      StudyParticipantOperationalStatus @default(CREATED)
+  screeningStatus                        ScreeningStatus                   @default(NOT_STARTED)
+  applicationStartedAt                   DateTime?
+  applicationStartedAtRegisteredByUserId String?                           @db.Uuid
+  applicationStartedAtRegisteredAt       DateTime?
+  applicationStartedAtCorrectedAt        DateTime?
+  createdByUserId                        String                            @db.Uuid
+  createdAt                              DateTime                          @default(now())
+  updatedAt                              DateTime                          @updatedAt
+
+  participantProfile             ParticipantProfile             @relation(fields: [participantProfileId], references: [id])
+  study                          Study                          @relation(fields: [studyId], references: [id])
+  createdBy                      InternalUser                   @relation("StudyParticipantCreatedBy", fields: [createdByUserId], references: [id])
+  applicationStartedAtRegisteredBy InternalUser?                @relation("ApplicationTimeRegisteredBy", fields: [applicationStartedAtRegisteredByUserId], references: [id])
+  applicationTimeEvents          ApplicationTimeEvent[]
+  accessTokens                   ParticipantAccessToken[]
+  screeningAttempts              ScreeningAttempt[]
+  quotaEvaluations               QuotaEvaluation[]
+  rotationAssignment             ParticipantRotationAssignment?
+  armAssignments                 ParticipantArmAssignment[]
+  activities                     ParticipantActivity[]
+  attributeOrders                ParticipantAttributeOrder[]
+
+  @@unique([participantProfileId, studyId])
+  @@index([studyId, operationalStatus])
+  @@index([screeningStatus])
+  @@index([createdByUserId])
+  @@map("study_participants")
+}
+
+model ApplicationTimeEvent {
+  id                           String                    @id @default(uuid()) @db.Uuid
+  studyParticipantId           String                    @db.Uuid
+  eventType                    ApplicationTimeEventType
+  previousApplicationStartedAt DateTime?
+  newApplicationStartedAt      DateTime
+  timeZoneIana                 String
+  reason                       String
+  activityStateAtEvent         ActivityStateAtEvent
+  createdByUserId              String                    @db.Uuid
+  createdAt                    DateTime                  @default(now())
+
+  studyParticipant StudyParticipant @relation(fields: [studyParticipantId], references: [id])
+  createdBy        InternalUser     @relation("ApplicationTimeEventCreatedBy", fields: [createdByUserId], references: [id])
+
+  @@index([studyParticipantId, createdAt])
+  @@index([createdByUserId])
+  @@map("application_time_events")
+}
+
+model ParticipantAccessToken {
+  id               String                               @id @default(uuid()) @db.Uuid
+  studyParticipantId String                             @db.Uuid
+  tokenHash        String                               @unique
+  status           ParticipantAccessTokenStatus          @default(ACTIVE)
+  expiresAt        DateTime
+  expiresAtPolicy  ParticipantAccessTokenExpiryPolicy    @default(SEVEN_DAYS_AFTER_LAST_SCHEDULED_ACTIVITY)
+  lastUsedAt       DateTime?
+  createdByUserId  String                               @db.Uuid
+  createdAt        DateTime                             @default(now())
+  revokedAt        DateTime?
+  revokedByUserId  String?                              @db.Uuid
+  revocationReason ParticipantAccessTokenRevocationReason?
+  replacedByTokenId String?                             @unique @db.Uuid
+
+  studyParticipant StudyParticipant       @relation(fields: [studyParticipantId], references: [id])
+  createdBy        InternalUser           @relation("ParticipantAccessTokenCreatedBy", fields: [createdByUserId], references: [id])
+  revokedBy        InternalUser?          @relation("ParticipantAccessTokenRevokedBy", fields: [revokedByUserId], references: [id])
+  replacedByToken  ParticipantAccessToken? @relation("TokenReplacement", fields: [replacedByTokenId], references: [id])
+  replacesToken    ParticipantAccessToken? @relation("TokenReplacement")
+
+  @@index([studyParticipantId, status])
+  @@index([expiresAt])
+  @@map("participant_access_tokens")
+}
+
+model QuestionnaireDraft {
+  id              String                   @id @default(uuid()) @db.Uuid
+  studyId         String                   @db.Uuid
+  name            String
+  purpose         QuestionnairePurpose
+  definitionJson  Json
+  status          QuestionnaireDraftStatus @default(DRAFT)
+  createdByUserId String                   @db.Uuid
+  updatedByUserId String?                  @db.Uuid
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  study     Study          @relation(fields: [studyId], references: [id])
+  createdBy InternalUser   @relation("QuestionnaireDraftCreatedBy", fields: [createdByUserId], references: [id])
+  updatedBy InternalUser?  @relation("QuestionnaireDraftUpdatedBy", fields: [updatedByUserId], references: [id])
+  versions  QuestionnaireVersion[]
+
+  @@index([studyId, purpose, status])
+  @@map("questionnaire_drafts")
+}
+
+model QuestionnaireVersion {
+  id                   String                     @id @default(uuid()) @db.Uuid
+  questionnaireDraftId String                     @db.Uuid
+  studyId              String                     @db.Uuid
+  versionNumber        Int
+  definitionJson       Json
+  definitionHash       String
+  publishedByUserId    String                     @db.Uuid
+  publishedAt          DateTime                   @default(now())
+  retiredByUserId      String?                    @db.Uuid
+  retiredAt            DateTime?
+  status               QuestionnaireVersionStatus @default(ACTIVE)
+
+  questionnaireDraft QuestionnaireDraft   @relation(fields: [questionnaireDraftId], references: [id])
+  study              Study                @relation(fields: [studyId], references: [id])
+  publishedBy        InternalUser         @relation("QuestionnaireVersionPublishedBy", fields: [publishedByUserId], references: [id])
+  retiredBy          InternalUser?        @relation("QuestionnaireVersionRetiredBy", fields: [retiredByUserId], references: [id])
+  attributeSets      QuestionnaireAttributeSet[]
+  screeningAttempts  ScreeningAttempt[]
+  activitySchedules  ActivitySchedule[]
+  researchResponses  ResearchResponse[]
+  randomizationConfigs AttributeRandomizationConfig[]
+  attributeOrders    ParticipantAttributeOrder[]
+
+  @@unique([questionnaireDraftId, versionNumber])
+  @@unique([studyId, definitionHash])
+  @@index([studyId, status])
+  @@map("questionnaire_versions")
+}
+
+model LibraryItem {
+  id              String            @id @default(uuid()) @db.Uuid
+  studyId         String?           @db.Uuid
+  type            LibraryItemType
+  name            String
+  status          LibraryItemStatus @default(ACTIVE)
+  createdByUserId String            @db.Uuid
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  study      Study?               @relation(fields: [studyId], references: [id])
+  createdBy  InternalUser         @relation("LibraryItemCreatedBy", fields: [createdByUserId], references: [id])
+  revisions  LibraryItemRevision[]
+
+  @@index([studyId, type, status])
+  @@index([createdByUserId])
+  @@map("library_items")
+}
+
+model LibraryItemRevision {
+  id              String   @id @default(uuid()) @db.Uuid
+  libraryItemId   String   @db.Uuid
+  revisionNumber  Int
+  contentJson     Json
+  createdByUserId String   @db.Uuid
+  createdAt       DateTime @default(now())
+
+  libraryItem       LibraryItem                 @relation(fields: [libraryItemId], references: [id])
+  createdBy         InternalUser                @relation("LibraryItemRevisionCreatedBy", fields: [createdByUserId], references: [id])
+  questionnaireUses QuestionnaireAttributeSet[]
+
+  @@unique([libraryItemId, revisionNumber])
+  @@index([createdByUserId])
+  @@map("library_item_revisions")
+}
+
+model QuestionnaireAttributeSet {
+  id                     String  @id @default(uuid()) @db.Uuid
+  questionnaireVersionId String  @db.Uuid
+  blockInstanceKey       String
+  libraryItemRevisionId  String  @db.Uuid
+  sortHint               Int?
+  isRequired             Boolean @default(true)
+
+  questionnaireVersion QuestionnaireVersion @relation(fields: [questionnaireVersionId], references: [id])
+  libraryItemRevision  LibraryItemRevision  @relation(fields: [libraryItemRevisionId], references: [id])
+
+  @@unique([questionnaireVersionId, blockInstanceKey, libraryItemRevisionId])
+  @@index([libraryItemRevisionId])
+  @@map("questionnaire_attribute_sets")
+}
+
+model ScreeningAttempt {
+  id                     String          @id @default(uuid()) @db.Uuid
+  studyParticipantId     String          @db.Uuid
+  fieldUserId            String          @db.Uuid
+  questionnaireVersionId String          @db.Uuid
+  status                 ScreeningStatus @default(STARTED)
+  terminationCode        String?
+  terminationReason      String?
+  nseScore               Int?
+  nseClass               String?
+  startedAt              DateTime        @default(now())
+  completedAt            DateTime?
+
+  studyParticipant     StudyParticipant    @relation(fields: [studyParticipantId], references: [id])
+  fieldUser            InternalUser        @relation("ScreeningAttemptFieldUser", fields: [fieldUserId], references: [id])
+  questionnaireVersion QuestionnaireVersion @relation(fields: [questionnaireVersionId], references: [id])
+  answers              ScreeningAnswer[]
+
+  @@index([studyParticipantId, status])
+  @@index([fieldUserId, startedAt])
+  @@index([questionnaireVersionId])
+  @@map("screening_attempts")
+}
+
+model ScreeningAnswer {
+  id                 String   @id @default(uuid()) @db.Uuid
+  screeningAttemptId String   @db.Uuid
+  questionId         String
+  answerJson         Json
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  screeningAttempt ScreeningAttempt @relation(fields: [screeningAttemptId], references: [id])
+
+  @@unique([screeningAttemptId, questionId])
+  @@map("screening_answers")
+}
+
+model QuotaDefinition {
+  id               String             @id @default(uuid()) @db.Uuid
+  studyId          String             @db.Uuid
+  name             String
+  criteriaJson     Json
+  countingStage    QuotaCountingStage
+  targetCount      Int
+  warningThreshold Int?
+  status           QuotaStatus        @default(ACTIVE)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  study       Study             @relation(fields: [studyId], references: [id])
+  evaluations QuotaEvaluation[]
+
+  @@unique([studyId, name])
+  @@index([studyId, countingStage, status])
+  @@map("quota_definitions")
+}
+
+model QuotaEvaluation {
+  id                       String             @id @default(uuid()) @db.Uuid
+  studyParticipantId       String             @db.Uuid
+  quotaDefinitionId        String             @db.Uuid
+  matched                  Boolean
+  countingStage            QuotaCountingStage
+  currentCountAtEvaluation Int
+  isFull                   Boolean
+  warningShown             Boolean
+  blocksInterview          Boolean            @default(false)
+  evaluatedAt              DateTime           @default(now())
+
+  studyParticipant StudyParticipant @relation(fields: [studyParticipantId], references: [id])
+  quotaDefinition  QuotaDefinition  @relation(fields: [quotaDefinitionId], references: [id])
+
+  @@index([studyParticipantId, evaluatedAt])
+  @@index([quotaDefinitionId, countingStage])
+  @@map("quota_evaluations")
+}
+
+model ParticipantRotationAssignment {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  studyParticipantId String                 @unique @db.Uuid
+  rotationPlanId     String                 @db.Uuid
+  rotationCode       String
+  assignmentMode     RotationAssignmentMode @default(MANUAL_COVER_CODE)
+  assignedByUserId   String                 @db.Uuid
+  assignedAt         DateTime               @default(now())
+  changedAt          DateTime?
+
+  studyParticipant StudyParticipant      @relation(fields: [studyParticipantId], references: [id])
+  rotationPlan     RotationPlan          @relation(fields: [rotationPlanId], references: [id])
+  assignedBy       InternalUser          @relation("ParticipantRotationAssignedBy", fields: [assignedByUserId], references: [id])
+  arms             ParticipantArmAssignment[]
+
+  @@index([rotationPlanId])
+  @@index([assignedByUserId])
+  @@map("participant_rotation_assignments")
+}
+
+model ParticipantArmAssignment {
+  id                              String   @id @default(uuid()) @db.Uuid
+  participantRotationAssignmentId String   @db.Uuid
+  studyParticipantId              String   @db.Uuid
+  studyArmId                      String   @db.Uuid
+  studyProductId                  String   @db.Uuid
+  applicationOrder                Int
+  participantVisibleLabel         String
+  createdAt                       DateTime @default(now())
+
+  participantRotationAssignment ParticipantRotationAssignment @relation(fields: [participantRotationAssignmentId], references: [id])
+  studyParticipant              StudyParticipant              @relation(fields: [studyParticipantId], references: [id])
+  studyArm                      StudyArm                      @relation(fields: [studyArmId], references: [id])
+  studyProduct                  StudyProduct                  @relation(fields: [studyProductId], references: [id])
+
+  @@unique([participantRotationAssignmentId, studyArmId], map: "participant_arm_assignment_rotation_arm_unique")
+  @@unique([participantRotationAssignmentId, applicationOrder], map: "participant_arm_assignment_rotation_order_unique")
+  @@unique([studyParticipantId, studyArmId], map: "participant_arm_assignment_participant_arm_unique")
+  @@index([studyProductId])
+  @@map("participant_arm_assignments")
+}
+
+model ActivitySchedule {
+  id                     String                 @id @default(uuid()) @db.Uuid
+  studyId                String                 @db.Uuid
+  type                   ActivityType
+  name                   String
+  anchorEvent            ActivityAnchorEvent    @default(APPLICATION_STARTED)
+  offsetMinutes          Int
+  windowStartsMinutes    Int
+  windowEndsMinutes      Int
+  questionnaireVersionId String?                @db.Uuid
+  recurrenceJson         Json?
+  sortOrder              Int
+  status                 ActivityScheduleStatus @default(ACTIVE)
+
+  study                Study                 @relation(fields: [studyId], references: [id])
+  questionnaireVersion QuestionnaireVersion? @relation(fields: [questionnaireVersionId], references: [id])
+  participantActivities ParticipantActivity[]
+
+  @@unique([studyId, type, sortOrder])
+  @@index([studyId, status])
+  @@index([questionnaireVersionId])
+  @@map("activity_schedules")
+}
+
+model ParticipantActivity {
+  id                 String                    @id @default(uuid()) @db.Uuid
+  studyParticipantId String                    @db.Uuid
+  activityScheduleId String                    @db.Uuid
+  scheduledAt        DateTime
+  availableFrom      DateTime
+  availableUntil     DateTime
+  status             ParticipantActivityStatus @default(PENDING)
+  actualStartedAt    DateTime?
+  actualCompletedAt  DateTime?
+  lastSavedAt        DateTime?
+  reopenedByUserId   String?                   @db.Uuid
+  reopenedAt         DateTime?
+  reopenReason       String?
+
+  studyParticipant StudyParticipant @relation(fields: [studyParticipantId], references: [id])
+  activitySchedule ActivitySchedule @relation(fields: [activityScheduleId], references: [id])
+  reopenedBy       InternalUser?    @relation("ParticipantActivityReopenedBy", fields: [reopenedByUserId], references: [id])
+  reminders        ReminderLog[]
+  responses        ResearchResponse[]
+  mediaEvidence    MediaEvidencePlaceholder?
+
+  @@unique([studyParticipantId, activityScheduleId])
+  @@index([studyParticipantId, status])
+  @@index([scheduledAt])
+  @@map("participant_activities")
+}
+
+model ReminderLog {
+  id                    String         @id @default(uuid()) @db.Uuid
+  participantActivityId String         @db.Uuid
+  channel               ReminderChannel
+  status                ReminderStatus @default(PLANNED)
+  scheduledFor          DateTime?
+  sentAt                DateTime?
+  metadataJson          Json?
+
+  participantActivity ParticipantActivity @relation(fields: [participantActivityId], references: [id])
+
+  @@index([participantActivityId, scheduledFor])
+  @@map("reminder_logs")
+}
+
+model ResearchResponse {
+  id                     String                      @id @default(uuid()) @db.Uuid
+  participantActivityId  String                      @db.Uuid
+  questionnaireVersionId String                      @db.Uuid
+  questionId             String
+  blockInstanceKey       String?
+  contextType            ResearchResponseContextType @default(NONE)
+  contextProductId       String?                     @db.Uuid
+  contextArmId           String?                     @db.Uuid
+  answerJson             Json
+  validationStatus       ResponseValidationStatus    @default(VALID)
+  createdAt              DateTime                    @default(now())
+  updatedAt              DateTime                    @updatedAt
+
+  participantActivity  ParticipantActivity  @relation(fields: [participantActivityId], references: [id])
+  questionnaireVersion QuestionnaireVersion @relation(fields: [questionnaireVersionId], references: [id])
+  contextProduct       StudyProduct?        @relation("ResearchResponseProductContext", fields: [contextProductId], references: [id])
+  contextArm           StudyArm?            @relation("ResearchResponseArmContext", fields: [contextArmId], references: [id])
+
+  @@index([participantActivityId, questionnaireVersionId])
+  @@index([questionId])
+  @@index([contextType, contextProductId, contextArmId])
+  @@map("research_responses")
+}
+
+model AttributeRandomizationConfig {
+  id                     String  @id @default(uuid()) @db.Uuid
+  questionnaireVersionId String  @db.Uuid
+  blockInstanceKey       String
+  shareOrderAcrossProducts Boolean @default(true)
+  groupSize              Int
+  finalQuestionEnabled   Boolean @default(true)
+  finalQuestionText      String
+
+  questionnaireVersion QuestionnaireVersion @relation(fields: [questionnaireVersionId], references: [id])
+
+  @@unique([questionnaireVersionId, blockInstanceKey])
+  @@map("attribute_randomization_configs")
+}
+
+model ParticipantAttributeOrder {
+  id                     String                    @id @default(uuid()) @db.Uuid
+  studyParticipantId     String                    @db.Uuid
+  questionnaireVersionId String                    @db.Uuid
+  blockInstanceKey       String
+  orderKey               String
+  contextType            AttributeOrderContextType
+  contextProductId       String?                   @db.Uuid
+  contextArmId           String?                   @db.Uuid
+  seed                   String
+  orderedAttributeRevisionIds Json
+  groupedAttributeRevisionIds Json
+  createdAt              DateTime                  @default(now())
+
+  studyParticipant     StudyParticipant    @relation(fields: [studyParticipantId], references: [id])
+  questionnaireVersion QuestionnaireVersion @relation(fields: [questionnaireVersionId], references: [id])
+  contextProduct       StudyProduct?       @relation("AttributeOrderProductContext", fields: [contextProductId], references: [id])
+  contextArm           StudyArm?           @relation("AttributeOrderArmContext", fields: [contextArmId], references: [id])
+
+  @@unique([studyParticipantId, questionnaireVersionId, blockInstanceKey, orderKey])
+  @@index([questionnaireVersionId, blockInstanceKey])
+  @@index([contextType, contextProductId, contextArmId])
+  @@map("participant_attribute_orders")
+}
+
+model MediaEvidencePlaceholder {
+  id                    String                @id @default(uuid()) @db.Uuid
+  participantActivityId String                @unique @db.Uuid
+  type                  MediaEvidenceType     @default(VIDEO)
+  status                MediaEvidenceStatus   @default(EXPECTED)
+  privateStorageKey     String?
+  consentStatus         MediaConsentStatus    @default(NOT_REQUESTED)
+  consentCapturedAt     DateTime?
+  reviewStatus          MediaReviewStatus     @default(NOT_REVIEWED)
+  reviewedByUserId      String?               @db.Uuid
+  reviewedAt            DateTime?
+  capturedAt            DateTime?
+  retentionUntil        DateTime?
+  retentionPolicyStatus RetentionPolicyStatus @default(PENDING)
+  metadataJson          Json?
+
+  participantActivity ParticipantActivity @relation(fields: [participantActivityId], references: [id])
+  reviewedBy          InternalUser?       @relation("MediaEvidenceReviewedBy", fields: [reviewedByUserId], references: [id])
+
+  @@index([status])
+  @@index([reviewStatus])
+  @@map("media_evidence_placeholders")
+}
+
+model ExportJob {
+  id                     String            @id @default(uuid()) @db.Uuid
+  studyId                String            @db.Uuid
+  requestedByUserId      String            @db.Uuid
+  type                   ExportJobType
+  format                 ExportFormat
+  privacyMode            ExportPrivacyMode
+  includedPiiFields      Json?
+  anonymizationRulesJson Json?
+  status                 ExportJobStatus   @default(QUEUED)
+  createdAt              DateTime          @default(now())
+  completedAt            DateTime?
+  metadataJson           Json?
+
+  study       Study        @relation(fields: [studyId], references: [id])
+  requestedBy InternalUser @relation("ExportJobRequestedBy", fields: [requestedByUserId], references: [id])
+
+  @@index([studyId, type, status])
+  @@index([requestedByUserId, createdAt])
+  @@map("export_jobs")
+}
+
+model AuditLog {
+  id          String      @id @default(uuid()) @db.Uuid
+  actorUserId String?     @db.Uuid
+  entityType  String
+  entityId    String
+  action      AuditAction
+  beforeJson  Json?
+  afterJson   Json?
+  reason      String?
+  createdAt   DateTime    @default(now())
+
+  actor InternalUser? @relation("AuditLogActor", fields: [actorUserId], references: [id])
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
