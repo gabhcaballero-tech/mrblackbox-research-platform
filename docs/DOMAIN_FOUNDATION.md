@@ -6,7 +6,7 @@
 - `participants`: contratos y validaciones para separar `ParticipantProfile` de `StudyParticipant`.
 - `screening`: definiciones de filtros, reglas de continuar o terminar, puntajes y clasificacion por rangos.
 - `quotas`: definicion y evaluacion de cuotas por criterios y etapa de conteo.
-- `comparative-rotation`: validacion de rotacion manual de dos brazos para V1.
+- `comparative-rotation`: validacion y configuracion administrativa de productos, brazos y rotaciones manuales de dos brazos para V1.
 - `activities`: calculo de actividades programadas desde `applicationStartedAt` y reglas de correccion de hora.
 - `randomization`: aleatorizacion determinista de atributos por semilla, contexto y configuracion de orden compartido o independiente.
 - `questionnaire-engine`: esquema minimo de snapshot publicado e inmutable.
@@ -24,6 +24,7 @@
 - Las cuotas generan advertencias, pero nunca bloquean la entrevista en V1.
 - La rotacion V1 acepta solo `manual_cover_code`; la asignacion automatica queda fuera.
 - Las etiquetas visibles para participante se validan separadas de las claves reales de producto.
+- La configuracion comparativa V1 usa productos sensibles, brazos canonicos `left`/`right` y planes manuales `MANUAL`.
 - Las actividades usan offsets y ventanas configurables; los offsets de prueba cubren 15, 120, 240 y 480 minutos.
 - Las actividades recurrentes usan `occurrenceKey` para permitir varias instancias del mismo schedule.
 - La correccion de hora siempre devuelve una decision explicita e indica si requiere auditoria.
@@ -46,6 +47,8 @@
 - Texto obligatorio cuando la pregunta final de atributos se responde con `yes`.
 - Snapshot publicado con tipos V1: respuesta unica, multiple, texto, numero, si/no, escala, matriz, opcion Otro condicional y bloque de atributos.
 - Estudios V1 se crean siempre en `DRAFT`, con `code` normalizado y unico, y solo pueden editar `name`, `code` y `timeZoneIana` mientras sigan en borrador.
+- Productos, brazos y rotaciones solo pueden configurarse mientras el estudio siga en `DRAFT`.
+- El participante solo recibe etiquetas generadas por servidor: `Primera fragancia` y `Segunda fragancia`.
 - Actividades recurrentes de video pueden materializar `DAY_1`, `DAY_2` y `DAY_3`.
 - `responseKey` se construye desde pregunta, bloque y contexto; no debe incluir PII.
 - La consistencia de rotacion valida que plan, participante, brazos y productos pertenezcan al mismo estudio antes de persistir.
@@ -64,7 +67,7 @@
 ## No implementado todavia
 
 - Cambio de estado de estudios.
-- Productos, brazos, cuotas, rotaciones y cuestionarios conectados a estudios.
+- Participantes, cuotas, cuestionarios y exportaciones conectados a estudios.
 - Servicios externos, correo, WhatsApp, SMS, video, carga de archivos o despliegue.
 - Formularios finales, dashboards o editor visual libre.
 - Asignacion automatica de rotacion.

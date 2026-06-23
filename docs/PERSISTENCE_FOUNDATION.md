@@ -70,6 +70,7 @@ El esquema prepara PostgreSQL con Prisma para:
 - `ResearchResponse.responseKey` debe construirse deterministamente con pregunta, bloque y contexto; no debe contener PII.
 - La consistencia de estudio para rotacion manual queda como regla obligatoria de aplicacion antes de persistir, no como trigger ni SQL manual.
 - `Study.code` es unico globalmente y se normaliza en la aplicacion antes de persistir.
+- La configuracion comparativa V1 no agrega migracion nueva; usa `StudyProduct`, `StudyArm`, `RotationPlan` y `RotationPlanArm` existentes.
 
 ## Restricciones e indices relevantes
 
@@ -141,6 +142,19 @@ Resumen:
 - queda pendiente verificar manualmente que `studies` este vacia antes de aplicarla.
 
 No se aplico a Supabase ni a ninguna base de datos.
+
+## Configuracion comparativa V1
+
+No se creo migracion nueva para productos, brazos y rotaciones manuales.
+
+Se usan restricciones existentes:
+
+- `StudyProduct` mantiene `@@unique([studyId, internalCode])`.
+- `StudyArm` mantiene `@@unique([studyId, code])` y `@@unique([studyId, sortOrder])`.
+- `RotationPlan` mantiene `@@unique([studyId, rotationCode])`.
+- `RotationPlanArm` mantiene unicidad por brazo y orden dentro de un plan.
+
+El retiro de rotaciones usa `RotationPlan.status = INACTIVE`; productos y brazos solo se eliminan fisicamente en `DRAFT` si no tienen referencias.
 
 ## Validaciones ejecutadas
 

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { StudyListItem } from "@/modules/studies/repository";
 import { StudyEmptyState } from "./StudyEmptyState";
 import { StudyEditForm } from "./StudyEditForm";
@@ -16,7 +17,10 @@ function formatDate(value: Date) {
 }
 
 function StudyStatusBadge({ status }: { status: StudyListItem["status"] }) {
-  const tone = status === "DRAFT" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-zinc-200 bg-zinc-50 text-zinc-700";
+  const tone =
+    status === "DRAFT"
+      ? "border-amber-200 bg-amber-50 text-amber-800"
+      : "border-zinc-200 bg-zinc-50 text-zinc-700";
 
   return (
     <span className={`inline-flex w-fit rounded-md border px-2.5 py-1 text-xs font-semibold ${tone}`}>
@@ -35,19 +39,23 @@ export function StudyList({ studies }: StudyListProps) {
       {studies.map((study) => (
         <article className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm" key={study.id}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-xl font-semibold text-zinc-950">{study.name}</h2>
+                <h2 className="min-w-0 break-words text-xl font-semibold text-zinc-950">
+                  {study.name}
+                </h2>
                 <StudyStatusBadge status={study.status} />
               </div>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
-                <div>
+                <div className="min-w-0">
                   <dt className="font-medium text-zinc-500">Codigo</dt>
-                  <dd className="mt-1 font-semibold text-zinc-900">{study.code}</dd>
+                  <dd className="mt-1 break-all font-mono font-semibold text-zinc-900">
+                    {study.code}
+                  </dd>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <dt className="font-medium text-zinc-500">Zona horaria</dt>
-                  <dd className="mt-1 text-zinc-900">{study.timeZoneIana}</dd>
+                  <dd className="mt-1 break-words text-zinc-900">{study.timeZoneIana}</dd>
                 </div>
                 <div>
                   <dt className="font-medium text-zinc-500">Creado</dt>
@@ -65,6 +73,12 @@ export function StudyList({ studies }: StudyListProps) {
                 </div>
               </dl>
             </div>
+            <Link
+              className="inline-flex w-fit shrink-0 rounded-md border border-teal-200 bg-white px-4 py-2 text-sm font-semibold text-teal-700 transition hover:border-teal-300 hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+              href={`/admin/studies/${study.id}`}
+            >
+              Configurar
+            </Link>
           </div>
 
           {study.status === "DRAFT" ? (

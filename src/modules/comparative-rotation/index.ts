@@ -15,9 +15,12 @@ export type {
   ParticipantArmAssignment,
   RotationArmCode
 } from "./schemas";
+export * from "./admin-repository";
+export * from "./admin-service";
+export * from "./admin-validation";
 
 export const comparativeRotationModule = {
   key: "comparative-rotation",
-  status: "planned",
-  description: "Boundary for manual two-arm comparative rotation assignments."
+  status: "ready",
+  description: "Manual two-arm comparative rotation configuration and assignment rules."
 } as const;
