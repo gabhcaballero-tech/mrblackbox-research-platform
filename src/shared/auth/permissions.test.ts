@@ -30,4 +30,11 @@ describe("role capabilities", () => {
     expect(hasCapability("SUPERVISOR", "field:access")).toBe(true);
     expect(hasCapability("SUPERVISOR", "product-real:read")).toBe(false);
   });
+
+  it("allows only ADMIN and SUPERVISOR to review screening attempts", () => {
+    expect(hasCapability("ADMIN", "screening:review")).toBe(true);
+    expect(hasCapability("SUPERVISOR", "screening:review")).toBe(true);
+    expect(hasCapability("INTERVIEWER", "screening:review")).toBe(false);
+    expect(hasCapability("ANALYST", "screening:review")).toBe(false);
+  });
 });

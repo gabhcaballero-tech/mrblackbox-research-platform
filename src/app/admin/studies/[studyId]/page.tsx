@@ -83,6 +83,12 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
           >
             {UI_LABELS.screener.screener}
           </Link>
+          <Link
+            className="text-sm font-semibold text-zinc-700 transition hover:text-zinc-950"
+            href={`/admin/studies/${studyId}/screening-attempts`}
+          >
+            Ver intentos de screener
+          </Link>
         </div>
       </div>
 

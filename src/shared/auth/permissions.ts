@@ -10,6 +10,7 @@ export const CAPABILITIES = [
   "admin:access",
   "field:access",
   "screening:apply",
+  "screening:review",
   "participants:create",
   "participants:pii:read",
   "application-time:record",
@@ -33,6 +34,7 @@ export const ROLE_CAPABILITIES: Record<InternalUserRole, ReadonlySet<Capability>
   SUPERVISOR: new Set<Capability>([
     "field:access",
     "screening:apply",
+    "screening:review",
     "participants:create",
     "participants:pii:read",
     "application-time:record",
