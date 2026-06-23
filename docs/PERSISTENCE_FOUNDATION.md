@@ -11,13 +11,17 @@ Instaladas con aprobacion:
 - `prisma@7.8.0`
 - `@types/pg@8.20.0`
 
-No se instalaron paquetes de Supabase.
+Instaladas posteriormente para la fundacion de autenticacion interna:
+
+- `@supabase/ssr@0.12.0`
+- `@supabase/supabase-js@2.108.2`
 
 ## Archivos creados o modificados
 
 - `prisma/schema.prisma`
 - `prisma.config.ts`
 - `prisma/migrations/20260622213013_initial_persistence_foundation/migration.sql`
+- `prisma/migrations/20260622220438_add_internal_user_auth_user_id/migration.sql`
 - `prisma/migrations/migration_lock.toml`
 - `src/shared/db/client.ts`
 - `src/shared/db/index.ts`
@@ -30,7 +34,7 @@ No se instalaron paquetes de Supabase.
 
 El esquema prepara PostgreSQL con Prisma para:
 
-- Usuarios internos: `InternalUser` con roles V1 `ADMIN`, `SUPERVISOR`, `INTERVIEWER` y `ANALYST`.
+- Usuarios internos: `InternalUser` con roles V1 `ADMIN`, `SUPERVISOR`, `INTERVIEWER` y `ANALYST`, mas `authUserId` nullable/unico para vincular Supabase Auth.
 - Estudios: `Study` con zona horaria IANA, estado y relacion con productos, brazos, cuestionarios, cuotas, actividades y exportaciones.
 - Productos y brazos: `StudyProduct` guarda clave interna, etiqueta visible y nombre real; `StudyArm` permite brazo izquierdo, derecho y extension futura.
 - Rotacion: `RotationPlan` y `RotationPlanArm` definen codigos manuales; `ParticipantRotationAssignment` y `ParticipantArmAssignment` guardan la asignacion explicita por participacion.
@@ -52,7 +56,7 @@ El esquema prepara PostgreSQL con Prisma para:
 ## Decisiones de modelado
 
 - Prisma 7 usa `prisma.config.ts` para la URL del datasource; `schema.prisma` declara solo `provider = "postgresql"`.
-- `prisma.config.ts` usa `process.env.DATABASE_URL` cuando exista y un placeholder no real cuando no exista, para permitir `prisma validate` sin leer `.env` ni conectar a una base.
+- `prisma.config.ts` usa `env("DATABASE_URL")` desde `prisma/config` sin fallback ni URL ficticia. Debe fallar claramente si falta `DATABASE_URL`.
 - `.env.example` incluye solo un placeholder de `DATABASE_URL`; no se uso ni se leyo ningun `.env` real.
 - El cliente en `src/shared/db/client.ts` se preparo como fabrica lazy para no requerir `prisma generate` durante esta etapa.
 - La rotacion de dos brazos se modela con asignaciones por brazo, no con un unico `assignedArmId`.
@@ -106,6 +110,20 @@ Estado:
 - Pendiente de revision humana.
 - Pendiente de `prisma generate` en una fase aprobada.
 - Pendiente de despliegue controlado contra una base aprobada.
+
+## Migracion aditiva de autenticacion interna
+
+Migracion creada y no aplicada:
+
+- `20260622220438_add_internal_user_auth_user_id`
+
+Resumen:
+
+- agrega `internal_users.authUserId` como `UUID` nullable;
+- crea indice unico `internal_users_authUserId_key`;
+- permite vincular manualmente `InternalUser` con Supabase Auth sin crear privilegios automaticos.
+
+No se aplico a Supabase ni a ninguna base de datos.
 
 ## Validaciones ejecutadas
 

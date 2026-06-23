@@ -4,7 +4,7 @@ Base tecnica inicial para una plataforma web de investigacion de mercados. Esta 
 
 ## Proposito
 
-El repositorio contiene una aplicacion Next.js con App Router, React, TypeScript estricto, Tailwind CSS, Zod, Vitest y Playwright configurado. La base esta pensada para crecer por modulos sin activar aun base de datos, autenticacion, cuestionarios, filtros, cuotas, rotaciones, videos ni servicios externos.
+El repositorio contiene una aplicacion Next.js con App Router, React, TypeScript estricto, Tailwind CSS, Zod, Vitest, Playwright configurado, Prisma preparado para PostgreSQL y fundacion de autenticacion interna con Supabase Auth. La base esta pensada para crecer por modulos sin activar aun cuestionarios, filtros, cuotas, rotaciones, videos ni servicios externos.
 
 ## Requisitos locales
 
@@ -61,6 +61,7 @@ src/
     audit/
     media-evidence/
   shared/
+    auth/
     ui/
     validation/
     errors/
@@ -68,6 +69,10 @@ src/
     utils/
 ```
 
+## Autenticacion interna
+
+La fundacion de autenticacion usa Supabase Auth para identidad y cookies SSR, mientras `InternalUser` conserva rol, estado y permisos de aplicacion. `/p/[token]` permanece publico. El primer Admin debe crearse manualmente siguiendo `docs/FIRST_ADMIN_RUNBOOK.md`.
+
 ## Fuera de esta etapa
 
-La base de datos, autenticacion, cuentas de usuario, cuestionarios, filtros, NSE, cuotas, rotaciones, sesiones funcionales, evidencia de video y servicios externos se agregaran en fases posteriores.
+La aplicacion aun no implementa cuestionarios, filtros, NSE, cuotas, rotaciones funcionales, evidencia de video, servicios externos ni flujos administrativos finales. Las migraciones y el alta real de usuarios internos deben ejecutarse de forma controlada en fases posteriores.

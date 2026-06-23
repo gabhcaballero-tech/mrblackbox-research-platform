@@ -11,6 +11,7 @@
 - Playwright configurado para pruebas end-to-end futuras sin descargar navegadores ni agregar flujos complejos.
 - Estructura modular inicial bajo `src/modules/` para separar dominios futuros.
 - Componentes UI reutilizables bajo `src/shared/ui/`.
+- Fases posteriores agregaron Prisma para persistencia preparada y Supabase Auth SSR para acceso interno. Ver `docs/PERSISTENCE_FOUNDATION.md` y `docs/AUTHORIZATION_FOUNDATION.md`.
 
 ## Comandos ejecutados
 
@@ -109,11 +110,16 @@ Dependencias de desarrollo:
 - `src/shared/types/*`
 - `src/shared/utils/*`
 - `src/modules/*/index.ts`
+- `prisma/schema.prisma`
+- `src/shared/auth/*`
+- `proxy.ts`
+- `docs/AUTHORIZATION_FOUNDATION.md`
+- `docs/FIRST_ADMIN_RUNBOOK.md`
 
 ## Fuera de esta etapa
 
-- PostgreSQL, Prisma o cualquier conexion a base de datos.
-- Autenticacion real o cuentas de usuario.
+- Conexion activa a una base de datos remota, migraciones aplicadas o seeds.
+- Registro publico, administracion real de usuarios o privilegios automaticos.
 - Formularios de cuestionarios.
 - Filtros, NSE, cuotas, rotaciones o sesiones funcionales.
 - Servicios externos, correo, SMS, WhatsApp, almacenamiento de video o despliegue.
