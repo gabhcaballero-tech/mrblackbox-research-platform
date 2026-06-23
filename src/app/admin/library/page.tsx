@@ -47,7 +47,7 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
   );
 }
 
-function LibraryFilters({ filters }: { filters: Record<string, string | string[] | undefined> }) {
+export function LibraryFilters({ filters }: { filters: Record<string, string | string[] | undefined> }) {
   const valueOf = (key: string) => {
     const value = filters[key];
     return Array.isArray(value) ? value[0] ?? "" : value ?? "";
@@ -57,7 +57,12 @@ function LibraryFilters({ filters }: { filters: Record<string, string | string[]
     <form className="mb-6 grid gap-3 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm md:grid-cols-5">
       <label className={labelClass}>
         {UI_LABELS.library.search}
-        <input className={inputClass} defaultValue={valueOf("query")} name="query" />
+        <input
+          className={inputClass}
+          defaultValue={valueOf("query")}
+          name="query"
+          placeholder={UI_LABELS.library.searchPlaceholder}
+        />
       </label>
       <label className={labelClass}>
         {UI_LABELS.library.type}
@@ -77,11 +82,21 @@ function LibraryFilters({ filters }: { filters: Record<string, string | string[]
       </label>
       <label className={labelClass}>
         {UI_LABELS.library.category}
-        <input className={inputClass} defaultValue={valueOf("category")} name="category" />
+        <input
+          className={inputClass}
+          defaultValue={valueOf("category")}
+          name="category"
+          placeholder={UI_LABELS.library.categorySearchPlaceholder}
+        />
       </label>
       <label className={labelClass}>
         {UI_LABELS.library.tags}
-        <input className={inputClass} defaultValue={valueOf("tag")} name="tag" />
+        <input
+          className={inputClass}
+          defaultValue={valueOf("tag")}
+          name="tag"
+          placeholder={UI_LABELS.library.tagsSearchPlaceholder}
+        />
       </label>
       <div className="md:col-span-5">
         <button className={secondaryButtonClass} type="submit">

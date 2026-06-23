@@ -11,7 +11,8 @@ import {
   insertLibraryRevisionIntoScreenerForAdmin,
   listLibraryItemsForAdmin,
   saveBlockFromScreenerForAdmin,
-  saveQuestionFromScreenerForAdmin
+  saveQuestionFromScreenerForAdmin,
+  updateLibraryItemMetadataForAdmin
 } from "./service";
 import type {
   LibraryItemRecord,
@@ -302,6 +303,23 @@ function createLibraryMemory(
       }
 
       return 0;
+    },
+    async updateItemMetadata(input) {
+      const item = items.find((entry) => entry.id === input.itemId);
+
+      if (!item || item.status !== "ACTIVE") {
+        return null;
+      }
+
+      item.category = input.category ?? null;
+      item.description = input.description ?? null;
+      item.name = input.name;
+      item.scope = input.scope;
+      item.studyId = input.scope === "STUDY_SPECIFIC" ? item.studyId : null;
+      item.tags = input.tags;
+      item.updatedAt = new Date("2026-01-04T00:00:00.000Z");
+
+      return item;
     }
   };
 
@@ -482,6 +500,255 @@ describe("question-library", () => {
     expect(library.items[0]?.revisions[1]?.status).toBe("ACTIVE");
   });
 
+  it("edita metadatos sin crear una revision nueva", async () => {
+    const content = buildQuestionLibraryContent({
+      metadata: { isGenericContentConfirmed: false, tags: [] },
+      question: baseDefinition().questions[0]!
+    });
+    const library = createLibraryMemory();
+    const created = await library.repository.createItemWithRevision({
+      category: "Base",
+      contentHash: "hash-1",
+      contentJson: content,
+      createdByUserId: admin.id,
+      description: "Original",
+      name: "Genero",
+      scope: "STUDY_SPECIFIC",
+      studyId: "study-1",
+      tags: [],
+      type: "QUESTION"
+    });
+
+    const result = await updateLibraryItemMetadataForAdmin({
+      actor: admin,
+      formInput: {
+        category: "Demograficos",
+        confirmGeneric: false,
+        description: "Nueva descripcion",
+        name: "Genero editable",
+        scope: "STUDY_SPECIFIC",
+        tags: "perfil, screener"
+      },
+      itemId: created.item.id,
+      repository: library.repository
+    });
+
+    expect(result.ok).toBe(true);
+    expect(library.items[0]?.name).toBe("Genero editable");
+    expect(library.items[0]?.revisions).toHaveLength(1);
+    expect(library.items[0]?.revisions[0]?.contentHash).toBe("hash-1");
+  });
+
+  it("requiere confirmacion al cambiar metadatos a generico", async () => {
+    const content = buildQuestionLibraryContent({
+      metadata: { isGenericContentConfirmed: false, tags: [] },
+      question: baseDefinition().questions[0]!
+    });
+    const library = createLibraryMemory();
+    const created = await library.repository.createItemWithRevision({
+      category: "Base",
+      contentHash: "hash-1",
+      contentJson: content,
+      createdByUserId: admin.id,
+      description: "Original",
+      name: "Genero",
+      scope: "STUDY_SPECIFIC",
+      studyId: "study-1",
+      tags: [],
+      type: "QUESTION"
+    });
+
+    const result = await updateLibraryItemMetadataForAdmin({
+      actor: admin,
+      formInput: {
+        category: "Base",
+        confirmGeneric: false,
+        description: "Original",
+        name: "Genero",
+        scope: "GENERIC",
+        tags: ""
+      },
+      itemId: created.item.id,
+      repository: library.repository
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("crea una revision de pregunta y conserva opciones y acciones", async () => {
+    const originalContent = buildQuestionLibraryContent({
+      metadata: { isGenericContentConfirmed: false, tags: [] },
+      question: baseDefinition().questions[0]!
+    });
+    const library = createLibraryMemory();
+    const created = await library.repository.createItemWithRevision({
+      category: "Base",
+      contentHash: "hash-1",
+      contentJson: originalContent,
+      createdByUserId: admin.id,
+      description: "Original",
+      name: "Genero",
+      scope: "STUDY_SPECIFIC",
+      studyId: "study-1",
+      tags: [],
+      type: "QUESTION"
+    });
+    const nextContent = buildQuestionLibraryContent({
+      metadata: { isGenericContentConfirmed: false, tags: [] },
+      question: { ...baseDefinition().questions[0]!, text: "Genero actualizado" }
+    });
+
+    const result = await createLibraryRevisionForAdmin({
+      actor: admin,
+      content: nextContent,
+      libraryItemId: created.item.id,
+      repository: library.repository
+    });
+
+    expect(result.ok).toBe(true);
+    expect(library.items[0]?.revisions[0]?.status).toBe("SUPERSEDED");
+    expect(library.items[0]?.revisions[1]?.status).toBe("ACTIVE");
+    const oldContent = library.items[0]?.revisions[0]?.contentJson as LibraryContent;
+    const activeContent = library.items[0]?.revisions[1]?.contentJson as LibraryContent;
+    expect(oldContent.kind === "QUESTION" ? oldContent.question.text : "").toBe("Genero");
+    expect(
+      activeContent.kind === "QUESTION" && "options" in activeContent.question
+        ? activeContent.question.options[1]?.actions[0]?.type
+        : ""
+    ).toBe("TERMINATE");
+  });
+
+  it("crea una revision de bloque y rechaza reglas rotas", async () => {
+    const originalContent = buildBlockLibraryContent({
+      definition: baseDefinition(),
+      metadata: { isGenericContentConfirmed: false, tags: [] },
+      questionIds: ["GENERO", "EDAD"]
+    });
+    const library = createLibraryMemory();
+    const created = await library.repository.createItemWithRevision({
+      category: "Base",
+      contentHash: "hash-1",
+      contentJson: originalContent,
+      createdByUserId: admin.id,
+      description: "Original",
+      name: "Bloque",
+      scope: "STUDY_SPECIFIC",
+      studyId: "study-1",
+      tags: [],
+      type: "BLOCK_TEMPLATE"
+    });
+    const nextContent = buildBlockLibraryContent({
+      definition: { ...baseDefinition(), title: "Filtro actualizado" },
+      metadata: { isGenericContentConfirmed: false, tags: [] },
+      questionIds: ["GENERO", "EDAD"]
+    });
+    const createdRevision = await createLibraryRevisionForAdmin({
+      actor: admin,
+      content: nextContent,
+      libraryItemId: created.item.id,
+      repository: library.repository
+    });
+
+    const brokenRevision = await createLibraryRevisionForAdmin({
+      actor: admin,
+      content: {
+        ...nextContent,
+        rules: [
+          {
+            ...nextContent.rules[0]!,
+            condition: {
+              max: 10,
+              min: 1,
+              questionId: "NO_EXISTE",
+              type: "NUMBER_RANGE"
+            }
+          }
+        ]
+      },
+      libraryItemId: created.item.id,
+      repository: library.repository
+    });
+
+    expect(createdRevision.ok).toBe(true);
+    expect(brokenRevision.ok).toBe(false);
+    expect(library.items[0]?.revisions[0]?.status).toBe("SUPERSEDED");
+  });
+
+  it("deniega no ADMIN y elementos retirados al crear revision", async () => {
+    const content = buildQuestionLibraryContent({
+      metadata: { isGenericContentConfirmed: false, tags: [] },
+      question: baseDefinition().questions[0]!
+    });
+    const library = createLibraryMemory();
+    const created = await library.repository.createItemWithRevision({
+      category: "Base",
+      contentHash: "hash-1",
+      contentJson: content,
+      createdByUserId: admin.id,
+      description: "Original",
+      name: "Genero",
+      scope: "STUDY_SPECIFIC",
+      studyId: "study-1",
+      tags: [],
+      type: "QUESTION"
+    });
+
+    const denied = await createLibraryRevisionForAdmin({
+      actor: analyst,
+      content,
+      libraryItemId: created.item.id,
+      repository: library.repository
+    });
+    library.items[0]!.status = "INACTIVE";
+    const retired = await createLibraryRevisionForAdmin({
+      actor: admin,
+      content,
+      libraryItemId: created.item.id,
+      repository: library.repository
+    });
+
+    expect(denied.ok).toBe(false);
+    expect(denied.ok ? "" : denied.code).toBe("UNAUTHORIZED");
+    expect(retired.ok).toBe(false);
+    expect(retired.ok ? "" : retired.code).toBe("ITEM_NOT_FOUND");
+  });
+
+  it("no altera copias insertadas en estudios al editar biblioteca", async () => {
+    const content = buildQuestionLibraryContent({
+      metadata: { isGenericContentConfirmed: false, tags: [] },
+      question: baseDefinition().questions[0]!
+    });
+    const destination = baseDefinition({ questions: [], rules: [] });
+    const inserted = insertLibraryContentIntoDefinition({ content, destination });
+    const library = createLibraryMemory();
+    const created = await library.repository.createItemWithRevision({
+      category: "Base",
+      contentHash: "hash-1",
+      contentJson: content,
+      createdByUserId: admin.id,
+      description: "Original",
+      name: "Genero",
+      scope: "STUDY_SPECIFIC",
+      studyId: "study-1",
+      tags: [],
+      type: "QUESTION"
+    });
+    const nextContent = buildQuestionLibraryContent({
+      metadata: { isGenericContentConfirmed: false, tags: [] },
+      question: { ...baseDefinition().questions[0]!, text: "Genero editado en biblioteca" }
+    });
+
+    await createLibraryRevisionForAdmin({
+      actor: admin,
+      content: nextContent,
+      libraryItemId: created.item.id,
+      repository: library.repository
+    });
+
+    expect(inserted.definition.questions[0]?.text).toBe("Genero");
+  });
+
   it("retira una revision sin borrarla", async () => {
     const content = buildQuestionLibraryContent({
       metadata: { isGenericContentConfirmed: false, tags: [] },
@@ -543,6 +810,80 @@ describe("question-library", () => {
     expect(inserted.definition.rules.some((rule) => rule.id === "EDAD_MENOR_COPIA")).toBe(true);
     const copiedRule = inserted.definition.rules.find((rule) => rule.id === "EDAD_MENOR_COPIA");
     expect(copiedRule?.condition.type === "NUMBER_RANGE" ? copiedRule.condition.questionId : "").toBe("EDAD_COPIA");
+  });
+
+  it("conserva visibilityCondition al guardar contenido", () => {
+    const content = buildQuestionLibraryContent({
+      metadata: { isGenericContentConfirmed: false, tags: [] },
+      question: {
+        ...baseDefinition().questions[1]!,
+        visibilityCondition: {
+          questionId: "GENERO",
+          type: "ANSWER_EQUALS",
+          value: "HOMBRE"
+        }
+      }
+    });
+
+    expect(content.question.visibilityCondition).toMatchObject({
+      questionId: "GENERO",
+      type: "ANSWER_EQUALS",
+      value: "HOMBRE"
+    });
+  });
+
+  it("remapea IDs dentro de visibilityCondition al insertar desde biblioteca", () => {
+    const current = baseDefinition({
+      questions: baseDefinition().questions.map((question) =>
+        question.id === "EDAD"
+          ? {
+              ...question,
+              visibilityCondition: {
+                questionId: "GENERO",
+                type: "ANSWER_EQUALS",
+                value: "HOMBRE"
+              }
+            }
+          : question
+      )
+    });
+    const content = buildBlockLibraryContent({
+      definition: current,
+      metadata: { isGenericContentConfirmed: false, tags: [] },
+      questionIds: ["GENERO", "EDAD"]
+    });
+    const inserted = insertLibraryContentIntoDefinition({
+      content,
+      destination: baseDefinition()
+    });
+    const copiedQuestion = inserted.definition.questions.find((question) => question.id === "EDAD_COPIA");
+
+    expect(
+      copiedQuestion?.visibilityCondition && "questionId" in copiedQuestion.visibilityCondition
+        ? copiedQuestion.visibilityCondition.questionId
+        : ""
+    ).toBe("GENERO_COPIA");
+  });
+
+  it("rechaza insercion con visibilityCondition rota", () => {
+    const content = buildQuestionLibraryContent({
+      metadata: { isGenericContentConfirmed: false, tags: [] },
+      question: {
+        ...baseDefinition().questions[1]!,
+        visibilityCondition: {
+          questionId: "ORIGEN_INEXISTENTE",
+          type: "ANSWER_EQUALS",
+          value: "SI"
+        }
+      }
+    });
+
+    expect(() =>
+      insertLibraryContentIntoDefinition({
+        content,
+        destination: baseDefinition({ questions: [], rules: [] })
+      })
+    ).toThrow(/visibilidad condicional/);
   });
 
   it("inserta NSE solo cuando no existe NSE destino", () => {

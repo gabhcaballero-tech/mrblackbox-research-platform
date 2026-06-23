@@ -1,16 +1,22 @@
+"use client";
+
 import Link from "next/link";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import {
   insertLibraryRevisionIntoScreenerAction,
-  saveScreenerBlockToLibraryAction,
-  saveScreenerQuestionToLibraryAction
+  saveScreenerBlockToLibraryFeedbackAction,
+  saveScreenerQuestionToLibraryFeedbackAction,
+  type QuestionLibraryActionState
 } from "@/modules/question-library/actions";
 import type { LibraryItemProjection } from "@/modules/question-library/service";
 import type { ScreenerQuestion } from "@/modules/screener";
 import { UI_LABELS } from "@/shared/ui/labels";
+import { LibrarySaveFields } from "./LibrarySaveFields";
 
-type LibrarySaveFieldsProps = {
-  defaultName: string;
-  readOnly: boolean;
+const initialActionState: QuestionLibraryActionState = {
+  message: "",
+  ok: false
 };
 
 export function SaveQuestionToLibraryForm({
@@ -22,20 +28,26 @@ export function SaveQuestionToLibraryForm({
   readOnly: boolean;
   studyId: string;
 }) {
+  const [state, formAction] = useActionState(
+    saveScreenerQuestionToLibraryFeedbackAction.bind(null, studyId, question.id),
+    initialActionState
+  );
+
   return (
     <details className="mt-4 rounded-md border border-teal-100 bg-white p-3">
       <summary className="cursor-pointer text-sm font-semibold text-teal-700">
         {UI_LABELS.actions.saveQuestionToLibrary}
       </summary>
       <form
-        action={saveScreenerQuestionToLibraryAction.bind(null, studyId, question.id)}
+        action={formAction}
         className="mt-3 grid gap-3 md:grid-cols-2"
       >
+        <LibraryActionMessage state={state} />
         <LibrarySaveFields defaultName={question.text} readOnly={readOnly} />
         <div className="md:col-span-2">
-          <button className={secondaryButtonClass} disabled={readOnly} type="submit">
+          <SubmitButton disabled={readOnly}>
             {UI_LABELS.actions.saveQuestionToLibrary}
-          </button>
+          </SubmitButton>
         </div>
       </form>
     </details>
@@ -51,6 +63,11 @@ export function SaveBlockToLibraryForm({
   readOnly: boolean;
   studyId: string;
 }) {
+  const [state, formAction] = useActionState(
+    saveScreenerBlockToLibraryFeedbackAction.bind(null, studyId),
+    initialActionState
+  );
+
   if (questions.length === 0) {
     return null;
   }
@@ -60,7 +77,8 @@ export function SaveBlockToLibraryForm({
       <summary className="cursor-pointer text-sm font-semibold text-zinc-800">
         {UI_LABELS.actions.saveBlockToLibrary}
       </summary>
-      <form action={saveScreenerBlockToLibraryAction.bind(null, studyId)} className="mt-4 space-y-4">
+      <form action={formAction} className="mt-4 space-y-4">
+        <LibraryActionMessage state={state} />
         <fieldset className="grid gap-2 md:grid-cols-2">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">
             Selecciona preguntas del bloque
@@ -81,9 +99,9 @@ export function SaveBlockToLibraryForm({
         <div className="grid gap-3 md:grid-cols-2">
           <LibrarySaveFields defaultName="Bloque de filtro" readOnly={readOnly} />
         </div>
-        <button className={secondaryButtonClass} disabled={readOnly} type="submit">
+        <SubmitButton disabled={readOnly}>
           {UI_LABELS.actions.saveBlockToLibrary}
-        </button>
+        </SubmitButton>
       </form>
     </details>
   );
@@ -99,7 +117,7 @@ export function InsertFromLibraryPanel({
   studyId: string;
 }) {
   return (
-    <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+    <div className="rounded-md border border-zinc-200 bg-white p-4">
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-zinc-950">
@@ -116,7 +134,7 @@ export function InsertFromLibraryPanel({
       <form className="mb-4 grid gap-3 md:grid-cols-5">
         <label className={labelClass}>
           {UI_LABELS.library.search}
-          <input className={inputClass} name="query" placeholder="Nombre o descripción" />
+          <input className={inputClass} name="query" placeholder={UI_LABELS.library.searchPlaceholder} />
         </label>
         <label className={labelClass}>
           {UI_LABELS.library.type}
@@ -128,11 +146,11 @@ export function InsertFromLibraryPanel({
         </label>
         <label className={labelClass}>
           {UI_LABELS.library.category}
-          <input className={inputClass} name="category" />
+          <input className={inputClass} name="category" placeholder={UI_LABELS.library.categorySearchPlaceholder} />
         </label>
         <label className={labelClass}>
           {UI_LABELS.library.tags}
-          <input className={inputClass} name="tag" />
+          <input className={inputClass} name="tag" placeholder={UI_LABELS.library.tagsSearchPlaceholder} />
         </label>
         <div className="flex items-end">
           <button className={secondaryButtonClass} type="submit">
@@ -187,42 +205,49 @@ export function InsertFromLibraryPanel({
           ))}
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
-function LibrarySaveFields({ defaultName, readOnly }: LibrarySaveFieldsProps) {
+function LibraryActionMessage({ state }: { state: QuestionLibraryActionState }) {
+  if (!state.message) {
+    return null;
+  }
+
   return (
-    <>
-      <label className={labelClass}>
-        {UI_LABELS.library.itemName}
-        <input className={inputClass} defaultValue={defaultName} disabled={readOnly} name="name" required />
-      </label>
-      <label className={labelClass}>
-        {UI_LABELS.library.category}
-        <input className={inputClass} disabled={readOnly} name="category" />
-      </label>
-      <label className={`${labelClass} md:col-span-2`}>
-        {UI_LABELS.library.description}
-        <input className={inputClass} disabled={readOnly} name="description" />
-      </label>
-      <label className={labelClass}>
-        {UI_LABELS.library.tags}
-        <input className={inputClass} disabled={readOnly} name="tags" placeholder="perfil, nse" />
-        <span className="text-xs font-normal text-zinc-500">{UI_LABELS.library.tagsHelp}</span>
-      </label>
-      <label className={labelClass}>
-        {UI_LABELS.library.scope}
-        <select className={inputClass} defaultValue="STUDY_SPECIFIC" disabled={readOnly} name="scope">
-          <option value="STUDY_SPECIFIC">{UI_LABELS.library.specific}</option>
-          <option value="GENERIC">{UI_LABELS.library.generic}</option>
-        </select>
-      </label>
-      <label className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 md:col-span-2">
-        <input disabled={readOnly} name="confirmGeneric" type="checkbox" />
-        <span>{UI_LABELS.library.confirmGeneric}</span>
-      </label>
-    </>
+    <div
+      className={`rounded-md border px-3 py-2 text-sm md:col-span-2 ${
+        state.ok
+          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+          : "border-rose-200 bg-rose-50 text-rose-800"
+      }`}
+      role={state.ok ? "status" : "alert"}
+    >
+      <p className="font-medium">{state.message}</p>
+      {state.ok && state.itemId ? (
+        <div className="mt-2 flex flex-wrap gap-3">
+          <Link
+            className="font-semibold text-emerald-900 underline"
+            href={`/admin/library/${state.itemId}?saved=library`}
+          >
+            Abrir elemento en biblioteca
+          </Link>
+          <a className="font-semibold text-emerald-900 underline" href="#create-question-panel">
+            Seguir editando screener
+          </a>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SubmitButton({ children, disabled }: { children: string; disabled: boolean }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button className={secondaryButtonClass} disabled={disabled || pending} type="submit">
+      {pending ? UI_LABELS.common.saving : children}
+    </button>
   );
 }
 

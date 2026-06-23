@@ -210,6 +210,65 @@ export const screenerRuleInputSchema = z.object({
   }
 });
 
+export const screenerVisibilityInputSchema = z.object({
+  conditionType: z.enum(["ANSWER_EQUALS", "ANY_SELECTED", "ALL_SELECTED", "NUMBER_RANGE"]).default("ANSWER_EQUALS"),
+  max: z.preprocess(optionalNumber, z.number().optional()),
+  min: z.preprocess(optionalNumber, z.number().optional()),
+  mode: z.enum(["ALWAYS", "CONDITIONAL"]).default("ALWAYS"),
+  questionId: z.preprocess(optionalText, z.string().optional()),
+  value: z.preprocess(optionalText, z.string().optional()),
+  values: z.preprocess(optionalText, z.string().optional())
+}).superRefine((input, context) => {
+  if (input.mode === "ALWAYS") {
+    return;
+  }
+
+  if (!input.questionId) {
+    context.addIssue({
+      code: "custom",
+      message: "Selecciona la pregunta origen de la visibilidad.",
+      path: ["questionId"]
+    });
+  }
+
+  if (input.conditionType === "ANSWER_EQUALS" && !input.value) {
+    context.addIssue({
+      code: "custom",
+      message: "Selecciona o ingresa el valor esperado.",
+      path: ["value"]
+    });
+  }
+
+  if (
+    (input.conditionType === "ANY_SELECTED" || input.conditionType === "ALL_SELECTED") &&
+    !hasDelimitedValues(input.values)
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "Selecciona al menos una opcion para la condicion.",
+      path: ["values"]
+    });
+  }
+
+  if (input.conditionType === "NUMBER_RANGE") {
+    if (input.min === undefined && input.max === undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "Ingresa al menos un minimo o un maximo para el rango.",
+        path: ["min"]
+      });
+    }
+
+    if (input.min !== undefined && input.max !== undefined && input.min > input.max) {
+      context.addIssue({
+        code: "custom",
+        message: "El minimo no puede ser mayor que el maximo.",
+        path: ["min"]
+      });
+    }
+  }
+});
+
 export const screenerNseInputSchema = z.object({
   code: z.preprocess(
     normalizeTechnicalKey,
@@ -237,6 +296,7 @@ export type ScreenerAdminFieldErrors = Record<string, string[] | undefined>;
 export type ScreenerQuestionInput = z.infer<typeof screenerQuestionInputSchema>;
 export type ScreenerOptionInput = z.infer<typeof screenerOptionInputSchema>;
 export type ScreenerRuleInput = z.infer<typeof screenerRuleInputSchema>;
+export type ScreenerVisibilityInput = z.infer<typeof screenerVisibilityInputSchema>;
 export type ScreenerNseInput = z.infer<typeof screenerNseInputSchema>;
 
 export function getMetadataInputFromFormData(formData: FormData) {
@@ -288,6 +348,18 @@ export function getRuleInputFromFormData(formData: FormData) {
     outcomeReason: formData.get("outcomeReason"),
     outcomeRequiresReview: formData.get("outcomeRequiresReview"),
     outcomeType: formData.get("outcomeType"),
+    questionId: formData.get("questionId"),
+    value: formData.get("value"),
+    values: formData.get("values")
+  };
+}
+
+export function getVisibilityInputFromFormData(formData: FormData) {
+  return {
+    conditionType: formData.get("conditionType"),
+    max: formData.get("max"),
+    min: formData.get("min"),
+    mode: formData.get("mode") ?? "ALWAYS",
     questionId: formData.get("questionId"),
     value: formData.get("value"),
     values: formData.get("values")

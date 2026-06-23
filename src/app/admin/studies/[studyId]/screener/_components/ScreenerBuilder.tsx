@@ -2,7 +2,6 @@ import {
   addScreenerQuestionAction,
   createScreenerDraftAction,
   deleteScreenerQuestionAction,
-  moveScreenerQuestionAction,
   publishScreenerAction,
   retireScreenerVersionAction,
   saveScreenerMetadataAction,
@@ -30,6 +29,7 @@ import {
   STUDY_STATUS_LABELS,
   UI_LABELS
 } from "@/shared/ui/labels";
+import { AddContentTabs } from "./AddContentTabs";
 import { ConsentDefaultOptionsButton } from "./ConsentDefaultOptionsButton";
 import {
   InsertFromLibraryPanel,
@@ -39,6 +39,8 @@ import {
 import { NseGuidedEditor } from "./NseGuidedEditor";
 import { OptionAddForm } from "./OptionAddForm";
 import { OptionEditForm } from "./OptionEditForm";
+import { QuestionMoveControls } from "./QuestionMoveControls";
+import { QuestionVisibilityForm } from "./QuestionVisibilityForm";
 import { RuleGuidedForm } from "./RuleGuidedForm";
 
 type ScreenerBuilderProps = {
@@ -106,9 +108,13 @@ export function ScreenerBuilder({
       ) : (
         <>
           <DraftStatusPanel draft={draft} definition={definition} />
-          <InsertFromLibraryPanel items={libraryItems} readOnly={readOnly} studyId={study.id} />
           <MetadataPanel definition={definition} readOnly={readOnly} studyId={study.id} />
-          <QuestionPanel definition={definition} readOnly={readOnly} studyId={study.id} />
+          <QuestionPanel
+            definition={definition}
+            libraryItems={libraryItems}
+            readOnly={readOnly}
+            studyId={study.id}
+          />
           <RulePanel definition={definition} readOnly={readOnly} studyId={study.id} />
           <NsePanel definition={definition} readOnly={readOnly} studyId={study.id} />
           <PublishPanel definition={definition} readOnly={readOnly} studyId={study.id} />
@@ -237,10 +243,12 @@ function MetadataPanel({
 
 function QuestionPanel({
   definition,
+  libraryItems,
   readOnly,
   studyId
 }: {
   definition: ScreenerDefinition;
+  libraryItems: LibraryItemProjection[];
   readOnly: boolean;
   studyId: string;
 }) {
@@ -260,6 +268,7 @@ function QuestionPanel({
         ) : (
           questions.map((question) => (
             <QuestionCard
+              definition={definition}
               key={question.id}
               question={question}
               readOnly={readOnly}
@@ -270,20 +279,38 @@ function QuestionPanel({
       </div>
       <SaveBlockToLibraryForm questions={questions} readOnly={readOnly} studyId={studyId} />
       <div className="mt-6 rounded-md border border-teal-100 bg-teal-50 p-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-teal-800">
-          {UI_LABELS.actions.addQuestion}
-        </h3>
-        <QuestionForm action={addScreenerQuestionAction.bind(null, studyId)} readOnly={readOnly} />
+        <SectionHeader
+          description="Crea una pregunta desde cero o inserta una copia editable desde la biblioteca."
+          title={UI_LABELS.screener.addContentToScreener}
+        />
+        <AddContentTabs
+          createPanel={
+            <div className="rounded-md border border-teal-100 bg-white p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-teal-800">
+                {UI_LABELS.actions.createNewQuestion}
+              </h3>
+              <QuestionForm
+                action={addScreenerQuestionAction.bind(null, studyId)}
+                readOnly={readOnly}
+              />
+            </div>
+          }
+          libraryPanel={
+            <InsertFromLibraryPanel items={libraryItems} readOnly={readOnly} studyId={studyId} />
+          }
+        />
       </div>
     </section>
   );
 }
 
 function QuestionCard({
+  definition,
   question,
   readOnly,
   studyId
 }: {
+  definition: ScreenerDefinition;
   question: ScreenerQuestion;
   readOnly: boolean;
   studyId: string;
@@ -301,12 +328,7 @@ function QuestionCard({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <TinyForm action={moveScreenerQuestionAction.bind(null, studyId, question.id, "up")} disabled={readOnly}>
-            {UI_LABELS.actions.moveUp}
-          </TinyForm>
-          <TinyForm action={moveScreenerQuestionAction.bind(null, studyId, question.id, "down")} disabled={readOnly}>
-            {UI_LABELS.actions.moveDown}
-          </TinyForm>
+          <QuestionMoveControls questionId={question.id} readOnly={readOnly} studyId={studyId} />
           <TinyForm action={deleteScreenerQuestionAction.bind(null, studyId, question.id)} disabled={readOnly}>
             {UI_LABELS.actions.delete}
           </TinyForm>
@@ -317,6 +339,12 @@ function QuestionCard({
         action={updateScreenerQuestionAction.bind(null, studyId, question.id)}
         question={question}
         readOnly={readOnly}
+      />
+      <QuestionVisibilityForm
+        question={question}
+        questions={definition.questions}
+        readOnly={readOnly}
+        studyId={studyId}
       />
       <SaveQuestionToLibraryForm question={question} readOnly={readOnly} studyId={studyId} />
 

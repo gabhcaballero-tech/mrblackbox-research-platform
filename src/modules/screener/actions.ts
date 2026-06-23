@@ -21,6 +21,7 @@ import {
   saveScreenerNseForAdmin,
   updateScreenerOptionForAdmin,
   updateScreenerQuestionForAdmin,
+  updateScreenerQuestionVisibilityForAdmin,
   updateScreenerRuleForAdmin
 } from "./service";
 import {
@@ -29,6 +30,7 @@ import {
   getOptionInputFromFormData,
   getQuestionInputFromFormData,
   getRuleInputFromFormData,
+  getVisibilityInputFromFormData,
   type ScreenerAdminFieldErrors
 } from "./validation";
 
@@ -39,6 +41,9 @@ export type ScreenerOptionActionState = {
 };
 
 export type ScreenerRuleActionState = ScreenerOptionActionState;
+export type ScreenerNseActionState = ScreenerOptionActionState;
+export type ScreenerVisibilityActionState = ScreenerOptionActionState;
+export type ScreenerQuestionMoveActionState = ScreenerOptionActionState;
 
 function revalidateScreener(studyId: string) {
   revalidatePath("/admin");
@@ -156,6 +161,47 @@ export async function moveScreenerQuestionAction(
 
   if (result.ok) {
     revalidateScreener(studyId);
+  }
+}
+
+export async function moveScreenerQuestionWithFeedbackAction(
+  studyId: string,
+  questionId: string,
+  direction: "down" | "up",
+  _previousState: ScreenerQuestionMoveActionState,
+  _formData: FormData
+): Promise<ScreenerQuestionMoveActionState> {
+  void _previousState;
+  void _formData;
+
+  try {
+    const actor = await requireCapability("admin:access");
+    const result = await moveScreenerQuestionForAdmin({
+      actor,
+      direction,
+      questionId,
+      repository: createScreenerRepository(),
+      studyId
+    });
+
+    if (!result.ok) {
+      return {
+        fieldErrors: result.fieldErrors,
+        message: result.message,
+        ok: false
+      };
+    }
+
+    revalidateScreener(studyId);
+    return {
+      message: "Pregunta reordenada correctamente.",
+      ok: true
+    };
+  } catch {
+    return {
+      message: "No se pudo reordenar la pregunta. Intenta nuevamente.",
+      ok: false
+    };
   }
 }
 
@@ -406,20 +452,79 @@ export async function deleteScreenerRuleAction(
   }
 }
 
+export async function updateScreenerQuestionVisibilityAction(
+  studyId: string,
+  questionId: string,
+  _previousState: ScreenerVisibilityActionState,
+  formData: FormData
+): Promise<ScreenerVisibilityActionState> {
+  void _previousState;
+
+  try {
+    const actor = await requireCapability("admin:access");
+    const result = await updateScreenerQuestionVisibilityForAdmin({
+      actor,
+      formInput: getVisibilityInputFromFormData(formData),
+      questionId,
+      repository: createScreenerRepository(),
+      studyId
+    });
+
+    if (!result.ok) {
+      return {
+        fieldErrors: result.fieldErrors,
+        message: result.message,
+        ok: false
+      };
+    }
+
+    revalidateScreener(studyId);
+    return {
+      message: "Visibilidad condicional actualizada correctamente.",
+      ok: true
+    };
+  } catch {
+    return {
+      message: "No se pudo actualizar la visibilidad condicional. Intenta nuevamente.",
+      ok: false
+    };
+  }
+}
+
 export async function saveScreenerNseAction(
   studyId: string,
+  _previousState: ScreenerNseActionState,
   formData: FormData
-): Promise<void> {
-  const actor = await requireCapability("admin:access");
-  const result = await saveScreenerNseForAdmin({
-    actor,
-    formInput: getNseInputFromFormData(formData),
-    repository: createScreenerRepository(),
-    studyId
-  });
+): Promise<ScreenerNseActionState> {
+  void _previousState;
 
-  if (result.ok) {
+  try {
+    const actor = await requireCapability("admin:access");
+    const result = await saveScreenerNseForAdmin({
+      actor,
+      formInput: getNseInputFromFormData(formData),
+      repository: createScreenerRepository(),
+      studyId
+    });
+
+    if (!result.ok) {
+      return {
+        fieldErrors: result.fieldErrors,
+        message: result.message,
+        ok: false
+      };
+    }
+
     revalidateScreener(studyId);
+    return {
+      message: "NSE guardado correctamente.",
+      ok: true
+    };
+  } catch {
+    return {
+      message: "No se pudo guardar el NSE. Intenta nuevamente.",
+      ok: false
+    };
   }
 }
 

@@ -8,6 +8,7 @@ import {
   screenerDefinitionSchema,
   validateScreenerDefinitionForPublication,
   type NseScoreTable,
+  type ScreenerCondition,
   type ScreenerDefinition,
   type ScreenerOption,
   type ScreenerOptionAction,
@@ -28,11 +29,13 @@ import {
   screenerOptionInputSchema,
   screenerQuestionInputSchema,
   screenerRuleInputSchema,
+  screenerVisibilityInputSchema,
   type ScreenerAdminFieldErrors,
   type ScreenerNseInput,
   type ScreenerOptionInput,
   type ScreenerQuestionInput,
-  type ScreenerRuleInput
+  type ScreenerRuleInput,
+  type ScreenerVisibilityInput
 } from "./validation";
 
 export type ScreenerAdminActor = {
@@ -288,14 +291,17 @@ export async function updateScreenerQuestionForAdmin({
         throw new ScreenerServiceMutationError("QUESTION_NOT_FOUND", "La pregunta no existe.");
       }
 
-      const nextQuestion = buildQuestion(
-        {
-          ...parsed.data,
-          id: questionId
-        },
-        current.order,
-        "options" in current ? current.options : []
-      );
+      const nextQuestion = {
+        ...buildQuestion(
+          {
+            ...parsed.data,
+            id: questionId
+          },
+          current.order,
+          "options" in current ? current.options : []
+        ),
+        visibilityCondition: current.visibilityCondition
+      };
 
       return normalizeDefinitionOrders({
         ...definition,
@@ -330,7 +336,14 @@ export async function deleteScreenerQuestionForAdmin({
               inputs: definition.nse.inputs.filter((input) => input.questionId !== questionId)
             }
           : undefined,
-        questions: definition.questions.filter((question) => question.id !== questionId),
+        questions: definition.questions
+          .filter((question) => question.id !== questionId)
+          .map((question) =>
+            question.visibilityCondition &&
+            conditionReferencesQuestion(question.visibilityCondition, questionId)
+              ? { ...question, visibilityCondition: undefined }
+              : question
+          ),
         rules: definition.rules.filter((rule) => !ruleReferencesQuestion(rule, questionId))
       });
     },
@@ -366,11 +379,22 @@ export async function moveScreenerQuestionForAdmin({
       }
 
       [questions[index], questions[targetIndex]] = [questions[targetIndex], questions[index]];
+      const reorderedQuestions = questions.map((question, nextIndex) => ({
+        ...question,
+        order: nextIndex + 1
+      }));
 
-      return normalizeDefinitionOrders({
+      const nextDefinition = normalizeDefinitionOrders({
         ...definition,
-        questions
+        questions: reorderedQuestions
       });
+      const visibilityMoveError = getQuestionMoveVisibilityError(nextDefinition, questionId);
+
+      if (visibilityMoveError) {
+        throw new ScreenerServiceMutationError("VALIDATION_ERROR", visibilityMoveError);
+      }
+
+      return nextDefinition;
     },
     repository,
     studyId
@@ -635,6 +659,53 @@ export async function deleteScreenerRuleForAdmin({
         ...definition,
         rules: definition.rules.filter((rule) => rule.id !== ruleId)
       });
+    },
+    repository,
+    studyId
+  });
+}
+
+export async function updateScreenerQuestionVisibilityForAdmin({
+  actor,
+  formInput,
+  questionId,
+  repository,
+  studyId
+}: DraftMutationInput & { questionId: string }): Promise<ScreenerServiceResult<{ updated: true }>> {
+  const parsed = screenerVisibilityInputSchema.safeParse(formInput);
+
+  if (!parsed.success) {
+    return validationResult("Revisa la visibilidad condicional.", parsed.error.flatten().fieldErrors);
+  }
+
+  return mutateDraftForAdmin({
+    actor,
+    mutate(definition) {
+      let foundQuestion = false;
+      const visibilityCondition =
+        parsed.data.mode === "CONDITIONAL" ? buildCondition(parsed.data) : undefined;
+
+      const questions = definition.questions.map((question) => {
+        if (question.id !== questionId) {
+          return question;
+        }
+
+        foundQuestion = true;
+
+        return {
+          ...question,
+          visibilityCondition
+        };
+      });
+
+      if (!foundQuestion) {
+        throw new ScreenerServiceMutationError("QUESTION_NOT_FOUND", "La pregunta no existe.");
+      }
+
+      return {
+        ...definition,
+        questions
+      };
     },
     repository,
     studyId
@@ -1077,23 +1148,23 @@ function buildRule(input: ScreenerRuleInput, order: number): ScreenerRule {
   };
 }
 
-function buildCondition(input: ScreenerRuleInput): ScreenerRule["condition"] {
+function buildCondition(input: ScreenerRuleInput | ScreenerVisibilityInput): ScreenerRule["condition"] {
   switch (input.conditionType) {
     case "ANSWER_EQUALS":
       return {
-        questionId: input.questionId,
+        questionId: input.questionId ?? "",
         type: "ANSWER_EQUALS",
         value: input.value ?? ""
       };
     case "ANY_SELECTED":
       return {
-        questionId: input.questionId,
+        questionId: input.questionId ?? "",
         type: "ANY_SELECTED",
         values: splitValues(input.values ?? input.value ?? "")
       };
     case "ALL_SELECTED":
       return {
-        questionId: input.questionId,
+        questionId: input.questionId ?? "",
         type: "ALL_SELECTED",
         values: splitValues(input.values ?? input.value ?? "")
       };
@@ -1101,7 +1172,7 @@ function buildCondition(input: ScreenerRuleInput): ScreenerRule["condition"] {
       return {
         max: input.max,
         min: input.min,
-        questionId: input.questionId,
+        questionId: input.questionId ?? "",
         type: "NUMBER_RANGE"
       };
   }
@@ -1358,6 +1429,51 @@ function conditionReferencesQuestion(condition: ScreenerRule["condition"], quest
   }
 
   return condition.questionId === questionId;
+}
+
+function getQuestionMoveVisibilityError(
+  definition: ScreenerDefinition,
+  movedQuestionId: string
+): string | null {
+  const questionsById = new Map(definition.questions.map((question) => [question.id, question]));
+
+  for (const question of definition.questions) {
+    if (!question.visibilityCondition) {
+      continue;
+    }
+
+    const sourceQuestionIds = getConditionQuestionIds(question.visibilityCondition);
+
+    for (const sourceQuestionId of sourceQuestionIds) {
+      const sourceQuestion = questionsById.get(sourceQuestionId);
+
+      if (!sourceQuestion) {
+        continue;
+      }
+
+      if (sourceQuestion.order >= question.order) {
+        if (question.id === movedQuestionId) {
+          return "No se puede mover esta pregunta antes de la pregunta de la que depende.";
+        }
+
+        if (sourceQuestionId === movedQuestionId) {
+          return "No se puede mover esta pregunta despues de una pregunta que depende de ella.";
+        }
+
+        return "No se pudo reordenar la pregunta porque romperia una dependencia de visibilidad.";
+      }
+    }
+  }
+
+  return null;
+}
+
+function getConditionQuestionIds(condition: ScreenerCondition): string[] {
+  if (condition.type === "ANY" || condition.type === "ALL") {
+    return condition.conditions.flatMap(getConditionQuestionIds);
+  }
+
+  return [condition.questionId];
 }
 
 class ScreenerServiceMutationError extends Error {

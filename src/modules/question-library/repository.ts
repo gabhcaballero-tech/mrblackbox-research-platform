@@ -71,6 +71,15 @@ export type CreateLibraryRevisionInput = {
   libraryItemId: string;
 };
 
+export type UpdateLibraryItemMetadataInput = {
+  category?: string;
+  description?: string;
+  itemId: string;
+  name: string;
+  scope: LibraryItemScope;
+  tags: string[];
+};
+
 export type RetireLibraryRevisionInput = {
   retiredByUserId: string;
   revisionId: string;
@@ -141,6 +150,7 @@ export type QuestionLibraryRepository = {
   listItems: (filters: LibrarySearchFilters) => Promise<LibraryItemWithRevisions[]>;
   recordDraftUse: (input: RecordQuestionnaireDraftLibraryUseInput) => Promise<void>;
   retireRevision: (input: RetireLibraryRevisionInput) => Promise<number>;
+  updateItemMetadata: (input: UpdateLibraryItemMetadataInput) => Promise<LibraryItemRecord | null>;
 };
 
 type LibraryPrismaClient = PrismaClientLike & {
@@ -148,6 +158,7 @@ type LibraryPrismaClient = PrismaClientLike & {
   libraryItem: {
     findMany: (args: unknown) => Promise<LibraryItemWithRevisions[]>;
     findUnique: (args: unknown) => Promise<LibraryItemWithRevisions | null>;
+    update: (args: unknown) => Promise<LibraryItemRecord>;
   };
   libraryItemRevision: {
     updateMany: (args: unknown) => Promise<{ count: number }>;
@@ -530,6 +541,30 @@ export function createQuestionLibraryRepository(
       });
 
       return result.count;
+    },
+    async updateItemMetadata(input) {
+      const prisma = await getPrisma();
+      const current = await prisma.libraryItem.findUnique({
+        select: itemSelect,
+        where: { id: input.itemId }
+      });
+
+      if (!current || current.status !== "ACTIVE") {
+        return null;
+      }
+
+      return prisma.libraryItem.update({
+        data: {
+          category: input.category,
+          description: input.description,
+          name: input.name,
+          scope: input.scope,
+          studyId: input.scope === "STUDY_SPECIFIC" ? current.studyId : null,
+          tags: input.tags
+        },
+        select: itemSelect,
+        where: { id: input.itemId }
+      });
     }
   };
 }

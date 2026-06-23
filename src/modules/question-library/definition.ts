@@ -263,11 +263,21 @@ export function insertLibraryContentIntoDefinition({
   const nextQuestionStartOrder = nextOrder(destinationDefinition.questions);
   const copiedQuestions = contentQuestions.map((question, index) => {
     const questionCopy = cloneJson(question);
+    const visibilityCondition = questionCopy.visibilityCondition
+      ? remapConditionQuestionIds(questionCopy.visibilityCondition, questionIdMap)
+      : undefined;
+
+    assertVisibilityConditionCanBeInserted({
+      condition: visibilityCondition,
+      destinationQuestionIds: existingQuestionIds,
+      insertedQuestionIds: newQuestionIds
+    });
 
     return {
       ...questionCopy,
       id: questionIdMap[question.id]!,
-      order: nextQuestionStartOrder + index
+      order: nextQuestionStartOrder + index,
+      visibilityCondition
     };
   });
   const nextRuleStartOrder = nextOrder(destinationDefinition.rules);
@@ -335,6 +345,30 @@ function remapNseQuestionIds(
       questionId: questionIdMap[input.questionId] ?? input.questionId
     }))
   };
+}
+
+function assertVisibilityConditionCanBeInserted({
+  condition,
+  destinationQuestionIds,
+  insertedQuestionIds
+}: {
+  condition: ScreenerCondition | undefined;
+  destinationQuestionIds: Set<string>;
+  insertedQuestionIds: Set<string>;
+}) {
+  if (!condition) {
+    return;
+  }
+
+  const missingQuestionId = getConditionQuestionIds(condition).find(
+    (questionId) => !destinationQuestionIds.has(questionId) && !insertedQuestionIds.has(questionId)
+  );
+
+  if (missingQuestionId) {
+    throw new Error(
+      `La visibilidad condicional apunta a una pregunta que no existe en el destino: ${missingQuestionId}.`
+    );
+  }
 }
 
 function normalizeQuestions(questions: ScreenerQuestion[]): ScreenerQuestion[] {

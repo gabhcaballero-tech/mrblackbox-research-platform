@@ -13,6 +13,7 @@ import type {
   LibraryItemRecord,
   LibraryItemWithRevisions,
   LibraryRevisionRecord,
+  UpdateLibraryItemMetadataInput,
   LibrarySearchFilters,
   QuestionLibraryRepository
 } from "./repository";
@@ -321,6 +322,26 @@ export async function createLibraryRevisionForAdmin({
     return denied;
   }
 
+  const item = await repository.getItemById(libraryItemId);
+
+  if (!item || item.status !== "ACTIVE") {
+    return {
+      code: "ITEM_NOT_FOUND",
+      message: "El elemento de biblioteca no existe o ya fue retirado.",
+      ok: false
+    };
+  }
+
+  const activeRevision = item.revisions.find((revision) => revision.status === "ACTIVE");
+
+  if (!activeRevision) {
+    return {
+      code: "REVISION_NOT_FOUND",
+      message: "El elemento no tiene una revision activa para reemplazar.",
+      ok: false
+    };
+  }
+
   let parsedContent: LibraryContent;
 
   try {
@@ -329,6 +350,17 @@ export async function createLibraryRevisionForAdmin({
     return {
       code: "INVALID_CONTENT",
       message: error instanceof Error ? error.message : "El contenido no es valido.",
+      ok: false
+    };
+  }
+
+  if (
+    (item.type === "QUESTION" && parsedContent.kind !== "QUESTION") ||
+    (item.type === "BLOCK_TEMPLATE" && parsedContent.kind !== "BLOCK")
+  ) {
+    return {
+      code: "INVALID_CONTENT",
+      message: "El tipo de contenido no coincide con el elemento de biblioteca.",
       ok: false
     };
   }
@@ -342,6 +374,52 @@ export async function createLibraryRevisionForAdmin({
 
   return {
     data: revision,
+    ok: true
+  };
+}
+
+export async function updateLibraryItemMetadataForAdmin({
+  actor,
+  formInput,
+  itemId,
+  repository
+}: {
+  actor: QuestionLibraryAdminActor | null;
+  formInput: unknown;
+  itemId: string;
+  repository: QuestionLibraryRepository;
+}): Promise<QuestionLibraryServiceResult<LibraryItemRecord>> {
+  const denied = ensureAdmin<LibraryItemRecord>(actor);
+
+  if (denied) {
+    return denied;
+  }
+
+  const parsedInput = parseSaveInput(formInput);
+
+  if (!parsedInput.ok) {
+    return parsedInput;
+  }
+
+  const updated = await repository.updateItemMetadata({
+    category: parsedInput.data.category,
+    description: parsedInput.data.description,
+    itemId,
+    name: parsedInput.data.name,
+    scope: parsedInput.data.scope,
+    tags: parsedInput.data.tags
+  } satisfies UpdateLibraryItemMetadataInput);
+
+  if (!updated) {
+    return {
+      code: "ITEM_NOT_FOUND",
+      message: "El elemento de biblioteca no existe o ya fue retirado.",
+      ok: false
+    };
+  }
+
+  return {
+    data: updated,
     ok: true
   };
 }

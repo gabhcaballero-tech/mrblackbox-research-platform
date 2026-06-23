@@ -2,6 +2,7 @@
   actions: {
     addOption: "Agregar opción",
     addQuestion: "Agregar pregunta",
+    createNewQuestion: "Crear nueva pregunta",
     addRule: "Agregar regla",
     backToStudyConfiguration: "Volver a configuración del estudio",
     backToStudies: "Volver a estudios",
@@ -9,8 +10,10 @@
     close: "Cerrar",
     configure: "Configurar",
     confirm: "Confirmar",
+    copyHash: "Copiar hash",
     createArm: "Crear brazo",
     createDraft: "Crear borrador",
+    createNewRevision: "Crear nueva revisión",
     createProduct: "Crear producto",
     createRotation: "Crear rotación",
     createStudy: "Crear estudio",
@@ -21,6 +24,7 @@
     deleteQuestion: "Eliminar pregunta",
     deleteRule: "Eliminar regla",
     edit: "Editar",
+    editMetadata: "Editar metadatos",
     moveDown: "Bajar",
     moveOptionDown: "Bajar opción",
     moveOptionUp: "Subir opción",
@@ -139,17 +143,27 @@
     activeRevision: "Revisión activa",
     block: "Bloque",
     category: "Categoría",
+    categoryHelp: "Agrupa elementos que suelen usarse juntos.",
+    categoryPlaceholder: "Ej. Consentimiento, Datos sociodemográficos o Exclusiones",
+    categorySearchPlaceholder: "Ej. Exclusiones",
     confirmGeneric:
       "Confirma que este contenido no incluye marcas, clientes, productos reales, cuotas ni criterios exclusivos de un estudio.",
     content: "Contenido",
     description: "Descripción",
+    descriptionHelp: "Describe para qué sirve este elemento dentro de un estudio.",
+    descriptionPlaceholder:
+      "Ej. Pregunta obligatoria para confirmar la aceptación voluntaria antes del filtro.",
     generic: "Genérico",
+    genericScopeHelp:
+      "Podrá reutilizarse en cualquier estudio. Debe estar libre de marcas, clientes, productos reales, cuotas y criterios exclusivos.",
     history: "Historial",
     insertHelp:
       "Inserta una copia editable en el borrador. Los cambios futuros de biblioteca no modificarán este screener.",
     insertedWarning:
       "Si existen IDs repetidos, el sistema creará IDs nuevos y actualizará reglas y NSE.",
     itemName: "Nombre del elemento",
+    itemNameHelp: "Usa un nombre corto que permita identificarlo y reutilizarlo.",
+    itemNamePlaceholder: "Ej. Consentimiento estándar",
     library: "Biblioteca",
     libraryHelp:
       "Guarda y reutiliza preguntas o bloques de screener sin crear dependencias vivas con estudios publicados.",
@@ -160,10 +174,15 @@
     revisions: "Revisiones",
     scope: "Alcance",
     search: "Buscar",
+    searchPlaceholder: "Ej. consentimiento o NSE",
     specific: "Específico de este estudio",
+    specificScopeHelp:
+      "Solo estará disponible dentro de este estudio. Úsalo para marcas, productos, criterios o redacción particular.",
     studySpecific: "Específico de estudio",
     tags: "Etiquetas",
-    tagsHelp: "Separa etiquetas con comas.",
+    tagsHelp: "Separa las etiquetas con comas para facilitar la búsqueda.",
+    tagsPlaceholder: "Ej. screener, consentimiento, elegibilidad",
+    tagsSearchPlaceholder: "Ej. elegibilidad, screener",
     type: "Tipo",
     warningSpecificOtherStudy:
       "Elemento específico de otro estudio. Revisa que no contenga criterios exclusivos antes de insertarlo."
@@ -175,6 +194,7 @@
   screener: {
     action: "Acción",
     actionCode: "Código de acción",
+    addContentToScreener: "Añadir contenido al screener",
     addQuestionHelp:
       "Agrega, edita, elimina y reordena preguntas. Los ID técnicos son estables.",
     condition: "Condición",
@@ -301,6 +321,12 @@ export const QUESTIONNAIRE_DRAFT_STATUS_LABELS = {
 export const QUESTIONNAIRE_VERSION_STATUS_LABELS = {
   ACTIVE: "Activa",
   RETIRED: "Retirada"
+} as const;
+
+export const LIBRARY_REVISION_STATUS_LABELS = {
+  ACTIVE: "Activa",
+  RETIRED: "Retirada",
+  SUPERSEDED: "Reemplazada"
 } as const;
 
 export const ROTATION_PLAN_STATUS_LABELS = {

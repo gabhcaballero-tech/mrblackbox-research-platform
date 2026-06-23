@@ -7,7 +7,7 @@ import {
   screenerDefinitionSchema,
   type ScreenerDefinition
 } from "./definition";
-import { conditionMatches, evaluateScreener } from "./evaluator";
+import { conditionMatches, evaluateScreener, getVisibleQuestions, isQuestionVisible } from "./evaluator";
 import type {
   ScreenerBuilderData,
   ScreenerDraftRecord,
@@ -21,6 +21,7 @@ import {
   addScreenerQuestionForAdmin,
   addScreenerRuleForAdmin,
   createScreenerDraftForAdmin,
+  moveScreenerQuestionForAdmin,
   projectScreenerVersionForAdmin,
   publishScreenerForAdmin,
   saveScreenerNseForAdmin,
@@ -228,6 +229,28 @@ function answers(overrides: Record<string, unknown> = {}) {
     "q-multiple": ["a"],
     ...overrides
   };
+}
+
+function definitionWithConditionalQuestion(
+  visibilityCondition: ScreenerDefinition["questions"][number]["visibilityCondition"]
+): ScreenerDefinition {
+  const current = definition();
+
+  return definition({
+    questions: [
+      ...current.questions,
+      {
+        dataDestination: "SCREENING",
+        id: "q-follow",
+        order: 8,
+        required: true,
+        text: "Pregunta condicional",
+        type: "INTEGER",
+        validation: {},
+        visibilityCondition
+      }
+    ]
+  });
 }
 
 function study(overrides: Partial<ScreenerStudySummary> = {}): ScreenerStudySummary {
@@ -461,6 +484,126 @@ describe("screener evaluator", () => {
         answers()
       )
     ).toBe(true);
+  });
+
+  it("treats questions without visibility condition as always visible", () => {
+    const current = definition();
+
+    expect(isQuestionVisible(current.questions[0]!, answers(), current)).toBe(true);
+    expect(getVisibleQuestions(current, answers()).map((question) => question.id)).toContain("q-choice");
+  });
+
+  it("shows a question when an equality visibility condition matches", () => {
+    const current = definitionWithConditionalQuestion({
+      questionId: "q-choice",
+      type: "ANSWER_EQUALS",
+      value: "yes"
+    });
+
+    expect(getVisibleQuestions(current, answers()).map((question) => question.id)).toContain("q-follow");
+  });
+
+  it("hides a question when visibility condition does not match or source answer is missing", () => {
+    const current = definitionWithConditionalQuestion({
+      questionId: "q-choice",
+      type: "ANSWER_EQUALS",
+      value: "other"
+    });
+
+    expect(getVisibleQuestions(current, answers()).map((question) => question.id)).not.toContain("q-follow");
+    expect(
+      getVisibleQuestions(current, answers({ "q-choice": undefined })).map((question) => question.id)
+    ).not.toContain("q-follow");
+  });
+
+  it("supports numeric range and selected option visibility conditions", () => {
+    const rangeDefinition = definitionWithConditionalQuestion({
+      max: 30,
+      min: 18,
+      questionId: "q-age",
+      type: "NUMBER_RANGE"
+    });
+    const selectedDefinition = definitionWithConditionalQuestion({
+      questionId: "q-multiple",
+      type: "ANY_SELECTED",
+      values: ["b"]
+    });
+
+    expect(getVisibleQuestions(rangeDefinition, answers({ "q-age": 25 })).map((question) => question.id)).toContain("q-follow");
+    expect(getVisibleQuestions(selectedDefinition, answers({ "q-multiple": ["b"] })).map((question) => question.id)).toContain("q-follow");
+  });
+
+  it("does not mark hidden required questions as incomplete", () => {
+    const current = definitionWithConditionalQuestion({
+      questionId: "q-choice",
+      type: "ANSWER_EQUALS",
+      value: "other"
+    });
+
+    const result = evaluateScreener(current, answers());
+
+    expect(result.status).toBe("PASSED");
+    expect(result.missingQuestionIds).not.toContain("q-follow");
+  });
+
+  it("marks visible required questions as incomplete when answer is missing", () => {
+    const current = definitionWithConditionalQuestion({
+      questionId: "q-choice",
+      type: "ANSWER_EQUALS",
+      value: "yes"
+    });
+
+    const result = evaluateScreener(current, answers());
+
+    expect(result.status).toBe("INCOMPLETE");
+    expect(result.missingQuestionIds).toContain("q-follow");
+  });
+
+  it("rejects invalid visibility references", () => {
+    const current = definition();
+
+    expect(() =>
+      definition({
+        questions: current.questions.map((question) =>
+          question.id === "q-choice"
+            ? {
+                ...question,
+                visibilityCondition: {
+                  questionId: "q-choice",
+                  type: "ANSWER_EQUALS",
+                  value: "yes"
+                }
+              }
+            : question
+        )
+      })
+    ).toThrow();
+
+    expect(() =>
+      definition({
+        questions: current.questions.map((question) =>
+          question.id === "q-choice"
+            ? {
+                ...question,
+                visibilityCondition: {
+                  max: 99,
+                  min: 18,
+                  questionId: "q-age",
+                  type: "NUMBER_RANGE"
+                }
+              }
+            : question
+        )
+      })
+    ).toThrow();
+
+    expect(() =>
+      definitionWithConditionalQuestion({
+        questionId: "q-missing",
+        type: "ANSWER_EQUALS",
+        value: "yes"
+      })
+    ).toThrow();
   });
 
   it("terminates by option action", () => {
@@ -1455,6 +1598,339 @@ describe("screener admin service", () => {
       ok: false
     });
     expect(result.ok ? "" : result.message).toMatch(/n.mero entero/);
+  });
+
+  it("moves up a question without visibility condition", async () => {
+    const builder = {
+      draft: draft(
+        definition({
+          questions: [
+            {
+              dataDestination: "SCREENING",
+              id: "q-1",
+              order: 1,
+              required: true,
+              text: "Pregunta 1",
+              type: "SHORT_TEXT",
+              validation: {}
+            },
+            {
+              dataDestination: "SCREENING",
+              id: "q-2",
+              order: 2,
+              required: true,
+              text: "Pregunta 2",
+              type: "SHORT_TEXT",
+              validation: {}
+            },
+            {
+              dataDestination: "SCREENING",
+              id: "q-3",
+              order: 3,
+              required: true,
+              text: "Pregunta 3",
+              type: "SHORT_TEXT",
+              validation: {}
+            }
+          ],
+          rules: []
+        })
+      ),
+      study: study(),
+      versions: []
+    };
+
+    const result = await moveScreenerQuestionForAdmin({
+      actor: adminActor,
+      direction: "up",
+      questionId: "q-3",
+      repository: fakeRepository(builder),
+      studyId
+    });
+    const nextDefinition = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+
+    expect(result).toMatchObject({ ok: true });
+    expect(nextDefinition.questions.map((question) => question.id)).toEqual(["q-1", "q-3", "q-2"]);
+  });
+
+  it("moves up a dependent question while it stays after its source question", async () => {
+    const builder = {
+      draft: draft(
+        definition({
+          questions: [
+            {
+              dataDestination: "SCREENING",
+              id: "q-source",
+              options: [
+                {
+                  actions: [],
+                  isOther: false,
+                  label: "Si",
+                  order: 1,
+                  otherTextRequired: false,
+                  value: "YES"
+                }
+              ],
+              order: 1,
+              required: true,
+              text: "Pregunta origen",
+              type: "SINGLE_CHOICE",
+              validation: {}
+            },
+            {
+              dataDestination: "SCREENING",
+              id: "q-middle",
+              order: 2,
+              required: false,
+              text: "Pregunta intermedia",
+              type: "SHORT_TEXT",
+              validation: {}
+            },
+            {
+              dataDestination: "SCREENING",
+              id: "q-dependent",
+              order: 3,
+              required: true,
+              text: "Pregunta dependiente",
+              type: "INTEGER",
+              validation: {},
+              visibilityCondition: {
+                questionId: "q-source",
+                type: "ANSWER_EQUALS",
+                value: "YES"
+              }
+            }
+          ],
+          rules: []
+        })
+      ),
+      study: study(),
+      versions: []
+    };
+
+    const result = await moveScreenerQuestionForAdmin({
+      actor: adminActor,
+      direction: "up",
+      questionId: "q-dependent",
+      repository: fakeRepository(builder),
+      studyId
+    });
+    const nextDefinition = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+    const dependent = nextDefinition.questions.find((question) => question.id === "q-dependent");
+
+    expect(result).toMatchObject({ ok: true });
+    expect(nextDefinition.questions.map((question) => question.id)).toEqual([
+      "q-source",
+      "q-dependent",
+      "q-middle"
+    ]);
+    expect(dependent?.visibilityCondition).toMatchObject({
+      questionId: "q-source",
+      type: "ANSWER_EQUALS",
+      value: "YES"
+    });
+  });
+
+  it("blocks moving a dependent question above its source question", async () => {
+    const builder = {
+      draft: draft(
+        definition({
+          nse: {
+            code: "nse",
+            inputs: [
+              {
+                missingScore: 0,
+                questionId: "q-dependent",
+                scoreByAnswer: { "2": 2 }
+              }
+            ],
+            label: "NSE",
+            ranges: [{ code: "OK", eligible: true, label: "OK", max: 10, min: 0 }],
+            type: "score_table"
+          },
+          questions: [
+            {
+              dataDestination: "SCREENING",
+              id: "q-source",
+              options: [
+                {
+                  actions: [],
+                  isOther: false,
+                  label: "Si",
+                  order: 1,
+                  otherTextRequired: false,
+                  value: "YES"
+                }
+              ],
+              order: 1,
+              required: true,
+              text: "Pregunta origen",
+              type: "SINGLE_CHOICE",
+              validation: {}
+            },
+            {
+              dataDestination: "SCREENING",
+              id: "q-dependent",
+              order: 2,
+              required: true,
+              text: "Pregunta dependiente",
+              type: "INTEGER",
+              validation: { max: 20, min: 2 },
+              visibilityCondition: {
+                questionId: "q-source",
+                type: "ANSWER_EQUALS",
+                value: "YES"
+              }
+            }
+          ],
+          rules: [
+            {
+              condition: {
+                max: 20,
+                min: 2,
+                questionId: "q-dependent",
+                type: "NUMBER_RANGE"
+              },
+              id: "dependent-range",
+              order: 1,
+              outcome: {
+                code: "DEPENDENT_OK",
+                reason: "La respuesta es valida.",
+                type: "TERMINATE"
+              }
+            }
+          ]
+        })
+      ),
+      study: study(),
+      versions: []
+    };
+
+    const before = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+    const result = await moveScreenerQuestionForAdmin({
+      actor: adminActor,
+      direction: "up",
+      questionId: "q-dependent",
+      repository: fakeRepository(builder),
+      studyId
+    });
+    const after = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+
+    expect(result).toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "No se puede mover esta pregunta antes de la pregunta de la que depende.",
+      ok: false
+    });
+    expect(after.questions.map((question) => question.id)).toEqual(before.questions.map((question) => question.id));
+    expect(after.questions.find((question) => question.id === "q-dependent")?.visibilityCondition).toEqual(
+      before.questions.find((question) => question.id === "q-dependent")?.visibilityCondition
+    );
+    expect(after.rules).toEqual(before.rules);
+    expect(after.nse).toEqual(before.nse);
+    expect(new Set(after.questions.map((question) => question.id)).size).toBe(after.questions.length);
+  });
+
+  it("allows F9A to move until it is immediately after F9 and no further", async () => {
+    const builder = {
+      draft: draft(
+        definition({
+          questions: [
+            {
+              dataDestination: "SCREENING",
+              id: "F9_FRECUENCIA_SEMANAL",
+              options: [
+                {
+                  actions: [{ type: "CONTINUE" }],
+                  isOther: false,
+                  label: "Mas de una vez al dia",
+                  order: 1,
+                  otherTextRequired: false,
+                  value: "MAS_DE_UNA_VEZ_DIA"
+                }
+              ],
+              order: 1,
+              required: true,
+              text: "Frecuencia semanal",
+              type: "SINGLE_CHOICE",
+              validation: {}
+            },
+            {
+              dataDestination: "SCREENING",
+              id: "F10_OTRA",
+              order: 2,
+              required: false,
+              text: "Pregunta 10",
+              type: "SHORT_TEXT",
+              validation: {}
+            },
+            {
+              dataDestination: "SCREENING",
+              id: "F11_OTRA",
+              order: 3,
+              required: false,
+              text: "Pregunta 11",
+              type: "SHORT_TEXT",
+              validation: {}
+            },
+            {
+              dataDestination: "SCREENING",
+              id: "F9A_VECES_AL_DIA",
+              order: 4,
+              required: true,
+              text: "Veces al dia",
+              type: "INTEGER",
+              validation: { max: 20, min: 2 },
+              visibilityCondition: {
+                questionId: "F9_FRECUENCIA_SEMANAL",
+                type: "ANSWER_EQUALS",
+                value: "MAS_DE_UNA_VEZ_DIA"
+              }
+            }
+          ],
+          rules: []
+        })
+      ),
+      study: study(),
+      versions: []
+    };
+    const repository = fakeRepository(builder);
+
+    const firstMove = await moveScreenerQuestionForAdmin({
+      actor: adminActor,
+      direction: "up",
+      questionId: "F9A_VECES_AL_DIA",
+      repository,
+      studyId
+    });
+    const secondMove = await moveScreenerQuestionForAdmin({
+      actor: adminActor,
+      direction: "up",
+      questionId: "F9A_VECES_AL_DIA",
+      repository,
+      studyId
+    });
+    const thirdMove = await moveScreenerQuestionForAdmin({
+      actor: adminActor,
+      direction: "up",
+      questionId: "F9A_VECES_AL_DIA",
+      repository,
+      studyId
+    });
+    const nextDefinition = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+
+    expect(firstMove).toMatchObject({ ok: true });
+    expect(secondMove).toMatchObject({ ok: true });
+    expect(nextDefinition.questions.map((question) => question.id)).toEqual([
+      "F9_FRECUENCIA_SEMANAL",
+      "F9A_VECES_AL_DIA",
+      "F10_OTRA",
+      "F11_OTRA"
+    ]);
+    expect(thirdMove).toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "No se puede mover esta pregunta antes de la pregunta de la que depende.",
+      ok: false
+    });
   });
 
   it("projects published and retired versions as read-only", () => {

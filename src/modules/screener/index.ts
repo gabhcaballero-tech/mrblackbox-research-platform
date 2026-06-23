@@ -13,6 +13,7 @@ export {
 export type {
   NseScoreTable,
   ParticipantProfileBinding,
+  ScreenerComparableValue,
   ScreenerCondition,
   ScreenerDataDestination,
   ScreenerDefinition,
@@ -25,7 +26,9 @@ export type {
 export {
   conditionMatches,
   evaluateNse,
-  evaluateScreener
+  evaluateScreener,
+  getVisibleQuestions,
+  isQuestionVisible
 } from "./evaluator";
 export type {
   ScreenerAnswer,

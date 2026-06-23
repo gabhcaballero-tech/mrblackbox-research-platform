@@ -89,7 +89,10 @@ export function evaluateScreener(
   answers: ScreenerAnswers
 ): ScreenerEvaluationResult {
   const definition = parseScreenerDefinition(definitionInput);
-  const requiredMissingQuestionIds = findMissingRequiredQuestionIds(definition, answers);
+  const visibleQuestions = getVisibleQuestions(definition, answers);
+  const visibleQuestionIds = new Set(visibleQuestions.map((question) => question.id));
+  const visibleAnswers = filterAnswersByQuestionIds(answers, visibleQuestionIds);
+  const requiredMissingQuestionIds = findMissingRequiredQuestionIds(visibleQuestions, visibleAnswers);
 
   if (requiredMissingQuestionIds.length > 0) {
     return buildEvaluationResult({
@@ -108,7 +111,11 @@ export function evaluateScreener(
     });
   }
 
-  const ruleAndActionEvaluation = evaluateRulesAndOptionActions(definition, answers);
+  const ruleAndActionEvaluation = evaluateRulesAndOptionActions(
+    definition,
+    visibleAnswers,
+    visibleQuestionIds
+  );
   const firstTermination = ruleAndActionEvaluation.terminationReasons[0];
 
   if (firstTermination) {
@@ -124,7 +131,9 @@ export function evaluateScreener(
     });
   }
 
-  const nse = definition.nse ? evaluateNse(definition.nse, answers) : null;
+  const nse = definition.nse
+    ? evaluateNseForVisibleQuestions(definition.nse, answers, visibleQuestionIds)
+    : null;
 
   if (nse && nse.eligible === false) {
     const nseTermination = {
@@ -176,6 +185,43 @@ export function evaluateScreener(
     safeExplanation: "El filtro es elegible.",
     status: "PASSED"
   });
+}
+
+export function isQuestionVisible(
+  question: ScreenerQuestion,
+  answers: ScreenerAnswers,
+  _definition: ScreenerDefinition
+): boolean {
+  void _definition;
+
+  if (!question.visibilityCondition) {
+    return true;
+  }
+
+  return conditionMatches(question.visibilityCondition, answers);
+}
+
+export function getVisibleQuestions(
+  definitionInput: ScreenerDefinition,
+  answers: ScreenerAnswers
+): ScreenerQuestion[] {
+  const definition = parseScreenerDefinition(definitionInput);
+  const visibleAnswers: ScreenerAnswers = {};
+  const visibleQuestions: ScreenerQuestion[] = [];
+
+  for (const question of [...definition.questions].sort((left, right) => left.order - right.order)) {
+    if (!isQuestionVisible(question, visibleAnswers, definition)) {
+      continue;
+    }
+
+    visibleQuestions.push(question);
+
+    if (answers[question.id] !== undefined) {
+      visibleAnswers[question.id] = answers[question.id];
+    }
+  }
+
+  return visibleQuestions;
 }
 
 export function evaluateNse(
@@ -243,10 +289,10 @@ function buildEvaluationResult(input: {
 }
 
 function findMissingRequiredQuestionIds(
-  definition: ScreenerDefinition,
+  questions: ScreenerQuestion[],
   answers: ScreenerAnswers
 ): string[] {
-  return definition.questions
+  return questions
     .filter((question) => {
       if (!question.required) {
         return false;
@@ -282,7 +328,8 @@ function requiresMissingOtherText(question: ScreenerQuestion, answer: ScreenerAn
 
 function evaluateRulesAndOptionActions(
   definition: ScreenerDefinition,
-  answers: ScreenerAnswers
+  answers: ScreenerAnswers,
+  visibleQuestionIds: Set<string>
 ): EvaluationAccumulator {
   const accumulator: EvaluationAccumulator = {
     flags: [],
@@ -291,6 +338,10 @@ function evaluateRulesAndOptionActions(
   };
 
   for (const question of definition.questions) {
+    if (!visibleQuestionIds.has(question.id)) {
+      continue;
+    }
+
     if (!("options" in question)) {
       continue;
     }
@@ -323,6 +374,31 @@ function evaluateRulesAndOptionActions(
   }
 
   return accumulator;
+}
+
+function evaluateNseForVisibleQuestions(
+  nse: NseScoreTable,
+  answers: ScreenerAnswers,
+  visibleQuestionIds: Set<string>
+): ScreenerNseEvaluation {
+  return evaluateNse(
+    {
+      ...nse,
+      inputs: nse.inputs.filter(
+        (input) => visibleQuestionIds.has(input.questionId) || !isMissingAnswer(answers[input.questionId])
+      )
+    },
+    answers
+  );
+}
+
+function filterAnswersByQuestionIds(
+  answers: ScreenerAnswers,
+  questionIds: Set<string>
+): ScreenerAnswers {
+  return Object.fromEntries(
+    Object.entries(answers).filter(([questionId]) => questionIds.has(questionId))
+  );
 }
 
 function applyOutcome(

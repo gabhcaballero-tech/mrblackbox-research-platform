@@ -41,6 +41,7 @@ La definicion se valida con Zod y contiene:
 - `purpose: "SCREENER"`;
 - `title` y `description`;
 - preguntas ordenadas;
+- visibilidad condicional opcional por pregunta;
 - opciones ordenadas;
 - acciones por opcion;
 - reglas sin JavaScript ni expresiones arbitrarias;
@@ -65,6 +66,25 @@ Destinos de datos:
 
 `PARTICIPANT_PROFILE` solo permite bindings explicitos de perfil. No se aceptan nombres arbitrarios de columnas.
 
+## Visibilidad condicional
+
+Cada pregunta puede incluir `visibilityCondition`. Si no existe, la pregunta es visible siempre.
+
+Cuando existe, la pregunta solo se considera visible si la condicion se cumple con las respuestas actuales. La condicion reutiliza el mismo modelo guiado de reglas:
+
+- respuesta igual a un valor;
+- cualquiera de estas opciones seleccionada;
+- todas estas opciones seleccionadas;
+- numero dentro de rango.
+
+Ejemplo soportado para una fase posterior de Campo:
+
+- `F9A_VECES_AL_DIA` visible solo si `F9_FRECUENCIA_SEMANAL` es `MAS_DE_UNA_VEZ_DIA`.
+
+La pregunta origen debe existir y estar antes de la pregunta dependiente. No se permiten dependencias hacia la misma pregunta ni hacia preguntas posteriores, para evitar ciclos y navegacion confusa.
+
+La futura interfaz de aplicacion puede usar `getVisibleQuestions(definition, currentAnswers)` para obtener la lista de preguntas que deben mostrarse con las respuestas capturadas hasta ese momento.
+
 ## Evaluacion
 
 El evaluador puro respeta esta prioridad:
@@ -87,6 +107,8 @@ La salida preparada para `ScreeningAttempt.evaluationJson` incluye:
 
 No incluye PII crudo.
 
+Las preguntas obligatorias ocultas por `visibilityCondition` no cuentan como faltantes. Si la condicion se cumple y la pregunta queda visible, una respuesta faltante si produce `INCOMPLETE`.
+
 ## Administracion
 
 Ruta agregada:
@@ -100,6 +122,7 @@ La pantalla incluye:
 - resumen del estudio;
 - estado del borrador;
 - editor de preguntas;
+- visibilidad condicional dentro de cada tarjeta de pregunta;
 - gestion de opciones;
 - reglas y terminaciones;
 - calculo NSE;
@@ -146,6 +169,9 @@ Se agregaron pruebas para:
 - rechazo de no ADMIN;
 - proyeccion ANALYST sin PII de perfil;
 - bloqueo de mutaciones en estudio no `DRAFT`.
+- visibilidad condicional por igualdad, seleccion y rango;
+- preguntas obligatorias ocultas sin `INCOMPLETE`;
+- validacion de referencias invalidas, dependencia propia y preguntas posteriores.
 
 ## Pendiente
 

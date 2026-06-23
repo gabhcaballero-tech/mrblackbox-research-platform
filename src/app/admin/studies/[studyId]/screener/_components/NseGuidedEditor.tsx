@@ -1,9 +1,11 @@
 "use client";
 
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 import {
   clearScreenerNseAction,
-  saveScreenerNseAction
+  saveScreenerNseAction,
+  type ScreenerNseActionState
 } from "@/modules/screener/actions";
 import type { ScreenerDefinition } from "@/modules/screener";
 import {
@@ -30,10 +32,27 @@ export function NseGuidedEditor({ definition, readOnly, studyId }: NseGuidedEdit
   const compatibleQuestions = useMemo(() => getNseCompatibleQuestions(definition), [definition]);
   const [state, setState] = useState<NseEditorState>(() => createNseEditorState(definition));
   const [selectedQuestionId, setSelectedQuestionId] = useState("");
+  const [lastSavedSignature, setLastSavedSignature] = useState<string | null>(() =>
+    definition.nse ? buildNseSignature(createNseEditorState(definition)) : null
+  );
+  const [actionState, formAction] = useActionState(saveScreenerNseAction.bind(null, studyId), {
+    message: "",
+    ok: false
+  } satisfies ScreenerNseActionState);
+  const lastHandledSuccessMessageRef = useRef<string>("");
   const validation = validateNseEditorState(state);
   const availableQuestions = compatibleQuestions.filter(
     (question) => !state.inputs.some((input) => input.questionId === question.id)
   );
+  const currentSignature = buildNseSignature(state);
+  const isSavedConfiguration = lastSavedSignature !== null && currentSignature === lastSavedSignature;
+
+  useEffect(() => {
+    if (actionState.ok && actionState.message && actionState.message !== lastHandledSuccessMessageRef.current) {
+      lastHandledSuccessMessageRef.current = actionState.message;
+      setLastSavedSignature(buildNseSignature(state));
+    }
+  }, [actionState, state]);
 
   function addQuestion() {
     const question = compatibleQuestions.find((candidate) => candidate.id === selectedQuestionId);
@@ -65,7 +84,7 @@ export function NseGuidedEditor({ definition, readOnly, studyId }: NseGuidedEdit
         </p>
       </div>
 
-      <form action={saveScreenerNseAction.bind(null, studyId)} className="space-y-6" onSubmit={handleSubmit}>
+      <form action={formAction} className="space-y-6" onSubmit={handleSubmit}>
         <input
           name="inputsText"
           readOnly
@@ -101,6 +120,25 @@ export function NseGuidedEditor({ definition, readOnly, studyId }: NseGuidedEdit
             />
           </label>
         </div>
+
+        {actionState.message ? (
+          <div
+            className={`rounded-md border px-3 py-2 text-sm ${
+              actionState.ok
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-rose-200 bg-rose-50 text-rose-800"
+            }`}
+            role={actionState.ok ? "status" : "alert"}
+          >
+            {actionState.message}
+          </div>
+        ) : null}
+
+        {isSavedConfiguration ? (
+          <p className="text-sm text-zinc-600" role="status">
+            Esta configuracion NSE ya esta guardada en el borrador.
+          </p>
+        ) : null}
 
         <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
           <label className={labelClass}>
@@ -159,14 +197,13 @@ export function NseGuidedEditor({ definition, readOnly, studyId }: NseGuidedEdit
         <RangeEditor readOnly={readOnly} setState={setState} state={state} />
         <NseSummary
           inputsCount={state.inputs.length}
+          isSavedConfiguration={isSavedConfiguration}
           rangesCount={state.ranges.length}
           validation={validation}
         />
 
         <div className="flex flex-wrap gap-2">
-          <button className={primaryButtonClass} disabled={readOnly || !validation.ready} type="submit">
-            {UI_LABELS.actions.saveNse}
-          </button>
+          <NseSubmitButton disabled={readOnly || !validation.ready} />
         </div>
       </form>
 
@@ -407,10 +444,12 @@ function RangeEditor({
 
 function NseSummary({
   inputsCount,
+  isSavedConfiguration,
   rangesCount,
   validation
 }: {
   inputsCount: number;
+  isSavedConfiguration: boolean;
   rangesCount: number;
   validation: ReturnType<typeof validateNseEditorState>;
 }) {
@@ -438,7 +477,13 @@ function NseSummary({
         </div>
         <div>
           <dt className="font-medium">Estado</dt>
-          <dd>{validation.ready ? "Listo para guardar" : "Faltan configuraciones"}</dd>
+          <dd>
+            {validation.ready
+              ? isSavedConfiguration
+                ? "NSE configurado y guardado"
+                : "Configuracion valida para guardar"
+              : "Faltan configuraciones"}
+          </dd>
         </div>
       </dl>
       {validation.errors.length > 0 ? (
@@ -478,6 +523,38 @@ function updateScore(
         : input
     )
   };
+}
+
+function buildNseSignature(state: NseEditorState): string {
+  return JSON.stringify({
+    code: state.code,
+    inputs: state.inputs.map((input) => ({
+      missingScore: input.missingScore,
+      questionId: input.questionId,
+      rows: input.rows.map((row) => ({
+        score: row.score,
+        value: row.value
+      }))
+    })),
+    label: state.label,
+    ranges: state.ranges.map((range) => ({
+      code: range.code,
+      eligible: range.eligible,
+      label: range.label,
+      max: range.max,
+      min: range.min
+    }))
+  });
+}
+
+function NseSubmitButton({ disabled }: { disabled: boolean }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button className={primaryButtonClass} disabled={disabled || pending} type="submit">
+      {pending ? "Guardando NSE..." : UI_LABELS.actions.saveNse}
+    </button>
+  );
 }
 
 function updateMissingScore(

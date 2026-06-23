@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ScreenerDefinition } from "@/modules/screener";
+import type { LibraryItemProjection } from "@/modules/question-library/service";
 import { ScreenerBuilder } from "./ScreenerBuilder";
 
 vi.mock("@/modules/screener/actions", () => ({
@@ -15,12 +16,20 @@ vi.mock("@/modules/screener/actions", () => ({
   deleteScreenerRuleAction: vi.fn(),
   moveScreenerOptionAction: vi.fn(),
   moveScreenerQuestionAction: vi.fn(),
+  moveScreenerQuestionWithFeedbackAction: vi.fn(async () => ({
+    message: "Pregunta reordenada correctamente.",
+    ok: true
+  })),
   publishScreenerAction: vi.fn(),
   retireScreenerVersionAction: vi.fn(),
   saveScreenerMetadataAction: vi.fn(),
   saveScreenerNseAction: vi.fn(),
   updateScreenerOptionAction: vi.fn(),
-  updateScreenerQuestionAction: vi.fn()
+  updateScreenerQuestionAction: vi.fn(),
+  updateScreenerQuestionVisibilityAction: vi.fn(async () => ({
+    message: "Visibilidad condicional actualizada correctamente.",
+    ok: true
+  }))
 }));
 
 vi.mock("next/navigation", () => ({
@@ -78,7 +87,7 @@ const testDefinition: ScreenerDefinition = {
   title: "Filtro de prueba"
 };
 
-function renderBuilder(definition: ScreenerDefinition) {
+function renderBuilder(definition: ScreenerDefinition, libraryItems: LibraryItemProjection[] = []) {
   render(
     <ScreenerBuilder
       definition={definition}
@@ -94,7 +103,7 @@ function renderBuilder(definition: ScreenerDefinition) {
         updatedAt: new Date("2026-01-02T12:00:00Z"),
         updatedByUserId: null
       }}
-      libraryItems={[]}
+      libraryItems={libraryItems}
       readOnly={false}
       study={{
         code: "TEST-1",
@@ -122,7 +131,172 @@ function renderBuilder(definition: ScreenerDefinition) {
   );
 }
 
+function definitionWithDependentQuestion(
+  visibilityCondition?: ScreenerDefinition["questions"][number]["visibilityCondition"]
+): ScreenerDefinition {
+  return {
+    ...testDefinition,
+    questions: [
+      ...testDefinition.questions,
+      {
+        dataDestination: "SCREENING",
+        id: "times-per-day",
+        order: 2,
+        required: true,
+        text: "Veces al dia",
+        type: "INTEGER",
+        validation: {},
+        visibilityCondition
+      }
+    ]
+  };
+}
+
+function openVisibilityPanel(index: number) {
+  const summary = screen.getAllByText("Visibilidad condicional")[index]!;
+  fireEvent.click(summary);
+  return summary.closest("details") as HTMLElement;
+}
+
 describe("ScreenerBuilder", () => {
+  it("ubica insertar desde biblioteca dentro de anadir contenido, no en la parte superior", () => {
+    renderBuilder(testDefinition);
+
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
+
+    expect(headings[1]).toBe("Estado del borrador");
+    expect(headings[2]).toBe("Resumen del cuestionario");
+    expect(headings).toContain("Añadir contenido al screener");
+    expect(screen.queryByRole("heading", { name: "Insertar desde biblioteca" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Insertar desde biblioteca" }));
+
+    expect(screen.getByRole("heading", { name: "Insertar desde biblioteca" })).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole("heading", { name: "Añadir contenido al screener" })
+        .compareDocumentPosition(screen.getByRole("heading", { name: "Insertar desde biblioteca" })) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it("muestra crear nueva pregunta e insertar desde biblioteca como acciones del mismo bloque", () => {
+    renderBuilder(testDefinition);
+
+    const tabList = screen.getByRole("tablist", { name: "Añadir contenido al screener" });
+
+    expect(within(tabList).getByRole("tab", { name: "Crear nueva pregunta" })).toBeInTheDocument();
+    expect(within(tabList).getByRole("tab", { name: "Insertar desde biblioteca" })).toBeInTheDocument();
+  });
+
+  it("abre crear nueva pregunta con el formulario existente", () => {
+    renderBuilder(testDefinition);
+
+    const createPanel = screen.getByRole("tabpanel", { name: "Crear nueva pregunta" });
+
+    expect(within(createPanel).getByLabelText("ID técnico")).toBeInTheDocument();
+    expect(within(createPanel).getByLabelText("Texto de la pregunta")).toBeInTheDocument();
+    expect(within(createPanel).getByRole("button", { name: "Agregar pregunta" })).toBeInTheDocument();
+  });
+
+  it("muestra visible siempre por defecto en cada pregunta", () => {
+    renderBuilder(definitionWithDependentQuestion());
+
+    const panel = openVisibilityPanel(1);
+
+    expect(within(panel).getByLabelText("Visible siempre")).toBeChecked();
+    expect(within(panel).getByText("Esta pregunta se mostrara siempre.")).toBeInTheDocument();
+  });
+
+  it("permite configurar visibilidad condicional guiada", async () => {
+    renderBuilder(definitionWithDependentQuestion());
+
+    const panel = openVisibilityPanel(1);
+
+    fireEvent.click(within(panel).getByLabelText("Mostrar solo si otra pregunta cumple una condicion"));
+    fireEvent.change(within(panel).getByLabelText("Pregunta origen"), { target: { value: "brand" } });
+    fireEvent.change(within(panel).getByLabelText("Valor"), { target: { value: "option-a" } });
+    fireEvent.click(within(panel).getByRole("button", { name: "Guardar visibilidad" }));
+
+    expect(
+      await screen.findByText("Visibilidad condicional actualizada correctamente.")
+    ).toBeInTheDocument();
+  });
+
+  it("conserva valores de visibilidad condicional al renderizar", () => {
+    renderBuilder(
+      definitionWithDependentQuestion({
+        questionId: "brand",
+        type: "ANSWER_EQUALS",
+        value: "option-a"
+      })
+    );
+
+    const panel = openVisibilityPanel(1);
+
+    expect(within(panel).getByLabelText("Mostrar solo si otra pregunta cumple una condicion")).toBeChecked();
+    expect(within(panel).getByLabelText("Pregunta origen")).toHaveValue("brand");
+    expect(within(panel).getByLabelText("Valor")).toHaveValue("option-a");
+  });
+
+  it("abre insertar desde biblioteca con busqueda, filtros y enlace a biblioteca", () => {
+    renderBuilder(testDefinition);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Insertar desde biblioteca" }));
+
+    const libraryPanel = screen.getByRole("tabpanel", { name: "Insertar desde biblioteca" });
+
+    expect(within(libraryPanel).getByRole("heading", { name: "Insertar desde biblioteca" })).toBeInTheDocument();
+    expect(within(libraryPanel).getByLabelText("Buscar")).toBeInTheDocument();
+    expect(within(libraryPanel).getByLabelText("Tipo")).toBeInTheDocument();
+    expect(within(libraryPanel).getByRole("link", { name: "Ver biblioteca" })).toBeInTheDocument();
+    expect(within(libraryPanel).getByPlaceholderText("Ej. consentimiento o NSE")).toBeInTheDocument();
+    expect(within(libraryPanel).getByPlaceholderText("Ej. Exclusiones")).toBeInTheDocument();
+    expect(within(libraryPanel).getByPlaceholderText("Ej. elegibilidad, screener")).toBeInTheDocument();
+  });
+
+  it("cambiar de accion no borra datos capturados en pregunta nueva", () => {
+    renderBuilder(testDefinition);
+
+    const createPanel = screen.getByRole("tabpanel", { name: "Crear nueva pregunta" });
+    const questionTextInput = within(createPanel).getByLabelText("Texto de la pregunta");
+
+    fireEvent.change(questionTextInput, { target: { value: "Nueva pregunta de prueba" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Insertar desde biblioteca" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Crear nueva pregunta" }));
+
+    expect(
+      within(screen.getByRole("tabpanel", { name: "Crear nueva pregunta" })).getByLabelText(
+        "Texto de la pregunta"
+      )
+    ).toHaveValue("Nueva pregunta de prueba");
+  });
+
+  it("mantiene guardar preguntas seleccionadas como bloque cerca del listado", () => {
+    renderBuilder(testDefinition);
+
+    const questionHeading = screen.getByRole("heading", { name: "1. Marca usada" });
+    const saveBlock = screen.getAllByText("Guardar preguntas seleccionadas como bloque")[0]!;
+    const addContentHeading = screen.getByRole("heading", { name: "Añadir contenido al screener" });
+
+    expect(questionHeading.compareDocumentPosition(saveBlock) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(saveBlock.compareDocumentPosition(addContentHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("mantiene los formularios para guardar pregunta y bloque en biblioteca", () => {
+    renderBuilder(testDefinition);
+
+    fireEvent.click(screen.getAllByText("Guardar pregunta en biblioteca")[0]!);
+    fireEvent.click(screen.getAllByText("Guardar preguntas seleccionadas como bloque")[0]!);
+
+    expect(screen.getAllByLabelText("Nombre del elemento").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("Usa un nombre corto que permita identificarlo y reutilizarlo.").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByRole("button", { name: "Guardar pregunta en biblioteca" }).length).toBeGreaterThanOrEqual(1);
+    expect(
+      screen.getAllByRole("button", { name: "Guardar preguntas seleccionadas como bloque" }).length
+    ).toBeGreaterThanOrEqual(1);
+  });
+
   it("muestra los selects principales en español y oculta valores internos crudos", () => {
     render(
       <ScreenerBuilder

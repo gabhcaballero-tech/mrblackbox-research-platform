@@ -110,7 +110,8 @@ const questionBaseSchema = z
     profileBinding: participantProfileBindingSchema.optional(),
     required: z.boolean().default(false),
     text: nonEmptyTextSchema.max(240),
-    validation: screenerValidationSchema
+    validation: screenerValidationSchema,
+    visibilityCondition: z.lazy(() => screenerConditionSchema).optional()
   })
   .strict()
   .superRefine((question, context) => {
@@ -523,6 +524,38 @@ function validateDefinitionReferences(
   );
 
   const questionsById = new Map(definition.questions.map((question) => [question.id, question]));
+  const questionOrdersById = new Map(definition.questions.map((question) => [question.id, question.order]));
+
+  definition.questions.forEach((question, questionIndex) => {
+    if (!question.visibilityCondition) {
+      return;
+    }
+
+    validateConditionReferences(question.visibilityCondition, questionsById, context, [
+      "questions",
+      questionIndex,
+      "visibilityCondition"
+    ]);
+
+    for (const sourceQuestionId of getConditionQuestionIds(question.visibilityCondition)) {
+      if (sourceQuestionId === question.id) {
+        context.addIssue({
+          code: "custom",
+          message: "Una pregunta no puede depender de si misma para su visibilidad.",
+          path: ["questions", questionIndex, "visibilityCondition"]
+        });
+      }
+
+      const sourceOrder = questionOrdersById.get(sourceQuestionId);
+      if (sourceOrder !== undefined && sourceOrder >= question.order) {
+        context.addIssue({
+          code: "custom",
+          message: "La visibilidad condicional solo puede depender de preguntas anteriores.",
+          path: ["questions", questionIndex, "visibilityCondition"]
+        });
+      }
+    }
+  });
 
   definition.rules.forEach((rule, ruleIndex) => {
     validateConditionReferences(rule.condition, questionsById, context, [
@@ -614,6 +647,14 @@ function validateConditionReferences(
       validateConditionValue(value, question, context, [...path, "values", index])
     );
   }
+}
+
+function getConditionQuestionIds(condition: ScreenerCondition): string[] {
+  if (condition.type === "ANY" || condition.type === "ALL") {
+    return condition.conditions.flatMap(getConditionQuestionIds);
+  }
+
+  return [condition.questionId];
 }
 
 function validateConditionValue(

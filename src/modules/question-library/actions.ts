@@ -5,11 +5,21 @@ import { requireCapability } from "@/shared/auth/session";
 import { createScreenerRepository } from "@/modules/screener/repository";
 import { createQuestionLibraryRepository } from "./repository";
 import {
+  createLibraryRevisionForAdmin,
   insertLibraryRevisionIntoScreenerForAdmin,
   retireLibraryRevisionForAdmin,
   saveBlockFromScreenerForAdmin,
-  saveQuestionFromScreenerForAdmin
+  saveQuestionFromScreenerForAdmin,
+  updateLibraryItemMetadataForAdmin
 } from "./service";
+import { getLibraryRevisionContentFromFormData } from "./revision-form";
+
+export type QuestionLibraryActionState = {
+  fieldErrors?: Record<string, string[] | undefined>;
+  itemId?: string;
+  message: string;
+  ok: boolean;
+};
 
 function getLibrarySaveRawInput(formData: FormData) {
   return {
@@ -56,6 +66,41 @@ export async function saveScreenerQuestionToLibraryAction(
   revalidateLibrary(studyId, result.data.item.id);
 }
 
+export async function saveScreenerQuestionToLibraryFeedbackAction(
+  studyId: string,
+  questionId: string,
+  _previousState: QuestionLibraryActionState,
+  formData: FormData
+): Promise<QuestionLibraryActionState> {
+  void _previousState;
+
+  const actor = await requireCapability("admin:access");
+  const result = await saveQuestionFromScreenerForAdmin({
+    actor,
+    formInput: getLibrarySaveRawInput(formData),
+    libraryRepository: createQuestionLibraryRepository(),
+    questionId,
+    screenerRepository: createScreenerRepository(),
+    studyId
+  });
+
+  if (!result.ok) {
+    return {
+      fieldErrors: result.fieldErrors,
+      message: result.message,
+      ok: false
+    };
+  }
+
+  revalidateLibrary(studyId, result.data.item.id);
+
+  return {
+    itemId: result.data.item.id,
+    message: "Pregunta guardada correctamente en la biblioteca.",
+    ok: true
+  };
+}
+
 export async function saveScreenerBlockToLibraryAction(
   studyId: string,
   formData: FormData
@@ -75,6 +120,40 @@ export async function saveScreenerBlockToLibraryAction(
   }
 
   revalidateLibrary(studyId, result.data.item.id);
+}
+
+export async function saveScreenerBlockToLibraryFeedbackAction(
+  studyId: string,
+  _previousState: QuestionLibraryActionState,
+  formData: FormData
+): Promise<QuestionLibraryActionState> {
+  void _previousState;
+
+  const actor = await requireCapability("admin:access");
+  const result = await saveBlockFromScreenerForAdmin({
+    actor,
+    formInput: getLibrarySaveRawInput(formData),
+    libraryRepository: createQuestionLibraryRepository(),
+    questionIds: formData.getAll("questionIds").map(String),
+    screenerRepository: createScreenerRepository(),
+    studyId
+  });
+
+  if (!result.ok) {
+    return {
+      fieldErrors: result.fieldErrors,
+      message: result.message,
+      ok: false
+    };
+  }
+
+  revalidateLibrary(studyId, result.data.item.id);
+
+  return {
+    itemId: result.data.item.id,
+    message: "Bloque guardado correctamente en la biblioteca.",
+    ok: true
+  };
 }
 
 export async function insertLibraryRevisionIntoScreenerAction(
@@ -116,4 +195,81 @@ export async function retireLibraryRevisionAction(
   if (result.ok) {
     revalidateLibrary(undefined, itemId);
   }
+}
+
+export async function updateLibraryItemMetadataAction(
+  itemId: string,
+  _previousState: QuestionLibraryActionState,
+  formData: FormData
+): Promise<QuestionLibraryActionState> {
+  void _previousState;
+
+  const actor = await requireCapability("admin:access");
+  const result = await updateLibraryItemMetadataForAdmin({
+    actor,
+    formInput: getLibrarySaveRawInput(formData),
+    itemId,
+    repository: createQuestionLibraryRepository()
+  });
+
+  if (!result.ok) {
+    return {
+      fieldErrors: result.fieldErrors,
+      message: result.message,
+      ok: false
+    };
+  }
+
+  revalidateLibrary(undefined, itemId);
+
+  return {
+    itemId,
+    message: "Metadatos actualizados correctamente.",
+    ok: true
+  };
+}
+
+export async function createLibraryRevisionFromFormAction(
+  itemId: string,
+  _previousState: QuestionLibraryActionState,
+  formData: FormData
+): Promise<QuestionLibraryActionState> {
+  void _previousState;
+
+  const actor = await requireCapability("admin:access");
+  let content;
+
+  try {
+    content = getLibraryRevisionContentFromFormData(formData);
+  } catch (error) {
+    return {
+      message:
+        error instanceof Error
+          ? error.message
+          : "Revisa el contenido de la nueva revisión.",
+      ok: false
+    };
+  }
+
+  const result = await createLibraryRevisionForAdmin({
+    actor,
+    content,
+    libraryItemId: itemId,
+    repository: createQuestionLibraryRepository()
+  });
+
+  if (!result.ok) {
+    return {
+      message: result.message,
+      ok: false
+    };
+  }
+
+  revalidateLibrary(undefined, itemId);
+
+  return {
+    itemId,
+    message: "Nueva revisión creada correctamente. La revisión anterior quedó como reemplazada.",
+    ok: true
+  };
 }

@@ -44,6 +44,7 @@ Una pregunta guarda:
 - opciones;
 - acciones directas por opción;
 - validaciones;
+- visibilidad condicional;
 - destino de datos;
 - configuración de opción Otro.
 
@@ -51,6 +52,7 @@ Un bloque guarda:
 
 - preguntas ordenadas;
 - opciones y acciones directas;
+- visibilidad condicional de preguntas;
 - reglas relacionadas;
 - NSE solo si todas sus preguntas de entrada están dentro del bloque.
 
@@ -80,8 +82,10 @@ Insertar desde biblioteca:
 - copia el contenido al `QuestionnaireDraft.definitionJson`;
 - recalcula el orden de preguntas y reglas;
 - remapea IDs técnicos cuando hay colisión;
-- actualiza reglas y NSE con los IDs nuevos;
+- actualiza reglas, NSE y `visibilityCondition` con los IDs nuevos;
 - registra `QuestionnaireDraftLibraryUse` con hash e `idMapJson`.
+
+Si una pregunta insertada tiene `visibilityCondition` hacia otra pregunta del bloque, la referencia se remapea junto con el ID tecnico. Si apunta a una pregunta externa, esa pregunta debe existir en el borrador destino; de lo contrario la insercion se rechaza para evitar contenido roto.
 
 No se crea una dependencia viva entre biblioteca y borrador. Cambios futuros a la biblioteca no modifican borradores ya insertados ni versiones publicadas.
 
