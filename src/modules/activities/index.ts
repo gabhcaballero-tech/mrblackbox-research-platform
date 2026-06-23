@@ -1,11 +1,16 @@
 export {
   calculateParticipantActivities,
+  calculateParticipantActivityOccurrences,
   createDefaultMeasurementSchedules,
+  DEFAULT_ACTIVITY_OCCURRENCE_KEY,
   DEFAULT_MEASUREMENT_OFFSETS_MINUTES,
   evaluateApplicationTimeCorrection,
-  getScheduledActivityStatus
+  getScheduledActivityStatus,
+  validateUniqueActivityOccurrences
 } from "./scheduler";
 export type {
+  ActivityOccurrenceInput,
+  ActivityOccurrenceValidationResult,
   ActivityWindowConfig,
   ApplicationTimeCorrectionResult
 } from "./scheduler";

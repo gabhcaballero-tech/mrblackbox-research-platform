@@ -756,6 +756,7 @@ model ParticipantActivity {
   id                 String                    @id @default(uuid()) @db.Uuid
   studyParticipantId String                    @db.Uuid
   activityScheduleId String                    @db.Uuid
+  occurrenceKey      String
   scheduledAt        DateTime
   availableFrom      DateTime
   availableUntil     DateTime
@@ -774,7 +775,7 @@ model ParticipantActivity {
   responses        ResearchResponse[]
   mediaEvidence    MediaEvidencePlaceholder?
 
-  @@unique([studyParticipantId, activityScheduleId])
+  @@unique([studyParticipantId, activityScheduleId, occurrenceKey], map: "participant_activity_occurrence_unique")
   @@index([studyParticipantId, status])
   @@index([scheduledAt])
   @@map("participant_activities")
@@ -798,6 +799,7 @@ model ReminderLog {
 model ResearchResponse {
   id                     String                      @id @default(uuid()) @db.Uuid
   participantActivityId  String                      @db.Uuid
+  responseKey            String
   questionnaireVersionId String                      @db.Uuid
   questionId             String
   blockInstanceKey       String?
@@ -814,6 +816,7 @@ model ResearchResponse {
   contextProduct       StudyProduct?        @relation("ResearchResponseProductContext", fields: [contextProductId], references: [id])
   contextArm           StudyArm?            @relation("ResearchResponseArmContext", fields: [contextArmId], references: [id])
 
+  @@unique([participantActivityId, responseKey], map: "research_response_activity_response_key_unique")
   @@index([participantActivityId, questionnaireVersionId])
   @@index([questionId])
   @@index([contextType, contextProductId, contextArmId])

@@ -9,6 +9,7 @@
 - `activities`: calculo de actividades programadas desde `applicationStartedAt` y reglas de correccion de hora.
 - `randomization`: aleatorizacion determinista de atributos por semilla, contexto y configuracion de orden compartido o independiente.
 - `questionnaire-engine`: esquema minimo de snapshot publicado e inmutable.
+- `responses`: construccion determinista de `responseKey` para guardados parciales o autosave sin duplicados.
 - `testing`: fixtures genericos para pruebas unitarias de dominio.
 
 ## Decisiones de diseno
@@ -22,6 +23,7 @@
 - La rotacion V1 acepta solo `manual_cover_code`; la asignacion automatica queda fuera.
 - Las etiquetas visibles para participante se validan separadas de las claves reales de producto.
 - Las actividades usan offsets y ventanas configurables; los offsets de prueba cubren 15, 120, 240 y 480 minutos.
+- Las actividades recurrentes usan `occurrenceKey` para permitir varias instancias del mismo schedule.
 - La correccion de hora siempre devuelve una decision explicita e indica si requiere auditoria.
 - La aleatorizacion de atributos usa semilla inyectable y permite reutilizar ordenes guardadas al retomar.
 - La pregunta final de atributos queda fija y fuera de los grupos aleatorizados.
@@ -41,6 +43,9 @@
 - Orden compartido o independiente entre fragancias segun configuracion.
 - Texto obligatorio cuando la pregunta final de atributos se responde con `yes`.
 - Snapshot publicado con tipos V1: respuesta unica, multiple, texto, numero, si/no, escala, matriz, opcion Otro condicional y bloque de atributos.
+- Actividades recurrentes de video pueden materializar `DAY_1`, `DAY_2` y `DAY_3`.
+- `responseKey` se construye desde pregunta, bloque y contexto; no debe incluir PII.
+- La consistencia de rotacion valida que plan, participante, brazos y productos pertenezcan al mismo estudio antes de persistir.
 
 ## Pruebas ejecutadas
 
@@ -49,7 +54,7 @@
 - `npm.cmd run typecheck`
   - Resultado: paso despues de ajustar tipado numerico en el acumulador de puntaje y completar defaults tipados de opciones en fixtures.
 - `npm.cmd run test`
-  - Resultado: paso con 10 archivos de prueba y 19 pruebas.
+  - Resultado: paso con 11 archivos de prueba y 26 pruebas.
 - `npm.cmd run build`
   - Resultado: paso con Next.js 16.2.9.
 

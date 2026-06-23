@@ -38,7 +38,9 @@ export const activityScheduleSchema = z
 export const participantActivitySchema = z
   .object({
     id: z.string().trim().min(1),
+    studyParticipantId: z.string().trim().min(1).optional(),
     activityScheduleId: z.string().trim().min(1),
+    occurrenceKey: z.string().trim().min(1),
     scheduledAt: z.date(),
     availableFrom: z.date(),
     availableUntil: z.date(),

@@ -24,7 +24,22 @@ export type ApplicationTimeCorrectionResult = {
   message: string;
 };
 
+export type ActivityOccurrenceInput = {
+  occurrenceKey: string;
+  offsetMinutes: number;
+};
+
+export type ActivityOccurrenceValidationResult =
+  | {
+      success: true;
+    }
+  | {
+      success: false;
+      duplicateKeys: string[];
+    };
+
 export const DEFAULT_MEASUREMENT_OFFSETS_MINUTES = [15, 120, 240, 480] as const;
+export const DEFAULT_ACTIVITY_OCCURRENCE_KEY = "DEFAULT";
 
 export function createDefaultMeasurementSchedules(
   windowConfig: ActivityWindowConfig
@@ -59,12 +74,67 @@ export function calculateParticipantActivities(
       return {
         id: `activity-${schedule.id}`,
         activityScheduleId: schedule.id,
+        occurrenceKey: DEFAULT_ACTIVITY_OCCURRENCE_KEY,
         scheduledAt,
         availableFrom,
         availableUntil,
         status: getScheduledActivityStatus(now, availableFrom, availableUntil)
       };
     });
+}
+
+export function calculateParticipantActivityOccurrences(
+  applicationStartedAt: Date,
+  scheduleInput: ActivitySchedule,
+  occurrences: ActivityOccurrenceInput[],
+  now: Date = applicationStartedAt
+): ParticipantActivity[] {
+  const schedule = activityScheduleSchema.parse(scheduleInput);
+
+  return occurrences.map((occurrence) => {
+    const scheduledAt = addMinutes(applicationStartedAt, occurrence.offsetMinutes);
+    const availableFrom = addMinutes(scheduledAt, schedule.windowStartsMinutes);
+    const availableUntil = addMinutes(scheduledAt, schedule.windowEndsMinutes);
+
+    return {
+      id: `activity-${schedule.id}-${occurrence.occurrenceKey}`,
+      activityScheduleId: schedule.id,
+      occurrenceKey: occurrence.occurrenceKey,
+      scheduledAt,
+      availableFrom,
+      availableUntil,
+      status: getScheduledActivityStatus(now, availableFrom, availableUntil)
+    };
+  });
+}
+
+export function validateUniqueActivityOccurrences(
+  activities: Array<Pick<ParticipantActivity, "activityScheduleId" | "occurrenceKey">>
+): ActivityOccurrenceValidationResult {
+  const seenKeys = new Set<string>();
+  const duplicateKeys = new Set<string>();
+
+  for (const activity of activities) {
+    const key = `${activity.activityScheduleId}:${activity.occurrenceKey}`;
+
+    if (seenKeys.has(key)) {
+      duplicateKeys.add(key);
+      continue;
+    }
+
+    seenKeys.add(key);
+  }
+
+  if (duplicateKeys.size > 0) {
+    return {
+      success: false,
+      duplicateKeys: [...duplicateKeys]
+    };
+  }
+
+  return {
+    success: true
+  };
 }
 
 export function getScheduledActivityStatus(

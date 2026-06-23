@@ -1,5 +1,10 @@
 export { validateManualTwoArmRotation } from "./manual-rotation";
 export type { ManualRotationValidationResult } from "./manual-rotation";
+export { validateRotationPersistenceConsistency } from "./persistence-consistency";
+export type {
+  RotationPersistenceConsistencyInput,
+  RotationPersistenceConsistencyResult
+} from "./persistence-consistency";
 export {
   manualTwoArmRotationAssignmentSchema,
   participantArmAssignmentSchema,
