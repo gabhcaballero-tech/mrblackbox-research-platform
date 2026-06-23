@@ -17,6 +17,8 @@ No se instalaron paquetes de Supabase.
 
 - `prisma/schema.prisma`
 - `prisma.config.ts`
+- `prisma/migrations/20260622213013_initial_persistence_foundation/migration.sql`
+- `prisma/migrations/migration_lock.toml`
 - `src/shared/db/client.ts`
 - `src/shared/db/index.ts`
 - `.env.example`
@@ -82,6 +84,28 @@ El esquema prepara PostgreSQL con Prisma para:
 - `ParticipantAttributeOrder` evita duplicados por participacion, version, bloque y `orderKey`.
 - `ParticipantAccessToken.tokenHash` es unico.
 - Indices adicionales cubren estados, fechas, roles operativos, contexto de respuestas y auditoria.
+
+## Migracion SQL inicial offline
+
+Migracion creada:
+
+- `20260622213013_initial_persistence_foundation`
+
+Fue generada localmente desde `prisma/schema.prisma` con `prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script`, usando salida a archivo. La migracion todavia no se aplico a Supabase ni a ninguna base PostgreSQL.
+
+Revision estatica inicial:
+
+- Enums aproximados: 40.
+- Tablas aproximadas: 30.
+- Indices aproximados: 74.
+- Llaves foraneas aproximadas: 65.
+- No se encontraron comandos `DROP`, `DELETE`, `TRUNCATE`, `ALTER DATABASE` ni `REVOKE`.
+
+Estado:
+
+- Pendiente de revision humana.
+- Pendiente de `prisma generate` en una fase aprobada.
+- Pendiente de despliegue controlado contra una base aprobada.
 
 ## Validaciones ejecutadas
 
