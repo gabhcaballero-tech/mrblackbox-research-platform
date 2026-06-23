@@ -5,12 +5,12 @@ import type { FieldAttemptScreen } from "@/modules/field/service";
 import type { FieldStudySummary } from "@/modules/field/repository";
 import {
   FieldStudyCard,
-  ParticipantStartForm,
   ScreeningQuestionForm,
   ScreeningResultCard,
   fieldAttemptStatusLabel,
   fieldResultTitle
 } from "./FieldComponents";
+import { ParticipantStartForm } from "./ParticipantStartForm";
 
 vi.mock("@/modules/field/actions", () => ({
   saveFieldScreeningAnswerAction: vi.fn(),
@@ -28,7 +28,7 @@ const study: FieldStudySummary = {
   },
   code: "FMASCULINA-NAVIGO-2026",
   id: "study-1",
-  name: "Fragancia Masculina — Navigo Homme",
+  name: "Fragancia Masculina - Navigo Homme",
   status: "ACTIVE",
   timeZoneIana: "America/Mexico_City"
 };
@@ -81,6 +81,7 @@ function screenFixture(
         }
       },
       questionnaireVersionId: "version-1",
+      startedAt: new Date("2026-06-23T10:00:00Z"),
       status: status as FieldAttemptScreen["attempt"]["status"],
       studyParticipant: {
         id: "sp-1",
@@ -181,18 +182,125 @@ describe("FieldComponents", () => {
   it("renders active field study cards", () => {
     render(<FieldStudyCard study={study} />);
 
-    expect(screen.getByText("Fragancia Masculina — Navigo Homme")).toBeInTheDocument();
+    expect(screen.getByText("Fragancia Masculina - Navigo Homme")).toBeInTheDocument();
     expect(screen.getByText("FMASCULINA-NAVIGO-2026")).toBeInTheDocument();
+    expect(screen.getByText("Versión 1")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Aplicar filtro" })).toBeInTheDocument();
   });
 
-  it("renders minimal participant start form", () => {
+  it("renders participant start form with duplicate detection guidance", () => {
     render(<ParticipantStartForm studyId="study-1" />);
 
     expect(screen.getByLabelText("Nombre o identificador operativo")).toBeInTheDocument();
     expect(screen.getByLabelText("Teléfono")).toBeInTheDocument();
     expect(screen.getByLabelText("Correo")).toBeInTheDocument();
+    expect(screen.getByLabelText("Referencia externa")).toBeInTheDocument();
+    expect(screen.getByText(/detectar si el panelista ya estaba registrado/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Iniciar filtro" })).toBeInTheDocument();
+  });
+
+  it("renders duplicate participant alert with previous attempts and actions", () => {
+    render(
+      <ParticipantStartForm
+        initialState={{
+          duplicate: {
+            input: {
+              email: "",
+              externalReference: "",
+              name: "Otra captura",
+              phone: "5550000000"
+            },
+            kind: "duplicate_found",
+            matches: [
+              {
+                canCreateNewAttempt: true,
+                canForceNewAttempt: false,
+                canReviewAttempts: true,
+                continueAttemptHref: null,
+                hasClosedAttemptInStudy: true,
+                hasOpenAttemptInStudy: false,
+                matchedIdentifiers: [{ label: "Teléfono", value: "5550000000" }],
+                participantProfileId: "profile-1",
+                profileName: "Participante prueba",
+                studyAttempts: [
+                  {
+                    canOpenDetail: true,
+                    code: "GENERO_NO_ELEGIBLE",
+                    detailHref: "/admin/screening-attempts/attempt-1",
+                    id: "attempt-1",
+                    nseClass: "C típico",
+                    nseScore: 144,
+                    reason: "No califica.",
+                    startedAt: new Date("2026-06-23T10:00:00Z"),
+                    status: "TERMINATED"
+                  }
+                ],
+                studyParticipantExists: true
+              }
+            ],
+            message: "Este panelista ya estaba registrado."
+          },
+          values: {
+            name: "Otra captura",
+            phone: "5550000000"
+          }
+        }}
+        studyId="study-1"
+      />
+    );
+
+    expect(screen.getByText("Este panelista ya estaba registrado.")).toBeInTheDocument();
+    expect(screen.getByText("Participante prueba")).toBeInTheDocument();
+    expect(screen.getAllByText("Teléfono").length).toBeGreaterThan(0);
+    expect(screen.getByText("5550000000")).toBeInTheDocument();
+    expect(screen.getByText(/Este panelista ya tuvo un intento previo/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ver detalle de supervisión" })).toHaveAttribute(
+      "href",
+      "/admin/screening-attempts/attempt-1"
+    );
+    expect(screen.getByRole("button", { name: "Usar este panelista y crear nuevo intento" })).toBeInTheDocument();
+  });
+
+  it("shows open attempt blocking state with continue action", () => {
+    render(
+      <ParticipantStartForm
+        initialState={{
+          duplicate: {
+            input: {
+              email: "",
+              externalReference: "",
+              name: "Otra captura",
+              phone: "5550000000"
+            },
+            kind: "duplicate_found",
+            matches: [
+              {
+                canCreateNewAttempt: false,
+                canForceNewAttempt: false,
+                canReviewAttempts: false,
+                continueAttemptHref: "/field/screening/attempt-1",
+                hasClosedAttemptInStudy: false,
+                hasOpenAttemptInStudy: true,
+                matchedIdentifiers: [{ label: "Teléfono", value: "5550000000" }],
+                participantProfileId: "profile-1",
+                profileName: "Participante prueba",
+                studyAttempts: [],
+                studyParticipantExists: true
+              }
+            ],
+            message: "Este panelista ya estaba registrado."
+          }
+        }}
+        studyId="study-1"
+      />
+    );
+
+    expect(screen.getByText("Ya existe un intento abierto para este panelista.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Continuar intento existente" })).toHaveAttribute(
+      "href",
+      "/field/screening/attempt-1"
+    );
+    expect(screen.queryByRole("button", { name: "Usar este panelista y crear nuevo intento" })).not.toBeInTheDocument();
   });
 
   it("renders single choice questions with visible options", () => {

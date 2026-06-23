@@ -68,6 +68,7 @@ export type FieldScreeningAttemptRecord = {
     };
   };
   questionnaireVersionId: string;
+  startedAt: Date;
   status: FieldScreeningStatus;
   studyParticipant: FieldStudyParticipantRecord & {
     participantProfile: FieldParticipantProfileRecord;
@@ -127,6 +128,12 @@ export type FieldRepository = {
   createParticipantProfile: (input: CreateParticipantProfileInput) => Promise<FieldParticipantProfileRecord>;
   createScreeningAttempt: (input: CreateScreeningAttemptInput) => Promise<FieldScreeningAttemptRecord>;
   createStudyParticipant: (input: CreateStudyParticipantInput) => Promise<FieldStudyParticipantRecord>;
+  findParticipantProfileById: (participantProfileId: string) => Promise<FieldParticipantProfileRecord | null>;
+  findParticipantProfileMatches: (input: {
+    email?: string;
+    externalReference?: string;
+    phone?: string;
+  }) => Promise<FieldParticipantProfileRecord[]>;
   findReusableParticipantProfile: (input: {
     email?: string;
     externalReference?: string;
@@ -139,6 +146,10 @@ export type FieldRepository = {
   getAttempt: (attemptId: string) => Promise<FieldScreeningAttemptRecord | null>;
   getStudyWithActiveScreener: (studyId: string) => Promise<FieldStudySummary | null>;
   listAnswers: (attemptId: string) => Promise<FieldScreeningAnswerRecord[]>;
+  listScreeningAttemptsForProfileInStudy: (input: {
+    participantProfileId: string;
+    studyId: string;
+  }) => Promise<FieldScreeningAttemptRecord[]>;
   listAvailableStudies: () => Promise<FieldStudySummary[]>;
   updateAttemptEvaluation: (input: CompleteScreeningAttemptInput) => Promise<void>;
   updateStudyParticipantScreening: (input: {
@@ -152,7 +163,9 @@ export type FieldRepository = {
 type FieldPrismaClient = PrismaClientLike & {
   participantProfile: {
     create: (args: unknown) => Promise<FieldParticipantProfileRecord>;
+    findMany: (args: unknown) => Promise<FieldParticipantProfileRecord[]>;
     findFirst: (args: unknown) => Promise<FieldParticipantProfileRecord | null>;
+    findUnique: (args: unknown) => Promise<FieldParticipantProfileRecord | null>;
   };
   screeningAnswer: {
     findMany: (args: unknown) => Promise<FieldScreeningAnswerRecord[]>;
@@ -160,6 +173,7 @@ type FieldPrismaClient = PrismaClientLike & {
   };
   screeningAttempt: {
     create: (args: unknown) => Promise<FieldScreeningAttemptRecord>;
+    findMany: (args: unknown) => Promise<FieldScreeningAttemptRecord[]>;
     findUnique: (args: unknown) => Promise<FieldScreeningAttemptRecord | null>;
     update: (args: unknown) => Promise<FieldScreeningAttemptRecord>;
   };
@@ -240,6 +254,7 @@ const attemptSelect = {
     }
   },
   questionnaireVersionId: true,
+  startedAt: true,
   status: true,
   studyParticipant: {
     select: {
@@ -278,6 +293,18 @@ function toFieldStudy(study: StudyWithVersions): FieldStudySummary {
     status: study.status,
     timeZoneIana: study.timeZoneIana
   };
+}
+
+function buildParticipantProfileMatchOr(input: {
+  email?: string;
+  externalReference?: string;
+  phone?: string;
+}) {
+  return [
+    input.phone ? { phone: input.phone } : null,
+    input.email ? { email: input.email } : null,
+    input.externalReference ? { externalReference: input.externalReference } : null
+  ].filter(Boolean);
 }
 
 export function createFieldRepository(prismaClient?: FieldPrismaClient): FieldRepository {
@@ -328,13 +355,32 @@ export function createFieldRepository(prismaClient?: FieldPrismaClient): FieldRe
         select: studyParticipantSelect
       });
     },
+    async findParticipantProfileById(participantProfileId) {
+      const prisma = await getPrisma();
+
+      return prisma.participantProfile.findUnique({
+        select: participantProfileSelect,
+        where: { id: participantProfileId }
+      });
+    },
+    async findParticipantProfileMatches(input) {
+      const prisma = await getPrisma();
+      const or = buildParticipantProfileMatchOr(input);
+
+      if (or.length === 0) {
+        return [];
+      }
+
+      return prisma.participantProfile.findMany({
+        orderBy: { createdAt: "asc" },
+        select: participantProfileSelect,
+        take: 10,
+        where: { OR: or }
+      });
+    },
     async findReusableParticipantProfile(input) {
       const prisma = await getPrisma();
-      const or = [
-        input.phone ? { phone: input.phone } : null,
-        input.email ? { email: input.email } : null,
-        input.externalReference ? { externalReference: input.externalReference } : null
-      ].filter(Boolean);
+      const or = buildParticipantProfileMatchOr(input);
 
       if (or.length === 0) {
         return null;
@@ -390,6 +436,20 @@ export function createFieldRepository(prismaClient?: FieldPrismaClient): FieldRe
         orderBy: { createdAt: "asc" },
         select: answerSelect,
         where: { screeningAttemptId: attemptId }
+      });
+    },
+    async listScreeningAttemptsForProfileInStudy(input) {
+      const prisma = await getPrisma();
+
+      return prisma.screeningAttempt.findMany({
+        orderBy: { startedAt: "desc" },
+        select: attemptSelect,
+        where: {
+          studyParticipant: {
+            participantProfileId: input.participantProfileId,
+            studyId: input.studyId
+          }
+        }
       });
     },
     async listAvailableStudies() {

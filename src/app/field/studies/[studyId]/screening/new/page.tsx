@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { createFieldRepository } from "@/modules/field/repository";
+import { getFieldStudy } from "@/modules/field/service";
 import { requireCapability } from "@/shared/auth/session";
 import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
-import { createFieldRepository } from "@/modules/field/repository";
-import { getFieldStudy } from "@/modules/field/service";
-import { ParticipantStartForm } from "../../../../_components/FieldComponents";
+import { ParticipantStartForm } from "../../../../_components/ParticipantStartForm";
 
 export const dynamic = "force-dynamic";
 

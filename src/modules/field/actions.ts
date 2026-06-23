@@ -6,12 +6,24 @@ import { requireCapability } from "@/shared/auth/session";
 import { createFieldRepository } from "./repository";
 import {
   saveFieldScreeningAnswer,
-  startFieldScreeningAttempt
+  startFieldScreeningAttempt,
+  type FieldDuplicateDetectionResult
 } from "./service";
 import {
   getFieldAnswerInputFromFormData,
   getFieldParticipantInputFromFormData
 } from "./validation";
+
+export type FieldStartActionState = {
+  duplicate?: FieldDuplicateDetectionResult;
+  error?: string;
+  values?: {
+    email?: string;
+    externalReference?: string;
+    name?: string;
+    phone?: string;
+  };
+};
 
 function fieldAttemptPath(attemptId: string, questionId?: string | null, message?: string) {
   const params = new URLSearchParams();
@@ -30,18 +42,38 @@ function fieldAttemptPath(attemptId: string, questionId?: string | null, message
 
 export async function startFieldScreeningAttemptAction(
   studyId: string,
+  _previousState: FieldStartActionState,
   formData: FormData
-): Promise<void> {
+): Promise<FieldStartActionState> {
   const actor = await requireCapability("screening:apply");
+  const participantInput = getFieldParticipantInputFromFormData(formData);
+  const decision = String(formData.get("participantDecision") ?? "");
+  const [decisionType, participantProfileId] = decision.split(":");
   const result = await startFieldScreeningAttempt({
     actor,
-    formInput: getFieldParticipantInputFromFormData(formData),
+    confirmation: participantProfileId
+      ? {
+          allowOpenAttemptOverride: decisionType === "force-new-open",
+          participantProfileId
+        }
+      : undefined,
+    formInput: participantInput,
     repository: createFieldRepository(),
     studyId
   });
 
   if (!result.ok) {
-    redirect(`/field/studies/${studyId}/screening/new?error=${encodeURIComponent(result.message)}`);
+    return {
+      error: result.message,
+      values: participantInput
+    };
+  }
+
+  if (result.data.kind === "duplicate_found") {
+    return {
+      duplicate: result.data,
+      values: result.data.input
+    };
   }
 
   revalidatePath("/field");

@@ -35,6 +35,7 @@ export type FieldActor = {
 export type FieldServiceErrorCode =
   | "ATTEMPT_CLOSED"
   | "ATTEMPT_NOT_FOUND"
+  | "OPEN_ATTEMPT_EXISTS"
   | "QUESTION_HIDDEN"
   | "QUESTION_NOT_FOUND"
   | "STUDY_NOT_AVAILABLE"
@@ -53,11 +54,52 @@ export type FieldServiceResult<T> =
     };
 
 export type FieldAttemptStartResult = {
+  kind: "started";
   attemptId: string;
   participantProfileId: string;
   reusedParticipantProfile: boolean;
   studyParticipantId: string;
 };
+
+export type FieldDuplicateIdentifier = {
+  label: string;
+  value: string;
+};
+
+export type FieldDuplicateAttemptSummary = {
+  canOpenDetail: boolean;
+  code: string | null;
+  detailHref: string | null;
+  id: string;
+  nseClass: string | null;
+  nseScore: number | null;
+  reason: string | null;
+  startedAt: Date;
+  status: FieldScreeningStatus;
+};
+
+export type FieldDuplicateParticipantMatch = {
+  canCreateNewAttempt: boolean;
+  canForceNewAttempt: boolean;
+  canReviewAttempts: boolean;
+  continueAttemptHref: string | null;
+  hasClosedAttemptInStudy: boolean;
+  hasOpenAttemptInStudy: boolean;
+  matchedIdentifiers: FieldDuplicateIdentifier[];
+  participantProfileId: string;
+  profileName: string;
+  studyParticipantExists: boolean;
+  studyAttempts: FieldDuplicateAttemptSummary[];
+};
+
+export type FieldDuplicateDetectionResult = {
+  input: FieldParticipantInput;
+  kind: "duplicate_found";
+  matches: FieldDuplicateParticipantMatch[];
+  message: string;
+};
+
+export type FieldStartFlowResult = FieldAttemptStartResult | FieldDuplicateDetectionResult;
 
 export type FieldAttemptScreen = {
   answers: ScreenerAnswers;
@@ -78,6 +120,11 @@ export type FieldAnswerSaveResult = {
   closed: boolean;
   nextQuestionId: string | null;
   status: FieldScreeningStatus;
+};
+
+type FieldStartConfirmation = {
+  allowOpenAttemptOverride?: boolean;
+  participantProfileId?: string;
 };
 
 function isFieldActor(actor: FieldActor | null): actor is FieldActor {
@@ -150,15 +197,17 @@ export async function getFieldStudy({
 
 export async function startFieldScreeningAttempt({
   actor,
+  confirmation,
   formInput,
   repository,
   studyId
 }: {
   actor: FieldActor | null;
+  confirmation?: FieldStartConfirmation;
   formInput: unknown;
   repository: FieldRepository;
   studyId: string;
-}): Promise<FieldServiceResult<FieldAttemptStartResult>> {
+}): Promise<FieldServiceResult<FieldStartFlowResult>> {
   if (!isFieldActor(actor)) {
     return unauthorizedResult();
   }
@@ -185,44 +234,89 @@ export async function startFieldScreeningAttempt({
 
   parseScreenerDefinition(study.activeScreenerVersion.definitionJson);
 
-  const participantProfile = await findOrCreateParticipantProfile({
+  if (confirmation?.participantProfileId) {
+    const profile = await repository.findParticipantProfileById(confirmation.participantProfileId);
+
+    if (!profile || !profileMatchesParticipantInput(profile, parsed.data)) {
+      return {
+        code: "VALIDATION_ERROR",
+        message: "No se pudo confirmar el panelista registrado con los datos capturados.",
+        ok: false
+      };
+    }
+
+    const attempts = await repository.listScreeningAttemptsForProfileInStudy({
+      participantProfileId: profile.id,
+      studyId
+    });
+    const hasOpenAttempt = attempts.some((attempt) => isOpenStatus(attempt.status));
+
+    if (hasOpenAttempt && !confirmation.allowOpenAttemptOverride) {
+      return {
+        code: "OPEN_ATTEMPT_EXISTS",
+        message: "Ya existe un intento abierto para este panelista.",
+        ok: false
+      };
+    }
+
+    if (hasOpenAttempt && confirmation.allowOpenAttemptOverride && !canForceNewAttempt(actor)) {
+      return {
+        code: "OPEN_ATTEMPT_EXISTS",
+        message: "Solo ADMIN o SUPERVISOR pueden crear otro intento cuando ya existe uno abierto.",
+        ok: false
+      };
+    }
+
+    return createAttemptForProfile({
+      actorId: actor.id,
+      profile,
+      repository,
+      reusedParticipantProfile: true,
+      screenerVersionId: study.activeScreenerVersion.id,
+      studyId
+    });
+  }
+
+  const matchingProfiles = await repository.findParticipantProfileMatches({
+    email: parsed.data.email,
+    externalReference: parsed.data.externalReference,
+    phone: parsed.data.phone
+  });
+
+  if (matchingProfiles.length > 0) {
+    return {
+      data: {
+        input: parsed.data,
+        kind: "duplicate_found",
+        matches: await buildDuplicateMatches({
+          actor,
+          input: parsed.data,
+          profiles: matchingProfiles,
+          repository,
+          studyId
+        }),
+        message: "Este panelista ya estaba registrado."
+      },
+      ok: true
+    };
+  }
+
+  const profile = await repository.createParticipantProfile({
+    createdByUserId: actor.id,
+    email: parsed.data.email,
+    externalReference: parsed.data.externalReference,
+    name: parsed.data.name,
+    phone: parsed.data.phone
+  });
+
+  return createAttemptForProfile({
     actorId: actor.id,
-    input: parsed.data,
-    repository
+    profile,
+    repository,
+    reusedParticipantProfile: false,
+    screenerVersionId: study.activeScreenerVersion.id,
+    studyId
   });
-  const studyParticipant =
-    (await repository.findStudyParticipant({
-      participantProfileId: participantProfile.profile.id,
-      studyId
-    })) ??
-    (await repository.createStudyParticipant({
-      createdByUserId: actor.id,
-      participantProfileId: participantProfile.profile.id,
-      screeningStatus: "STARTED",
-      studyId
-    }));
-
-  await repository.updateStudyParticipantScreening({
-    operationalStatus: "SCREENING_STARTED",
-    screeningStatus: "STARTED",
-    studyParticipantId: studyParticipant.id
-  });
-
-  const attempt = await repository.createScreeningAttempt({
-    fieldUserId: actor.id,
-    questionnaireVersionId: study.activeScreenerVersion.id,
-    studyParticipantId: studyParticipant.id
-  });
-
-  return {
-    data: {
-      attemptId: attempt.id,
-      participantProfileId: participantProfile.profile.id,
-      reusedParticipantProfile: participantProfile.reused,
-      studyParticipantId: studyParticipant.id
-    },
-    ok: true
-  };
 }
 
 export async function getFieldScreeningAttemptScreen({
@@ -387,38 +481,162 @@ export async function saveFieldScreeningAnswer({
   };
 }
 
-async function findOrCreateParticipantProfile({
+async function createAttemptForProfile({
   actorId,
-  input,
-  repository
+  profile,
+  repository,
+  reusedParticipantProfile,
+  screenerVersionId,
+  studyId
 }: {
   actorId: string;
-  input: FieldParticipantInput;
+  profile: { id: string };
   repository: FieldRepository;
-}) {
-  const reusableProfile = await repository.findReusableParticipantProfile({
-    email: input.email,
-    externalReference: input.externalReference,
-    phone: input.phone
+  reusedParticipantProfile: boolean;
+  screenerVersionId: string;
+  studyId: string;
+}): Promise<FieldServiceResult<FieldAttemptStartResult>> {
+  const studyParticipant =
+    (await repository.findStudyParticipant({
+      participantProfileId: profile.id,
+      studyId
+    })) ??
+    (await repository.createStudyParticipant({
+      createdByUserId: actorId,
+      participantProfileId: profile.id,
+      screeningStatus: "STARTED",
+      studyId
+    }));
+
+  await repository.updateStudyParticipantScreening({
+    operationalStatus: "SCREENING_STARTED",
+    screeningStatus: "STARTED",
+    studyParticipantId: studyParticipant.id
   });
 
-  if (reusableProfile) {
-    return {
-      profile: reusableProfile,
-      reused: true
-    };
-  }
+  const attempt = await repository.createScreeningAttempt({
+    fieldUserId: actorId,
+    questionnaireVersionId: screenerVersionId,
+    studyParticipantId: studyParticipant.id
+  });
 
   return {
-    profile: await repository.createParticipantProfile({
-      createdByUserId: actorId,
-      email: input.email,
-      externalReference: input.externalReference,
-      name: input.name,
-      phone: input.phone
-    }),
-    reused: false
+    data: {
+      attemptId: attempt.id,
+      kind: "started",
+      participantProfileId: profile.id,
+      reusedParticipantProfile,
+      studyParticipantId: studyParticipant.id
+    },
+    ok: true
   };
+}
+
+async function buildDuplicateMatches({
+  actor,
+  input,
+  profiles,
+  repository,
+  studyId
+}: {
+  actor: FieldActor;
+  input: FieldParticipantInput;
+  profiles: Array<{
+    email: string | null;
+    externalReference: string | null;
+    id: string;
+    name: string;
+    phone: string | null;
+  }>;
+  repository: FieldRepository;
+  studyId: string;
+}): Promise<FieldDuplicateParticipantMatch[]> {
+  return Promise.all(
+    profiles.map(async (profile) => {
+      const studyParticipant = await repository.findStudyParticipant({
+        participantProfileId: profile.id,
+        studyId
+      });
+      const attempts = await repository.listScreeningAttemptsForProfileInStudy({
+        participantProfileId: profile.id,
+        studyId
+      });
+      const openAttempt = attempts.find((attempt) => isOpenStatus(attempt.status));
+      const canOpenCurrentAttempt = openAttempt ? canReadAttempt(actor, openAttempt) : false;
+      const canReviewAttempts = hasCapability(actor.role, "screening:review");
+      const hasOpenAttemptInStudy = Boolean(openAttempt);
+
+      return {
+        canCreateNewAttempt: !hasOpenAttemptInStudy,
+        canForceNewAttempt: hasOpenAttemptInStudy && canForceNewAttempt(actor),
+        canReviewAttempts,
+        continueAttemptHref: openAttempt && canOpenCurrentAttempt ? `/field/screening/${openAttempt.id}` : null,
+        hasClosedAttemptInStudy: attempts.some((attempt) => isClosedStatus(attempt.status)),
+        hasOpenAttemptInStudy,
+        matchedIdentifiers: visibleDuplicateIdentifiers(profile, input, actor),
+        participantProfileId: profile.id,
+        profileName: profile.name,
+        studyAttempts: attempts.map((attempt) => ({
+          canOpenDetail: canReviewAttempts,
+          code: attempt.terminationCode,
+          detailHref: canReviewAttempts ? `/admin/screening-attempts/${attempt.id}` : null,
+          id: attempt.id,
+          nseClass: attempt.nseClass,
+          nseScore: attempt.nseScore,
+          reason: attempt.terminationReason,
+          startedAt: attempt.startedAt,
+          status: attempt.status
+        })),
+        studyParticipantExists: Boolean(studyParticipant)
+      };
+    })
+  );
+}
+
+function visibleDuplicateIdentifiers(
+  profile: {
+    email: string | null;
+    externalReference: string | null;
+    phone: string | null;
+  },
+  input: FieldParticipantInput,
+  actor: FieldActor
+): FieldDuplicateIdentifier[] {
+  const canReadPii = hasCapability(actor.role, "participants:pii:read");
+  const identifiers: FieldDuplicateIdentifier[] = [];
+
+  if (profile.phone && (canReadPii || input.phone === profile.phone)) {
+    identifiers.push({ label: "Teléfono", value: profile.phone });
+  }
+
+  if (profile.email && (canReadPii || input.email === profile.email)) {
+    identifiers.push({ label: "Correo", value: profile.email });
+  }
+
+  if (profile.externalReference && (canReadPii || input.externalReference === profile.externalReference)) {
+    identifiers.push({ label: "Referencia externa", value: profile.externalReference });
+  }
+
+  return identifiers;
+}
+
+function profileMatchesParticipantInput(
+  profile: {
+    email: string | null;
+    externalReference: string | null;
+    phone: string | null;
+  },
+  input: FieldParticipantInput
+): boolean {
+  return Boolean(
+    (input.phone && profile.phone === input.phone) ||
+      (input.email && profile.email === input.email) ||
+      (input.externalReference && profile.externalReference === input.externalReference)
+  );
+}
+
+function canForceNewAttempt(actor: FieldActor): boolean {
+  return actor.role === "ADMIN" || actor.role === "SUPERVISOR";
 }
 
 async function loadAttemptContext({
@@ -757,4 +975,8 @@ function hasAnswer(answer: ScreenerAnswer | undefined): boolean {
 
 function isClosedStatus(status: FieldScreeningStatus): boolean {
   return status === "PASSED" || status === "TERMINATED" || status === "PENDING_REVIEW";
+}
+
+function isOpenStatus(status: FieldScreeningStatus): boolean {
+  return status === "STARTED" || status === "INCOMPLETE";
 }

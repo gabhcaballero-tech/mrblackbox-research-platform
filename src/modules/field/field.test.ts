@@ -230,6 +230,7 @@ function createMemoryRepository(studies: FieldStudySummary[] = [study()]): Field
           }
         },
         questionnaireVersionId: input.questionnaireVersionId,
+        startedAt: new Date("2026-06-23T10:00:00Z"),
         status: "STARTED",
         studyParticipant: {
           ...participant,
@@ -252,6 +253,16 @@ function createMemoryRepository(studies: FieldStudySummary[] = [study()]): Field
       };
       participants.push(participant);
       return participant;
+    },
+    async findParticipantProfileById(participantProfileId) {
+      return profiles.find((profile) => profile.id === participantProfileId) ?? null;
+    },
+    async findParticipantProfileMatches(input) {
+      return profiles.filter((profile) =>
+        (input.phone && profile.phone === input.phone) ||
+        (input.email && profile.email === input.email) ||
+        (input.externalReference && profile.externalReference === input.externalReference)
+      );
     },
     async findReusableParticipantProfile(input) {
       return profiles.find((profile) =>
@@ -278,6 +289,13 @@ function createMemoryRepository(studies: FieldStudySummary[] = [study()]): Field
     },
     async listAvailableStudies() {
       return studies.filter((item) => item.status === "ACTIVE" && item.activeScreenerVersion.status === "ACTIVE");
+    },
+    async listScreeningAttemptsForProfileInStudy(input) {
+      return attempts.filter(
+        (attempt) =>
+          attempt.studyParticipant.participantProfileId === input.participantProfileId &&
+          attempt.studyParticipant.studyId === input.studyId
+      );
     },
     async updateAttemptEvaluation(input) {
       const attempt = attempts.find((item) => item.id === input.attemptId)!;
@@ -329,7 +347,8 @@ async function startAttempt(repository: FieldRepository, currentActor = intervie
   });
 
   expect(result).toMatchObject({ ok: true });
-  return result.ok ? result.data.attemptId : "";
+  expect(result.ok && result.data.kind === "started").toBe(true);
+  return result.ok && result.data.kind === "started" ? result.data.attemptId : "";
 }
 
 async function answer(repository: FieldRepository, attemptId: string, questionId: string, value: string | string[]) {
@@ -383,6 +402,7 @@ describe("field service", () => {
     expect(result).toMatchObject({
       data: {
         attemptId: "attempt-1",
+        kind: "started",
         participantProfileId: "profile-1",
         studyParticipantId: "study-participant-1"
       },
@@ -390,7 +410,42 @@ describe("field service", () => {
     });
   });
 
-  it("reuses ParticipantProfile by reliable data", async () => {
+  it("does not allow starting with only name", async () => {
+    const repository = createMemoryRepository();
+    const result = await startFieldScreeningAttempt({
+      actor: interviewer,
+      formInput: { email: "", externalReference: "", name: "Persona", phone: "" },
+      repository,
+      studyId
+    });
+
+    expect(result).toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Captura teléfono, correo o referencia externa para poder detectar si el panelista ya estaba registrado.",
+      ok: false
+    });
+  });
+
+  it("allows starting with phone, email or external reference", async () => {
+    for (const formInput of [
+      { email: "", externalReference: "", name: "Con teléfono", phone: "5551111111" },
+      { email: "persona@example.com", externalReference: "", name: "Con correo", phone: "" },
+      { email: "", externalReference: "REF-1", name: "Con referencia", phone: "" }
+    ]) {
+      const repository = createMemoryRepository();
+      const result = await startFieldScreeningAttempt({
+        actor: interviewer,
+        formInput,
+        repository,
+        studyId
+      });
+
+      expect(result).toMatchObject({ ok: true });
+      expect(result.ok ? result.data.kind : null).toBe("started");
+    }
+  });
+
+  it("detects existing ParticipantProfile by phone before creating a new attempt", async () => {
     const repository = createMemoryRepository();
     await startAttempt(repository);
     const second = await startFieldScreeningAttempt({
@@ -400,8 +455,128 @@ describe("field service", () => {
       studyId
     });
 
-    expect(second.ok ? second.data.reusedParticipantProfile : false).toBe(true);
-    expect(second.ok ? second.data.participantProfileId : null).toBe("profile-1");
+    expect(second.ok ? second.data.kind : null).toBe("duplicate_found");
+    expect(second.ok && second.data.kind === "duplicate_found" ? second.data.matches[0]?.profileName : null).toBe(
+      "Participante prueba"
+    );
+  });
+
+  it("detects existing ParticipantProfile by email and external reference", async () => {
+    const repository = createMemoryRepository();
+    await startFieldScreeningAttempt({
+      actor: interviewer,
+      formInput: { email: "panelista@example.com", externalReference: "REF-77", name: "Persona", phone: "5558887777" },
+      repository,
+      studyId
+    });
+
+    const byEmail = await startFieldScreeningAttempt({
+      actor: interviewer,
+      formInput: { email: "panelista@example.com", externalReference: "", name: "Otra", phone: "" },
+      repository,
+      studyId
+    });
+    const byReference = await startFieldScreeningAttempt({
+      actor: interviewer,
+      formInput: { email: "", externalReference: "REF-77", name: "Otra", phone: "" },
+      repository,
+      studyId
+    });
+
+    expect(byEmail.ok ? byEmail.data.kind : null).toBe("duplicate_found");
+    expect(byReference.ok ? byReference.data.kind : null).toBe("duplicate_found");
+  });
+
+  it("shows a previous closed attempt for the same study", async () => {
+    const repository = createMemoryRepository();
+    const attemptId = await startAttempt(repository);
+    await answer(repository, attemptId, "F1_GENERO", "MUJER");
+
+    const result = await startFieldScreeningAttempt({
+      actor: interviewer,
+      formInput: { email: "", externalReference: "", name: "Otra captura", phone: "5550000000" },
+      repository,
+      studyId
+    });
+
+    const match = result.ok && result.data.kind === "duplicate_found" ? result.data.matches[0] : null;
+    expect(match?.hasClosedAttemptInStudy).toBe(true);
+    expect(match?.studyAttempts[0]).toMatchObject({
+      code: "GENERO_NO_ELEGIBLE",
+      status: "TERMINATED"
+    });
+  });
+
+  it("blocks a new attempt when an open attempt already exists and offers continue", async () => {
+    const repository = createMemoryRepository();
+    await startAttempt(repository);
+
+    const duplicate = await startFieldScreeningAttempt({
+      actor: interviewer,
+      formInput: { email: "", externalReference: "", name: "Otra captura", phone: "5550000000" },
+      repository,
+      studyId
+    });
+    const blocked = await startFieldScreeningAttempt({
+      actor: interviewer,
+      confirmation: { participantProfileId: "profile-1" },
+      formInput: { email: "", externalReference: "", name: "Otra captura", phone: "5550000000" },
+      repository,
+      studyId
+    });
+
+    const match = duplicate.ok && duplicate.data.kind === "duplicate_found" ? duplicate.data.matches[0] : null;
+    expect(match?.hasOpenAttemptInStudy).toBe(true);
+    expect(match?.continueAttemptHref).toBe("/field/screening/attempt-1");
+    expect(blocked).toMatchObject({
+      code: "OPEN_ATTEMPT_EXISTS",
+      message: "Ya existe un intento abierto para este panelista.",
+      ok: false
+    });
+  });
+
+  it("allows a new attempt over an existing profile when only closed attempts exist and the user confirms", async () => {
+    const repository = createMemoryRepository();
+    const attemptId = await startAttempt(repository);
+    await answer(repository, attemptId, "F1_GENERO", "MUJER");
+
+    const result = await startFieldScreeningAttempt({
+      actor: interviewer,
+      confirmation: { participantProfileId: "profile-1" },
+      formInput: { email: "", externalReference: "", name: "Otra captura", phone: "5550000000" },
+      repository,
+      studyId
+    });
+
+    expect(result).toMatchObject({
+      data: {
+        attemptId: "attempt-2",
+        kind: "started",
+        participantProfileId: "profile-1",
+        reusedParticipantProfile: true
+      },
+      ok: true
+    });
+  });
+
+  it("does not expose additional PII to interviewer in duplicate detection", async () => {
+    const repository = createMemoryRepository();
+    await startFieldScreeningAttempt({
+      actor: interviewer,
+      formInput: { email: "panelista@example.com", externalReference: "REF-77", name: "Persona", phone: "5558887777" },
+      repository,
+      studyId
+    });
+
+    const result = await startFieldScreeningAttempt({
+      actor: interviewer,
+      formInput: { email: "", externalReference: "", name: "Otra captura", phone: "5558887777" },
+      repository,
+      studyId
+    });
+    const identifiers = result.ok && result.data.kind === "duplicate_found" ? result.data.matches[0]?.matchedIdentifiers : [];
+
+    expect(identifiers).toEqual([{ label: "Teléfono", value: "5558887777" }]);
   });
 
   it("rejects study without active screener and unauthorized users", async () => {
@@ -410,7 +585,7 @@ describe("field service", () => {
     await expect(
       startFieldScreeningAttempt({
         actor: interviewer,
-        formInput: { email: "", externalReference: "", name: "Persona", phone: "" },
+        formInput: { email: "", externalReference: "", name: "Persona", phone: "5551234567" },
         repository,
         studyId
       })

@@ -2,13 +2,8 @@ import Link from "next/link";
 import type { ScreenerAnswer, ScreenerQuestion } from "@/modules/screener";
 import type { FieldStudySummary } from "@/modules/field/repository";
 import type { FieldAttemptScreen } from "@/modules/field/service";
-import { saveFieldScreeningAnswerAction, startFieldScreeningAttemptAction } from "@/modules/field/actions";
+import { saveFieldScreeningAnswerAction } from "@/modules/field/actions";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
-
-type ParticipantStartFormProps = {
-  error?: string;
-  studyId: string;
-};
 
 type ScreeningQuestionFormProps = {
   error?: string;
@@ -46,49 +41,6 @@ export function FieldStudyCard({ study }: { study: FieldStudySummary }) {
         </Link>
       </div>
     </article>
-  );
-}
-
-export function ParticipantStartForm({ error, studyId }: ParticipantStartFormProps) {
-  return (
-    <form
-      action={startFieldScreeningAttemptAction.bind(null, studyId)}
-      className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm"
-    >
-      <h2 className="text-lg font-semibold text-zinc-950">Datos mínimos del participante</h2>
-      <p className="mt-1 text-sm leading-6 text-zinc-600">
-        Captura solo lo necesario para iniciar el filtro. Si teléfono, correo o referencia coinciden, se reutiliza el
-        perfil.
-      </p>
-      {error ? (
-        <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <label className={labelClass}>
-          Nombre o identificador operativo
-          <input className={inputClass} name="name" required />
-        </label>
-        <label className={labelClass}>
-          Teléfono
-          <input className={inputClass} name="phone" />
-        </label>
-        <label className={labelClass}>
-          Correo
-          <input className={inputClass} name="email" type="email" />
-        </label>
-        <label className={labelClass}>
-          Referencia externa
-          <input className={inputClass} name="externalReference" />
-        </label>
-      </div>
-      <div className="mt-5">
-        <button className={primaryButtonClass} type="submit">
-          Iniciar filtro
-        </button>
-      </div>
-    </form>
   );
 }
 

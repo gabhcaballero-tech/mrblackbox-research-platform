@@ -19,7 +19,17 @@ export const fieldParticipantInputSchema = z
       .transform((value) => (value.length > 0 ? value : undefined))
       .pipe(z.string().min(6).max(40).optional())
   })
-  .strict();
+  .strict()
+  .superRefine((input, context) => {
+    if (!input.phone && !input.email && !input.externalReference) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "Captura teléfono, correo o referencia externa para poder detectar si el panelista ya estaba registrado.",
+        path: ["phone"]
+      });
+    }
+  });
 
 export const fieldAnswerInputSchema = z
   .object({
