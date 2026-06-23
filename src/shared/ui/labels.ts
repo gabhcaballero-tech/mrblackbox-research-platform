@@ -1,4 +1,4 @@
-export const UI_LABELS = {
+﻿export const UI_LABELS = {
   actions: {
     addOption: "Agregar opción",
     addQuestion: "Agregar pregunta",
@@ -40,7 +40,12 @@ export const UI_LABELS = {
     saveOption: "Actualizar opción",
     saveProduct: "Guardar producto",
     saveQuestion: "Actualizar pregunta",
+    saveQuestionToLibrary: "Guardar pregunta en biblioteca",
+    saveBlockToLibrary: "Guardar preguntas seleccionadas como bloque",
     saveRotation: "Guardar rotación",
+    insertFromLibrary: "Insertar desde biblioteca",
+    retireRevision: "Retirar revisión",
+    viewLibrary: "Ver biblioteca",
     viewStudies: "Ver estudios"
   },
   areas: {
@@ -129,6 +134,39 @@ export const UI_LABELS = {
     password: "Contraseña",
     signIn: "Iniciar sesión",
     signInError: "No se pudo iniciar sesión con esas credenciales."
+  },
+  library: {
+    activeRevision: "Revisión activa",
+    block: "Bloque",
+    category: "Categoría",
+    confirmGeneric:
+      "Confirma que este contenido no incluye marcas, clientes, productos reales, cuotas ni criterios exclusivos de un estudio.",
+    content: "Contenido",
+    description: "Descripción",
+    generic: "Genérico",
+    history: "Historial",
+    insertHelp:
+      "Inserta una copia editable en el borrador. Los cambios futuros de biblioteca no modificarán este screener.",
+    insertedWarning:
+      "Si existen IDs repetidos, el sistema creará IDs nuevos y actualizará reglas y NSE.",
+    itemName: "Nombre del elemento",
+    library: "Biblioteca",
+    libraryHelp:
+      "Guarda y reutiliza preguntas o bloques de screener sin crear dependencias vivas con estudios publicados.",
+    noItems: "No hay elementos de biblioteca con los filtros actuales.",
+    preview: "Previsualización",
+    question: "Pregunta",
+    revision: "Revisión",
+    revisions: "Revisiones",
+    scope: "Alcance",
+    search: "Buscar",
+    specific: "Específico de este estudio",
+    studySpecific: "Específico de estudio",
+    tags: "Etiquetas",
+    tagsHelp: "Separa etiquetas con comas.",
+    type: "Tipo",
+    warningSpecificOtherStudy:
+      "Elemento específico de otro estudio. Revisa que no contenga criterios exclusivos antes de insertarlo."
   },
   navigation: {
     home: "Inicio",

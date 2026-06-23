@@ -132,12 +132,12 @@ const questionBaseSchema = z
   });
 
 const questionWithoutOptionsSchema = questionBaseSchema.extend({
-  type: z.enum(["CONSENT_YES_NO", "INTEGER", "SHORT_TEXT", "LONG_TEXT"])
+  type: z.enum(["INTEGER", "SHORT_TEXT", "LONG_TEXT"])
 });
 
 const questionWithOptionsSchema = questionBaseSchema.extend({
   options: z.array(screenerOptionSchema).default([]),
-  type: z.enum(["SINGLE_CHOICE", "MULTIPLE_CHOICE", "INTERVIEWER_CHECKLIST"])
+  type: z.enum(["CONSENT_YES_NO", "SINGLE_CHOICE", "MULTIPLE_CHOICE", "INTERVIEWER_CHECKLIST"])
 });
 
 export const screenerQuestionSchema = z

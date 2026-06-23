@@ -1,50 +1,50 @@
 import {
-  addScreenerOptionAction,
   addScreenerQuestionAction,
-  addScreenerRuleAction,
-  clearScreenerNseAction,
   createScreenerDraftAction,
-  deleteScreenerOptionAction,
   deleteScreenerQuestionAction,
-  deleteScreenerRuleAction,
-  moveScreenerOptionAction,
   moveScreenerQuestionAction,
   publishScreenerAction,
   retireScreenerVersionAction,
   saveScreenerMetadataAction,
-  saveScreenerNseAction,
-  updateScreenerOptionAction,
   updateScreenerQuestionAction
 } from "@/modules/screener/actions";
 import type {
   ParticipantProfileBinding,
-  ScreenerCondition,
   ScreenerDataDestination,
   ScreenerDefinition,
   ScreenerOption,
   ScreenerQuestion,
-  ScreenerQuestionType,
-  ScreenerRule
+  ScreenerQuestionType
 } from "@/modules/screener";
 import type {
   ScreenerDraftRecord,
   ScreenerStudySummary,
   ScreenerVersionRecord
 } from "@/modules/screener/repository";
+import type { LibraryItemProjection } from "@/modules/question-library/service";
 import {
   DATA_DESTINATION_LABELS,
   PROFILE_BINDING_LABELS,
   QUESTION_TYPE_LABELS,
   QUESTIONNAIRE_VERSION_STATUS_LABELS,
-  RULE_CONDITION_LABELS,
-  RULE_OUTCOME_LABELS,
   STUDY_STATUS_LABELS,
   UI_LABELS
 } from "@/shared/ui/labels";
+import { ConsentDefaultOptionsButton } from "./ConsentDefaultOptionsButton";
+import {
+  InsertFromLibraryPanel,
+  SaveBlockToLibraryForm,
+  SaveQuestionToLibraryForm
+} from "./LibraryScreenerForms";
+import { NseGuidedEditor } from "./NseGuidedEditor";
+import { OptionAddForm } from "./OptionAddForm";
+import { OptionEditForm } from "./OptionEditForm";
+import { RuleGuidedForm } from "./RuleGuidedForm";
 
 type ScreenerBuilderProps = {
   definition: ScreenerDefinition | null;
   draft: ScreenerDraftRecord | null;
+  libraryItems: LibraryItemProjection[];
   readOnly: boolean;
   study: ScreenerStudySummary;
   versions: ScreenerVersionRecord[];
@@ -84,19 +84,6 @@ const optionActionTypes = [
   "PENDING_REVIEW"
 ] satisfies Array<ScreenerOption["actions"][number]["type"]>;
 
-const ruleConditionTypes = [
-  "ANSWER_EQUALS",
-  "ANY_SELECTED",
-  "ALL_SELECTED",
-  "NUMBER_RANGE"
-] satisfies ScreenerCondition["type"][];
-
-const ruleOutcomeTypes = [
-  "TERMINATE",
-  "PENDING_REVIEW",
-  "FLAG"
-] satisfies Array<ScreenerRule["outcome"]["type"]>;
-
 const dateFormatter = new Intl.DateTimeFormat("es-MX", {
   dateStyle: "medium",
   timeStyle: "short"
@@ -105,6 +92,7 @@ const dateFormatter = new Intl.DateTimeFormat("es-MX", {
 export function ScreenerBuilder({
   definition,
   draft,
+  libraryItems,
   readOnly,
   study,
   versions
@@ -118,6 +106,7 @@ export function ScreenerBuilder({
       ) : (
         <>
           <DraftStatusPanel draft={draft} definition={definition} />
+          <InsertFromLibraryPanel items={libraryItems} readOnly={readOnly} studyId={study.id} />
           <MetadataPanel definition={definition} readOnly={readOnly} studyId={study.id} />
           <QuestionPanel definition={definition} readOnly={readOnly} studyId={study.id} />
           <RulePanel definition={definition} readOnly={readOnly} studyId={study.id} />
@@ -279,6 +268,7 @@ function QuestionPanel({
           ))
         )}
       </div>
+      <SaveBlockToLibraryForm questions={questions} readOnly={readOnly} studyId={studyId} />
       <div className="mt-6 rounded-md border border-teal-100 bg-teal-50 p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-teal-800">
           {UI_LABELS.actions.addQuestion}
@@ -328,9 +318,16 @@ function QuestionCard({
         question={question}
         readOnly={readOnly}
       />
+      <SaveQuestionToLibraryForm question={question} readOnly={readOnly} studyId={studyId} />
 
       {"options" in question ? (
-        <OptionPanel options={question.options} questionId={question.id} readOnly={readOnly} studyId={studyId} />
+        <OptionPanel
+          options={question.options}
+          questionId={question.id}
+          questionType={question.type}
+          readOnly={readOnly}
+          studyId={studyId}
+        />
       ) : null}
     </article>
   );
@@ -457,17 +454,25 @@ function QuestionForm({
 function OptionPanel({
   options,
   questionId,
+  questionType,
   readOnly,
   studyId
 }: {
   options: ScreenerOption[];
   questionId: string;
+  questionType: ScreenerQuestionType;
   readOnly: boolean;
   studyId: string;
 }) {
+  const showConsentDefaultsButton =
+    questionType === "CONSENT_YES_NO" && hasMissingConsentDefaultOptions(options);
+
   return (
     <div className="mt-5 rounded-md border border-white bg-white p-4">
       <h4 className="text-sm font-semibold text-zinc-900">{UI_LABELS.screener.options}</h4>
+      {showConsentDefaultsButton ? (
+        <ConsentDefaultOptionsButton questionId={questionId} readOnly={readOnly} studyId={studyId} />
+      ) : null}
       <div className="mt-3 space-y-3">
         {options.length === 0 ? (
           <p className="text-sm text-zinc-500">{UI_LABELS.screener.noOptions}</p>
@@ -475,9 +480,10 @@ function OptionPanel({
           options
             .sort((left, right) => left.order - right.order)
             .map((option) => (
-              <OptionForm
+              <OptionEditForm
                 key={option.value}
                 option={option}
+                optionActionTypes={optionActionTypes}
                 questionId={questionId}
                 readOnly={readOnly}
                 studyId={studyId}
@@ -489,130 +495,20 @@ function OptionPanel({
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
           {UI_LABELS.actions.addOption}
         </p>
-        <OptionForm questionId={questionId} readOnly={readOnly} studyId={studyId} />
+        <OptionAddForm
+          optionActionTypes={optionActionTypes}
+          questionId={questionId}
+          readOnly={readOnly}
+          studyId={studyId}
+        />
       </div>
     </div>
   );
 }
 
-function OptionForm({
-  option,
-  questionId,
-  readOnly,
-  studyId
-}: {
-  option?: ScreenerOption;
-  questionId: string;
-  readOnly: boolean;
-  studyId: string;
-}) {
-  const action = option
-    ? updateScreenerOptionAction.bind(null, studyId, questionId, option.value)
-    : addScreenerOptionAction.bind(null, studyId, questionId);
-  const firstAction = option?.actions[0];
-
-  return (
-    <form action={action} className="grid gap-3 rounded-md border border-zinc-100 p-3 md:grid-cols-4">
-      <label className={labelClass}>
-        {UI_LABELS.screener.optionValue}
-        <input
-          className={inputClass}
-          defaultValue={option?.value ?? ""}
-          name="value"
-          readOnly={Boolean(option)}
-          required
-        />
-      </label>
-      <label className={labelClass}>
-        {UI_LABELS.screener.visibleLabel}
-        <input className={inputClass} defaultValue={option?.label ?? ""} disabled={readOnly} name="label" required />
-      </label>
-      <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
-        <input defaultChecked={option?.isOther ?? false} disabled={readOnly} name="isOther" type="checkbox" />
-        {UI_LABELS.screener.other}
-      </label>
-      <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
-        <input
-          defaultChecked={option?.otherTextRequired ?? false}
-          disabled={readOnly}
-          name="otherTextRequired"
-          type="checkbox"
-        />
-        {UI_LABELS.screener.otherRequiresText}
-      </label>
-      <label className={labelClass}>
-        {UI_LABELS.screener.action}
-        <select className={inputClass} defaultValue={firstAction?.type ?? "NONE"} disabled={readOnly} name="actionType">
-          <option value="NONE">{UI_LABELS.common.doesNotApply}</option>
-          {optionActionTypes.map((type) => (
-            <option key={type} value={type}>
-              {RULE_OUTCOME_LABELS[type]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className={labelClass}>
-        {UI_LABELS.screener.actionCode}
-        <input
-          className={inputClass}
-          defaultValue={getActionCode(firstAction)}
-          disabled={readOnly}
-          name="actionCode"
-        />
-      </label>
-      <label className={labelClass}>
-        {UI_LABELS.screener.reason}
-        <input
-          className={inputClass}
-          defaultValue={getActionReason(firstAction)}
-          disabled={readOnly}
-          name="actionReason"
-        />
-      </label>
-      <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
-        <input
-          defaultChecked={getActionRequiresReview(firstAction)}
-          disabled={readOnly}
-          name="actionRequiresReview"
-          type="checkbox"
-        />
-        {UI_LABELS.screener.requiresReview}
-      </label>
-      <div className="flex flex-wrap gap-2 md:col-span-4">
-        <button className={secondaryButtonClass} disabled={readOnly} type="submit">
-          {option ? UI_LABELS.actions.saveOption : UI_LABELS.actions.addOption}
-        </button>
-        {option ? (
-          <>
-            <button
-              className={secondaryButtonClass}
-              disabled={readOnly}
-              formAction={moveScreenerOptionAction.bind(null, studyId, questionId, option.value, "up")}
-              type="submit"
-            >
-              {UI_LABELS.actions.moveOptionUp}
-            </button>
-            <button
-              className={secondaryButtonClass}
-              disabled={readOnly}
-              formAction={moveScreenerOptionAction.bind(null, studyId, questionId, option.value, "down")}
-              type="submit"
-            >
-              {UI_LABELS.actions.moveOptionDown}
-            </button>
-            <button
-              className={secondaryButtonClass}
-              disabled={readOnly}
-              formAction={deleteScreenerOptionAction.bind(null, studyId, questionId, option.value)}
-              type="submit"
-            >
-              {UI_LABELS.actions.deleteOption}
-            </button>
-          </>
-        ) : null}
-      </div>
-    </form>
-  );
+function hasMissingConsentDefaultOptions(options: ScreenerOption[]): boolean {
+  const values = new Set(options.map((option) => option.value));
+  return !values.has("SI") || !values.has("NO");
 }
 
 function RulePanel({
@@ -630,107 +526,11 @@ function RulePanel({
         description={UI_LABELS.screener.rulesHelp}
         title={UI_LABELS.screener.rulesAndTerminations}
       />
-      <div className="space-y-2">
-        {definition.rules.length === 0 ? (
-          <p className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
-            {UI_LABELS.screener.noAdditionalRules}
-          </p>
-        ) : (
-          definition.rules.map((rule) => (
-            <RuleItem key={rule.id} readOnly={readOnly} rule={rule} studyId={studyId} />
-          ))
-        )}
-      </div>
-      <form action={addScreenerRuleAction.bind(null, studyId)} className="mt-5 grid gap-3 md:grid-cols-4">
-        <label className={labelClass}>
-          {UI_LABELS.screener.ruleId}
-          <input className={inputClass} disabled={readOnly} name="id" required />
-        </label>
-        <label className={labelClass}>
-          {UI_LABELS.screener.question}
-          <input className={inputClass} disabled={readOnly} name="questionId" required />
-        </label>
-        <label className={labelClass}>
-          {UI_LABELS.screener.condition}
-          <select className={inputClass} disabled={readOnly} name="conditionType">
-            {ruleConditionTypes.map((type) => (
-              <option key={type} value={type}>
-                {RULE_CONDITION_LABELS[type]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={labelClass}>
-          {UI_LABELS.screener.result}
-          <select className={inputClass} disabled={readOnly} name="outcomeType">
-            {ruleOutcomeTypes.map((type) => (
-              <option key={type} value={type}>
-                {RULE_OUTCOME_LABELS[type]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={labelClass}>
-          {UI_LABELS.screener.value}
-          <input className={inputClass} disabled={readOnly} name="value" />
-        </label>
-        <label className={labelClass}>
-          {UI_LABELS.screener.values}
-          <input className={inputClass} disabled={readOnly} name="values" placeholder="a,b,c" />
-        </label>
-        <label className={labelClass}>
-          {UI_LABELS.screener.minimum}
-          <input className={inputClass} disabled={readOnly} name="min" />
-        </label>
-        <label className={labelClass}>
-          {UI_LABELS.screener.maximum}
-          <input className={inputClass} disabled={readOnly} name="max" />
-        </label>
-        <label className={labelClass}>
-          {UI_LABELS.common.code}
-          <input className={inputClass} disabled={readOnly} name="outcomeCode" required />
-        </label>
-        <label className={`${labelClass} md:col-span-2`}>
-          {UI_LABELS.screener.reason}
-          <input className={inputClass} disabled={readOnly} name="outcomeReason" />
-        </label>
-        <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
-          <input disabled={readOnly} name="outcomeRequiresReview" type="checkbox" />
-          {UI_LABELS.screener.flagRequiresReview}
-        </label>
-        <div className="md:col-span-4">
-          <button className={secondaryButtonClass} disabled={readOnly} type="submit">
-            {UI_LABELS.actions.addRule}
-          </button>
-        </div>
-      </form>
+      <RuleGuidedForm definition={definition} readOnly={readOnly} studyId={studyId} />
     </section>
   );
 }
 
-function RuleItem({
-  readOnly,
-  rule,
-  studyId
-}: {
-  readOnly: boolean;
-  rule: ScreenerRule;
-  studyId: string;
-}) {
-  return (
-    <div className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 md:flex-row md:items-center md:justify-between">
-      <div>
-        <p className="font-mono text-sm font-semibold text-zinc-900">{rule.id}</p>
-        <p className="text-xs text-zinc-600">
-          {formatConditionLabel(rule.condition)} → {RULE_OUTCOME_LABELS[rule.outcome.type]}
-        </p>
-      </div>
-      <FormButton action={deleteScreenerRuleAction.bind(null, studyId, rule.id)} disabled={readOnly}>
-        {UI_LABELS.actions.deleteRule}
-      </FormButton>
-    </div>
-  );
-}
 
 function NsePanel({
   definition,
@@ -741,67 +541,7 @@ function NsePanel({
   readOnly: boolean;
   studyId: string;
 }) {
-  return (
-    <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-      <SectionHeader
-        description={`${UI_LABELS.screener.nseHelp} ${UI_LABELS.screener.formatInputs} ${UI_LABELS.screener.formatRanges}`}
-        title={UI_LABELS.screener.nseCalculation}
-      />
-      {definition.nse ? (
-        <div className="mb-4 rounded-md border border-teal-100 bg-teal-50 p-3 text-sm text-teal-900">
-          {UI_LABELS.screener.nseConfigured}: {definition.nse.label} con{" "}
-          {definition.nse.inputs.length} entradas y {definition.nse.ranges.length} rangos.
-        </div>
-      ) : (
-        <p className="mb-4 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
-          {UI_LABELS.screener.noNse}
-        </p>
-      )}
-      <form action={saveScreenerNseAction.bind(null, studyId)} className="grid gap-3 md:grid-cols-2">
-        <label className={labelClass}>
-          {UI_LABELS.screener.nseCode}
-          <input className={inputClass} defaultValue={definition.nse?.code ?? "nse"} disabled={readOnly} name="code" />
-        </label>
-        <label className={labelClass}>
-          {UI_LABELS.screener.nseLabel}
-          <input className={inputClass} defaultValue={definition.nse?.label ?? "NSE"} disabled={readOnly} name="label" />
-        </label>
-        <label className={`${labelClass} md:col-span-2`}>
-          {UI_LABELS.screener.nseInputs}
-          <textarea
-            className={inputClass}
-            defaultValue={formatNseInputs(definition.nse)}
-            disabled={readOnly}
-            name="inputsText"
-            rows={4}
-          />
-        </label>
-        <label className={`${labelClass} md:col-span-2`}>
-          {UI_LABELS.screener.nseRanges}
-          <textarea
-            className={inputClass}
-            defaultValue={formatNseRanges(definition.nse)}
-            disabled={readOnly}
-            name="rangesText"
-            rows={4}
-          />
-        </label>
-        <div className="flex flex-wrap gap-2 md:col-span-2">
-          <button className={secondaryButtonClass} disabled={readOnly} type="submit">
-            {UI_LABELS.actions.saveNse}
-          </button>
-          <button
-            className={secondaryButtonClass}
-            disabled={readOnly}
-            formAction={clearScreenerNseAction.bind(null, studyId)}
-            type="submit"
-          >
-            {UI_LABELS.actions.removeNse}
-          </button>
-        </div>
-      </form>
-    </section>
-  );
+  return <NseGuidedEditor definition={definition} readOnly={readOnly} studyId={studyId} />;
 }
 
 function PublishPanel({
@@ -945,48 +685,6 @@ function FormButton({
       </button>
     </form>
   );
-}
-
-function formatConditionLabel(condition: ScreenerCondition): string {
-  return RULE_CONDITION_LABELS[condition.type];
-}
-
-function formatNseInputs(nse: ScreenerDefinition["nse"]): string {
-  if (!nse) {
-    return "";
-  }
-
-  return nse.inputs
-    .map((input) => {
-      const scores = Object.entries(input.scoreByAnswer)
-        .map(([value, score]) => `${value}=${score}`)
-        .join(",");
-
-      return `${input.questionId}|${scores}|missing=${input.missingScore}`;
-    })
-    .join("\n");
-}
-
-function formatNseRanges(nse: ScreenerDefinition["nse"]): string {
-  if (!nse) {
-    return "";
-  }
-
-  return nse.ranges
-    .map((range) => `${range.code}|${range.label}|${range.min}|${range.max}|${range.eligible}`)
-    .join("\n");
-}
-
-function getActionCode(action: ScreenerOption["actions"][number] | undefined): string {
-  return action && "code" in action ? action.code : "";
-}
-
-function getActionReason(action: ScreenerOption["actions"][number] | undefined): string {
-  return action && "reason" in action ? action.reason : "";
-}
-
-function getActionRequiresReview(action: ScreenerOption["actions"][number] | undefined): boolean {
-  return action && "requiresReview" in action ? action.requiresReview : false;
 }
 
 const labelClass = "flex flex-col gap-1 text-sm font-medium text-zinc-700";

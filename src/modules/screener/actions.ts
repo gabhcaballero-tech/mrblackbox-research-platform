@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireCapability } from "@/shared/auth/session";
 import { createScreenerRepository } from "./repository";
 import {
+  addConsentDefaultOptionsForAdmin,
   addScreenerOptionForAdmin,
   addScreenerQuestionForAdmin,
   addScreenerRuleForAdmin,
@@ -19,15 +20,25 @@ import {
   saveScreenerMetadataForAdmin,
   saveScreenerNseForAdmin,
   updateScreenerOptionForAdmin,
-  updateScreenerQuestionForAdmin
+  updateScreenerQuestionForAdmin,
+  updateScreenerRuleForAdmin
 } from "./service";
 import {
   getMetadataInputFromFormData,
   getNseInputFromFormData,
   getOptionInputFromFormData,
   getQuestionInputFromFormData,
-  getRuleInputFromFormData
+  getRuleInputFromFormData,
+  type ScreenerAdminFieldErrors
 } from "./validation";
+
+export type ScreenerOptionActionState = {
+  fieldErrors?: ScreenerAdminFieldErrors;
+  message: string;
+  ok: boolean;
+};
+
+export type ScreenerRuleActionState = ScreenerOptionActionState;
 
 function revalidateScreener(studyId: string) {
   revalidatePath("/admin");
@@ -152,18 +163,35 @@ export async function addScreenerOptionAction(
   studyId: string,
   questionId: string,
   formData: FormData
-): Promise<void> {
-  const actor = await requireCapability("admin:access");
-  const result = await addScreenerOptionForAdmin({
-    actor,
-    formInput: getOptionInputFromFormData(formData),
-    questionId,
-    repository: createScreenerRepository(),
-    studyId
-  });
+): Promise<ScreenerOptionActionState> {
+  try {
+    const actor = await requireCapability("admin:access");
+    const result = await addScreenerOptionForAdmin({
+      actor,
+      formInput: getOptionInputFromFormData(formData),
+      questionId,
+      repository: createScreenerRepository(),
+      studyId
+    });
 
-  if (result.ok) {
+    if (!result.ok) {
+      return {
+        fieldErrors: result.fieldErrors,
+        message: result.message,
+        ok: false
+      };
+    }
+
     revalidateScreener(studyId);
+    return {
+      message: "La opción se guardó correctamente.",
+      ok: true
+    };
+  } catch {
+    return {
+      message: "No se pudo guardar la opción. Intenta nuevamente.",
+      ok: false
+    };
   }
 }
 
@@ -172,19 +200,36 @@ export async function updateScreenerOptionAction(
   questionId: string,
   optionValue: string,
   formData: FormData
-): Promise<void> {
-  const actor = await requireCapability("admin:access");
-  const result = await updateScreenerOptionForAdmin({
-    actor,
-    formInput: getOptionInputFromFormData(formData),
-    optionValue,
-    questionId,
-    repository: createScreenerRepository(),
-    studyId
-  });
+): Promise<ScreenerOptionActionState> {
+  try {
+    const actor = await requireCapability("admin:access");
+    const result = await updateScreenerOptionForAdmin({
+      actor,
+      formInput: getOptionInputFromFormData(formData),
+      optionValue,
+      questionId,
+      repository: createScreenerRepository(),
+      studyId
+    });
 
-  if (result.ok) {
+    if (!result.ok) {
+      return {
+        fieldErrors: result.fieldErrors,
+        message: result.message,
+        ok: false
+      };
+    }
+
     revalidateScreener(studyId);
+    return {
+      message: "Opción actualizada correctamente.",
+      ok: true
+    };
+  } catch {
+    return {
+      message: "No se pudo actualizar la opción. Intenta nuevamente.",
+      ok: false
+    };
   }
 }
 
@@ -234,20 +279,110 @@ export async function moveScreenerOptionAction(
   }
 }
 
+export async function addConsentDefaultOptionsAction(
+  studyId: string,
+  questionId: string,
+  _formData: FormData
+): Promise<ScreenerOptionActionState> {
+  void _formData;
+
+  try {
+    const actor = await requireCapability("admin:access");
+    const result = await addConsentDefaultOptionsForAdmin({
+      actor,
+      questionId,
+      repository: createScreenerRepository(),
+      studyId
+    });
+
+    if (!result.ok) {
+      return {
+        fieldErrors: result.fieldErrors,
+        message: result.message,
+        ok: false
+      };
+    }
+
+    revalidateScreener(studyId);
+    return {
+      message: "Opciones de consentimiento agregadas correctamente.",
+      ok: true
+    };
+  } catch {
+    return {
+      message: "No se pudieron agregar las opciones de consentimiento. Intenta nuevamente.",
+      ok: false
+    };
+  }
+}
+
 export async function addScreenerRuleAction(
   studyId: string,
   formData: FormData
-): Promise<void> {
-  const actor = await requireCapability("admin:access");
-  const result = await addScreenerRuleForAdmin({
-    actor,
-    formInput: getRuleInputFromFormData(formData),
-    repository: createScreenerRepository(),
-    studyId
-  });
+): Promise<ScreenerRuleActionState> {
+  try {
+    const actor = await requireCapability("admin:access");
+    const result = await addScreenerRuleForAdmin({
+      actor,
+      formInput: getRuleInputFromFormData(formData),
+      repository: createScreenerRepository(),
+      studyId
+    });
 
-  if (result.ok) {
+    if (!result.ok) {
+      return {
+        fieldErrors: result.fieldErrors,
+        message: result.message,
+        ok: false
+      };
+    }
+
     revalidateScreener(studyId);
+    return {
+      message: "Regla guardada correctamente.",
+      ok: true
+    };
+  } catch {
+    return {
+      message: "No se pudo guardar la regla. Intenta nuevamente.",
+      ok: false
+    };
+  }
+}
+
+export async function updateScreenerRuleAction(
+  studyId: string,
+  ruleId: string,
+  formData: FormData
+): Promise<ScreenerRuleActionState> {
+  try {
+    const actor = await requireCapability("admin:access");
+    const result = await updateScreenerRuleForAdmin({
+      actor,
+      formInput: getRuleInputFromFormData(formData),
+      repository: createScreenerRepository(),
+      ruleId,
+      studyId
+    });
+
+    if (!result.ok) {
+      return {
+        fieldErrors: result.fieldErrors,
+        message: result.message,
+        ok: false
+      };
+    }
+
+    revalidateScreener(studyId);
+    return {
+      message: "Regla actualizada correctamente.",
+      ok: true
+    };
+  } catch {
+    return {
+      message: "No se pudo actualizar la regla. Intenta nuevamente.",
+      ok: false
+    };
   }
 }
 

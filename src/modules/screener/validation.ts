@@ -41,6 +41,15 @@ function optionalNumber(value: unknown): number | undefined {
   return Number.isFinite(numberValue) ? numberValue : undefined;
 }
 
+function hasDelimitedValues(value: string | undefined): boolean {
+  return Boolean(
+    value
+      ?.split(",")
+      .map((item) => item.trim())
+      .filter(Boolean).length
+  );
+}
+
 export const screenerMetadataInputSchema = z.object({
   description: z.preprocess(optionalText, z.string().max(500).optional()),
   title: z.preprocess(
@@ -98,6 +107,30 @@ export const screenerOptionInputSchema = z.object({
       .max(80)
       .regex(technicalKeyPattern, "Usa letras, números, guiones o guiones bajos internos.")
   )
+}).superRefine((input, context) => {
+  if (
+    (input.actionType === "TERMINATE" ||
+      input.actionType === "PENDING_REVIEW" ||
+      input.actionType === "FLAG") &&
+    !input.actionCode
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "El código de acción es obligatorio.",
+      path: ["actionCode"]
+    });
+  }
+
+  if (
+    (input.actionType === "TERMINATE" || input.actionType === "PENDING_REVIEW") &&
+    !input.actionReason
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "El motivo es obligatorio para terminar el filtro o enviar a revisión.",
+      path: ["actionReason"]
+    });
+  }
 });
 
 export const screenerRuleInputSchema = z.object({
@@ -119,6 +152,62 @@ export const screenerRuleInputSchema = z.object({
   questionId: z.preprocess(normalizeTechnicalKey, z.string().min(1, "La pregunta es obligatoria.")),
   value: z.preprocess(optionalText, z.string().optional()),
   values: z.preprocess(optionalText, z.string().optional())
+}).superRefine((input, context) => {
+  if (input.conditionType === "ANSWER_EQUALS" && !input.value) {
+    context.addIssue({
+      code: "custom",
+      message: "Selecciona o ingresa el valor esperado.",
+      path: ["value"]
+    });
+  }
+
+  if (
+    (input.conditionType === "ANY_SELECTED" || input.conditionType === "ALL_SELECTED") &&
+    !hasDelimitedValues(input.values)
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "Selecciona al menos una opción para la condición.",
+      path: ["values"]
+    });
+  }
+
+  if (input.conditionType === "NUMBER_RANGE") {
+    if (input.min === undefined && input.max === undefined) {
+      context.addIssue({
+        code: "custom",
+          message: "Ingresa al menos un mínimo o un máximo para el rango.",
+        path: ["min"]
+      });
+    }
+
+    if (input.min !== undefined && input.max !== undefined && input.min > input.max) {
+      context.addIssue({
+        code: "custom",
+          message: "El mínimo no puede ser mayor que el máximo.",
+        path: ["min"]
+      });
+    }
+  }
+
+  if (!input.outcomeCode) {
+    context.addIssue({
+      code: "custom",
+      message: "El código de resultado es obligatorio.",
+      path: ["outcomeCode"]
+    });
+  }
+
+  if (
+    (input.outcomeType === "TERMINATE" || input.outcomeType === "PENDING_REVIEW") &&
+    !input.outcomeReason
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "El motivo es obligatorio para terminar el filtro o enviar a revisión.",
+      path: ["outcomeReason"]
+    });
+  }
 });
 
 export const screenerNseInputSchema = z.object({

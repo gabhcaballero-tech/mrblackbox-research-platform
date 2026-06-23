@@ -8,6 +8,8 @@ import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { parseScreenerDefinition } from "@/modules/screener";
 import { createScreenerRepository } from "@/modules/screener/repository";
 import { getScreenerBuilderForAdmin } from "@/modules/screener/service";
+import { createQuestionLibraryRepository } from "@/modules/question-library/repository";
+import { listLibraryItemsForAdmin } from "@/modules/question-library/service";
 import { ScreenerBuilder } from "./_components/ScreenerBuilder";
 
 export const dynamic = "force-dynamic";
@@ -16,14 +18,22 @@ type ScreenerPageProps = {
   params: Promise<{
     studyId: string;
   }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function ScreenerPage({ params }: ScreenerPageProps) {
+export default async function ScreenerPage({ params, searchParams }: ScreenerPageProps) {
   const { studyId } = await params;
+  const libraryFilters = (await searchParams) ?? {};
   const admin = await requireCapability("admin:access");
   const result = await getScreenerBuilderForAdmin({
     actor: admin,
     repository: createScreenerRepository(),
+    studyId
+  });
+  const libraryResult = await listLibraryItemsForAdmin({
+    actor: admin,
+    filters: libraryFilters,
+    repository: createQuestionLibraryRepository(),
     studyId
   });
 
@@ -33,6 +43,10 @@ export default async function ScreenerPage({ params }: ScreenerPageProps) {
     }
 
     throw new Error(result.message);
+  }
+
+  if (!libraryResult.ok) {
+    throw new Error(libraryResult.message);
   }
 
   const { draft, study, versions } = result.data;
@@ -70,6 +84,7 @@ export default async function ScreenerPage({ params }: ScreenerPageProps) {
       <ScreenerBuilder
         definition={definition}
         draft={draft}
+        libraryItems={libraryResult.data}
         readOnly={readOnly}
         study={study}
         versions={versions}

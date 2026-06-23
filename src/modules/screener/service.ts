@@ -92,6 +92,33 @@ type LoadedDraftContext = {
   draft: ScreenerDraftRecord;
 };
 
+function createConsentDefaultOptions(): ScreenerOption[] {
+  return [
+    {
+      actions: [{ type: "CONTINUE" }],
+      isOther: false,
+      label: "Sí, acepto participar",
+      order: 1,
+      otherTextRequired: false,
+      value: "SI"
+    },
+    {
+      actions: [
+        {
+          code: "SIN_CONSENTIMIENTO",
+          reason: "La persona no aceptó participar voluntariamente en el estudio.",
+          type: "TERMINATE"
+        }
+      ],
+      isOther: false,
+      label: "No, no acepto participar",
+      order: 2,
+      otherTextRequired: false,
+      value: "NO"
+    }
+  ];
+}
+
 function isAdmin(actor: ScreenerAdminActor | null): actor is ScreenerAdminActor {
   return Boolean(actor && actor.status === "ACTIVE" && hasCapability(actor.role, "admin:access"));
 }
@@ -478,6 +505,58 @@ export async function moveScreenerOptionForAdmin({
   });
 }
 
+export async function addConsentDefaultOptionsForAdmin({
+  actor,
+  questionId,
+  repository,
+  studyId
+}: ServiceInput & { questionId: string }): Promise<ScreenerServiceResult<{ updated: true }>> {
+  return mutateDraftForAdmin({
+    actor,
+    mutate(definition) {
+      let foundQuestion = false;
+      const questions = definition.questions.map((question) => {
+        if (question.id !== questionId) {
+          return question;
+        }
+
+        foundQuestion = true;
+
+        if (question.type !== "CONSENT_YES_NO") {
+          throw new ScreenerServiceMutationError(
+            "VALIDATION_ERROR",
+            "Las opciones predeterminadas solo aplican a preguntas de consentimiento."
+          );
+        }
+
+        if (!("options" in question)) {
+          throw new ScreenerServiceMutationError(
+            "VALIDATION_ERROR",
+            "La pregunta de consentimiento no admite opciones en este borrador."
+          );
+        }
+
+        return {
+          ...question,
+          options: normalizeOptionOrders(mergeMissingConsentOptions(question.options)),
+          required: true
+        };
+      });
+
+      if (!foundQuestion) {
+        throw new ScreenerServiceMutationError("QUESTION_NOT_FOUND", "La pregunta no existe.");
+      }
+
+      return {
+        ...definition,
+        questions
+      };
+    },
+    repository,
+    studyId
+  });
+}
+
 export async function addScreenerRuleForAdmin({
   actor,
   formInput,
@@ -493,9 +572,49 @@ export async function addScreenerRuleForAdmin({
   return mutateDraftForAdmin({
     actor,
     mutate(definition) {
+      const rule = buildRule(parsed.data, nextOrder(definition.rules));
+
+      assertRuleQuestionExists(definition, rule);
+
       return normalizeDefinitionOrders({
         ...definition,
-        rules: [...definition.rules, buildRule(parsed.data, nextOrder(definition.rules))]
+        rules: [...definition.rules, rule]
+      });
+    },
+    repository,
+    studyId
+  });
+}
+
+export async function updateScreenerRuleForAdmin({
+  actor,
+  formInput,
+  repository,
+  ruleId,
+  studyId
+}: DraftMutationInput & { ruleId: string }): Promise<ScreenerServiceResult<{ updated: true }>> {
+  const parsed = screenerRuleInputSchema.safeParse(formInput);
+
+  if (!parsed.success) {
+    return validationResult("Revisa la regla.", parsed.error.flatten().fieldErrors);
+  }
+
+  return mutateDraftForAdmin({
+    actor,
+    mutate(definition) {
+      const current = definition.rules.find((rule) => rule.id === ruleId);
+
+      if (!current) {
+        throw new ScreenerServiceMutationError("VALIDATION_ERROR", "La regla no existe.");
+      }
+
+      const rule = buildRule({ ...parsed.data, id: ruleId }, current.order);
+
+      assertRuleQuestionExists(definition, rule);
+
+      return normalizeDefinitionOrders({
+        ...definition,
+        rules: definition.rules.map((item) => (item.id === ruleId ? rule : item))
       });
     },
     repository,
@@ -863,7 +982,7 @@ function buildQuestion(
     id: input.id,
     order,
     profileBinding: input.profileBinding,
-    required: input.required,
+    required: input.type === "CONSENT_YES_NO" ? true : input.required,
     text: input.text,
     validation: compactObject({
       max: input.validationMax,
@@ -874,6 +993,14 @@ function buildQuestion(
       minSelections: input.validationMinSelections
     })
   };
+
+  if (input.type === "CONSENT_YES_NO") {
+    return {
+      ...base,
+      options: existingOptions.length > 0 ? existingOptions : createConsentDefaultOptions(),
+      type: input.type
+    };
+  }
 
   if (
     input.type === "SINGLE_CHOICE" ||
@@ -1015,7 +1142,7 @@ function buildNse(input: ScreenerNseInput): NseScoreTable {
 }
 
 function parseNseInputs(value: string): NseScoreTable["inputs"] {
-  return value
+  const inputs = value
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
@@ -1044,10 +1171,26 @@ function parseNseInputs(value: string): NseScoreTable["inputs"] {
         )
       };
     });
+
+  const questionIds = new Set<string>();
+
+  for (const input of inputs) {
+    if (questionIds.has(input.questionId)) {
+      throw new Error("Cada pregunta puede agregarse una sola vez al cálculo NSE.");
+    }
+
+    questionIds.add(input.questionId);
+
+    if (!Number.isFinite(input.missingScore)) {
+      throw new Error("El puntaje por respuesta faltante debe ser numérico.");
+    }
+  }
+
+  return inputs;
 }
 
 function parseNseRanges(value: string): NseScoreTable["ranges"] {
-  return value
+  const ranges = value
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
@@ -1072,6 +1215,41 @@ function parseNseRanges(value: string): NseScoreTable["ranges"] {
         min: Number(min)
       };
     });
+
+  const codes = new Set<string>();
+
+  for (const range of ranges) {
+    if (codes.has(range.code)) {
+      throw new Error("No puede haber dos rangos NSE con el mismo código.");
+    }
+
+    codes.add(range.code);
+
+    if (!Number.isInteger(range.min) || !Number.isInteger(range.max)) {
+      throw new Error("El puntaje mínimo y máximo de cada rango deben ser enteros.");
+    }
+
+    if (range.min > range.max) {
+      throw new Error("El puntaje mínimo no puede ser mayor que el puntaje máximo.");
+    }
+  }
+
+  const sortedRanges = [...ranges].sort((left, right) => left.min - right.min);
+
+  for (let index = 1; index < sortedRanges.length; index += 1) {
+    const previous = sortedRanges[index - 1]!;
+    const current = sortedRanges[index]!;
+
+    if (current.min <= previous.max) {
+      throw new Error("Los rangos NSE no pueden traslaparse.");
+    }
+  }
+
+  if (!ranges.some((range) => range.eligible)) {
+    throw new Error("Marca al menos un rango NSE como elegible.");
+  }
+
+  return ranges;
 }
 
 function normalizeDefinitionOrders(definition: ScreenerDefinition): ScreenerDefinition {
@@ -1111,6 +1289,22 @@ function normalizeOptionOrders(options: ScreenerOption[]): ScreenerOption[] {
     }));
 }
 
+function mergeMissingConsentOptions(options: ScreenerOption[]): ScreenerOption[] {
+  const existingValues = new Set(options.map((option) => option.value));
+  const nextOptions = [...options];
+
+  for (const defaultOption of createConsentDefaultOptions()) {
+    if (!existingValues.has(defaultOption.value)) {
+      nextOptions.push({
+        ...defaultOption,
+        order: nextOrder(nextOptions)
+      });
+    }
+  }
+
+  return nextOptions;
+}
+
 function nextOrder(items: Array<{ order: number }>): number {
   return items.length === 0 ? 1 : Math.max(...items.map((item) => item.order)) + 1;
 }
@@ -1130,6 +1324,30 @@ function compactObject<T extends Record<string, unknown>>(input: T): Partial<T> 
 
 function ruleReferencesQuestion(rule: ScreenerRule, questionId: string): boolean {
   return conditionReferencesQuestion(rule.condition, questionId);
+}
+
+function assertRuleQuestionExists(definition: ScreenerDefinition, rule: ScreenerRule): void {
+  const questionIds = new Set(definition.questions.map((question) => question.id));
+
+  if (!conditionReferencesExistingQuestion(rule.condition, questionIds)) {
+    throw new ScreenerServiceMutationError(
+      "QUESTION_NOT_FOUND",
+      "La pregunta seleccionada no existe en el borrador."
+    );
+  }
+}
+
+function conditionReferencesExistingQuestion(
+  condition: ScreenerRule["condition"],
+  questionIds: Set<string>
+): boolean {
+  if (condition.type === "ANY" || condition.type === "ALL") {
+    return condition.conditions.every((nestedCondition) =>
+      conditionReferencesExistingQuestion(nestedCondition, questionIds)
+    );
+  }
+
+  return questionIds.has(condition.questionId);
 }
 
 function conditionReferencesQuestion(condition: ScreenerRule["condition"], questionId: string): boolean {

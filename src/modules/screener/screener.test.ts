@@ -16,10 +16,16 @@ import type {
   ScreenerVersionRecord
 } from "./repository";
 import {
+  addConsentDefaultOptionsForAdmin,
+  addScreenerOptionForAdmin,
   addScreenerQuestionForAdmin,
+  addScreenerRuleForAdmin,
   createScreenerDraftForAdmin,
   projectScreenerVersionForAdmin,
   publishScreenerForAdmin,
+  saveScreenerNseForAdmin,
+  updateScreenerOptionForAdmin,
+  updateScreenerRuleForAdmin,
   type ScreenerAdminActor
 } from "./service";
 
@@ -45,6 +51,30 @@ function definition(overrides: Partial<ScreenerDefinition> = {}): ScreenerDefini
       {
         dataDestination: "SCREENING",
         id: "q-consent",
+        options: [
+          {
+            actions: [{ type: "CONTINUE" }],
+            isOther: false,
+            label: "Sí, acepto participar",
+            order: 1,
+            otherTextRequired: false,
+            value: "SI"
+          },
+          {
+            actions: [
+              {
+                code: "SIN_CONSENTIMIENTO",
+                reason: "La persona no aceptó participar voluntariamente en el estudio.",
+                type: "TERMINATE"
+              }
+            ],
+            isOther: false,
+            label: "No, no acepto participar",
+            order: 2,
+            otherTextRequired: false,
+            value: "NO"
+          }
+        ],
         order: 1,
         required: true,
         text: "Consentimiento",
@@ -532,6 +562,220 @@ describe("screener admin service", () => {
     expect(result).toMatchObject({ code: "STUDY_NOT_DRAFT", ok: false });
   });
 
+  it("creates default SI and NO options for a new consent question", async () => {
+    const builder = {
+      draft: draft(definition({ questions: [], rules: [] })),
+      study: study(),
+      versions: []
+    };
+
+    const result = await addScreenerQuestionForAdmin({
+      actor: adminActor,
+      formInput: {
+        dataDestination: "SCREENING",
+        id: "q-consent-new",
+        required: false,
+        text: "Consentimiento",
+        type: "CONSENT_YES_NO"
+      },
+      repository: fakeRepository(builder),
+      studyId
+    });
+    const nextDefinition = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+
+    expect(result).toMatchObject({ ok: true });
+    expect(nextDefinition.questions[0]).toMatchObject({
+      id: "q-consent-new",
+      required: true,
+      type: "CONSENT_YES_NO",
+      options: [
+        {
+          actions: [{ type: "CONTINUE" }],
+          label: "Sí, acepto participar",
+          order: 1,
+          value: "SI"
+        },
+        {
+          actions: [
+            {
+              code: "SIN_CONSENTIMIENTO",
+              reason: "La persona no aceptó participar voluntariamente en el estudio.",
+              type: "TERMINATE"
+            }
+          ],
+          label: "No, no acepto participar",
+          order: 2,
+          value: "NO"
+        }
+      ]
+    });
+  });
+
+  it("repairs an existing consent question without options", async () => {
+    const builder = {
+      draft: draft(
+        definition({
+          questions: [
+            {
+              dataDestination: "SCREENING",
+              id: "q-consent-old",
+              order: 1,
+              required: true,
+              text: "Consentimiento",
+              type: "CONSENT_YES_NO"
+            } as unknown as ScreenerDefinition["questions"][number]
+          ],
+          rules: []
+        })
+      ),
+      study: study(),
+      versions: []
+    };
+
+    const result = await addConsentDefaultOptionsForAdmin({
+      actor: adminActor,
+      questionId: "q-consent-old",
+      repository: fakeRepository(builder),
+      studyId
+    });
+    const nextDefinition = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+
+    expect(result).toMatchObject({ ok: true });
+    expect(nextDefinition.questions[0]).toMatchObject({
+      options: [
+        { label: "Sí, acepto participar", value: "SI" },
+        { label: "No, no acepto participar", value: "NO" }
+      ],
+      required: true
+    });
+  });
+
+  it("does not duplicate SI or NO when repairing consent options", async () => {
+    const builder = {
+      draft: draft(
+        definition({
+          questions: [
+            {
+              dataDestination: "SCREENING",
+              id: "q-consent-partial",
+              options: [
+                {
+                  actions: [{ type: "CONTINUE" }],
+                  isOther: false,
+                  label: "Acepto personalizado",
+                  order: 1,
+                  otherTextRequired: false,
+                  value: "SI"
+                }
+              ],
+              order: 1,
+              required: true,
+              text: "Consentimiento",
+              type: "CONSENT_YES_NO",
+              validation: {}
+            }
+          ],
+          rules: []
+        })
+      ),
+      study: study(),
+      versions: []
+    };
+
+    await addConsentDefaultOptionsForAdmin({
+      actor: adminActor,
+      questionId: "q-consent-partial",
+      repository: fakeRepository(builder),
+      studyId
+    });
+    await addConsentDefaultOptionsForAdmin({
+      actor: adminActor,
+      questionId: "q-consent-partial",
+      repository: fakeRepository(builder),
+      studyId
+    });
+    const nextDefinition = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+    const question = nextDefinition.questions[0];
+
+    expect("options" in question ? question.options.filter((option) => option.value === "SI") : []).toHaveLength(1);
+    expect("options" in question ? question.options.filter((option) => option.value === "NO") : []).toHaveLength(1);
+    expect(question).toMatchObject({
+      options: [
+        { label: "Acepto personalizado", value: "SI" },
+        { label: "No, no acepto participar", value: "NO" }
+      ]
+    });
+  });
+
+  it("does not overwrite a customized consent option", async () => {
+    const builder = {
+      draft: draft(
+        definition({
+          questions: [
+            {
+              dataDestination: "SCREENING",
+              id: "q-consent-custom",
+              options: [
+                {
+                  actions: [
+                    {
+                      code: "NO_CUSTOM",
+                      reason: "Motivo personalizado.",
+                      type: "TERMINATE"
+                    }
+                  ],
+                  isOther: false,
+                  label: "No personalizado",
+                  order: 1,
+                  otherTextRequired: false,
+                  value: "NO"
+                }
+              ],
+              order: 1,
+              required: true,
+              text: "Consentimiento",
+              type: "CONSENT_YES_NO",
+              validation: {}
+            }
+          ],
+          rules: []
+        })
+      ),
+      study: study(),
+      versions: []
+    };
+
+    const result = await addConsentDefaultOptionsForAdmin({
+      actor: adminActor,
+      questionId: "q-consent-custom",
+      repository: fakeRepository(builder),
+      studyId
+    });
+    const nextDefinition = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+
+    expect(result).toMatchObject({ ok: true });
+    expect(nextDefinition.questions[0]).toMatchObject({
+      options: [
+        {
+          actions: [
+            {
+              code: "NO_CUSTOM",
+              reason: "Motivo personalizado.",
+              type: "TERMINATE"
+            }
+          ],
+          label: "No personalizado",
+          value: "NO"
+        },
+        {
+          actions: [{ type: "CONTINUE" }],
+          label: "Sí, acepto participar",
+          value: "SI"
+        }
+      ]
+    });
+  });
+
   it("publishes consecutive versions and retires the previous active version", async () => {
     const builder = {
       draft: draft(),
@@ -549,6 +793,668 @@ describe("screener admin service", () => {
     expect(result.ok ? result.data.retiredCount : null).toBe(1);
     expect(builder.versions.filter((item) => item.status === "ACTIVE")).toHaveLength(1);
     expect(builder.versions.find((item) => item.versionNumber === 1)?.status).toBe("RETIRED");
+  });
+
+  it("saves guided NSE values into the existing definition contract", async () => {
+    const builder = {
+      draft: draft(),
+      study: study(),
+      versions: []
+    };
+    const result = await saveScreenerNseForAdmin({
+      actor: adminActor,
+      formInput: {
+        code: "nse",
+        inputsText: "q-choice|yes=3,no=0,other=1|missing=0",
+        label: "Nivel NSE",
+        rangesText: "BAJO|Bajo|0|2|false\nALTO|Alto|3|10|true"
+      },
+      repository: fakeRepository(builder),
+      studyId
+    });
+
+    expect(result).toMatchObject({ ok: true });
+    expect(builder.draft?.definitionJson).toMatchObject({
+      nse: {
+        code: "nse",
+        inputs: [
+          {
+            missingScore: 0,
+            questionId: "q-choice",
+            scoreByAnswer: {
+              no: 0,
+              other: 1,
+              yes: 3
+            }
+          }
+        ],
+        label: "Nivel NSE",
+        ranges: [
+          { code: "BAJO", eligible: false, label: "Bajo", max: 2, min: 0 },
+          { code: "ALTO", eligible: true, label: "Alto", max: 10, min: 3 }
+        ],
+        type: "score_table"
+      }
+    });
+  });
+
+  it("adds the first option to an option question", async () => {
+    const builder = {
+      draft: draft(
+        definition({
+          questions: [
+            {
+              dataDestination: "SCREENING",
+              id: "q-gender",
+              options: [],
+              order: 1,
+              required: true,
+              text: "Genero",
+              type: "SINGLE_CHOICE",
+              validation: {}
+            }
+          ],
+          rules: []
+        })
+      ),
+      study: study(),
+      versions: []
+    };
+
+    const result = await addScreenerOptionForAdmin({
+      actor: adminActor,
+      formInput: {
+        actionRequiresReview: false,
+        actionType: "NONE",
+        isOther: false,
+        label: "Hombre",
+        otherTextRequired: false,
+        value: "HOMBRE"
+      },
+      questionId: "q-gender",
+      repository: fakeRepository(builder),
+      studyId
+    });
+    const nextDefinition = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+
+    expect(result).toMatchObject({ ok: true });
+    expect(nextDefinition.questions[0]).toMatchObject({
+      options: [{ label: "Hombre", value: "HOMBRE" }]
+    });
+  });
+
+  it("adds a second distinct option to the same question", async () => {
+    const builder = {
+      draft: draft(
+        definition({
+          questions: [
+            {
+              dataDestination: "SCREENING",
+              id: "q-gender",
+              options: [],
+              order: 1,
+              required: true,
+              text: "Genero",
+              type: "SINGLE_CHOICE",
+              validation: {}
+            }
+          ],
+          rules: []
+        })
+      ),
+      study: study(),
+      versions: []
+    };
+    const repository = fakeRepository(builder);
+
+    await addScreenerOptionForAdmin({
+      actor: adminActor,
+      formInput: {
+        actionRequiresReview: false,
+        actionType: "NONE",
+        isOther: false,
+        label: "Hombre",
+        otherTextRequired: false,
+        value: "HOMBRE"
+      },
+      questionId: "q-gender",
+      repository,
+      studyId
+    });
+    const result = await addScreenerOptionForAdmin({
+      actor: adminActor,
+      formInput: {
+        actionRequiresReview: false,
+        actionType: "NONE",
+        isOther: false,
+        label: "Mujer",
+        otherTextRequired: false,
+        value: "MUJER"
+      },
+      questionId: "q-gender",
+      repository,
+      studyId
+    });
+    const nextDefinition = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+
+    expect(result).toMatchObject({ ok: true });
+    expect(nextDefinition.questions[0]).toMatchObject({
+      options: [
+        { label: "Hombre", order: 1, value: "HOMBRE" },
+        { label: "Mujer", order: 2, value: "MUJER" }
+      ]
+    });
+  });
+
+  it("rejects duplicate option values without replacing the current options", async () => {
+    const builder = {
+      draft: draft(
+        definition({
+          questions: [
+            {
+              dataDestination: "SCREENING",
+              id: "q-gender",
+              options: [],
+              order: 1,
+              required: true,
+              text: "Genero",
+              type: "SINGLE_CHOICE",
+              validation: {}
+            }
+          ],
+          rules: []
+        })
+      ),
+      study: study(),
+      versions: []
+    };
+    const repository = fakeRepository(builder);
+
+    await addScreenerOptionForAdmin({
+      actor: adminActor,
+      formInput: {
+        actionRequiresReview: false,
+        actionType: "NONE",
+        isOther: false,
+        label: "Hombre",
+        otherTextRequired: false,
+        value: "HOMBRE"
+      },
+      questionId: "q-gender",
+      repository,
+      studyId
+    });
+    const result = await addScreenerOptionForAdmin({
+      actor: adminActor,
+      formInput: {
+        actionRequiresReview: false,
+        actionType: "NONE",
+        isOther: false,
+        label: "Duplicado",
+        otherTextRequired: false,
+        value: "HOMBRE"
+      },
+      questionId: "q-gender",
+      repository,
+      studyId
+    });
+    const nextDefinition = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+
+    expect(result).toMatchObject({ code: "VALIDATION_ERROR", ok: false });
+    expect(JSON.stringify(result)).toContain("duplicado");
+    expect(nextDefinition.questions[0]).toMatchObject({
+      options: [{ label: "Hombre", value: "HOMBRE" }]
+    });
+  });
+
+  it("updates an existing option with TERMINATE action and persists code and reason", async () => {
+    const builder = {
+      draft: draft(
+        definition({
+          questions: [
+            {
+              dataDestination: "SCREENING",
+              id: "q-gender",
+              options: [
+                {
+                  actions: [],
+                  isOther: false,
+                  label: "Mujer",
+                  order: 1,
+                  otherTextRequired: false,
+                  value: "MUJER"
+                }
+              ],
+              order: 1,
+              required: true,
+              text: "Genero",
+              type: "SINGLE_CHOICE",
+              validation: {}
+            }
+          ],
+          rules: []
+        })
+      ),
+      study: study(),
+      versions: []
+    };
+
+    const result = await updateScreenerOptionForAdmin({
+      actor: adminActor,
+      formInput: {
+        actionCode: "GENERO_NO_ELEGIBLE",
+        actionReason: "El estudio esta dirigido a hombres.",
+        actionRequiresReview: false,
+        actionType: "TERMINATE",
+        isOther: false,
+        label: "Mujer",
+        otherTextRequired: false,
+        value: "MUJER"
+      },
+      optionValue: "MUJER",
+      questionId: "q-gender",
+      repository: fakeRepository(builder),
+      studyId
+    });
+    const nextDefinition = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+
+    expect(result).toMatchObject({ ok: true });
+    expect(nextDefinition.questions[0]).toMatchObject({
+      options: [
+        {
+          actions: [
+            {
+              code: "GENERO_NO_ELEGIBLE",
+              reason: "El estudio esta dirigido a hombres.",
+              type: "TERMINATE"
+            }
+          ],
+          label: "Mujer",
+          value: "MUJER"
+        }
+      ]
+    });
+  });
+
+  it.each([
+    {
+      actionCode: undefined,
+      actionReason: undefined,
+      actionRequiresReview: false,
+      actionType: "CONTINUE",
+      expectedActions: [{ type: "CONTINUE" }]
+    },
+    {
+      actionCode: "GENERO_NO_ELEGIBLE",
+      actionReason: "No califica.",
+      actionRequiresReview: false,
+      actionType: "TERMINATE",
+      expectedActions: [
+        { code: "GENERO_NO_ELEGIBLE", reason: "No califica.", type: "TERMINATE" }
+      ]
+    },
+    {
+      actionCode: "REVISAR_GENERO",
+      actionReason: "Requiere revisión.",
+      actionRequiresReview: false,
+      actionType: "PENDING_REVIEW",
+      expectedActions: [
+        { code: "REVISAR_GENERO", reason: "Requiere revisión.", type: "PENDING_REVIEW" }
+      ]
+    },
+    {
+      actionCode: "BANDERA_GENERO",
+      actionReason: undefined,
+      actionRequiresReview: true,
+      actionType: "FLAG",
+      expectedActions: [
+        { code: "BANDERA_GENERO", requiresReview: true, type: "FLAG" }
+      ]
+    }
+  ] as const)("saves direct option action $actionType", async ({
+    actionCode,
+    actionReason,
+    actionRequiresReview,
+    actionType,
+    expectedActions
+  }) => {
+    const builder = {
+      draft: draft(
+        definition({
+          questions: [
+            {
+              dataDestination: "SCREENING",
+              id: "q-gender",
+              options: [
+                {
+                  actions: [],
+                  isOther: false,
+                  label: "Mujer",
+                  order: 1,
+                  otherTextRequired: false,
+                  value: "MUJER"
+                }
+              ],
+              order: 1,
+              required: true,
+              text: "Genero",
+              type: "SINGLE_CHOICE",
+              validation: {}
+            }
+          ],
+          rules: []
+        })
+      ),
+      study: study(),
+      versions: []
+    };
+
+    const result = await updateScreenerOptionForAdmin({
+      actor: adminActor,
+      formInput: {
+        actionCode,
+        actionReason,
+        actionRequiresReview,
+        actionType,
+        isOther: false,
+        label: "Mujer",
+        otherTextRequired: false,
+        value: "MUJER"
+      },
+      optionValue: "MUJER",
+      questionId: "q-gender",
+      repository: fakeRepository(builder),
+      studyId
+    });
+    const nextDefinition = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+
+    expect(result).toMatchObject({ ok: true });
+    expect(nextDefinition.questions[0]).toMatchObject({
+      options: [{ actions: expectedActions, label: "Mujer", value: "MUJER" }]
+    });
+  });
+
+  it("rejects TERMINATE option updates without code or reason", async () => {
+    const builder = {
+      draft: draft(
+        definition({
+          questions: [
+            {
+              dataDestination: "SCREENING",
+              id: "q-gender",
+              options: [
+                {
+                  actions: [],
+                  isOther: false,
+                  label: "Mujer",
+                  order: 1,
+                  otherTextRequired: false,
+                  value: "MUJER"
+                }
+              ],
+              order: 1,
+              required: true,
+              text: "Genero",
+              type: "SINGLE_CHOICE",
+              validation: {}
+            }
+          ],
+          rules: []
+        })
+      ),
+      study: study(),
+      versions: []
+    };
+
+    const result = await updateScreenerOptionForAdmin({
+      actor: adminActor,
+      formInput: {
+        actionRequiresReview: false,
+        actionType: "TERMINATE",
+        isOther: false,
+        label: "Mujer",
+        otherTextRequired: false,
+        value: "MUJER"
+      },
+      optionValue: "MUJER",
+      questionId: "q-gender",
+      repository: fakeRepository(builder),
+      studyId
+    });
+    const nextDefinition = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+
+    expect(result).toMatchObject({ code: "VALIDATION_ERROR", ok: false });
+    expect(result.ok ? null : result.fieldErrors?.actionCode?.[0]).toMatch(/código de acción/);
+    expect(result.ok ? null : result.fieldErrors?.actionReason?.[0]).toMatch(/motivo/);
+    expect(nextDefinition.questions[0]).toMatchObject({
+      options: [{ actions: [], label: "Mujer", value: "MUJER" }]
+    });
+  });
+
+  it("keeps No aplica only when NONE is the saved option action", async () => {
+    const builder = {
+      draft: draft(
+        definition({
+          questions: [
+            {
+              dataDestination: "SCREENING",
+              id: "q-gender",
+              options: [
+                {
+                  actions: [
+                    {
+                      code: "GENERO_NO_ELEGIBLE",
+                      reason: "No califica.",
+                      type: "TERMINATE"
+                    }
+                  ],
+                  isOther: false,
+                  label: "Mujer",
+                  order: 1,
+                  otherTextRequired: false,
+                  value: "MUJER"
+                }
+              ],
+              order: 1,
+              required: true,
+              text: "Genero",
+              type: "SINGLE_CHOICE",
+              validation: {}
+            }
+          ],
+          rules: []
+        })
+      ),
+      study: study(),
+      versions: []
+    };
+
+    const result = await updateScreenerOptionForAdmin({
+      actor: adminActor,
+      formInput: {
+        actionCode: "IGNORED",
+        actionReason: "Ignorado",
+        actionRequiresReview: false,
+        actionType: "NONE",
+        isOther: false,
+        label: "Mujer",
+        otherTextRequired: false,
+        value: "MUJER"
+      },
+      optionValue: "MUJER",
+      questionId: "q-gender",
+      repository: fakeRepository(builder),
+      studyId
+    });
+    const nextDefinition = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+
+    expect(result).toMatchObject({ ok: true });
+    expect(nextDefinition.questions[0]).toMatchObject({
+      options: [{ actions: [], label: "Mujer", value: "MUJER" }]
+    });
+  });
+
+  it("rejects invalid guided NSE ranges on the server side", async () => {
+    const builder = {
+      draft: draft(),
+      study: study(),
+      versions: []
+    };
+
+    await expect(
+      saveScreenerNseForAdmin({
+        actor: adminActor,
+        formInput: {
+          code: "nse",
+          inputsText: "q-choice|yes=3,no=0,other=1|missing=0",
+          label: "Nivel NSE",
+          rangesText: "BAJO|Bajo|0|5|true\nMEDIO|Medio|5|10|false"
+        },
+        repository: fakeRepository(builder),
+        studyId
+      })
+    ).resolves.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Los rangos NSE no pueden traslaparse.",
+      ok: false
+    });
+  });
+
+  it("rejects rules that point to a missing draft question", async () => {
+    const builder = {
+      draft: draft(),
+      study: study(),
+      versions: []
+    };
+
+    const result = await addScreenerRuleForAdmin({
+      actor: adminActor,
+      formInput: {
+        conditionType: "ANSWER_EQUALS",
+        id: "missing-question-rule",
+        outcomeCode: "missing-question",
+        outcomeReason: "Pregunta no disponible.",
+        outcomeRequiresReview: false,
+        outcomeType: "TERMINATE",
+        questionId: "missing-question",
+        value: "yes"
+      },
+      repository: fakeRepository(builder),
+      studyId
+    });
+
+    expect(result).toMatchObject({
+      code: "QUESTION_NOT_FOUND",
+      message: "La pregunta seleccionada no existe en el borrador.",
+      ok: false
+    });
+  });
+
+  it("updates an existing rule without duplicating it", async () => {
+    const builder = {
+      draft: draft(),
+      study: study(),
+      versions: []
+    };
+
+    const result = await updateScreenerRuleForAdmin({
+      actor: adminActor,
+      formInput: {
+        conditionType: "NUMBER_RANGE",
+        id: "minor",
+        max: "19",
+        min: "0",
+        outcomeCode: "EDAD_MENOR_20",
+        outcomeReason: "La edad es menor a 20 años.",
+        outcomeRequiresReview: false,
+        outcomeType: "TERMINATE",
+        questionId: "q-age"
+      },
+      repository: fakeRepository(builder),
+      ruleId: "minor",
+      studyId
+    });
+    const nextDefinition = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+
+    expect(result).toMatchObject({ ok: true });
+    expect(nextDefinition.rules).toHaveLength(1);
+    expect(nextDefinition.rules[0]).toMatchObject({
+      condition: {
+        max: 19,
+        min: 0,
+        questionId: "q-age",
+        type: "NUMBER_RANGE"
+      },
+      id: "minor",
+      outcome: {
+        code: "EDAD_MENOR_20",
+        reason: "La edad es menor a 20 años.",
+        type: "TERMINATE"
+      }
+    });
+  });
+
+  it("rejects invalid numeric ranges before saving a rule", async () => {
+    const builder = {
+      draft: draft(),
+      study: study(),
+      versions: []
+    };
+
+    const result = await addScreenerRuleForAdmin({
+      actor: adminActor,
+      formInput: {
+        conditionType: "NUMBER_RANGE",
+        id: "invalid-range-rule",
+        max: "5",
+        min: "10",
+        outcomeCode: "age-range",
+        outcomeReason: "Edad fuera de rango.",
+        outcomeRequiresReview: false,
+        outcomeType: "TERMINATE",
+        questionId: "q-age"
+      },
+      repository: fakeRepository(builder),
+      studyId
+    });
+
+    expect(result).toMatchObject({
+      code: "VALIDATION_ERROR",
+      ok: false
+    });
+    expect(result.ok ? null : result.fieldErrors?.min?.[0]).toMatch(/mínimo.*máximo/);
+  });
+
+  it("rejects incompatible question and rule condition combinations", async () => {
+    const builder = {
+      draft: draft(),
+      study: study(),
+      versions: []
+    };
+
+    const result = await updateScreenerRuleForAdmin({
+      actor: adminActor,
+      formInput: {
+        conditionType: "NUMBER_RANGE",
+        id: "minor",
+        max: "19",
+        min: "0",
+        outcomeCode: "INVALID_RANGE",
+        outcomeReason: "No aplica.",
+        outcomeRequiresReview: false,
+        outcomeType: "TERMINATE",
+        questionId: "q-choice"
+      },
+      repository: fakeRepository(builder),
+      ruleId: "minor",
+      studyId
+    });
+
+    expect(result).toMatchObject({
+      code: "VALIDATION_ERROR",
+      ok: false
+    });
+    expect(result.ok ? "" : result.message).toMatch(/n.mero entero/);
   });
 
   it("projects published and retired versions as read-only", () => {

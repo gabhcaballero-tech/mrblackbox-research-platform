@@ -8,6 +8,7 @@ Incluye:
 
 - borrador editable `SCREENER` por estudio;
 - editor guiado de preguntas, opciones, reglas y NSE;
+- biblioteca reutilizable de preguntas y bloques desde el builder;
 - validacion de definicion `screening.v1`;
 - publicacion de versiones inmutables con hash SHA-256;
 - retiro automatico de version activa previa al publicar;
@@ -105,6 +106,10 @@ La pantalla incluye:
 - publicacion;
 - historial de versiones;
 - vista tecnica solo lectura de versiones publicadas.
+- acceso para guardar preguntas o bloques en biblioteca;
+- panel para insertar copias desde biblioteca.
+
+La biblioteca no crea dependencias vivas: insertar contenido copia preguntas, reglas y NSE al borrador, remapea IDs cuando hay colisiones y registra trazabilidad historica.
 
 ## Publicacion
 

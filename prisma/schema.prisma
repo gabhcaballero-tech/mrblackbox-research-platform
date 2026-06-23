@@ -127,6 +127,17 @@ enum LibraryItemStatus {
   ARCHIVED
 }
 
+enum LibraryItemScope {
+  GENERIC
+  STUDY_SPECIFIC
+}
+
+enum LibraryItemRevisionStatus {
+  ACTIVE
+  SUPERSEDED
+  RETIRED
+}
+
 enum QuotaCountingStage {
   SCREENING_PASSED
   PARTICIPANT_ASSIGNED
@@ -288,6 +299,8 @@ model InternalUser {
   retiredQuestionnaires       QuestionnaireVersion[]           @relation("QuestionnaireVersionRetiredBy")
   createdLibraryItems         LibraryItem[]                    @relation("LibraryItemCreatedBy")
   createdLibraryRevisions     LibraryItemRevision[]            @relation("LibraryItemRevisionCreatedBy")
+  retiredLibraryRevisions     LibraryItemRevision[]            @relation("LibraryItemRevisionRetiredBy")
+  insertedLibraryUses         QuestionnaireDraftLibraryUse[]    @relation("QuestionnaireDraftLibraryUseInsertedBy")
   screeningAttempts           ScreeningAttempt[]               @relation("ScreeningAttemptFieldUser")
   rotationAssignments         ParticipantRotationAssignment[]  @relation("ParticipantRotationAssignedBy")
   reopenedActivities          ParticipantActivity[]            @relation("ParticipantActivityReopenedBy")
@@ -524,6 +537,7 @@ model QuestionnaireDraft {
   createdBy InternalUser   @relation("QuestionnaireDraftCreatedBy", fields: [createdByUserId], references: [id])
   updatedBy InternalUser?  @relation("QuestionnaireDraftUpdatedBy", fields: [updatedByUserId], references: [id])
   versions  QuestionnaireVersion[]
+  libraryUses QuestionnaireDraftLibraryUse[]
 
   @@index([studyId, purpose, status])
   @@map("questionnaire_drafts")
@@ -564,6 +578,10 @@ model LibraryItem {
   studyId         String?           @db.Uuid
   type            LibraryItemType
   name            String
+  description     String?
+  category        String?
+  tags            String[]          @default([])
+  scope           LibraryItemScope  @default(STUDY_SPECIFIC)
   status          LibraryItemStatus @default(ACTIVE)
   createdByUserId String            @db.Uuid
   createdAt       DateTime          @default(now())
@@ -583,16 +601,43 @@ model LibraryItemRevision {
   libraryItemId   String   @db.Uuid
   revisionNumber  Int
   contentJson     Json
+  contentHash     String?
+  status          LibraryItemRevisionStatus @default(ACTIVE)
   createdByUserId String   @db.Uuid
   createdAt       DateTime @default(now())
+  retiredByUserId String?  @db.Uuid
+  retiredAt       DateTime?
 
   libraryItem       LibraryItem                 @relation(fields: [libraryItemId], references: [id])
   createdBy         InternalUser                @relation("LibraryItemRevisionCreatedBy", fields: [createdByUserId], references: [id])
+  retiredBy         InternalUser?               @relation("LibraryItemRevisionRetiredBy", fields: [retiredByUserId], references: [id])
   questionnaireUses QuestionnaireAttributeSet[]
+  draftUses         QuestionnaireDraftLibraryUse[]
 
   @@unique([libraryItemId, revisionNumber])
+  @@index([libraryItemId, status])
   @@index([createdByUserId])
+  @@index([retiredByUserId])
   @@map("library_item_revisions")
+}
+
+model QuestionnaireDraftLibraryUse {
+  id                    String   @id @default(uuid()) @db.Uuid
+  questionnaireDraftId  String   @db.Uuid
+  libraryItemRevisionId String   @db.Uuid
+  insertedContentHash   String?
+  idMapJson             Json
+  insertedByUserId      String   @db.Uuid
+  insertedAt            DateTime @default(now())
+
+  questionnaireDraft  QuestionnaireDraft  @relation(fields: [questionnaireDraftId], references: [id])
+  libraryItemRevision LibraryItemRevision @relation(fields: [libraryItemRevisionId], references: [id])
+  insertedBy          InternalUser        @relation("QuestionnaireDraftLibraryUseInsertedBy", fields: [insertedByUserId], references: [id])
+
+  @@index([questionnaireDraftId, insertedAt])
+  @@index([libraryItemRevisionId])
+  @@index([insertedByUserId])
+  @@map("questionnaire_draft_library_uses")
 }
 
 model QuestionnaireAttributeSet {

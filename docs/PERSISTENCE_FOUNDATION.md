@@ -24,6 +24,7 @@ Instaladas posteriormente para la fundacion de autenticacion interna:
 - `prisma/migrations/20260622220438_add_internal_user_auth_user_id/migration.sql`
 - `prisma/migrations/20260622230824_add_study_code/migration.sql`
 - `prisma/migrations/20260623003740_add_screener_pending_review_evaluation/migration.sql`
+- `prisma/migrations/20260623082108_add_screener_question_library/migration.sql`
 - `prisma/migrations/migration_lock.toml`
 - `src/shared/db/client.ts`
 - `src/shared/db/index.ts`
@@ -44,6 +45,7 @@ El esquema prepara PostgreSQL con Prisma para:
 - Acceso participante: `ParticipantAccessToken` guarda hash, expiracion, revocacion y reemplazo de tokens.
 - Cuestionarios: `QuestionnaireDraft` conserva borradores editables; `QuestionnaireVersion` conserva snapshots publicados e inmutables por version/hash.
 - Biblioteca: `LibraryItem`, `LibraryItemRevision` y `QuestionnaireAttributeSet` preservan revisiones usadas por cuestionarios publicados.
+- Biblioteca de screener V1: `LibraryItem` agrega metadatos buscables y alcance; `LibraryItemRevision` agrega estado, hash y retiro lógico; `QuestionnaireDraftLibraryUse` conserva trazabilidad histórica de inserciones sin dependencia viva.
 - Screening: `ScreeningAttempt` y `ScreeningAnswer` vinculan filtros y respuestas a la participacion, no al perfil personal.
 - Screening V1 agrega `PENDING_REVIEW` y `ScreeningAttempt.evaluationJson` para guardar resultado seguro de evaluacion, banderas, razones, faltantes y NSE sin PII crudo.
 - Cuotas: `QuotaDefinition` guarda criterios flexibles y etapa; `QuotaEvaluation` registra match, conteo, cuota llena y aviso sin bloqueo.
@@ -171,6 +173,23 @@ Resumen:
 - no agrega indices, llaves foraneas ni columnas adicionales.
 
 La administracion de screener usa los modelos existentes `QuestionnaireDraft` y `QuestionnaireVersion`. Publicar crea versiones inmutables y retira la version activa previa de screener dentro de una transaccion de aplicacion.
+
+## Biblioteca reutilizable de screener V1
+
+Migracion creada y no aplicada:
+
+- `20260623082108_add_screener_question_library`
+
+Resumen:
+
+- crea los enums `LibraryItemScope` y `LibraryItemRevisionStatus`;
+- agrega `description`, `category`, `tags` y `scope` a `library_items`;
+- agrega `contentHash`, `status`, `retiredByUserId` y `retiredAt` a `library_item_revisions`;
+- crea `questionnaire_draft_library_uses` para registrar inserciones desde biblioteca;
+- agrega indices por borrador, revision y usuario que inserta;
+- agrega llaves foraneas necesarias.
+
+No se aplico a Supabase ni a ninguna base de datos. Queda pendiente revisar y aplicar en entorno controlado.
 
 ## Validaciones ejecutadas
 
