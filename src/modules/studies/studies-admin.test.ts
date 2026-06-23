@@ -3,11 +3,13 @@ import type { InternalUserRole, InternalUserStatus } from "@/shared/auth/permiss
 import type {
   CreateStudyRecordInput,
   StudiesRepository,
+  StudyActivationState,
   StudyEditState,
   StudyListItem,
   UpdateDraftStudyRecordInput
 } from "./repository";
 import {
+  activateStudyForAdmin,
   createStudyForAdmin,
   listStudiesForAdmin,
   type StudiesActor,
@@ -46,9 +48,20 @@ function fakeRepository(options: {
   studies?: StudyListItem[];
   onCreate?: (input: CreateStudyRecordInput) => Promise<StudyListItem> | StudyListItem;
   onUpdate?: (input: UpdateDraftStudyRecordInput) => Promise<number> | number;
+  onActivate?: (id: string) => Promise<number> | number;
+  onFindActivationState?: (id: string) => Promise<StudyActivationState> | StudyActivationState;
   onFindEditState?: (id: string) => Promise<StudyEditState> | StudyEditState;
 } = {}): StudiesRepository {
   return {
+    async activateStudy(id) {
+      if (options.onActivate) {
+        return options.onActivate(id);
+      }
+
+      return options.studies?.some((item) => item.id === id && item.status === "DRAFT")
+        ? 1
+        : 0;
+    },
     async createStudy(input) {
       if (options.onCreate) {
         return options.onCreate(input);
@@ -67,6 +80,21 @@ function fakeRepository(options: {
       }
 
       return options.studies?.find((item) => item.id === id) ?? null;
+    },
+    async findStudyActivationState(id) {
+      if (options.onFindActivationState) {
+        return options.onFindActivationState(id);
+      }
+
+      const found = options.studies?.find((item) => item.id === id);
+
+      return found
+        ? {
+            id: found.id,
+            questionnaireVersions: [],
+            status: found.status
+          }
+        : null;
     },
     async listStudies() {
       return options.studies ?? [];
@@ -259,5 +287,84 @@ describe("study admin service", () => {
       code: "STUDY_NOT_DRAFT",
       ok: false
     });
+  });
+
+  it("allows ADMIN to activate a DRAFT study with active published screener", async () => {
+    let activatedId: string | null = null;
+    const definitionJson = {
+      purpose: "SCREENER",
+      questions: [
+        {
+          dataDestination: "SCREENING",
+          id: "CONSENT",
+          options: [
+            {
+              actions: [{ type: "CONTINUE" }],
+              isOther: false,
+              label: "Sí",
+              order: 1,
+              otherTextRequired: false,
+              value: "SI"
+            }
+          ],
+          order: 1,
+          required: true,
+          text: "Consentimiento",
+          type: "SINGLE_CHOICE",
+          validation: {}
+        }
+      ],
+      rules: [],
+      schemaVersion: "screening.v1",
+      title: "Filtro"
+    };
+
+    const result = await activateStudyForAdmin({
+      actor: adminActor,
+      repository: fakeRepository({
+        onActivate(id) {
+          activatedId = id;
+          return 1;
+        },
+        onFindActivationState() {
+          return {
+            id: "study-1",
+            questionnaireVersions: [{ definitionJson, id: "version-1" }],
+            status: "DRAFT"
+          };
+        }
+      }),
+      studyId: "study-1"
+    });
+
+    expect(result).toMatchObject({ ok: true });
+    expect(activatedId).toBe("study-1");
+    expect(definitionJson).toMatchObject({ title: "Filtro" });
+  });
+
+  it("denies non ADMIN activation and studies without published screener", async () => {
+    await expect(
+      activateStudyForAdmin({
+        actor: actor("SUPERVISOR"),
+        repository: fakeRepository(),
+        studyId: "study-1"
+      })
+    ).resolves.toMatchObject({ code: "UNAUTHORIZED", ok: false });
+
+    await expect(
+      activateStudyForAdmin({
+        actor: adminActor,
+        repository: fakeRepository({
+          onFindActivationState() {
+            return {
+              id: "study-1",
+              questionnaireVersions: [],
+              status: "DRAFT"
+            };
+          }
+        }),
+        studyId: "study-1"
+      })
+    ).resolves.toMatchObject({ code: "SCREENER_NOT_PUBLISHED", ok: false });
   });
 });

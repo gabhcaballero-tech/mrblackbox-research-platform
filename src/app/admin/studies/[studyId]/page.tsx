@@ -10,6 +10,9 @@ import {
   buildComparativeChecklist,
   getComparativeConfigurationForAdmin
 } from "@/modules/comparative-rotation/admin-service";
+import { createScreenerRepository } from "@/modules/screener/repository";
+import { getScreenerBuilderForAdmin } from "@/modules/screener/service";
+import { ActivateStudyPanel } from "./_components/ActivateStudyPanel";
 import { ArmSection } from "./_components/ArmSection";
 import { ConfigurationChecklist } from "./_components/ConfigurationChecklist";
 import { ConfigurationSummary } from "./_components/ConfigurationSummary";
@@ -43,8 +46,15 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
   }
 
   const config = result.data;
+  const screenerResult = await getScreenerBuilderForAdmin({
+    actor: admin,
+    repository: createScreenerRepository(),
+    studyId
+  });
   const checklist = buildComparativeChecklist(config);
   const readOnly = config.study.status !== "DRAFT";
+  const hasActiveScreener =
+    screenerResult.ok && screenerResult.data.versions.some((version) => version.status === "ACTIVE");
 
   return (
     <AppShell>
@@ -78,6 +88,7 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
 
       <div className="space-y-8">
         <ConfigurationSummary config={config} readOnly={readOnly} />
+        <ActivateStudyPanel canActivate={!readOnly && hasActiveScreener} studyId={studyId} />
         <ConfigurationChecklist checklist={checklist} />
         <ProductSection products={config.products} readOnly={readOnly} studyId={studyId} />
         <ArmSection arms={config.arms} readOnly={readOnly} studyId={studyId} />

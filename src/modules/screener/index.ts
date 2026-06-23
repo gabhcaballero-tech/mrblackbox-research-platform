@@ -33,6 +33,7 @@ export {
 export type {
   ScreenerAnswer,
   ScreenerAnswers,
+  ScreenerEvaluationReason,
   ScreenerEvaluationResult,
   ScreenerEvaluationStatus,
   ScreeningAttemptEvaluationJson

@@ -32,9 +32,20 @@ export type StudyEditState = {
   status: StudyStatus;
 } | null;
 
+export type StudyActivationState = {
+  id: string;
+  questionnaireVersions: Array<{
+    definitionJson: unknown;
+    id: string;
+  }>;
+  status: StudyStatus;
+} | null;
+
 export type StudiesRepository = {
   listStudies: () => Promise<StudyListItem[]>;
+  activateStudy: (id: string) => Promise<number>;
   createStudy: (input: CreateStudyRecordInput) => Promise<StudyListItem>;
+  findStudyActivationState: (id: string) => Promise<StudyActivationState>;
   updateDraftStudy: (input: UpdateDraftStudyRecordInput) => Promise<number>;
   findStudyEditState: (id: string) => Promise<StudyEditState>;
 };
@@ -48,13 +59,18 @@ type StudyDelegate = {
     data: CreateStudyRecordInput;
     select: StudySelect;
   }) => Promise<StudyListItem>;
+  findFirst: (args: unknown) => Promise<StudyActivationState>;
   updateMany: (args: {
     where: { id: string; status: "DRAFT" };
-    data: {
-      code: string;
-      name: string;
-      timeZoneIana: string;
-    };
+    data:
+      | {
+          code: string;
+          name: string;
+          timeZoneIana: string;
+        }
+      | {
+          status: "ACTIVE";
+        };
   }) => Promise<{ count: number }>;
   findUnique: (args: {
     where: { id: string };
@@ -88,6 +104,20 @@ export function createStudiesRepository(prismaClient?: StudyPrismaClient): Studi
   }
 
   return {
+    async activateStudy(id) {
+      const prisma = await getPrisma();
+      const result = await prisma.study.updateMany({
+        data: {
+          status: "ACTIVE"
+        },
+        where: {
+          id,
+          status: "DRAFT"
+        }
+      });
+
+      return result.count;
+    },
     async createStudy(input) {
       const prisma = await getPrisma();
 
@@ -102,6 +132,31 @@ export function createStudiesRepository(prismaClient?: StudyPrismaClient): Studi
       return prisma.study.findUnique({
         select: {
           id: true,
+          status: true
+        },
+        where: { id }
+      });
+    },
+    async findStudyActivationState(id) {
+      const prisma = await getPrisma();
+
+      return prisma.study.findFirst({
+        select: {
+          id: true,
+          questionnaireVersions: {
+            orderBy: { versionNumber: "desc" },
+            select: {
+              definitionJson: true,
+              id: true
+            },
+            take: 1,
+            where: {
+              questionnaireDraft: {
+                purpose: "SCREENER"
+              },
+              status: "ACTIVE"
+            }
+          },
           status: true
         },
         where: { id }

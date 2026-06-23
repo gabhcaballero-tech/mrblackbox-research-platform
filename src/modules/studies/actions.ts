@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireCapability } from "@/shared/auth/session";
 import { createStudiesRepository } from "./repository";
 import {
+  activateStudyForAdmin,
   createStudyForAdmin,
   type StudyServiceResult,
   updateDraftStudyForAdmin
@@ -66,4 +67,27 @@ export async function updateStudyAction(
   }
 
   return actionStateFromResult(result, "Estudio actualizado.");
+}
+
+export async function activateStudyAction(
+  studyId: string,
+  _previousState: StudyActionState,
+  _formData: FormData
+): Promise<StudyActionState> {
+  void _formData;
+
+  const actor = await requireCapability("admin:access");
+  const result = await activateStudyForAdmin({
+    actor,
+    repository: createStudiesRepository(),
+    studyId
+  });
+
+  if (result.ok) {
+    revalidatePath("/admin");
+    revalidatePath(`/admin/studies/${studyId}`);
+    revalidatePath("/field");
+  }
+
+  return actionStateFromResult(result, "Estudio activado correctamente.");
 }

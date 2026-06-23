@@ -1,28 +1,46 @@
-import { AppShell } from "@/shared/ui/AppShell";
 import { requireCapability } from "@/shared/auth/session";
+import { AppShell } from "@/shared/ui/AppShell";
 import { EmptyState } from "@/shared/ui/EmptyState";
-import { ROLE_LABELS } from "@/shared/ui/labels";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { createFieldRepository } from "@/modules/field/repository";
+import { listFieldStudies } from "@/modules/field/service";
+import { FieldStudyCard } from "./_components/FieldComponents";
 
 export const dynamic = "force-dynamic";
 
 export default async function FieldPage() {
-  await requireCapability("field:access");
+  const actor = await requireCapability("field:access");
+  const result = await listFieldStudies({
+    actor,
+    repository: createFieldRepository()
+  });
+
+  if (!result.ok) {
+    throw new Error(result.message);
+  }
 
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Operación"
-        title="Campo / encuestadores"
-        description="Pantalla base protegida para flujos de campo. No incluye asignaciones ni captura real todavía."
-        actions={<StatusBadge status="planned">Preparado para crecer</StatusBadge>}
+        actions={<StatusBadge status="ready">Screeners publicados</StatusBadge>}
+        description="Selecciona un estudio activo para aplicar su cuestionario de filtro publicado."
+        eyebrow="Campo"
+        title="Aplicación de filtros"
       />
 
-      <EmptyState
-        title="Operación de campo pendiente"
-        description={`La ruta queda disponible para ${ROLE_LABELS.ADMIN}, ${ROLE_LABELS.SUPERVISOR} y ${ROLE_LABELS.INTERVIEWER}, sin activar procesos reales.`}
-      />
+      {result.data.length === 0 ? (
+        <EmptyState
+          title="No hay estudios activos con screener publicado disponibles para campo."
+          description="Activa un estudio con screener publicado desde Administración para habilitarlo aquí."
+        />
+      ) : (
+        <div className="space-y-4">
+          {result.data.map((study) => (
+            <FieldStudyCard key={study.id} study={study} />
+          ))}
+        </div>
+      )}
     </AppShell>
   );
 }

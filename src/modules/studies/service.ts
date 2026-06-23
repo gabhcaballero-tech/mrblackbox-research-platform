@@ -1,4 +1,5 @@
 import { hasCapability, type InternalUserRole, type InternalUserStatus } from "@/shared/auth/permissions";
+import { validateScreenerDefinitionForPublication } from "@/modules/screener";
 import type {
   CreateStudyRecordInput,
   StudiesRepository,
@@ -27,6 +28,8 @@ export type StudyServiceErrorCode =
   | "DUPLICATE_CODE"
   | "STUDY_NOT_FOUND"
   | "STUDY_NOT_DRAFT"
+  | "SCREENER_NOT_PUBLISHED"
+  | "SCREENER_INVALID"
   | "CONCURRENT_UPDATE_FAILED"
   | "UNKNOWN_ERROR";
 
@@ -204,4 +207,71 @@ export async function updateDraftStudyForAdmin({
       ok: false
     };
   }
+}
+
+export async function activateStudyForAdmin({
+  actor,
+  repository,
+  studyId
+}: {
+  actor: StudiesActor | null;
+  repository: StudiesRepository;
+  studyId: string;
+}): Promise<StudyServiceResult<{ id: string }>> {
+  if (!isAdmin(actor)) {
+    return unauthorizedResult();
+  }
+
+  const activationState = await repository.findStudyActivationState(studyId);
+
+  if (!activationState) {
+    return {
+      code: "STUDY_NOT_FOUND",
+      message: "El estudio no existe.",
+      ok: false
+    };
+  }
+
+  if (activationState.status !== "DRAFT") {
+    return {
+      code: "STUDY_NOT_DRAFT",
+      message: "Solo se pueden activar estudios en borrador.",
+      ok: false
+    };
+  }
+
+  const activeScreener = activationState.questionnaireVersions[0];
+
+  if (!activeScreener) {
+    return {
+      code: "SCREENER_NOT_PUBLISHED",
+      message: "Publica un screener activo antes de activar el estudio.",
+      ok: false
+    };
+  }
+
+  try {
+    validateScreenerDefinitionForPublication(activeScreener.definitionJson);
+  } catch {
+    return {
+      code: "SCREENER_INVALID",
+      message: "El screener publicado tiene errores críticos y no permite activar el estudio.",
+      ok: false
+    };
+  }
+
+  const updatedCount = await repository.activateStudy(studyId);
+
+  if (updatedCount !== 1) {
+    return {
+      code: "CONCURRENT_UPDATE_FAILED",
+      message: "No se pudo activar el estudio. Intenta de nuevo.",
+      ok: false
+    };
+  }
+
+  return {
+    data: { id: studyId },
+    ok: true
+  };
 }
