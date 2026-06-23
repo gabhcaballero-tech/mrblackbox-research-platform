@@ -63,6 +63,12 @@ export type ComparativeStudyConfig = {
   rotationPlans: ComparativeRotationPlan[];
 };
 
+export type ComparativeStudyRecord = ComparativeStudySummary & {
+  products: ComparativeProduct[];
+  arms: ComparativeArm[];
+  rotationPlans: ComparativeRotationPlan[];
+};
+
 export type CreateProductInput = {
   studyId: string;
   internalCode: string;
@@ -137,7 +143,7 @@ export type ComparativeConfigurationRepository = {
   retireRotationPlan: (input: RetireRotationPlanInput) => Promise<number>;
 };
 
-type ComparativeTransactionClient = {
+export type ComparativeTransactionClient = {
   rotationPlan: {
     create: (args: unknown) => Promise<unknown>;
     updateMany: (args: unknown) => Promise<{ count: number }>;
@@ -148,10 +154,10 @@ type ComparativeTransactionClient = {
   };
 };
 
-type ComparativePrismaClient = PrismaClientLike & {
+export type ComparativePrismaClient = PrismaClientLike & {
   $transaction: <T>(callback: (transaction: ComparativeTransactionClient) => Promise<T>) => Promise<T>;
   study: {
-    findUnique: (args: unknown) => Promise<ComparativeStudyConfig | null>;
+    findUnique: (args: unknown) => Promise<ComparativeStudyRecord | null>;
   };
   studyProduct: {
     create: (args: unknown) => Promise<unknown>;
@@ -201,6 +207,19 @@ const rotationPlanArmSelect = {
   },
   studyProductId: true
 } as const;
+
+export function mapStudyRecordToComparativeConfig(
+  record: ComparativeStudyRecord
+): ComparativeStudyConfig {
+  const { arms, products, rotationPlans, ...study } = record;
+
+  return {
+    arms,
+    products,
+    rotationPlans,
+    study
+  };
+}
 
 export function createComparativeConfigurationRepository(
   prismaClient?: ComparativePrismaClient
@@ -267,7 +286,7 @@ export function createComparativeConfigurationRepository(
     async getStudyConfig(studyId) {
       const prisma = await getPrisma();
 
-      return prisma.study.findUnique({
+      const record = await prisma.study.findUnique({
         select: {
           arms: {
             orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
@@ -305,6 +324,8 @@ export function createComparativeConfigurationRepository(
           id: studyId
         }
       });
+
+      return record ? mapStudyRecordToComparativeConfig(record) : null;
     },
     async retireRotationPlan(input) {
       const prisma = await getPrisma();

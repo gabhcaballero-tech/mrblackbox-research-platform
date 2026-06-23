@@ -1,2 +1,8 @@
-export { createPrismaClient, getDatabaseUrl } from "./client";
-export type { PrismaClientLike } from "./client";
+export {
+  createPrismaClient,
+  getDatabaseUrl,
+  getPrismaPool,
+  getPrismaPoolMax,
+  resetPrismaClientSingletonForTests
+} from "./client";
+export type { PrismaClientDependencies, PrismaClientLike } from "./client";

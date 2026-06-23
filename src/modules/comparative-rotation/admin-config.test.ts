@@ -2,13 +2,16 @@ import { describe, expect, it } from "vitest";
 import type { InternalUserRole } from "@/shared/auth/permissions";
 import type {
   ComparativeConfigurationRepository,
+  ComparativePrismaClient,
   ComparativeProduct,
   ComparativeRotationPlan,
+  ComparativeStudyRecord,
   ComparativeStudyConfig,
   CreateArmInput,
   CreateProductInput,
   CreateRotationPlanInput
 } from "./admin-repository";
+import { createComparativeConfigurationRepository } from "./admin-repository";
 import {
   buildComparativeChecklist,
   createArmForAdmin,
@@ -217,6 +220,74 @@ function fakeRepository(
     }
   };
 }
+
+function fakePrismaWithStudyRecord(
+  record: ComparativeStudyRecord | null
+): ComparativePrismaClient {
+  return {
+    $connect: async () => undefined,
+    $disconnect: async () => undefined,
+    $transaction: async (callback) => {
+      return callback({
+        rotationPlan: {
+          create: async () => ({}),
+          updateMany: async () => ({ count: 1 })
+        },
+        rotationPlanArm: {
+          createMany: async () => ({}),
+          deleteMany: async () => ({})
+        }
+      });
+    },
+    rotationPlan: {
+      updateMany: async () => ({ count: 1 })
+    },
+    study: {
+      findUnique: async () => record
+    },
+    studyArm: {
+      create: async () => ({}),
+      deleteMany: async () => ({ count: 1 }),
+      updateMany: async () => ({ count: 1 })
+    },
+    studyProduct: {
+      create: async () => ({}),
+      deleteMany: async () => ({ count: 1 }),
+      updateMany: async () => ({ count: 1 })
+    }
+  };
+}
+
+describe("comparative configuration repository contract", () => {
+  it("maps the flat Prisma study record into a config with explicit study.status", async () => {
+    const record: ComparativeStudyRecord = {
+      ...config().study,
+      arms: [],
+      products: [],
+      rotationPlans: []
+    };
+    const repository = createComparativeConfigurationRepository(fakePrismaWithStudyRecord(record));
+    const result = await repository.getStudyConfig(studyId);
+
+    expect(result).not.toBeNull();
+    expect(result?.study).toMatchObject({
+      code: "STUDY-01",
+      id: studyId,
+      name: "Estudio",
+      status: "DRAFT",
+      timeZoneIana: "America/Mexico_City"
+    });
+    expect(result?.products).toEqual([]);
+    expect(result?.arms).toEqual([]);
+    expect(result?.rotationPlans).toEqual([]);
+  });
+
+  it("returns null when the study does not exist", async () => {
+    const repository = createComparativeConfigurationRepository(fakePrismaWithStudyRecord(null));
+
+    await expect(repository.getStudyConfig(studyId)).resolves.toBeNull();
+  });
+});
 
 describe("comparative configuration authorization and study state", () => {
   it("allows ADMIN and denies non ADMIN", async () => {
