@@ -1,5 +1,10 @@
+export * from "./actions";
+export * from "./repository";
+export * from "./service";
+export * from "./validation";
+
 export const studiesModule = {
   key: "studies",
-  status: "planned",
-  description: "Boundary for future study setup and lifecycle work."
+  status: "ready",
+  description: "Study draft administration, validation and persistence boundary."
 } as const;

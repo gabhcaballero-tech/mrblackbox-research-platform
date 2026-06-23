@@ -1,0 +1,81 @@
+import type { StudyListItem } from "@/modules/studies/repository";
+import { StudyEmptyState } from "./StudyEmptyState";
+import { StudyEditForm } from "./StudyEditForm";
+
+type StudyListProps = {
+  studies: StudyListItem[];
+};
+
+const dateFormatter = new Intl.DateTimeFormat("es-MX", {
+  dateStyle: "medium",
+  timeStyle: "short"
+});
+
+function formatDate(value: Date) {
+  return dateFormatter.format(value);
+}
+
+function StudyStatusBadge({ status }: { status: StudyListItem["status"] }) {
+  const tone = status === "DRAFT" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-zinc-200 bg-zinc-50 text-zinc-700";
+
+  return (
+    <span className={`inline-flex w-fit rounded-md border px-2.5 py-1 text-xs font-semibold ${tone}`}>
+      {status}
+    </span>
+  );
+}
+
+export function StudyList({ studies }: StudyListProps) {
+  if (studies.length === 0) {
+    return <StudyEmptyState />;
+  }
+
+  return (
+    <section className="space-y-4" aria-label="Lista de estudios">
+      {studies.map((study) => (
+        <article className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm" key={study.id}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-xl font-semibold text-zinc-950">{study.name}</h2>
+                <StudyStatusBadge status={study.status} />
+              </div>
+              <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
+                <div>
+                  <dt className="font-medium text-zinc-500">Codigo</dt>
+                  <dd className="mt-1 font-semibold text-zinc-900">{study.code}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-zinc-500">Zona horaria</dt>
+                  <dd className="mt-1 text-zinc-900">{study.timeZoneIana}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-zinc-500">Creado</dt>
+                  <dd className="mt-1 text-zinc-900">{formatDate(study.createdAt)}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-zinc-500">Actualizado</dt>
+                  <dd className="mt-1 text-zinc-900">{formatDate(study.updatedAt)}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-zinc-500">Edicion</dt>
+                  <dd className="mt-1 text-zinc-900">
+                    {study.status === "DRAFT" ? "Disponible" : "Solo lectura"}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+
+          {study.status === "DRAFT" ? (
+            <StudyEditForm study={study} />
+          ) : (
+            <p className="mt-4 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
+              Este estudio no esta en borrador y no puede editarse desde esta fase.
+            </p>
+          )}
+        </article>
+      ))}
+    </section>
+  );
+}

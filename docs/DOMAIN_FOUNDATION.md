@@ -2,6 +2,7 @@
 
 ## Modulos creados o ampliados
 
+- `studies`: administracion inicial de estudios en borrador, validacion de nombre/codigo/zona horaria y reglas de edicion DRAFT.
 - `participants`: contratos y validaciones para separar `ParticipantProfile` de `StudyParticipant`.
 - `screening`: definiciones de filtros, reglas de continuar o terminar, puntajes y clasificacion por rangos.
 - `quotas`: definicion y evaluacion de cuotas por criterios y etapa de conteo.
@@ -15,6 +16,7 @@
 ## Decisiones de diseno
 
 - Las reglas se implementaron como funciones puras, sin base de datos, repositorios ni servicios externos.
+- La administracion V1 de estudios agrega repositorio Prisma server-only, pero conserva reglas de validacion y servicio probables sin conexion real en pruebas.
 - `ParticipantProfile` contiene datos personales y no acepta `studyId`.
 - `StudyParticipant` representa la participacion operativa en un estudio especifico.
 - Los filtros devuelven resultados estructurados con estado `passed`, `terminated` o `incomplete`.
@@ -43,6 +45,7 @@
 - Orden compartido o independiente entre fragancias segun configuracion.
 - Texto obligatorio cuando la pregunta final de atributos se responde con `yes`.
 - Snapshot publicado con tipos V1: respuesta unica, multiple, texto, numero, si/no, escala, matriz, opcion Otro condicional y bloque de atributos.
+- Estudios V1 se crean siempre en `DRAFT`, con `code` normalizado y unico, y solo pueden editar `name`, `code` y `timeZoneIana` mientras sigan en borrador.
 - Actividades recurrentes de video pueden materializar `DAY_1`, `DAY_2` y `DAY_3`.
 - `responseKey` se construye desde pregunta, bloque y contexto; no debe incluir PII.
 - La consistencia de rotacion valida que plan, participante, brazos y productos pertenezcan al mismo estudio antes de persistir.
@@ -60,8 +63,8 @@
 
 ## No implementado todavia
 
-- Persistencia, PostgreSQL, Prisma o migraciones.
-- Autenticacion, usuarios reales o permisos conectados a rutas.
+- Cambio de estado de estudios.
+- Productos, brazos, cuotas, rotaciones y cuestionarios conectados a estudios.
 - Servicios externos, correo, WhatsApp, SMS, video, carga de archivos o despliegue.
 - Formularios finales, dashboards o editor visual libre.
 - Asignacion automatica de rotacion.

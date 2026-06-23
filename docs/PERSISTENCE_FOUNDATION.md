@@ -22,6 +22,7 @@ Instaladas posteriormente para la fundacion de autenticacion interna:
 - `prisma.config.ts`
 - `prisma/migrations/20260622213013_initial_persistence_foundation/migration.sql`
 - `prisma/migrations/20260622220438_add_internal_user_auth_user_id/migration.sql`
+- `prisma/migrations/20260622230824_add_study_code/migration.sql`
 - `prisma/migrations/migration_lock.toml`
 - `src/shared/db/client.ts`
 - `src/shared/db/index.ts`
@@ -35,7 +36,7 @@ Instaladas posteriormente para la fundacion de autenticacion interna:
 El esquema prepara PostgreSQL con Prisma para:
 
 - Usuarios internos: `InternalUser` con roles V1 `ADMIN`, `SUPERVISOR`, `INTERVIEWER` y `ANALYST`, mas `authUserId` nullable/unico para vincular Supabase Auth.
-- Estudios: `Study` con zona horaria IANA, estado y relacion con productos, brazos, cuestionarios, cuotas, actividades y exportaciones.
+- Estudios: `Study` con codigo unico, zona horaria IANA, estado y relacion con productos, brazos, cuestionarios, cuotas, actividades y exportaciones.
 - Productos y brazos: `StudyProduct` guarda clave interna, etiqueta visible y nombre real; `StudyArm` permite brazo izquierdo, derecho y extension futura.
 - Rotacion: `RotationPlan` y `RotationPlanArm` definen codigos manuales; `ParticipantRotationAssignment` y `ParticipantArmAssignment` guardan la asignacion explicita por participacion.
 - Participantes: `ParticipantProfile` guarda PII y no contiene `studyId`; `StudyParticipant` une persona y estudio con estados operativos.
@@ -68,11 +69,13 @@ El esquema prepara PostgreSQL con Prisma para:
 - Las mediciones no recurrentes deben usar una ocurrencia estandar, como `DEFAULT`.
 - `ResearchResponse.responseKey` debe construirse deterministamente con pregunta, bloque y contexto; no debe contener PII.
 - La consistencia de estudio para rotacion manual queda como regla obligatoria de aplicacion antes de persistir, no como trigger ni SQL manual.
+- `Study.code` es unico globalmente y se normaliza en la aplicacion antes de persistir.
 
 ## Restricciones e indices relevantes
 
 - `ParticipantProfile` no tiene `studyId`.
 - `StudyParticipant` tiene `@@unique([participantProfileId, studyId])` para evitar duplicados directos de una persona en un estudio.
+- `Study.code` es unico mediante `@unique`.
 - `StudyProduct` tiene `@@unique([studyId, internalCode])`.
 - `StudyArm` tiene `@@unique([studyId, code])` y `@@unique([studyId, sortOrder])`.
 - `RotationPlan` tiene `@@unique([studyId, rotationCode])`.
@@ -122,6 +125,20 @@ Resumen:
 - agrega `internal_users.authUserId` como `UUID` nullable;
 - crea indice unico `internal_users_authUserId_key`;
 - permite vincular manualmente `InternalUser` con Supabase Auth sin crear privilegios automaticos.
+
+No se aplico a Supabase ni a ninguna base de datos.
+
+## Migracion aditiva de administracion de estudios
+
+Migracion creada y no aplicada:
+
+- `20260622230824_add_study_code`
+
+Resumen:
+
+- agrega `studies.code` como `TEXT NOT NULL`;
+- crea indice unico `studies_code_key`;
+- queda pendiente verificar manualmente que `studies` este vacia antes de aplicarla.
 
 No se aplico a Supabase ni a ninguna base de datos.
 
