@@ -2,6 +2,7 @@
 
 import { AppShell } from "@/shared/ui/AppShell";
 import { ErrorState } from "@/shared/ui/ErrorState";
+import { UI_LABELS } from "@/shared/ui/labels";
 
 export default function FieldError({ reset }: { reset: () => void }) {
   return (
@@ -15,7 +16,7 @@ export default function FieldError({ reset }: { reset: () => void }) {
             onClick={reset}
             type="button"
           >
-            Reintentar
+            {UI_LABELS.actions.retry}
           </button>
         }
       />

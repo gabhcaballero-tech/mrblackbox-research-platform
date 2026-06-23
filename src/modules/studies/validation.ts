@@ -57,16 +57,16 @@ export function isValidIanaTimeZone(value: string): boolean {
 
 export const studyIdSchema = z
   .preprocess((value) => String(value ?? "").trim(), z.string())
-  .refine((value) => UUID_PATTERN.test(value), "El estudio indicado no es valido.");
+  .refine((value) => UUID_PATTERN.test(value), "El estudio indicado no es válido.");
 
 export const studyAdminInputSchema = z.object({
   code: z.preprocess(
     normalizeStudyCode,
     z
       .string()
-      .min(2, "El codigo debe tener al menos 2 caracteres.")
-      .max(32, "El codigo no puede superar 32 caracteres.")
-      .regex(STUDY_CODE_PATTERN, "Usa solo letras, numeros y guiones internos.")
+      .min(2, "El código debe tener al menos 2 caracteres.")
+      .max(32, "El código no puede superar 32 caracteres.")
+      .regex(STUDY_CODE_PATTERN, "Usa solo letras, números y guiones internos.")
   ),
   name: z.preprocess(
     normalizeStudyName,
@@ -80,7 +80,7 @@ export const studyAdminInputSchema = z.object({
     z
       .string()
       .min(1, "La zona horaria es obligatoria.")
-      .refine(isValidIanaTimeZone, "La zona horaria IANA no es valida.")
+      .refine(isValidIanaTimeZone, "La zona horaria IANA no es válida.")
   )
 });
 

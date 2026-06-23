@@ -1,4 +1,5 @@
 import type { ComparativeChecklist } from "@/modules/comparative-rotation/admin-service";
+import { UI_LABELS } from "@/shared/ui/labels";
 
 type ConfigurationChecklistProps = {
   checklist: ComparativeChecklist;
@@ -7,17 +8,17 @@ type ConfigurationChecklistProps = {
 export function ConfigurationChecklist({ checklist }: ConfigurationChecklistProps) {
   const items = [
     {
-      label: "Productos creados",
-      value: `${checklist.productsCount}/2 o mas`,
+      label: UI_LABELS.comparative.productsCreated,
+      value: `${checklist.productsCount}/2 o más`,
       ready: checklist.productsCount >= 2
     },
     {
-      label: "Brazos configurados",
+      label: UI_LABELS.comparative.armsConfigured,
       value: `${checklist.armsCount}/2`,
       ready: checklist.armsCount === 2
     },
     {
-      label: "Rotaciones manuales activas",
+      label: UI_LABELS.comparative.activeManualRotations,
       value: String(checklist.activeRotationCount),
       ready: checklist.activeRotationCount > 0
     }
@@ -26,7 +27,7 @@ export function ConfigurationChecklist({ checklist }: ConfigurationChecklistProp
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
       <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">
-        Checklist de configuracion
+        Checklist de configuración
       </p>
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         {items.map((item) => (
@@ -34,7 +35,7 @@ export function ConfigurationChecklist({ checklist }: ConfigurationChecklistProp
             <p className="text-sm font-medium text-zinc-500">{item.label}</p>
             <p className="mt-2 text-2xl font-semibold text-zinc-950">{item.value}</p>
             <p className={item.ready ? "mt-2 text-sm text-emerald-700" : "mt-2 text-sm text-amber-700"}>
-              {item.ready ? "Listo" : "Pendiente"}
+              {item.ready ? "Listo" : UI_LABELS.common.pending}
             </p>
           </div>
         ))}

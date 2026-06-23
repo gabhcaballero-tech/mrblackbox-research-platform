@@ -6,13 +6,13 @@ describe("PageHeader", () => {
   it("renders the base heading and description", () => {
     render(
       <PageHeader
-        eyebrow="Base tecnica"
-        title="Administracion"
-        description="Placeholder de la plataforma."
+        eyebrow="Base técnica"
+        title="Administración"
+        description="Pantalla base de la plataforma."
       />
     );
 
-    expect(screen.getByRole("heading", { name: "Administracion" })).toBeInTheDocument();
-    expect(screen.getByText("Placeholder de la plataforma.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Administración" })).toBeInTheDocument();
+    expect(screen.getByText("Pantalla base de la plataforma.")).toBeInTheDocument();
   });
 });

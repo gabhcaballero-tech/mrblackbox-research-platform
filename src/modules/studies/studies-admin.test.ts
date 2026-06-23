@@ -209,7 +209,7 @@ describe("study admin service", () => {
 
     expect(result).toMatchObject({
       code: "DUPLICATE_CODE",
-      fieldErrors: { code: ["Ya existe un estudio con ese codigo."] },
+      fieldErrors: { code: ["Ya existe un estudio con ese código."] },
       ok: false
     });
   });

@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { updateStudyAction } from "@/modules/studies/actions";
 import { initialStudyActionState } from "@/modules/studies/action-state";
 import type { StudyListItem } from "@/modules/studies/repository";
+import { UI_LABELS } from "@/shared/ui/labels";
 import { StudyActionMessage } from "./StudyActionMessage";
 import { StudyFormFields } from "./StudyFormFields";
 import { SubmitButton } from "./SubmitButton";
@@ -31,7 +32,7 @@ export function StudyEditForm({ study }: StudyEditFormProps) {
       ) : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <StudyActionMessage state={state} />
-        <SubmitButton pendingLabel="Guardando...">Guardar cambios</SubmitButton>
+        <SubmitButton pendingLabel={UI_LABELS.common.saving}>{UI_LABELS.actions.saveChanges}</SubmitButton>
       </div>
     </form>
   );

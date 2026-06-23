@@ -2,12 +2,13 @@
 
 import { AppShell } from "@/shared/ui/AppShell";
 import { ErrorState } from "@/shared/ui/ErrorState";
+import { UI_LABELS } from "@/shared/ui/labels";
 
 export default function AdminError({ reset }: { reset: () => void }) {
   return (
     <AppShell>
       <ErrorState
-        title="Administracion no disponible"
+        title="Administración no disponible"
         message="La vista administrativa no pudo cargarse."
         action={
           <button
@@ -15,7 +16,7 @@ export default function AdminError({ reset }: { reset: () => void }) {
             onClick={reset}
             type="button"
           >
-            Reintentar
+            {UI_LABELS.actions.retry}
           </button>
         }
       />

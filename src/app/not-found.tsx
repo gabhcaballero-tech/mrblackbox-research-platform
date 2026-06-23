@@ -7,8 +7,8 @@ export default function NotFound() {
   return (
     <AppShell>
       <EmptyState
-        title="Pagina no encontrada"
-        description="La ruta solicitada no existe en esta base tecnica inicial."
+        title="Página no encontrada"
+        description="La ruta solicitada no existe en esta base técnica inicial."
         action={
           <Link
             className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-medium text-white"

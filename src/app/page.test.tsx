@@ -7,9 +7,9 @@ describe("HomePage", () => {
     render(<HomePage />);
 
     expect(
-      screen.getByRole("heading", { name: "MR Black Box Research Platform" })
+      screen.getByRole("heading", { name: "MR Black Box Plataforma de investigación" })
     ).toBeInTheDocument();
-    expect(screen.getAllByText("Administracion").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Administración").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Campo / encuestadores").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Participante").length).toBeGreaterThan(0);
   });

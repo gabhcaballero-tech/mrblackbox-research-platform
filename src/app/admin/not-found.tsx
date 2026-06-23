@@ -5,8 +5,8 @@ export default function AdminNotFound() {
   return (
     <AppShell>
       <EmptyState
-        title="Seccion administrativa no encontrada"
-        description="Esta base solo expone el placeholder principal de administracion."
+        title="Sección administrativa no encontrada"
+        description="Esta base solo expone la administración inicial de estudios."
       />
     </AppShell>
   );

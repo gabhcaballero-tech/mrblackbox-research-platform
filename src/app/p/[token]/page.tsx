@@ -24,13 +24,13 @@ export default async function ParticipantPage({ params }: ParticipantPageProps) 
       <PageHeader
         eyebrow="Acceso por enlace"
         title="Participante"
-        description="Placeholder para la experiencia futura de participantes. No hay cuestionarios, videos ni autenticacion real en esta etapa."
+        description="Pantalla base para la experiencia futura de participantes. No hay cuestionarios, videos ni autenticación real en esta etapa."
         actions={<StatusBadge status="planned">Enlace reconocido</StatusBadge>}
       />
 
       <EmptyState
-        title="Sesion de participante pendiente"
-        description="El token tiene formato valido para la maqueta, pero aun no activa sesiones ni captura informacion."
+        title="Sesión de participante pendiente"
+        description="El token tiene formato válido para la maqueta, pero aún no activa sesiones ni captura información."
       />
     </AppShell>
   );

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { StudyListItem } from "@/modules/studies/repository";
+import { STUDY_STATUS_LABELS, UI_LABELS } from "@/shared/ui/labels";
 import { StudyEmptyState } from "./StudyEmptyState";
 import { StudyEditForm } from "./StudyEditForm";
 
@@ -24,7 +25,7 @@ function StudyStatusBadge({ status }: { status: StudyListItem["status"] }) {
 
   return (
     <span className={`inline-flex w-fit rounded-md border px-2.5 py-1 text-xs font-semibold ${tone}`}>
-      {status}
+      {STUDY_STATUS_LABELS[status]}
     </span>
   );
 }
@@ -48,27 +49,27 @@ export function StudyList({ studies }: StudyListProps) {
               </div>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
                 <div className="min-w-0">
-                  <dt className="font-medium text-zinc-500">Codigo</dt>
+                  <dt className="font-medium text-zinc-500">{UI_LABELS.studies.code}</dt>
                   <dd className="mt-1 break-all font-mono font-semibold text-zinc-900">
                     {study.code}
                   </dd>
                 </div>
                 <div className="min-w-0">
-                  <dt className="font-medium text-zinc-500">Zona horaria</dt>
+                  <dt className="font-medium text-zinc-500">{UI_LABELS.studies.timeZone}</dt>
                   <dd className="mt-1 break-words text-zinc-900">{study.timeZoneIana}</dd>
                 </div>
                 <div>
-                  <dt className="font-medium text-zinc-500">Creado</dt>
+                  <dt className="font-medium text-zinc-500">{UI_LABELS.common.created}</dt>
                   <dd className="mt-1 text-zinc-900">{formatDate(study.createdAt)}</dd>
                 </div>
                 <div>
-                  <dt className="font-medium text-zinc-500">Actualizado</dt>
+                  <dt className="font-medium text-zinc-500">{UI_LABELS.common.updated}</dt>
                   <dd className="mt-1 text-zinc-900">{formatDate(study.updatedAt)}</dd>
                 </div>
                 <div>
-                  <dt className="font-medium text-zinc-500">Edicion</dt>
+                  <dt className="font-medium text-zinc-500">{UI_LABELS.common.editing}</dt>
                   <dd className="mt-1 text-zinc-900">
-                    {study.status === "DRAFT" ? "Disponible" : "Solo lectura"}
+                    {study.status === "DRAFT" ? UI_LABELS.common.available : UI_LABELS.common.readOnly}
                   </dd>
                 </div>
               </dl>
@@ -77,7 +78,7 @@ export function StudyList({ studies }: StudyListProps) {
               className="inline-flex w-fit shrink-0 rounded-md border border-teal-200 bg-white px-4 py-2 text-sm font-semibold text-teal-700 transition hover:border-teal-300 hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
               href={`/admin/studies/${study.id}`}
             >
-              Configurar
+              {UI_LABELS.actions.configure}
             </Link>
           </div>
 
@@ -85,7 +86,7 @@ export function StudyList({ studies }: StudyListProps) {
             <StudyEditForm study={study} />
           ) : (
             <p className="mt-4 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
-              Este estudio no esta en borrador y no puede editarse desde esta fase.
+              {UI_LABELS.studies.readOnlyMessage}
             </p>
           )}
         </article>

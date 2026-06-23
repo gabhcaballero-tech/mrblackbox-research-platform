@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireCapability } from "@/shared/auth/session";
 import { AppShell } from "@/shared/ui/AppShell";
+import { STUDY_STATUS_LABELS, UI_LABELS } from "@/shared/ui/labels";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { createComparativeConfigurationRepository } from "@/modules/comparative-rotation/admin-repository";
@@ -48,9 +49,13 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
   return (
     <AppShell>
       <PageHeader
-        actions={<StatusBadge status={readOnly ? "planned" : "ready"}>{readOnly ? "Solo lectura" : "DRAFT"}</StatusBadge>}
-        description="Configura productos, brazos y codigos de rotacion manuales. No incluye participantes, filtros, cuotas, cuestionarios ni exportaciones."
-        eyebrow="Configuracion comparativa"
+        actions={
+          <StatusBadge status={readOnly ? "planned" : "ready"}>
+            {readOnly ? UI_LABELS.common.readOnly : STUDY_STATUS_LABELS.DRAFT}
+          </StatusBadge>
+        }
+        description="Configura productos, brazos y códigos de rotación manuales. No incluye participantes, filtros, cuotas, cuestionarios ni exportaciones."
+        eyebrow="Configuración comparativa"
         title="Productos, brazos y rotaciones"
       />
 
@@ -60,13 +65,13 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
             className="text-sm font-semibold text-teal-700 transition hover:text-teal-800"
             href="/admin"
           >
-            Volver a estudios
+            {UI_LABELS.actions.backToStudies}
           </Link>
           <Link
             className="text-sm font-semibold text-zinc-700 transition hover:text-zinc-950"
             href={`/admin/studies/${studyId}/screener`}
           >
-            Configurar screener
+            {UI_LABELS.screener.screener}
           </Link>
         </div>
       </div>

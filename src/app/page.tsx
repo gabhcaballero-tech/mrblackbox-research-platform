@@ -3,28 +3,29 @@ import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { APP_ROUTES } from "@/shared/types/routes";
+import { UI_LABELS } from "@/shared/ui/labels";
 
 const areaCards = [
   {
-    title: "Administracion",
+    title: UI_LABELS.areas.admin,
     href: APP_ROUTES.admin,
     status: "ready",
     description:
       "Espacio reservado para configurar estudios, revisar actividad y preparar operaciones futuras."
   },
   {
-    title: "Campo / encuestadores",
+    title: `${UI_LABELS.areas.field} / encuestadores`,
     href: APP_ROUTES.field,
     status: "ready",
     description:
       "Entrada inicial para equipos de campo, seguimiento operativo y trabajo presencial futuro."
   },
   {
-    title: "Participante",
+    title: UI_LABELS.areas.participant,
     href: APP_ROUTES.participantExample,
     status: "ready",
     description:
-      "Vista placeholder para accesos por enlace, sin cuestionarios ni sesiones activas todavia."
+      "Pantalla base para accesos por enlace, sin cuestionarios ni sesiones activas todavía."
   }
 ] as const;
 
@@ -32,9 +33,9 @@ export default function HomePage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Base tecnica"
-        title="MR Black Box Research Platform"
-        description="Maqueta funcional minima para separar las tres areas principales antes de agregar datos, autenticacion o logica de estudios."
+        eyebrow="Base técnica"
+        title="MR Black Box Plataforma de investigación"
+        description="Maqueta funcional mínima para separar las tres áreas principales antes de agregar datos, autenticación o lógica de estudios."
       />
 
       <section className="grid gap-4 md:grid-cols-3">
@@ -51,7 +52,7 @@ export default function HomePage() {
                 <p className="mt-3 text-sm leading-6 text-zinc-600">{area.description}</p>
               </div>
             </div>
-            <span className="mt-6 text-sm font-medium text-teal-700">Abrir area</span>
+            <span className="mt-6 text-sm font-medium text-teal-700">Abrir área</span>
           </Link>
         ))}
       </section>

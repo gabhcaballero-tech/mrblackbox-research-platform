@@ -99,7 +99,7 @@ function isAdmin(actor: ScreenerAdminActor | null): actor is ScreenerAdminActor 
 function unauthorizedResult<T>(): ScreenerServiceResult<T> {
   return {
     code: "UNAUTHORIZED",
-    message: "Solo ADMIN puede administrar el screener.",
+    message: "Solo Administrador puede administrar el cuestionario de filtro.",
     ok: false
   };
 }
@@ -194,7 +194,7 @@ export async function saveScreenerMetadataForAdmin({
   const parsed = screenerMetadataInputSchema.safeParse(formInput);
 
   if (!parsed.success) {
-    return validationResult("Revisa los metadatos del screener.", parsed.error.flatten().fieldErrors);
+    return validationResult("Revisa los metadatos del cuestionario de filtro.", parsed.error.flatten().fieldErrors);
   }
 
   return mutateDraftForAdmin({
@@ -360,7 +360,7 @@ export async function addScreenerOptionForAdmin({
   const parsed = screenerOptionInputSchema.safeParse(formInput);
 
   if (!parsed.success) {
-    return validationResult("Revisa la opcion.", parsed.error.flatten().fieldErrors);
+    return validationResult("Revisa la opción.", parsed.error.flatten().fieldErrors);
   }
 
   return mutateQuestionOptions({
@@ -388,7 +388,7 @@ export async function updateScreenerOptionForAdmin({
   const parsed = screenerOptionInputSchema.safeParse(formInput);
 
   if (!parsed.success) {
-    return validationResult("Revisa la opcion.", parsed.error.flatten().fieldErrors);
+    return validationResult("Revisa la opción.", parsed.error.flatten().fieldErrors);
   }
 
   return mutateQuestionOptions({
@@ -397,7 +397,7 @@ export async function updateScreenerOptionForAdmin({
       const current = options.find((option) => option.value === optionValue);
 
       if (!current) {
-        throw new ScreenerServiceMutationError("OPTION_NOT_FOUND", "La opcion no existe.");
+        throw new ScreenerServiceMutationError("OPTION_NOT_FOUND", "La opción no existe.");
       }
 
       return normalizeOptionOrders(
@@ -430,7 +430,7 @@ export async function deleteScreenerOptionForAdmin({
     actor,
     mutateOptions(options) {
       if (!options.some((option) => option.value === optionValue)) {
-        throw new ScreenerServiceMutationError("OPTION_NOT_FOUND", "La opcion no existe.");
+        throw new ScreenerServiceMutationError("OPTION_NOT_FOUND", "La opción no existe.");
       }
 
       return normalizeOptionOrders(options.filter((option) => option.value !== optionValue));
@@ -460,7 +460,7 @@ export async function moveScreenerOptionForAdmin({
       const index = nextOptions.findIndex((option) => option.value === optionValue);
 
       if (index === -1) {
-        throw new ScreenerServiceMutationError("OPTION_NOT_FOUND", "La opcion no existe.");
+        throw new ScreenerServiceMutationError("OPTION_NOT_FOUND", "La opción no existe.");
       }
 
       const targetIndex = direction === "up" ? index - 1 : index + 1;
@@ -531,7 +531,7 @@ export async function saveScreenerNseForAdmin({
   const parsed = screenerNseInputSchema.safeParse(formInput);
 
   if (!parsed.success) {
-    return validationResult("Revisa el calculo NSE.", parsed.error.flatten().fieldErrors);
+    return validationResult("Revisa el cálculo NSE.", parsed.error.flatten().fieldErrors);
   }
 
   let nse: NseScoreTable;
@@ -539,7 +539,7 @@ export async function saveScreenerNseForAdmin({
   try {
     nse = buildNse(parsed.data);
   } catch (error) {
-    return validationResult(error instanceof Error ? error.message : "Revisa el calculo NSE.");
+    return validationResult(error instanceof Error ? error.message : "Revisa el cálculo NSE.");
   }
 
   return mutateDraftForAdmin({
@@ -598,7 +598,7 @@ export async function publishScreenerForAdmin({
     definitionHash = hashScreenerDefinition(canonicalDefinition);
   } catch (error) {
     return validationResult(
-      error instanceof Error ? error.message : "El screener no es publicable."
+      error instanceof Error ? error.message : "El cuestionario de filtro no es publicable."
     );
   }
 
@@ -619,14 +619,14 @@ export async function publishScreenerForAdmin({
     if (isPrismaUniqueConstraintError(error)) {
       return {
         code: "DUPLICATE_VERSION_HASH",
-        message: "Esta definicion ya fue publicada para el estudio.",
+        message: "Esta definición ya fue publicada para el estudio.",
         ok: false
       };
     }
 
     return {
       code: "UNKNOWN_ERROR",
-      message: "No se pudo publicar la version.",
+      message: "No se pudo publicar la versión.",
       ok: false
     };
   }
@@ -657,7 +657,7 @@ export async function retireScreenerVersionForAdmin({
   if (retired !== 1) {
     return {
       code: "VERSION_NOT_FOUND",
-      message: "La version activa no existe o ya fue retirada.",
+      message: "La versión activa no existe o ya fue retirada.",
       ok: false
     };
   }
@@ -709,7 +709,7 @@ async function loadDraftCapableBuilder<T>({
   if (builder.study.status !== "DRAFT") {
     return {
       code: "STUDY_NOT_DRAFT",
-      message: "El screener solo puede modificarse mientras el estudio esta en borrador.",
+      message: "El cuestionario de filtro solo puede modificarse mientras el estudio está en borrador.",
       ok: false
     };
   }
@@ -734,7 +734,7 @@ async function loadDraftContextForMutation<T>(
   if (!draft) {
     return {
       code: "DRAFT_NOT_FOUND",
-      message: "Primero crea el borrador del screener.",
+      message: "Primero crea el borrador del cuestionario de filtro.",
       ok: false
     };
   }
@@ -780,7 +780,7 @@ async function mutateDraftForAdmin({
     if (updated !== 1) {
       return {
         code: "DRAFT_NOT_FOUND",
-        message: "El borrador del screener no existe.",
+        message: "El borrador del cuestionario de filtro no existe.",
         ok: false
       };
     }
@@ -799,7 +799,7 @@ async function mutateDraftForAdmin({
     }
 
     return validationResult(
-      error instanceof Error ? error.message : "La definicion del screener no es valida."
+      error instanceof Error ? error.message : "La definición del cuestionario de filtro no es válida."
     );
   }
 }
@@ -915,7 +915,7 @@ function buildOptionActions(input: ScreenerOptionInput): ScreenerOptionAction[] 
   }
 
   if (!input.actionCode) {
-    throw new Error("Las acciones requieren codigo.");
+    throw new Error("Las acciones requieren código.");
   }
 
   if (input.actionType === "FLAG") {
@@ -929,7 +929,7 @@ function buildOptionActions(input: ScreenerOptionInput): ScreenerOptionAction[] 
   }
 
   if (!input.actionReason) {
-    throw new Error("Las acciones de terminacion o revision requieren razon.");
+    throw new Error("Las acciones de terminación o revisión requieren motivo.");
   }
 
   return [
@@ -982,7 +982,7 @@ function buildCondition(input: ScreenerRuleInput): ScreenerRule["condition"] {
 
 function buildRuleOutcome(input: ScreenerRuleInput): ScreenerRuleOutcome {
   if (!input.outcomeCode) {
-    throw new Error("La regla requiere codigo de resultado.");
+    throw new Error("La regla requiere código de resultado.");
   }
 
   if (input.outcomeType === "FLAG") {
@@ -994,7 +994,7 @@ function buildRuleOutcome(input: ScreenerRuleInput): ScreenerRuleOutcome {
   }
 
   if (!input.outcomeReason) {
-    throw new Error("La regla requiere razon.");
+    throw new Error("La regla requiere motivo.");
   }
 
   return {
@@ -1061,7 +1061,7 @@ function parseNseRanges(value: string): NseScoreTable["ranges"] {
         !Number.isFinite(Number(max)) ||
         !eligible
       ) {
-        throw new Error("Formato de rangos NSE: codigo|etiqueta|min|max|true.");
+        throw new Error("Formato de rangos NSE: código|etiqueta|min|max|true.");
       }
 
       return {

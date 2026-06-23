@@ -1,8 +1,10 @@
+import { UI_LABELS } from "./labels";
+
 type LoadingStateProps = {
   message?: string;
 };
 
-export function LoadingState({ message = "Cargando..." }: LoadingStateProps) {
+export function LoadingState({ message = UI_LABELS.common.loading }: LoadingStateProps) {
   return (
     <section
       aria-busy="true"

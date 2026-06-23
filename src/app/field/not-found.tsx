@@ -5,8 +5,8 @@ export default function FieldNotFound() {
   return (
     <AppShell>
       <EmptyState
-        title="Seccion de campo no encontrada"
-        description="Esta base solo expone el placeholder principal de campo."
+        title="Sección de campo no encontrada"
+        description="Esta base solo expone la pantalla principal de campo."
       />
     </AppShell>
   );

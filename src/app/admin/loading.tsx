@@ -4,7 +4,7 @@ import { LoadingState } from "@/shared/ui/LoadingState";
 export default function AdminLoading() {
   return (
     <AppShell>
-      <LoadingState message="Cargando administracion..." />
+      <LoadingState message="Cargando administración..." />
     </AppShell>
   );
 }

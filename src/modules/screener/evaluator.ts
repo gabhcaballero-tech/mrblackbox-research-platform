@@ -103,7 +103,7 @@ export function evaluateScreener(
         }
       ],
       result: "INCOMPLETE",
-      safeExplanation: "El filtro esta incompleto.",
+      safeExplanation: "El filtro está incompleto.",
       status: "INCOMPLETE"
     });
   }
@@ -151,7 +151,7 @@ export function evaluateScreener(
       .map((flag) => ({
         code: flag.code,
         questionId: flag.questionId,
-        reason: flag.label ?? "La respuesta requiere revision operativa."
+        reason: flag.label ?? "La respuesta requiere revisión operativa."
       }))
   ];
 
@@ -162,7 +162,7 @@ export function evaluateScreener(
       nse,
       reasons: pendingReviewReasons,
       result: "PENDING_REVIEW",
-      safeExplanation: "El filtro requiere revision operativa.",
+      safeExplanation: "El filtro requiere revisión operativa.",
       status: "PENDING_REVIEW"
     });
   }

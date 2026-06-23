@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ErrorState } from "@/shared/ui/ErrorState";
+import { UI_LABELS } from "@/shared/ui/labels";
 
 export default function UnauthorizedPage() {
   return (
@@ -11,18 +12,18 @@ export default function UnauthorizedPage() {
               className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
               href="/login"
             >
-              Volver a iniciar sesion
+              {UI_LABELS.unauthorized.backToSignIn}
             </Link>
             <Link
               className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 transition hover:border-teal-600 hover:text-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
               href="/p/demo-token"
             >
-              Ir a participante publico
+              {UI_LABELS.unauthorized.publicParticipant}
             </Link>
           </div>
         }
-        message="La sesion existe, pero no hay un usuario interno activo con permisos suficientes para esta area."
-        title="Acceso interno no autorizado"
+        message={UI_LABELS.unauthorized.message}
+        title={UI_LABELS.unauthorized.accessDenied}
       />
     </main>
   );

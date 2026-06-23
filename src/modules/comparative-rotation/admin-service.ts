@@ -132,7 +132,7 @@ function isAdmin(actor: ComparativeAdminActor | null): actor is ComparativeAdmin
 function unauthorizedResult<T>(): ComparativeServiceResult<T> {
   return {
     code: "UNAUTHORIZED",
-    message: "Solo ADMIN puede configurar productos, brazos y rotaciones.",
+    message: "Solo Administrador puede configurar productos, brazos y rotaciones.",
     ok: false
   };
 }
@@ -192,7 +192,7 @@ async function loadDraftConfigForAdmin<T>(
   if (result.data.study.status !== "DRAFT") {
     return {
       code: "STUDY_NOT_DRAFT",
-      message: "Esta configuracion solo puede modificarse mientras el estudio esta en borrador.",
+      message: "Esta configuración solo puede modificarse mientras el estudio está en borrador.",
       ok: false
     };
   }
@@ -204,9 +204,9 @@ function duplicateInternalCodeResult<T>(): ComparativeServiceResult<T> {
   return {
     code: "DUPLICATE_INTERNAL_CODE",
     fieldErrors: {
-      internalCode: ["Ya existe un producto con ese codigo interno en el estudio."]
+      internalCode: ["Ya existe un producto con ese código interno en el estudio."]
     },
-    message: "Ya existe un producto con ese codigo interno en el estudio.",
+    message: "Ya existe un producto con ese código interno en el estudio.",
     ok: false
   };
 }
@@ -277,7 +277,7 @@ export function buildComparativeChecklist(config: ComparativeStudyConfig): Compa
   let rotationBlockReason: string | null = null;
 
   if (armsCount !== 2) {
-    rotationBlockReason = "Configura exactamente los dos brazos canonicos antes de crear rotaciones.";
+    rotationBlockReason = "Configura exactamente los dos brazos canónicos antes de crear rotaciones.";
   } else if (productsCount < 2) {
     rotationBlockReason = "Crea al menos dos productos antes de crear rotaciones.";
   }
@@ -469,7 +469,7 @@ export async function deleteProductForAdmin({
   if (isProductReferenced(configResult.data, productId)) {
     return {
       code: "PRODUCT_REFERENCED",
-      message: "Primero modifica o retira la rotacion que usa este producto.",
+      message: "Primero modifica o retira la rotación que usa este producto.",
       ok: false
     };
   }
@@ -493,7 +493,7 @@ export async function deleteProductForAdmin({
     if (isPrismaForeignKeyConstraintError(error)) {
       return {
         code: "PRODUCT_REFERENCED",
-        message: "Primero modifica o retira la rotacion que usa este producto.",
+        message: "Primero modifica o retira la rotación que usa este producto.",
         ok: false
       };
     }
@@ -531,7 +531,7 @@ export async function createArmForAdmin({
   if (findCanonicalArm(configResult.data, parsed.data.code)) {
     return {
       code: "DUPLICATE_ARM_CODE",
-      message: "Ese brazo ya esta configurado.",
+      message: "Ese brazo ya está configurado.",
       ok: false
     };
   }
@@ -559,7 +559,7 @@ export async function createArmForAdmin({
     if (isPrismaUniqueConstraintError(error)) {
       return {
         code: "DUPLICATE_ARM_CODE",
-        message: "Ese brazo ya esta configurado.",
+        message: "Ese brazo ya está configurado.",
         ok: false
       };
     }
@@ -642,7 +642,7 @@ export async function deleteArmForAdmin({
   if (isArmReferenced(configResult.data, armId)) {
     return {
       code: "ARM_REFERENCED",
-      message: "Primero modifica o retira la rotacion que usa este brazo.",
+      message: "Primero modifica o retira la rotación que usa este brazo.",
       ok: false
     };
   }
@@ -666,7 +666,7 @@ export async function deleteArmForAdmin({
     if (isPrismaForeignKeyConstraintError(error)) {
       return {
         code: "ARM_REFERENCED",
-        message: "Primero modifica o retira la rotacion que usa este brazo.",
+        message: "Primero modifica o retira la rotación que usa este brazo.",
         ok: false
       };
     }
@@ -703,7 +703,7 @@ function buildRotationPlanArms(
   if (leftArm.id === rightArm.id) {
     return {
       code: "INVALID_ROTATION_ASSIGNMENT",
-      message: "Cada asignacion debe usar un brazo distinto.",
+      message: "Cada asignación debe usar un brazo distinto.",
       ok: false
     };
   }
@@ -714,7 +714,7 @@ function buildRotationPlanArms(
   if (!leftProduct || !rightProduct) {
     return {
       code: "INVALID_ROTATION_ASSIGNMENT",
-      message: "Los productos de la rotacion deben pertenecer al estudio actual.",
+      message: "Los productos de la rotación deben pertenecer al estudio actual.",
       ok: false
     };
   }
@@ -727,7 +727,7 @@ function buildRotationPlanArms(
   ) {
     return {
       code: "INVALID_ROTATION_ASSIGNMENT",
-      message: "Los productos y brazos de la rotacion deben pertenecer al estudio actual.",
+      message: "Los productos y brazos de la rotación deben pertenecer al estudio actual.",
       ok: false
     };
   }
@@ -790,9 +790,9 @@ function duplicateRotationCodeResult<T>(): ComparativeServiceResult<T> {
   return {
     code: "DUPLICATE_ROTATION_CODE",
     fieldErrors: {
-      rotationCode: ["Ya existe una rotacion con ese codigo en el estudio."]
+      rotationCode: ["Ya existe una rotación con ese código en el estudio."]
     },
-    message: "Ya existe una rotacion con ese codigo en el estudio.",
+    message: "Ya existe una rotación con ese código en el estudio.",
     ok: false
   };
 }
@@ -812,7 +812,7 @@ export async function createRotationPlanForAdmin({
   const parsed = rotationPlanAdminInputSchema.safeParse(formInput);
 
   if (!parsed.success) {
-    return validationResult("Revisa los campos de la rotacion.", parsed.error.flatten().fieldErrors);
+    return validationResult("Revisa los campos de la rotación.", parsed.error.flatten().fieldErrors);
   }
 
   if (hasDuplicateRotationCode(configResult.data.rotationPlans, parsed.data.rotationCode)) {
@@ -845,7 +845,7 @@ export async function createRotationPlanForAdmin({
 
     return {
       code: "UNKNOWN_ERROR",
-      message: "No se pudo crear la rotacion.",
+      message: "No se pudo crear la rotación.",
       ok: false
     };
   }
@@ -867,7 +867,7 @@ export async function updateRotationPlanForAdmin({
   if (!rotationPlanId || !findRotationPlan(configResult.data, rotationPlanId)) {
     return {
       code: "ROTATION_NOT_FOUND",
-      message: "La rotacion no existe en este estudio.",
+      message: "La rotación no existe en este estudio.",
       ok: false
     };
   }
@@ -875,7 +875,7 @@ export async function updateRotationPlanForAdmin({
   const parsed = rotationPlanAdminInputSchema.safeParse(formInput);
 
   if (!parsed.success) {
-    return validationResult("Revisa los campos de la rotacion.", parsed.error.flatten().fieldErrors);
+    return validationResult("Revisa los campos de la rotación.", parsed.error.flatten().fieldErrors);
   }
 
   if (hasDuplicateRotationCode(configResult.data.rotationPlans, parsed.data.rotationCode, rotationPlanId)) {
@@ -901,7 +901,7 @@ export async function updateRotationPlanForAdmin({
     if (updated !== 1) {
       return {
         code: "ROTATION_NOT_FOUND",
-        message: "La rotacion no existe en este estudio.",
+        message: "La rotación no existe en este estudio.",
         ok: false
       };
     }
@@ -917,7 +917,7 @@ export async function updateRotationPlanForAdmin({
 
     return {
       code: "UNKNOWN_ERROR",
-      message: "No se pudo actualizar la rotacion.",
+      message: "No se pudo actualizar la rotación.",
       ok: false
     };
   }
@@ -938,7 +938,7 @@ export async function retireRotationPlanForAdmin({
   if (!rotationPlanId || !findRotationPlan(configResult.data, rotationPlanId)) {
     return {
       code: "ROTATION_NOT_FOUND",
-      message: "La rotacion no existe en este estudio.",
+      message: "La rotación no existe en este estudio.",
       ok: false
     };
   }
@@ -948,7 +948,7 @@ export async function retireRotationPlanForAdmin({
   if (updated !== 1) {
     return {
       code: "ROTATION_NOT_FOUND",
-      message: "La rotacion no existe en este estudio.",
+      message: "La rotación no existe en este estudio.",
       ok: false
     };
   }

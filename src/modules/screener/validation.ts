@@ -45,7 +45,7 @@ export const screenerMetadataInputSchema = z.object({
   description: z.preprocess(optionalText, z.string().max(500).optional()),
   title: z.preprocess(
     normalizeDisplayText,
-    z.string().min(1, "El titulo es obligatorio.").max(160, "El titulo no puede superar 160 caracteres.")
+    z.string().min(1, "El título es obligatorio.").max(160, "El título no puede superar 160 caracteres.")
   )
 });
 
@@ -56,9 +56,9 @@ export const screenerQuestionInputSchema = z.object({
     normalizeTechnicalKey,
     z
       .string()
-      .min(1, "El ID tecnico es obligatorio.")
-      .max(80, "El ID tecnico no puede superar 80 caracteres.")
-      .regex(technicalKeyPattern, "Usa letras, numeros, guiones o guiones bajos internos.")
+      .min(1, "El ID técnico es obligatorio.")
+      .max(80, "El ID técnico no puede superar 80 caracteres.")
+      .regex(technicalKeyPattern, "Usa letras, números, guiones o guiones bajos internos.")
   ),
   profileBinding: z.preprocess(
     optionalText,
@@ -94,9 +94,9 @@ export const screenerOptionInputSchema = z.object({
     normalizeTechnicalKey,
     z
       .string()
-      .min(1, "El valor tecnico es obligatorio.")
+      .min(1, "El valor técnico es obligatorio.")
       .max(80)
-      .regex(technicalKeyPattern, "Usa letras, numeros, guiones o guiones bajos internos.")
+      .regex(technicalKeyPattern, "Usa letras, números, guiones o guiones bajos internos.")
   )
 });
 
@@ -104,7 +104,11 @@ export const screenerRuleInputSchema = z.object({
   conditionType: z.enum(["ANSWER_EQUALS", "ANY_SELECTED", "ALL_SELECTED", "NUMBER_RANGE"]),
   id: z.preprocess(
     normalizeTechnicalKey,
-    z.string().min(1, "El ID de regla es obligatorio.").max(80).regex(technicalKeyPattern)
+    z
+      .string()
+      .min(1, "El ID de regla es obligatorio.")
+      .max(80)
+      .regex(technicalKeyPattern, "Usa letras, números, guiones o guiones bajos internos.")
   ),
   max: z.preprocess(optionalNumber, z.number().optional()),
   min: z.preprocess(optionalNumber, z.number().optional()),
@@ -112,7 +116,7 @@ export const screenerRuleInputSchema = z.object({
   outcomeReason: z.preprocess(optionalText, z.string().max(240).optional()),
   outcomeRequiresReview: z.preprocess(checkboxValue, z.boolean()),
   outcomeType: z.enum(["TERMINATE", "PENDING_REVIEW", "FLAG"]),
-  questionId: z.preprocess(normalizeTechnicalKey, z.string().min(1)),
+  questionId: z.preprocess(normalizeTechnicalKey, z.string().min(1, "La pregunta es obligatoria.")),
   value: z.preprocess(optionalText, z.string().optional()),
   values: z.preprocess(optionalText, z.string().optional())
 });
@@ -120,7 +124,11 @@ export const screenerRuleInputSchema = z.object({
 export const screenerNseInputSchema = z.object({
   code: z.preprocess(
     normalizeTechnicalKey,
-    z.string().min(1, "El codigo NSE es obligatorio.").max(80).regex(technicalKeyPattern)
+    z
+      .string()
+      .min(1, "El código NSE es obligatorio.")
+      .max(80)
+      .regex(technicalKeyPattern, "Usa letras, números, guiones o guiones bajos internos.")
   ),
   inputsText: z.preprocess(
     (value) => String(value ?? "").trim(),

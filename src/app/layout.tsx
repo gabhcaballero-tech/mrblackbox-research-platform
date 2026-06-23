@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "MR Black Box Research Platform",
-  description: "Base tecnica inicial de la plataforma de investigacion."
+  title: "MR Black Box Plataforma de investigación",
+  description: "Base técnica inicial de la plataforma de investigación."
 };
 
 export default function RootLayout({

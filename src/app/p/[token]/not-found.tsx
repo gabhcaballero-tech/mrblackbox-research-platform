@@ -6,7 +6,7 @@ export default function ParticipantNotFound() {
     <AppShell>
       <EmptyState
         title="Enlace no reconocido"
-        description="El identificador del enlace no cumple el formato esperado para esta maqueta tecnica."
+        description="El identificador del enlace no cumple el formato esperado para esta maqueta técnica."
       />
     </AppShell>
   );

@@ -95,7 +95,7 @@ export const screenerOptionSchema = z
     if (option.otherTextRequired && !option.isOther) {
       context.addIssue({
         code: "custom",
-        message: "Only an Other option can require specification text.",
+        message: "Solo una opción Otro puede exigir texto de especificación.",
         path: ["otherTextRequired"]
       });
     }
@@ -117,7 +117,7 @@ const questionBaseSchema = z
     if (question.dataDestination === "PARTICIPANT_PROFILE" && !question.profileBinding) {
       context.addIssue({
         code: "custom",
-        message: "Participant profile questions require an explicit allowed binding.",
+        message: "Las preguntas de perfil del participante requieren una vinculación permitida explícita.",
         path: ["profileBinding"]
       });
     }
@@ -125,7 +125,7 @@ const questionBaseSchema = z
     if (question.dataDestination !== "PARTICIPANT_PROFILE" && question.profileBinding) {
       context.addIssue({
         code: "custom",
-        message: "Profile bindings are only allowed for participant profile questions.",
+        message: "Las vinculaciones de perfil solo se permiten en preguntas de perfil del participante.",
         path: ["profileBinding"]
       });
     }
@@ -147,20 +147,20 @@ export const screenerQuestionSchema = z
       addDuplicateIssue(
         question.options.map((option) => option.value),
         context,
-        "Duplicate option value.",
+        "El valor de opción está duplicado.",
         ["options"]
       );
       addDuplicateIssue(
         question.options.map((option) => option.order),
         context,
-        "Duplicate option order.",
+        "El orden de opción está duplicado.",
         ["options"]
       );
 
       if (question.options.filter((option) => option.isOther).length > 1) {
         context.addIssue({
           code: "custom",
-          message: "Only one Other option is allowed per question.",
+          message: "Solo se permite una opción Otro por pregunta.",
           path: ["options"]
         });
       }
@@ -234,14 +234,14 @@ export const screenerConditionSchema: z.ZodType<ScreenerCondition> = z.lazy(() =
       })
       .strict()
       .refine((condition) => condition.min !== undefined || condition.max !== undefined, {
-        message: "Number range requires min or max."
+        message: "El rango numérico requiere mínimo o máximo."
       })
       .refine(
         (condition) =>
           condition.min === undefined ||
           condition.max === undefined ||
           condition.min <= condition.max,
-        { message: "Number range min must be less than or equal to max." }
+        { message: "El mínimo del rango numérico debe ser menor o igual al máximo." }
       ),
     z
       .object({
@@ -310,7 +310,7 @@ export const nseRangeSchema = z
   })
   .strict()
   .refine((range) => range.min <= range.max, {
-    message: "NSE range min must be less than or equal to max."
+    message: "El mínimo del rango NSE debe ser menor o igual al máximo."
   });
 
 export const nseScoreTableSchema = z
@@ -365,7 +365,7 @@ export function validateScreenerDefinitionForPublication(input: unknown): Screen
   const definition = parseScreenerDefinition(input);
 
   if (definition.questions.length === 0) {
-    throw new Error("A screener needs at least one question before publishing.");
+    throw new Error("El cuestionario de filtro necesita al menos una pregunta antes de publicarse.");
   }
 
   const optionQuestionWithoutOptions = definition.questions.find(
@@ -373,7 +373,7 @@ export function validateScreenerDefinitionForPublication(input: unknown): Screen
   );
 
   if (optionQuestionWithoutOptions) {
-    throw new Error("Option questions need at least one option before publishing.");
+    throw new Error("Las preguntas de opción necesitan al menos una opción antes de publicarse.");
   }
 
   return definition;
@@ -500,25 +500,25 @@ function validateDefinitionReferences(
   addDuplicateIssue(
     definition.questions.map((question) => question.id),
     context,
-    "Duplicate question id.",
+    "El ID de pregunta está duplicado.",
     ["questions"]
   );
   addDuplicateIssue(
     definition.questions.map((question) => question.order),
     context,
-    "Duplicate question order.",
+    "El orden de pregunta está duplicado.",
     ["questions"]
   );
   addDuplicateIssue(
     definition.rules.map((rule) => rule.id),
     context,
-    "Duplicate rule id.",
+    "El ID de regla está duplicado.",
     ["rules"]
   );
   addDuplicateIssue(
     definition.rules.map((rule) => rule.order),
     context,
-    "Duplicate rule order.",
+    "El orden de regla está duplicado.",
     ["rules"]
   );
 
@@ -538,7 +538,7 @@ function validateDefinitionReferences(
     if (!question) {
       context.addIssue({
         code: "custom",
-        message: "NSE input references an unknown question.",
+        message: "La entrada NSE referencia una pregunta desconocida.",
         path: ["nse", "inputs", inputIndex, "questionId"]
       });
       return;
@@ -550,7 +550,7 @@ function validateDefinitionReferences(
         if (!optionValues.has(scoredValue)) {
           context.addIssue({
             code: "custom",
-            message: "NSE score table references an unknown option value.",
+            message: "La tabla de puntajes NSE referencia un valor de opción desconocido.",
             path: ["nse", "inputs", inputIndex, "scoreByAnswer", scoredValue]
           });
         }
@@ -581,7 +581,7 @@ function validateConditionReferences(
   if (!question) {
     context.addIssue({
       code: "custom",
-      message: "Rule condition references an unknown question.",
+      message: "La condición de la regla referencia una pregunta desconocida.",
       path: [...path, "questionId"]
     });
     return;
@@ -590,7 +590,7 @@ function validateConditionReferences(
   if (condition.type === "NUMBER_RANGE" && question.type !== "INTEGER") {
     context.addIssue({
       code: "custom",
-      message: "Number range conditions can only target INTEGER questions.",
+      message: "Las condiciones de rango numérico solo pueden apuntar a preguntas de número entero.",
       path
     });
     return;
@@ -604,7 +604,7 @@ function validateConditionReferences(
     if (!("options" in question)) {
       context.addIssue({
         code: "custom",
-        message: "Selection conditions require an option question.",
+          message: "Las condiciones de selección requieren una pregunta con opciones.",
         path
       });
       return;
@@ -626,7 +626,7 @@ function validateConditionValue(
     if (typeof value !== "boolean") {
       context.addIssue({
         code: "custom",
-        message: "Consent conditions require boolean values.",
+        message: "Las condiciones de consentimiento requieren valores booleanos.",
         path
       });
     }
@@ -639,7 +639,7 @@ function validateConditionValue(
     if (!optionValues.has(String(value))) {
       context.addIssue({
         code: "custom",
-        message: "Condition references an unknown option value.",
+        message: "La condición referencia un valor de opción desconocido.",
         path
       });
     }

@@ -14,6 +14,7 @@ import type {
   ComparativeRotationPlan
 } from "@/modules/comparative-rotation/admin-repository";
 import type { ComparativeChecklist } from "@/modules/comparative-rotation/admin-service";
+import { ROTATION_PLAN_STATUS_LABELS, UI_LABELS } from "@/shared/ui/labels";
 import { DangerSubmitButton } from "./DangerSubmitButton";
 import { FormMessage } from "./FormMessage";
 
@@ -59,7 +60,7 @@ function RotationFields({
   return (
     <div className="space-y-4">
       <label className="block min-w-0">
-        <span className="text-sm font-medium text-zinc-800">Codigo de rotacion</span>
+        <span className="text-sm font-medium text-zinc-800">{UI_LABELS.comparative.rotationCode}</span>
         <input
           className="mt-2 w-full min-w-0 rounded-md border border-zinc-300 px-3 py-2 font-mono text-sm uppercase text-zinc-950 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
           defaultValue={plan?.rotationCode}
@@ -79,19 +80,19 @@ function RotationFields({
           </legend>
           <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_6rem]">
             <label className="block min-w-0">
-              <span className="text-sm font-medium text-zinc-700">Producto</span>
+              <span className="text-sm font-medium text-zinc-700">{UI_LABELS.comparative.product}</span>
               <select
                 className="mt-2 w-full min-w-0 rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-950 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
                 defaultValue={defaultProductForArm(plan, "left")}
                 name="leftProductId"
                 required
               >
-                <option value="">Selecciona</option>
+                <option value="">{UI_LABELS.comparative.selectProduct}</option>
                 {productOptions(products)}
               </select>
             </label>
             <label className="block">
-              <span className="text-sm font-medium text-zinc-700">Orden</span>
+              <span className="text-sm font-medium text-zinc-700">{UI_LABELS.comparative.order}</span>
               <select
                 className="mt-2 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-950 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
                 defaultValue={defaultOrderForArm(plan, "left")}
@@ -111,19 +112,19 @@ function RotationFields({
           </legend>
           <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_6rem]">
             <label className="block min-w-0">
-              <span className="text-sm font-medium text-zinc-700">Producto</span>
+              <span className="text-sm font-medium text-zinc-700">{UI_LABELS.comparative.product}</span>
               <select
                 className="mt-2 w-full min-w-0 rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-950 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
                 defaultValue={defaultProductForArm(plan, "right")}
                 name="rightProductId"
                 required
               >
-                <option value="">Selecciona</option>
+                <option value="">{UI_LABELS.comparative.selectProduct}</option>
                 {productOptions(products)}
               </select>
             </label>
             <label className="block">
-              <span className="text-sm font-medium text-zinc-700">Orden</span>
+              <span className="text-sm font-medium text-zinc-700">{UI_LABELS.comparative.order}</span>
               <select
                 className="mt-2 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-950 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
                 defaultValue={defaultOrderForArm(plan, "right")}
@@ -175,7 +176,7 @@ function CreateRotationForm({
       <RotationFields arms={arms} products={products} state={state} />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <FormMessage state={state} />
-        <SubmitButton pendingLabel="Creando...">Crear rotacion</SubmitButton>
+        <SubmitButton pendingLabel={UI_LABELS.common.creating}>{UI_LABELS.actions.createRotation}</SubmitButton>
       </div>
     </form>
   );
@@ -206,7 +207,9 @@ function RotationPlanRow({
           <h3 className="break-all font-mono text-lg font-semibold text-zinc-950">
             {plan.rotationCode}
           </h3>
-          <p className="mt-1 text-sm text-zinc-600">Estado: {plan.status}</p>
+          <p className="mt-1 text-sm text-zinc-600">
+            {UI_LABELS.comparative.rotationStatus}: {ROTATION_PLAN_STATUS_LABELS[plan.status]}
+          </p>
         </div>
       </div>
 
@@ -214,11 +217,11 @@ function RotationPlanRow({
         <table className="min-w-full text-left text-sm">
           <thead className="text-zinc-500">
             <tr>
-              <th className="px-2 py-2 font-medium">Brazo</th>
-              <th className="px-2 py-2 font-medium">Orden</th>
-              <th className="px-2 py-2 font-medium">Codigo seguro</th>
-              <th className="px-2 py-2 font-medium">Etiqueta segura</th>
-              <th className="px-2 py-2 font-medium">Nombre real ADMIN</th>
+              <th className="px-2 py-2 font-medium">{UI_LABELS.comparative.arm}</th>
+              <th className="px-2 py-2 font-medium">{UI_LABELS.comparative.order}</th>
+              <th className="px-2 py-2 font-medium">{UI_LABELS.comparative.safeCode}</th>
+              <th className="px-2 py-2 font-medium">{UI_LABELS.comparative.safeLabel}</th>
+              <th className="px-2 py-2 font-medium">{UI_LABELS.comparative.realNameAdmin}</th>
             </tr>
           </thead>
           <tbody>
@@ -241,13 +244,13 @@ function RotationPlanRow({
             <RotationFields arms={arms} plan={plan} products={products} state={updateState} />
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <FormMessage state={updateState} />
-              <SubmitButton pendingLabel="Guardando...">Guardar rotacion</SubmitButton>
+              <SubmitButton pendingLabel={UI_LABELS.common.saving}>{UI_LABELS.actions.saveRotation}</SubmitButton>
             </div>
           </form>
           {plan.status === "ACTIVE" ? (
             <form action={retireFormAction} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <FormMessage state={retireState} />
-              <DangerSubmitButton pendingLabel="Retirando...">Retirar rotacion</DangerSubmitButton>
+              <DangerSubmitButton pendingLabel={UI_LABELS.actions.retiring}>{UI_LABELS.actions.retireRotation}</DangerSubmitButton>
             </form>
           ) : null}
         </div>
@@ -268,11 +271,13 @@ export function RotationSection({
     <section className="space-y-4 rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
       <div>
         <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">
-          Rotaciones manuales
+          {UI_LABELS.comparative.manualRotations}
         </p>
-        <h2 className="mt-2 text-xl font-semibold text-zinc-950">Planes por codigo manual</h2>
+        <h2 className="mt-2 text-xl font-semibold text-zinc-950">
+          {UI_LABELS.comparative.plansByManualCode}
+        </h2>
         <p className="mt-2 text-sm leading-6 text-zinc-600">
-          Cada plan usa dos brazos, dos productos distintos y ordenes 1 y 2. Las etiquetas de
+          Cada plan usa dos brazos, dos productos distintos y órdenes 1 y 2. Las etiquetas de
           participante se generan en servidor.
         </p>
       </div>
@@ -288,7 +293,7 @@ export function RotationSection({
       <div className="space-y-3">
         {rotationPlans.length === 0 ? (
           <p className="rounded-md border border-dashed border-zinc-300 bg-zinc-50 px-3 py-6 text-center text-sm text-zinc-600">
-            Aun no hay rotaciones manuales.
+            {UI_LABELS.comparative.noManualRotations}
           </p>
         ) : (
           rotationPlans.map((plan) => (

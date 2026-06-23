@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireCapability } from "@/shared/auth/session";
 import { AppShell } from "@/shared/ui/AppShell";
+import { STUDY_STATUS_LABELS, UI_LABELS } from "@/shared/ui/labels";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { parseScreenerDefinition } from "@/modules/screener";
@@ -41,10 +42,14 @@ export default async function ScreenerPage({ params }: ScreenerPageProps) {
   return (
     <AppShell>
       <PageHeader
-        actions={<StatusBadge status={readOnly ? "planned" : "ready"}>{readOnly ? "Solo lectura" : "DRAFT"}</StatusBadge>}
+        actions={
+          <StatusBadge status={readOnly ? "planned" : "ready"}>
+            {readOnly ? UI_LABELS.common.readOnly : STUDY_STATUS_LABELS.DRAFT}
+          </StatusBadge>
+        }
         description="Crea y publica el cuestionario de filtro. Esta fase no registra participantes ni intentos reales."
-        eyebrow="Screener V1"
-        title="Cuestionario de filtro"
+        eyebrow={UI_LABELS.screener.screenerV1}
+        title={UI_LABELS.screener.screener}
       />
 
       <div className="mb-6 flex flex-wrap gap-3">
@@ -52,13 +57,13 @@ export default async function ScreenerPage({ params }: ScreenerPageProps) {
           className="text-sm font-semibold text-teal-700 transition hover:text-teal-800"
           href={`/admin/studies/${studyId}`}
         >
-          Volver a configuracion del estudio
+          {UI_LABELS.actions.backToStudyConfiguration}
         </Link>
         <Link
           className="text-sm font-semibold text-zinc-600 transition hover:text-zinc-900"
           href="/admin"
         >
-          Ver estudios
+          {UI_LABELS.actions.viewStudies}
         </Link>
       </div>
 

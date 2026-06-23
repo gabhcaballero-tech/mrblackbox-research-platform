@@ -1,6 +1,7 @@
 import { AppShell } from "@/shared/ui/AppShell";
 import { requireCapability } from "@/shared/auth/session";
 import { EmptyState } from "@/shared/ui/EmptyState";
+import { ROLE_LABELS } from "@/shared/ui/labels";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 
@@ -12,15 +13,15 @@ export default async function FieldPage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Operacion"
+        eyebrow="Operación"
         title="Campo / encuestadores"
-        description="Placeholder protegido para flujos de campo. No incluye asignaciones ni captura real todavia."
+        description="Pantalla base protegida para flujos de campo. No incluye asignaciones ni captura real todavía."
         actions={<StatusBadge status="planned">Preparado para crecer</StatusBadge>}
       />
 
       <EmptyState
-        title="Operacion de campo pendiente"
-        description="La ruta queda disponible para ADMIN, SUPERVISOR e INTERVIEWER, sin activar procesos reales."
+        title="Operación de campo pendiente"
+        description={`La ruta queda disponible para ${ROLE_LABELS.ADMIN}, ${ROLE_LABELS.SUPERVISOR} y ${ROLE_LABELS.INTERVIEWER}, sin activar procesos reales.`}
       />
     </AppShell>
   );

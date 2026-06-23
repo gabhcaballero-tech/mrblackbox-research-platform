@@ -6,7 +6,7 @@ describe("StudyEmptyState", () => {
   it("shows a clear empty state and create button", () => {
     render(<StudyEmptyState />);
 
-    expect(screen.getByRole("heading", { name: "No hay estudios" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Aún no hay estudios configurados" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Crear estudio" })).toHaveAttribute(
       "href",
       "#create-study"

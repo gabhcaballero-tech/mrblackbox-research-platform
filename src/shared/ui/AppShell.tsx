@@ -1,12 +1,13 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { APP_ROUTES } from "@/shared/types/routes";
+import { UI_LABELS } from "./labels";
 
 const navItems = [
-  { href: APP_ROUTES.home, label: "Inicio" },
-  { href: APP_ROUTES.admin, label: "Administracion" },
-  { href: APP_ROUTES.field, label: "Campo" },
-  { href: APP_ROUTES.participantExample, label: "Participante" }
+  { href: APP_ROUTES.home, label: UI_LABELS.navigation.home },
+  { href: APP_ROUTES.admin, label: UI_LABELS.areas.admin },
+  { href: APP_ROUTES.field, label: UI_LABELS.areas.field },
+  { href: APP_ROUTES.participantExample, label: UI_LABELS.areas.participant }
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -18,10 +19,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="text-sm font-semibold uppercase tracking-wide text-teal-700">
               MR Black Box
             </span>
-            <span className="text-lg font-semibold text-zinc-950">Research Platform</span>
+            <span className="text-lg font-semibold text-zinc-950">Plataforma de investigación</span>
           </Link>
 
-          <nav aria-label="Navegacion principal" className="flex flex-wrap gap-2">
+          <nav aria-label={UI_LABELS.navigation.main} className="flex flex-wrap gap-2">
             {navItems.map((item) => (
               <Link
                 className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition hover:border-teal-500 hover:text-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500"

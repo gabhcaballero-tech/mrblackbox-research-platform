@@ -60,7 +60,7 @@ function isAdmin(actor: StudiesActor | null): actor is StudiesActor {
 function unauthorizedResult<T>(): StudyServiceResult<T> {
   return {
     code: "UNAUTHORIZED",
-    message: "Solo ADMIN puede administrar estudios.",
+    message: "Solo Administrador puede administrar estudios.",
     ok: false
   };
 }
@@ -69,9 +69,9 @@ function duplicateCodeResult<T>(): StudyServiceResult<T> {
   return {
     code: "DUPLICATE_CODE",
     fieldErrors: {
-      code: ["Ya existe un estudio con ese codigo."]
+      code: ["Ya existe un estudio con ese código."]
     },
-    message: "Ya existe un estudio con ese codigo.",
+    message: "Ya existe un estudio con ese código.",
     ok: false
   };
 }

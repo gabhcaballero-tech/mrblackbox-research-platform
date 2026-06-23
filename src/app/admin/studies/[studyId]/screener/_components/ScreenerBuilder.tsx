@@ -17,6 +17,9 @@ import {
   updateScreenerQuestionAction
 } from "@/modules/screener/actions";
 import type {
+  ParticipantProfileBinding,
+  ScreenerCondition,
+  ScreenerDataDestination,
   ScreenerDefinition,
   ScreenerOption,
   ScreenerQuestion,
@@ -28,6 +31,16 @@ import type {
   ScreenerStudySummary,
   ScreenerVersionRecord
 } from "@/modules/screener/repository";
+import {
+  DATA_DESTINATION_LABELS,
+  PROFILE_BINDING_LABELS,
+  QUESTION_TYPE_LABELS,
+  QUESTIONNAIRE_VERSION_STATUS_LABELS,
+  RULE_CONDITION_LABELS,
+  RULE_OUTCOME_LABELS,
+  STUDY_STATUS_LABELS,
+  UI_LABELS
+} from "@/shared/ui/labels";
 
 type ScreenerBuilderProps = {
   definition: ScreenerDefinition | null;
@@ -56,7 +69,33 @@ const profileBindings = [
   "AGE",
   "GENDER",
   "EXTERNAL_REFERENCE"
-] as const;
+] satisfies ParticipantProfileBinding[];
+
+const dataDestinations = [
+  "SCREENING",
+  "PARTICIPANT_PROFILE",
+  "OPERATIONAL_INTERNAL"
+] satisfies ScreenerDataDestination[];
+
+const optionActionTypes = [
+  "CONTINUE",
+  "TERMINATE",
+  "FLAG",
+  "PENDING_REVIEW"
+] satisfies Array<ScreenerOption["actions"][number]["type"]>;
+
+const ruleConditionTypes = [
+  "ANSWER_EQUALS",
+  "ANY_SELECTED",
+  "ALL_SELECTED",
+  "NUMBER_RANGE"
+] satisfies ScreenerCondition["type"][];
+
+const ruleOutcomeTypes = [
+  "TERMINATE",
+  "PENDING_REVIEW",
+  "FLAG"
+] satisfies Array<ScreenerRule["outcome"]["type"]>;
 
 const dateFormatter = new Intl.DateTimeFormat("es-MX", {
   dateStyle: "medium",
@@ -98,21 +137,21 @@ function StudySummary({ study }: { study: ScreenerStudySummary }) {
       <h2 className="text-lg font-semibold text-zinc-950">{study.name}</h2>
       <dl className="mt-4 grid gap-3 text-sm md:grid-cols-4">
         <div>
-          <dt className="font-medium text-zinc-500">Codigo</dt>
+          <dt className="font-medium text-zinc-500">{UI_LABELS.studies.code}</dt>
           <dd className="mt-1 break-all font-mono text-zinc-900">{study.code}</dd>
         </div>
         <div>
-          <dt className="font-medium text-zinc-500">Estado</dt>
-          <dd className="mt-1 text-zinc-900">{study.status}</dd>
+          <dt className="font-medium text-zinc-500">{UI_LABELS.common.status}</dt>
+          <dd className="mt-1 text-zinc-900">{STUDY_STATUS_LABELS[study.status]}</dd>
         </div>
         <div>
-          <dt className="font-medium text-zinc-500">Zona horaria</dt>
+          <dt className="font-medium text-zinc-500">{UI_LABELS.studies.timeZone}</dt>
           <dd className="mt-1 text-zinc-900">{study.timeZoneIana}</dd>
         </div>
         <div>
-          <dt className="font-medium text-zinc-500">Edicion</dt>
+          <dt className="font-medium text-zinc-500">{UI_LABELS.common.editing}</dt>
           <dd className="mt-1 text-zinc-900">
-            {study.status === "DRAFT" ? "Disponible" : "Solo lectura"}
+            {study.status === "DRAFT" ? UI_LABELS.common.available : UI_LABELS.common.readOnly}
           </dd>
         </div>
       </dl>
@@ -123,13 +162,13 @@ function StudySummary({ study }: { study: ScreenerStudySummary }) {
 function CreateDraftPanel({ readOnly, studyId }: { readOnly: boolean; studyId: string }) {
   return (
     <section className="rounded-lg border border-dashed border-teal-300 bg-teal-50 p-5">
-      <h2 className="text-lg font-semibold text-zinc-950">Borrador de screener</h2>
+      <h2 className="text-lg font-semibold text-zinc-950">{UI_LABELS.screener.screenerDraft}</h2>
       <p className="mt-2 text-sm leading-6 text-zinc-700">
-        Crea un borrador reutilizable para este estudio. La version publicada se generara despues.
+        Crea un borrador reutilizable para este estudio. La versión publicada se generará después.
       </p>
       <form action={createScreenerDraftAction.bind(null, studyId)} className="mt-4">
         <button className={primaryButtonClass} disabled={readOnly} type="submit">
-          Crear borrador
+          {UI_LABELS.actions.createDraft}
         </button>
       </form>
     </section>
@@ -145,22 +184,22 @@ function DraftStatusPanel({
 }) {
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-zinc-950">Estado del borrador</h2>
+      <h2 className="text-lg font-semibold text-zinc-950">{UI_LABELS.screener.draftStatus}</h2>
       <dl className="mt-4 grid gap-3 text-sm md:grid-cols-4">
         <div>
-          <dt className="font-medium text-zinc-500">Titulo</dt>
+          <dt className="font-medium text-zinc-500">{UI_LABELS.screener.title}</dt>
           <dd className="mt-1 text-zinc-900">{definition.title}</dd>
         </div>
         <div>
-          <dt className="font-medium text-zinc-500">Preguntas</dt>
+          <dt className="font-medium text-zinc-500">{UI_LABELS.screener.questions}</dt>
           <dd className="mt-1 text-zinc-900">{definition.questions.length}</dd>
         </div>
         <div>
-          <dt className="font-medium text-zinc-500">Reglas</dt>
+          <dt className="font-medium text-zinc-500">{UI_LABELS.screener.rules}</dt>
           <dd className="mt-1 text-zinc-900">{definition.rules.length}</dd>
         </div>
         <div>
-          <dt className="font-medium text-zinc-500">Actualizado</dt>
+          <dt className="font-medium text-zinc-500">{UI_LABELS.common.updated}</dt>
           <dd className="mt-1 text-zinc-900">{dateFormatter.format(draft.updatedAt)}</dd>
         </div>
       </dl>
@@ -181,15 +220,15 @@ function MetadataPanel({
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
       <SectionHeader
         description="Estos datos forman parte del snapshot publicado."
-        title="Resumen del cuestionario"
+        title={UI_LABELS.screener.questionnaireSummary}
       />
       <form action={saveScreenerMetadataAction.bind(null, studyId)} className="grid gap-4 md:grid-cols-2">
         <label className={labelClass}>
-          Titulo
+          {UI_LABELS.screener.title}
           <input className={inputClass} defaultValue={definition.title} disabled={readOnly} name="title" />
         </label>
         <label className={labelClass}>
-          Descripcion opcional
+          {UI_LABELS.screener.optionalDescription}
           <input
             className={inputClass}
             defaultValue={definition.description ?? ""}
@@ -199,7 +238,7 @@ function MetadataPanel({
         </label>
         <div className="md:col-span-2">
           <button className={primaryButtonClass} disabled={readOnly} type="submit">
-            Guardar borrador
+            {UI_LABELS.actions.saveDraft}
           </button>
         </div>
       </form>
@@ -221,13 +260,13 @@ function QuestionPanel({
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
       <SectionHeader
-        description="Agrega, edita, elimina y reordena preguntas. Los IDs tecnicos son estables."
-        title="Editor estructurado de preguntas"
+        description={UI_LABELS.screener.addQuestionHelp}
+        title={UI_LABELS.screener.structuredQuestionEditor}
       />
       <div className="space-y-4">
         {questions.length === 0 ? (
           <p className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
-            Todavia no hay preguntas en el borrador.
+            {UI_LABELS.screener.noDraftQuestions}
           </p>
         ) : (
           questions.map((question) => (
@@ -242,7 +281,7 @@ function QuestionPanel({
       </div>
       <div className="mt-6 rounded-md border border-teal-100 bg-teal-50 p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-teal-800">
-          Agregar pregunta
+          {UI_LABELS.actions.addQuestion}
         </h3>
         <QuestionForm action={addScreenerQuestionAction.bind(null, studyId)} readOnly={readOnly} />
       </div>
@@ -268,18 +307,18 @@ function QuestionCard({
             {question.order}. {question.text}
           </h3>
           <p className="mt-1 text-xs text-zinc-500">
-            {question.type} · {question.dataDestination}
+            {QUESTION_TYPE_LABELS[question.type]} · {DATA_DESTINATION_LABELS[question.dataDestination]}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <TinyForm action={moveScreenerQuestionAction.bind(null, studyId, question.id, "up")} disabled={readOnly}>
-            Subir
+            {UI_LABELS.actions.moveUp}
           </TinyForm>
           <TinyForm action={moveScreenerQuestionAction.bind(null, studyId, question.id, "down")} disabled={readOnly}>
-            Bajar
+            {UI_LABELS.actions.moveDown}
           </TinyForm>
           <TinyForm action={deleteScreenerQuestionAction.bind(null, studyId, question.id)} disabled={readOnly}>
-            Eliminar
+            {UI_LABELS.actions.delete}
           </TinyForm>
         </div>
       </div>
@@ -309,7 +348,7 @@ function QuestionForm({
   return (
     <form action={action} className="mt-4 grid gap-3 md:grid-cols-3">
       <label className={labelClass}>
-        ID tecnico
+        {UI_LABELS.screener.technicalId}
         <input
           className={inputClass}
           defaultValue={question?.id ?? ""}
@@ -319,66 +358,68 @@ function QuestionForm({
         />
       </label>
       <label className={labelClass}>
-        Tipo
+        {UI_LABELS.screener.questionType}
         <select className={inputClass} defaultValue={question?.type ?? "SINGLE_CHOICE"} disabled={readOnly} name="type">
           {questionTypes.map((type) => (
             <option key={type} value={type}>
-              {type}
+              {QUESTION_TYPE_LABELS[type]}
             </option>
           ))}
         </select>
       </label>
       <label className={labelClass}>
-        Destino de datos
+        {UI_LABELS.screener.dataDestination}
         <select
           className={inputClass}
           defaultValue={question?.dataDestination ?? "SCREENING"}
           disabled={readOnly}
           name="dataDestination"
         >
-          <option value="SCREENING">SCREENING</option>
-          <option value="PARTICIPANT_PROFILE">PARTICIPANT_PROFILE</option>
-          <option value="OPERATIONAL_INTERNAL">OPERATIONAL_INTERNAL</option>
+          {dataDestinations.map((destination) => (
+            <option key={destination} value={destination}>
+              {DATA_DESTINATION_LABELS[destination]}
+            </option>
+          ))}
         </select>
       </label>
       <label className={`${labelClass} md:col-span-2`}>
-        Texto
+        {UI_LABELS.screener.questionText}
         <input className={inputClass} defaultValue={question?.text ?? ""} disabled={readOnly} name="text" required />
       </label>
       <label className={labelClass}>
-        Binding de perfil
+        {UI_LABELS.screener.profileBinding}
         <select
           className={inputClass}
           defaultValue={question?.profileBinding ?? ""}
           disabled={readOnly}
           name="profileBinding"
         >
-          <option value="">No aplica</option>
+          <option value="">{UI_LABELS.common.doesNotApply}</option>
           {profileBindings.map((binding) => (
             <option key={binding} value={binding}>
-              {binding}
+              {PROFILE_BINDING_LABELS[binding]}
             </option>
           ))}
         </select>
       </label>
       <label className={`${labelClass} md:col-span-2`}>
-        Ayuda opcional
+        {UI_LABELS.screener.helpText}
         <input className={inputClass} defaultValue={question?.helpText ?? ""} disabled={readOnly} name="helpText" />
       </label>
       <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
         <input defaultChecked={question?.required ?? false} disabled={readOnly} name="required" type="checkbox" />
-        Obligatoria
+        {UI_LABELS.common.required}
       </label>
       <label className={labelClass}>
-        Min numero
+        {UI_LABELS.screener.minimumNumber}
         <input className={inputClass} defaultValue={question?.validation.min ?? ""} disabled={readOnly} name="validationMin" />
       </label>
       <label className={labelClass}>
-        Max numero
+        {UI_LABELS.screener.maximumNumber}
         <input className={inputClass} defaultValue={question?.validation.max ?? ""} disabled={readOnly} name="validationMax" />
       </label>
       <label className={labelClass}>
-        Max texto
+        {UI_LABELS.screener.maximumCharacters}
         <input
           className={inputClass}
           defaultValue={question?.validation.maxLength ?? ""}
@@ -387,7 +428,7 @@ function QuestionForm({
         />
       </label>
       <label className={labelClass}>
-        Min selecciones
+        {UI_LABELS.screener.minimumSelections}
         <input
           className={inputClass}
           defaultValue={question?.validation.minSelections ?? ""}
@@ -396,7 +437,7 @@ function QuestionForm({
         />
       </label>
       <label className={labelClass}>
-        Max selecciones
+        {UI_LABELS.screener.maximumSelections}
         <input
           className={inputClass}
           defaultValue={question?.validation.maxSelections ?? ""}
@@ -406,7 +447,7 @@ function QuestionForm({
       </label>
       <div className="md:col-span-3">
         <button className={secondaryButtonClass} disabled={readOnly} type="submit">
-          {question ? "Actualizar pregunta" : "Agregar pregunta"}
+          {question ? UI_LABELS.actions.saveQuestion : UI_LABELS.actions.addQuestion}
         </button>
       </div>
     </form>
@@ -426,10 +467,10 @@ function OptionPanel({
 }) {
   return (
     <div className="mt-5 rounded-md border border-white bg-white p-4">
-      <h4 className="text-sm font-semibold text-zinc-900">Opciones</h4>
+      <h4 className="text-sm font-semibold text-zinc-900">{UI_LABELS.screener.options}</h4>
       <div className="mt-3 space-y-3">
         {options.length === 0 ? (
-          <p className="text-sm text-zinc-500">Esta pregunta todavia no tiene opciones.</p>
+          <p className="text-sm text-zinc-500">{UI_LABELS.screener.noOptions}</p>
         ) : (
           options
             .sort((left, right) => left.order - right.order)
@@ -445,7 +486,9 @@ function OptionPanel({
         )}
       </div>
       <div className="mt-4 rounded-md bg-zinc-50 p-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Agregar opcion</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          {UI_LABELS.actions.addOption}
+        </p>
         <OptionForm questionId={questionId} readOnly={readOnly} studyId={studyId} />
       </div>
     </div>
@@ -471,7 +514,7 @@ function OptionForm({
   return (
     <form action={action} className="grid gap-3 rounded-md border border-zinc-100 p-3 md:grid-cols-4">
       <label className={labelClass}>
-        Valor
+        {UI_LABELS.screener.optionValue}
         <input
           className={inputClass}
           defaultValue={option?.value ?? ""}
@@ -481,12 +524,12 @@ function OptionForm({
         />
       </label>
       <label className={labelClass}>
-        Etiqueta
+        {UI_LABELS.screener.visibleLabel}
         <input className={inputClass} defaultValue={option?.label ?? ""} disabled={readOnly} name="label" required />
       </label>
       <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
         <input defaultChecked={option?.isOther ?? false} disabled={readOnly} name="isOther" type="checkbox" />
-        Es Otro
+        {UI_LABELS.screener.other}
       </label>
       <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
         <input
@@ -495,20 +538,21 @@ function OptionForm({
           name="otherTextRequired"
           type="checkbox"
         />
-        Otro exige texto
+        {UI_LABELS.screener.otherRequiresText}
       </label>
       <label className={labelClass}>
-        Accion
+        {UI_LABELS.screener.action}
         <select className={inputClass} defaultValue={firstAction?.type ?? "NONE"} disabled={readOnly} name="actionType">
-          <option value="NONE">NONE</option>
-          <option value="CONTINUE">CONTINUE</option>
-          <option value="TERMINATE">TERMINATE</option>
-          <option value="FLAG">FLAG</option>
-          <option value="PENDING_REVIEW">PENDING_REVIEW</option>
+          <option value="NONE">{UI_LABELS.common.doesNotApply}</option>
+          {optionActionTypes.map((type) => (
+            <option key={type} value={type}>
+              {RULE_OUTCOME_LABELS[type]}
+            </option>
+          ))}
         </select>
       </label>
       <label className={labelClass}>
-        Codigo accion
+        {UI_LABELS.screener.actionCode}
         <input
           className={inputClass}
           defaultValue={getActionCode(firstAction)}
@@ -517,7 +561,7 @@ function OptionForm({
         />
       </label>
       <label className={labelClass}>
-        Razon
+        {UI_LABELS.screener.reason}
         <input
           className={inputClass}
           defaultValue={getActionReason(firstAction)}
@@ -532,11 +576,11 @@ function OptionForm({
           name="actionRequiresReview"
           type="checkbox"
         />
-        Requiere revision
+        {UI_LABELS.screener.requiresReview}
       </label>
       <div className="flex flex-wrap gap-2 md:col-span-4">
         <button className={secondaryButtonClass} disabled={readOnly} type="submit">
-          {option ? "Actualizar opcion" : "Agregar opcion"}
+          {option ? UI_LABELS.actions.saveOption : UI_LABELS.actions.addOption}
         </button>
         {option ? (
           <>
@@ -546,7 +590,7 @@ function OptionForm({
               formAction={moveScreenerOptionAction.bind(null, studyId, questionId, option.value, "up")}
               type="submit"
             >
-              Subir
+              {UI_LABELS.actions.moveOptionUp}
             </button>
             <button
               className={secondaryButtonClass}
@@ -554,7 +598,7 @@ function OptionForm({
               formAction={moveScreenerOptionAction.bind(null, studyId, questionId, option.value, "down")}
               type="submit"
             >
-              Bajar
+              {UI_LABELS.actions.moveOptionDown}
             </button>
             <button
               className={secondaryButtonClass}
@@ -562,7 +606,7 @@ function OptionForm({
               formAction={deleteScreenerOptionAction.bind(null, studyId, questionId, option.value)}
               type="submit"
             >
-              Eliminar
+              {UI_LABELS.actions.deleteOption}
             </button>
           </>
         ) : null}
@@ -583,13 +627,13 @@ function RulePanel({
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
       <SectionHeader
-        description="Configura reglas sin expresiones arbitrarias. Los valores multiples se separan por coma."
-        title="Reglas y terminaciones"
+        description={UI_LABELS.screener.rulesHelp}
+        title={UI_LABELS.screener.rulesAndTerminations}
       />
       <div className="space-y-2">
         {definition.rules.length === 0 ? (
           <p className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
-            No hay reglas adicionales.
+            {UI_LABELS.screener.noAdditionalRules}
           </p>
         ) : (
           definition.rules.map((rule) => (
@@ -599,61 +643,64 @@ function RulePanel({
       </div>
       <form action={addScreenerRuleAction.bind(null, studyId)} className="mt-5 grid gap-3 md:grid-cols-4">
         <label className={labelClass}>
-          ID regla
+          {UI_LABELS.screener.ruleId}
           <input className={inputClass} disabled={readOnly} name="id" required />
         </label>
         <label className={labelClass}>
-          Pregunta
+          {UI_LABELS.screener.question}
           <input className={inputClass} disabled={readOnly} name="questionId" required />
         </label>
         <label className={labelClass}>
-          Condicion
+          {UI_LABELS.screener.condition}
           <select className={inputClass} disabled={readOnly} name="conditionType">
-            <option value="ANSWER_EQUALS">ANSWER_EQUALS</option>
-            <option value="ANY_SELECTED">ANY_SELECTED</option>
-            <option value="ALL_SELECTED">ALL_SELECTED</option>
-            <option value="NUMBER_RANGE">NUMBER_RANGE</option>
+            {ruleConditionTypes.map((type) => (
+              <option key={type} value={type}>
+                {RULE_CONDITION_LABELS[type]}
+              </option>
+            ))}
           </select>
         </label>
         <label className={labelClass}>
-          Resultado
+          {UI_LABELS.screener.result}
           <select className={inputClass} disabled={readOnly} name="outcomeType">
-            <option value="TERMINATE">TERMINATE</option>
-            <option value="PENDING_REVIEW">PENDING_REVIEW</option>
-            <option value="FLAG">FLAG</option>
+            {ruleOutcomeTypes.map((type) => (
+              <option key={type} value={type}>
+                {RULE_OUTCOME_LABELS[type]}
+              </option>
+            ))}
           </select>
         </label>
         <label className={labelClass}>
-          Valor
+          {UI_LABELS.screener.value}
           <input className={inputClass} disabled={readOnly} name="value" />
         </label>
         <label className={labelClass}>
-          Valores
+          {UI_LABELS.screener.values}
           <input className={inputClass} disabled={readOnly} name="values" placeholder="a,b,c" />
         </label>
         <label className={labelClass}>
-          Min
+          {UI_LABELS.screener.minimum}
           <input className={inputClass} disabled={readOnly} name="min" />
         </label>
         <label className={labelClass}>
-          Max
+          {UI_LABELS.screener.maximum}
           <input className={inputClass} disabled={readOnly} name="max" />
         </label>
         <label className={labelClass}>
-          Codigo
+          {UI_LABELS.common.code}
           <input className={inputClass} disabled={readOnly} name="outcomeCode" required />
         </label>
         <label className={`${labelClass} md:col-span-2`}>
-          Razon
+          {UI_LABELS.screener.reason}
           <input className={inputClass} disabled={readOnly} name="outcomeReason" />
         </label>
         <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
           <input disabled={readOnly} name="outcomeRequiresReview" type="checkbox" />
-          Bandera requiere revision
+          {UI_LABELS.screener.flagRequiresReview}
         </label>
         <div className="md:col-span-4">
           <button className={secondaryButtonClass} disabled={readOnly} type="submit">
-            Agregar regla
+            {UI_LABELS.actions.addRule}
           </button>
         </div>
       </form>
@@ -675,11 +722,11 @@ function RuleItem({
       <div>
         <p className="font-mono text-sm font-semibold text-zinc-900">{rule.id}</p>
         <p className="text-xs text-zinc-600">
-          {rule.condition.type} → {rule.outcome.type}
+          {formatConditionLabel(rule.condition)} → {RULE_OUTCOME_LABELS[rule.outcome.type]}
         </p>
       </div>
       <FormButton action={deleteScreenerRuleAction.bind(null, studyId, rule.id)} disabled={readOnly}>
-        Eliminar regla
+        {UI_LABELS.actions.deleteRule}
       </FormButton>
     </div>
   );
@@ -697,30 +744,30 @@ function NsePanel({
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
       <SectionHeader
-        description="Usa lineas estructuradas; no JSON. Entrada: questionId|valor=puntaje,valor=puntaje|missing=0. Rango: codigo|etiqueta|min|max|true."
-        title="Calculo NSE"
+        description={`${UI_LABELS.screener.nseHelp} ${UI_LABELS.screener.formatInputs} ${UI_LABELS.screener.formatRanges}`}
+        title={UI_LABELS.screener.nseCalculation}
       />
       {definition.nse ? (
         <div className="mb-4 rounded-md border border-teal-100 bg-teal-50 p-3 text-sm text-teal-900">
-          NSE activo: {definition.nse.label} con {definition.nse.inputs.length} entradas y{" "}
-          {definition.nse.ranges.length} rangos.
+          {UI_LABELS.screener.nseConfigured}: {definition.nse.label} con{" "}
+          {definition.nse.inputs.length} entradas y {definition.nse.ranges.length} rangos.
         </div>
       ) : (
         <p className="mb-4 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
-          El borrador no tiene calculo NSE configurado.
+          {UI_LABELS.screener.noNse}
         </p>
       )}
       <form action={saveScreenerNseAction.bind(null, studyId)} className="grid gap-3 md:grid-cols-2">
         <label className={labelClass}>
-          Codigo
+          {UI_LABELS.screener.nseCode}
           <input className={inputClass} defaultValue={definition.nse?.code ?? "nse"} disabled={readOnly} name="code" />
         </label>
         <label className={labelClass}>
-          Etiqueta
+          {UI_LABELS.screener.nseLabel}
           <input className={inputClass} defaultValue={definition.nse?.label ?? "NSE"} disabled={readOnly} name="label" />
         </label>
         <label className={`${labelClass} md:col-span-2`}>
-          Entradas
+          {UI_LABELS.screener.nseInputs}
           <textarea
             className={inputClass}
             defaultValue={formatNseInputs(definition.nse)}
@@ -730,7 +777,7 @@ function NsePanel({
           />
         </label>
         <label className={`${labelClass} md:col-span-2`}>
-          Rangos
+          {UI_LABELS.screener.nseRanges}
           <textarea
             className={inputClass}
             defaultValue={formatNseRanges(definition.nse)}
@@ -741,7 +788,7 @@ function NsePanel({
         </label>
         <div className="flex flex-wrap gap-2 md:col-span-2">
           <button className={secondaryButtonClass} disabled={readOnly} type="submit">
-            Guardar NSE
+            {UI_LABELS.actions.saveNse}
           </button>
           <button
             className={secondaryButtonClass}
@@ -749,7 +796,7 @@ function NsePanel({
             formAction={clearScreenerNseAction.bind(null, studyId)}
             type="submit"
           >
-            Retirar NSE
+            {UI_LABELS.actions.removeNse}
           </button>
         </div>
       </form>
@@ -774,18 +821,21 @@ function PublishPanel({
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
       <SectionHeader
-        description="La publicacion genera hash SHA-256, version consecutiva y retira la version activa previa."
-        title="Validacion y publicacion"
+        description={UI_LABELS.screener.publishHelp}
+        title={UI_LABELS.screener.validationAndPublishing}
       />
       <ul className="mb-4 space-y-2 text-sm text-zinc-700">
-        <li>Preguntas configuradas: {definition.questions.length}</li>
-        <li>Preguntas de opcion sin opciones: {optionQuestionsWithoutOptions.length}</li>
-        <li>Reglas configuradas: {definition.rules.length}</li>
-        <li>Bloque NSE: {definition.nse ? "Configurado" : "No configurado"}</li>
+        <li>{UI_LABELS.screener.configuredQuestions}: {definition.questions.length}</li>
+        <li>{UI_LABELS.screener.optionQuestionsWithoutOptions}: {optionQuestionsWithoutOptions.length}</li>
+        <li>{UI_LABELS.screener.configuredRules}: {definition.rules.length}</li>
+        <li>
+          {UI_LABELS.screener.nseBlock}:{" "}
+          {definition.nse ? UI_LABELS.common.configured : UI_LABELS.screener.notConfigured}
+        </li>
       </ul>
       <form action={publishScreenerAction.bind(null, studyId)}>
         <button className={primaryButtonClass} disabled={readOnly || !canPublish} type="submit">
-          Publicar version
+          {UI_LABELS.actions.publishVersion}
         </button>
       </form>
     </section>
@@ -804,12 +854,12 @@ function VersionHistory({
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
       <SectionHeader
-        description="Las versiones publicadas son de solo lectura. Las retiradas se conservan para trazabilidad."
-        title="Historial de versiones"
+        description={UI_LABELS.screener.versionHistoryHelp}
+        title={UI_LABELS.screener.versionHistory}
       />
       {versions.length === 0 ? (
         <p className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
-          Todavia no hay versiones publicadas.
+          {UI_LABELS.screener.noPublishedVersions}
         </p>
       ) : (
         <div className="space-y-3">
@@ -817,12 +867,15 @@ function VersionHistory({
             <article className="rounded-md border border-zinc-200 bg-zinc-50 p-4" key={version.id}>
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <h3 className="font-semibold text-zinc-950">Version {version.versionNumber}</h3>
+                  <h3 className="font-semibold text-zinc-950">
+                    {UI_LABELS.screener.versionNumber} {version.versionNumber}
+                  </h3>
                   <p className="mt-1 text-sm text-zinc-600">
-                    {version.status} · publicada {dateFormatter.format(version.publishedAt)}
+                    {QUESTIONNAIRE_VERSION_STATUS_LABELS[version.status]} · {UI_LABELS.screener.publishedOn}{" "}
+                    {dateFormatter.format(version.publishedAt)}
                   </p>
                   <p className="mt-1 break-all font-mono text-xs text-zinc-500">
-                    {version.definitionHash}
+                    {UI_LABELS.screener.definitionHash}: {version.definitionHash}
                   </p>
                 </div>
                 {version.status === "ACTIVE" ? (
@@ -830,18 +883,11 @@ function VersionHistory({
                     action={retireScreenerVersionAction.bind(null, studyId, version.id)}
                     disabled={readOnly}
                   >
-                    Retirar version
+                    {UI_LABELS.actions.retireVersion}
                   </FormButton>
                 ) : null}
               </div>
-              <details className="mt-3">
-                <summary className="cursor-pointer text-sm font-semibold text-teal-700">
-                  Vista tecnica solo lectura
-                </summary>
-                <pre className="mt-3 max-h-72 overflow-auto rounded-md bg-zinc-950 p-3 text-xs text-zinc-50">
-                  {JSON.stringify(version.definitionJson, null, 2)}
-                </pre>
-              </details>
+              <p className="mt-3 text-sm text-zinc-600">{UI_LABELS.screener.readOnlyDefinition}</p>
             </article>
           ))}
         </div>
@@ -899,6 +945,10 @@ function FormButton({
       </button>
     </form>
   );
+}
+
+function formatConditionLabel(condition: ScreenerCondition): string {
+  return RULE_CONDITION_LABELS[condition.type];
 }
 
 function formatNseInputs(nse: ScreenerDefinition["nse"]): string {

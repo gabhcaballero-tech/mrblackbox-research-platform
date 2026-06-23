@@ -50,9 +50,9 @@ export const productAdminInputSchema = z
       normalizeStudyCode,
       z
         .string()
-        .min(2, "El codigo interno debe tener al menos 2 caracteres.")
-        .max(32, "El codigo interno no puede superar 32 caracteres.")
-        .regex(SAFE_CODE_PATTERN, "Usa solo letras, numeros y guiones internos.")
+        .min(2, "El código interno debe tener al menos 2 caracteres.")
+        .max(32, "El código interno no puede superar 32 caracteres.")
+        .regex(SAFE_CODE_PATTERN, "Usa solo letras, números y guiones internos.")
     ),
     realName: z.preprocess(
       normalizeDisplayText,
@@ -103,9 +103,9 @@ export const rotationPlanAdminInputSchema = z.object({
     normalizeStudyCode,
     z
       .string()
-      .min(2, "El codigo de rotacion debe tener al menos 2 caracteres.")
-      .max(32, "El codigo de rotacion no puede superar 32 caracteres.")
-      .regex(SAFE_CODE_PATTERN, "Usa solo letras, numeros y guiones internos.")
+      .min(2, "El código de rotación debe tener al menos 2 caracteres.")
+      .max(32, "El código de rotación no puede superar 32 caracteres.")
+      .regex(SAFE_CODE_PATTERN, "Usa solo letras, números y guiones internos.")
   )
 });
 
