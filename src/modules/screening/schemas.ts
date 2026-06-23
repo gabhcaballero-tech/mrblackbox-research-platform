@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const screeningStatusSchema = z.enum(["passed", "terminated", "incomplete"]);
+export const screeningStatusSchema = z.enum(["passed", "terminated", "incomplete", "pending_review"]);
 
 export const screeningAnswerValueSchema = z.union([
   z.string(),

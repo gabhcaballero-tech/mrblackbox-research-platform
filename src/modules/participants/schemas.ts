@@ -41,7 +41,8 @@ export const studyParticipantScreeningStatusSchema = z.enum([
   "started",
   "passed",
   "terminated",
-  "incomplete"
+  "incomplete",
+  "pending_review"
 ]);
 
 export const studyParticipantSchema = z

@@ -55,12 +55,20 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
       />
 
       <div className="mb-6">
-        <Link
-          className="text-sm font-semibold text-teal-700 transition hover:text-teal-800"
-          href="/admin"
-        >
-          Volver a estudios
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            className="text-sm font-semibold text-teal-700 transition hover:text-teal-800"
+            href="/admin"
+          >
+            Volver a estudios
+          </Link>
+          <Link
+            className="text-sm font-semibold text-zinc-700 transition hover:text-zinc-950"
+            href={`/admin/studies/${studyId}/screener`}
+          >
+            Configurar screener
+          </Link>
+        </div>
       </div>
 
       <div className="space-y-8">

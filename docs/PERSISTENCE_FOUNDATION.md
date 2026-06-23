@@ -23,6 +23,7 @@ Instaladas posteriormente para la fundacion de autenticacion interna:
 - `prisma/migrations/20260622213013_initial_persistence_foundation/migration.sql`
 - `prisma/migrations/20260622220438_add_internal_user_auth_user_id/migration.sql`
 - `prisma/migrations/20260622230824_add_study_code/migration.sql`
+- `prisma/migrations/20260623003740_add_screener_pending_review_evaluation/migration.sql`
 - `prisma/migrations/migration_lock.toml`
 - `src/shared/db/client.ts`
 - `src/shared/db/index.ts`
@@ -44,6 +45,7 @@ El esquema prepara PostgreSQL con Prisma para:
 - Cuestionarios: `QuestionnaireDraft` conserva borradores editables; `QuestionnaireVersion` conserva snapshots publicados e inmutables por version/hash.
 - Biblioteca: `LibraryItem`, `LibraryItemRevision` y `QuestionnaireAttributeSet` preservan revisiones usadas por cuestionarios publicados.
 - Screening: `ScreeningAttempt` y `ScreeningAnswer` vinculan filtros y respuestas a la participacion, no al perfil personal.
+- Screening V1 agrega `PENDING_REVIEW` y `ScreeningAttempt.evaluationJson` para guardar resultado seguro de evaluacion, banderas, razones, faltantes y NSE sin PII crudo.
 - Cuotas: `QuotaDefinition` guarda criterios flexibles y etapa; `QuotaEvaluation` registra match, conteo, cuota llena y aviso sin bloqueo.
 - Hora de aplicacion: `ApplicationTimeEvent` registra alta y correccion de `applicationStartedAt` con usuario, motivo y estado de actividades.
 - Actividades: `ActivitySchedule` define mediciones, video futuro y seguimiento; `ParticipantActivity` instancia horarios, ventanas, ocurrencia y estados por participacion.
@@ -155,6 +157,20 @@ Se usan restricciones existentes:
 - `RotationPlanArm` mantiene unicidad por brazo y orden dentro de un plan.
 
 El retiro de rotaciones usa `RotationPlan.status = INACTIVE`; productos y brazos solo se eliminan fisicamente en `DRAFT` si no tienen referencias.
+
+## Screener Builder V1
+
+Migracion creada y no aplicada:
+
+- `20260623003740_add_screener_pending_review_evaluation`
+
+Resumen:
+
+- agrega `PENDING_REVIEW` al enum PostgreSQL `"ScreeningStatus"`;
+- agrega `screening_attempts.evaluationJson` como `JSONB` nullable;
+- no agrega indices, llaves foraneas ni columnas adicionales.
+
+La administracion de screener usa los modelos existentes `QuestionnaireDraft` y `QuestionnaireVersion`. Publicar crea versiones inmutables y retira la version activa previa de screener dentro de una transaccion de aplicacion.
 
 ## Validaciones ejecutadas
 

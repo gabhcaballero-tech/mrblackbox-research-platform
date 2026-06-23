@@ -5,6 +5,7 @@
 - `studies`: administracion inicial de estudios en borrador, validacion de nombre/codigo/zona horaria y reglas de edicion DRAFT.
 - `participants`: contratos y validaciones para separar `ParticipantProfile` de `StudyParticipant`.
 - `screening`: definiciones de filtros, reglas de continuar o terminar, puntajes y clasificacion por rangos.
+- `screener`: constructor administrativo de filtros, definicion `screening.v1`, versiones inmutables y evaluador puro de reglas/NSE.
 - `quotas`: definicion y evaluacion de cuotas por criterios y etapa de conteo.
 - `comparative-rotation`: validacion y configuracion administrativa de productos, brazos y rotaciones manuales de dos brazos para V1.
 - `activities`: calculo de actividades programadas desde `applicationStartedAt` y reglas de correccion de hora.
@@ -20,6 +21,8 @@
 - `ParticipantProfile` contiene datos personales y no acepta `studyId`.
 - `StudyParticipant` representa la participacion operativa en un estudio especifico.
 - Los filtros devuelven resultados estructurados con estado `passed`, `terminated` o `incomplete`.
+- El screener builder V1 usa `screening.v1`, editor guiado y versiones publicadas inmutables.
+- El evaluador nuevo de screener devuelve estados persistibles `PASSED`, `TERMINATED`, `INCOMPLETE` o `PENDING_REVIEW`.
 - El calculo NSE se modela como una configuracion generica de puntajes y rangos, no como una regla fija de un cliente.
 - Las cuotas generan advertencias, pero nunca bloquean la entrevista en V1.
 - La rotacion V1 acepta solo `manual_cover_code`; la asignacion automatica queda fuera.
@@ -35,6 +38,9 @@
 ## Reglas implementadas
 
 - Filtro aprobado cuando todas las respuestas obligatorias existen y ninguna regla de terminacion coincide.
+- Screener V1 valida IDs estables, referencias de reglas, opciones, destinos de datos y bindings permitidos de perfil.
+- Publicar screener crea hash canonico SHA-256, version consecutiva y retira la version activa previa.
+- `evaluationJson` queda preparado para guardar resultado seguro sin PII crudo.
 - Terminacion por regla directa o por seleccion incluida en respuesta multiple.
 - Puntaje configurable por respuesta y clasificacion por rangos inclusivos.
 - Cuota llena con `warningShown: true` y `blocksInterview: false`.
