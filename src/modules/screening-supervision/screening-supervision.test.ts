@@ -553,12 +553,64 @@ describe("screening supervision service", () => {
     expect(result.ok ? result.data.csv : "").toContain("FMASCULINA-NAVIGO-2026");
     expect(result.ok ? result.data.csv : "").toContain("Portal participante");
     expect(result.ok ? result.data.csv : "").toContain("Elegible confirmado");
+    expect(result.ok ? result.data.csv : "").toContain("23 jun 2026, 8:30 a.m.");
+    expect(result.ok ? result.data.csv : "").toContain("23 jun 2026, 9:00 a.m.");
+    expect(result.ok ? result.data.csv : "").toContain("23 jun 2026, 10:00 a.m.");
+    expect(result.ok ? result.data.csv : "").toContain("24 jun 2026, 11:10 a.m.");
+    expect(result.ok ? result.data.csv : "").toContain("24 jun 2026, 12:00 p.m.");
     expect(result.ok ? result.data.csv : "").toContain("144;C típico;RANGO-3");
     expect(result.ok ? result.data.csv : "").toContain("Sí;1;Sí;NAV-001;A7K4;M3P9;T8R2");
     expect(result.ok ? result.data.csv : "").toContain("Navigo|Otra - Especificación: Marca local");
     expect(result.ok ? result.data.csv : "").not.toContain("other-attempt");
     expect(result.ok ? result.data.csv : "").not.toContain("privateStorageKey");
     expect(result.ok ? result.data.csv : "").not.toContain("signedUrl");
+  });
+
+  it("falls back to America/Mexico_City when the study time zone is missing or invalid during export", async () => {
+    const invalidTimeZoneStudy: SupervisionStudyRecord = {
+      ...study,
+      timeZoneIana: "Invalid/Zone"
+    };
+    const invalidTimeZoneRecord = exportAttempt({
+      questionnaireVersion: {
+        definitionHash: "hash-version-1",
+        definitionJson: definition(),
+        id: "version-1",
+        study: invalidTimeZoneStudy,
+        versionNumber: 1
+      },
+      studyParticipant: {
+        id: "study-participant-1",
+        participantProfile: {
+          createdAt: new Date("2026-06-23T14:30:00Z"),
+          email: "participante@example.com",
+          externalReference: "REF-1",
+          id: "profile-1",
+          name: "Participante Uno",
+          phone: "5550000000"
+        },
+        studyId: invalidTimeZoneStudy.id
+      }
+    });
+    const invalidTimeZoneRepository = {
+      ...repository([invalidTimeZoneRecord]),
+      async getStudy(studyId: string) {
+        return studyId === invalidTimeZoneStudy.id ? invalidTimeZoneStudy : null;
+      }
+    } satisfies ScreeningSupervisionRepository;
+
+    const result = await exportScreeningAttemptsCsvForStudy({
+      actor: admin,
+      filters: {},
+      now: new Date("2026-06-24T12:00:00Z"),
+      repository: invalidTimeZoneRepository,
+      studyId: invalidTimeZoneStudy.id
+    });
+
+    expect(result.ok ? result.data.csv : "").toContain("23 jun 2026, 8:30 a.m.");
+    expect(result.ok ? result.data.csv : "").toContain("23 jun 2026, 9:00 a.m.");
+    expect(result.ok ? result.data.csv : "").toContain("23 jun 2026, 10:00 a.m.");
+    expect(result.ok ? result.data.filename : null).toBe("FMASCULINA-NAVIGO-2026_intentos_screener_2026-06-24.csv");
   });
 
   it("exports headers only when there are no matching attempts", async () => {

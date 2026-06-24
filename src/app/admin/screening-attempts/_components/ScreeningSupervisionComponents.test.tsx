@@ -174,6 +174,13 @@ describe("ScreeningSupervisionComponents", () => {
     expect(screen.getByText("v1")).toBeInTheDocument();
   });
 
+  it("renders start and close times using the study time zone", () => {
+    render(<ScreeningAttemptTable attempts={listData.attempts} studyId={study.id} />);
+
+    expect(screen.getByText("23 jun 2026, 9:00 a.m.")).toBeInTheDocument();
+    expect(screen.getByText("23 jun 2026, 10:00 a.m.")).toBeInTheDocument();
+  });
+
   it("truncates long reason visually and keeps the full title", () => {
     render(<ScreeningAttemptTable attempts={listData.attempts} studyId={study.id} />);
 
@@ -189,7 +196,26 @@ describe("ScreeningSupervisionComponents", () => {
     expect(screen.getByText("Navigo, Otra. Especificación: Marca local")).toBeInTheDocument();
     expect(screen.getByText("C típico")).toBeInTheDocument();
     expect(screen.getByText("RANGO-3")).toBeInTheDocument();
+    expect(screen.getByText("23 jun 2026, 9:00 a.m.")).toBeInTheDocument();
+    expect(screen.getByText("23 jun 2026, 10:00 a.m.")).toBeInTheDocument();
     expect(screen.queryByText(/answerJson|StudyProduct\.realName/)).not.toBeInTheDocument();
+  });
+
+  it("falls back to America/Mexico_City when the study time zone is invalid", () => {
+    render(
+      <ScreeningAttemptDetailView
+        detail={{
+          ...detail,
+          study: {
+            ...study,
+            timeZoneIana: "Invalid/Zone"
+          }
+        }}
+      />
+    );
+
+    expect(screen.getByText("23 jun 2026, 9:00 a.m.")).toBeInTheDocument();
+    expect(screen.getByText("23 jun 2026, 10:00 a.m.")).toBeInTheDocument();
   });
 
   it("keeps statuses in Spanish", () => {

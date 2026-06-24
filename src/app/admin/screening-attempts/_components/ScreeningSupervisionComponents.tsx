@@ -19,13 +19,34 @@ import { EvidenceReplacementForm } from "./EvidenceReplacementForm";
 import { ExportCsvButton } from "./ExportCsvButton";
 import { WhatsAppManualBlock } from "./WhatsAppManualBlock";
 
-const dateFormatter = new Intl.DateTimeFormat("es-MX", {
-  dateStyle: "medium",
-  timeStyle: "short"
-});
+const DEFAULT_STUDY_TIME_ZONE = "America/Mexico_City";
 
-function formatDate(value: Date | null): string {
-  return value ? dateFormatter.format(value) : "Sin cierre";
+function resolveStudyTimeZone(timeZoneIana?: string | null): string {
+  const candidate = timeZoneIana?.trim() || DEFAULT_STUDY_TIME_ZONE;
+
+  try {
+    new Intl.DateTimeFormat("es-MX", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: candidate
+    }).format(new Date());
+
+    return candidate;
+  } catch {
+    return DEFAULT_STUDY_TIME_ZONE;
+  }
+}
+
+function formatDate(value: Date | null, timeZoneIana?: string | null): string {
+  if (!value) {
+    return "Sin cierre";
+  }
+
+  return new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: resolveStudyTimeZone(timeZoneIana)
+  }).format(value);
 }
 
 function formatInputDate(value: Date | undefined): string {
@@ -239,8 +260,8 @@ export function ScreeningAttemptTable({ attempts, studyId }: { attempts: Screeni
                   </span>
                 </td>
                 <td className={`${tdClass} whitespace-nowrap`}>{compactNse(attempt)}</td>
-                <td className={`${tdClass} whitespace-nowrap`}>{formatDate(attempt.startedAt)}</td>
-                <td className={`${tdClass} whitespace-nowrap`}>{formatDate(attempt.closedAt)}</td>
+                <td className={`${tdClass} whitespace-nowrap`}>{formatDate(attempt.startedAt, attempt.study.timeZoneIana)}</td>
+                <td className={`${tdClass} whitespace-nowrap`}>{formatDate(attempt.closedAt, attempt.study.timeZoneIana)}</td>
                 <td className={`${tdClass} whitespace-nowrap`}>{compactVersion(attempt.screenerVersionNumber)}</td>
               </tr>
             ))}
@@ -279,8 +300,8 @@ export function ScreeningAttemptDetailView({ detail }: { detail: ScreeningAttemp
           <SummaryItem label="Confirmacion final" value={detail.confirmation ? "Confirmada" : "Sin confirmacion"} />
           <SummaryItem label="Folio" value={detail.confirmation?.folio ?? "No generado"} mono />
           <SummaryItem label="Código" value={detail.terminationCode ?? "No aplica"} />
-          <SummaryItem label="Inicio" value={formatDate(detail.startedAt)} />
-          <SummaryItem label="Cierre" value={formatDate(detail.closedAt)} />
+          <SummaryItem label="Inicio" value={formatDate(detail.startedAt, detail.study.timeZoneIana)} />
+          <SummaryItem label="Cierre" value={formatDate(detail.closedAt, detail.study.timeZoneIana)} />
           <SummaryItem label="Versión del screener" value={`v${detail.screenerVersionNumber}`} />
           <SummaryItem label="Hash de definición" value={detail.definitionHash} mono />
           <SummaryItem label="Puntaje NSE" value={String(detail.nseScore ?? "No calculado")} />

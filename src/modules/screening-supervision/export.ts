@@ -18,6 +18,7 @@ import { parseScreeningAttemptFilters } from "./validation";
 
 const CSV_SEPARATOR = ";";
 const CSV_CONTENT_TYPE = "text/csv; charset=utf-8";
+const DEFAULT_STUDY_TIME_ZONE = "America/Mexico_City";
 
 type ExportColumn = {
   header: string;
@@ -417,7 +418,7 @@ function formatDateTime(value: Date | null, timeZoneIana: string): string {
     return new Intl.DateTimeFormat("es-MX", {
       dateStyle: "medium",
       timeStyle: "short",
-      timeZone: timeZoneIana
+      timeZone: resolveStudyTimeZone(timeZoneIana)
     }).format(value);
   } catch {
     return value.toISOString();
@@ -429,7 +430,7 @@ function formatDateForFilename(value: Date, timeZoneIana: string): string {
     const parts = new Intl.DateTimeFormat("en-CA", {
       day: "2-digit",
       month: "2-digit",
-      timeZone: timeZoneIana,
+      timeZone: resolveStudyTimeZone(timeZoneIana),
       year: "numeric"
     }).formatToParts(value);
     const year = parts.find((part) => part.type === "year")?.value ?? "0000";
@@ -444,4 +445,20 @@ function formatDateForFilename(value: Date, timeZoneIana: string): string {
 
 function sanitizeFilenamePart(value: string): string {
   return value.replace(/[^A-Z0-9_-]+/gi, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "estudio";
+}
+
+function resolveStudyTimeZone(timeZoneIana?: string | null): string {
+  const candidate = timeZoneIana?.trim() || DEFAULT_STUDY_TIME_ZONE;
+
+  try {
+    new Intl.DateTimeFormat("es-MX", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: candidate
+    }).format(new Date());
+
+    return candidate;
+  } catch {
+    return DEFAULT_STUDY_TIME_ZONE;
+  }
 }
