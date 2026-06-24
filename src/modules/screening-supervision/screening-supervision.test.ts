@@ -566,6 +566,19 @@ describe("screening supervision service", () => {
     expect(result.ok ? result.data.csv : "").not.toContain("signedUrl");
   });
 
+  it("allows SUPERVISOR to export CSV", async () => {
+    const result = await exportScreeningAttemptsCsvForStudy({
+      actor: supervisor,
+      filters: {},
+      now: new Date("2026-06-24T12:00:00Z"),
+      repository: repository([exportAttempt()]),
+      studyId: study.id
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.filename : null).toBe("FMASCULINA-NAVIGO-2026_intentos_screener_2026-06-24.csv");
+  });
+
   it("falls back to America/Mexico_City when the study time zone is missing or invalid during export", async () => {
     const invalidTimeZoneStudy: SupervisionStudyRecord = {
       ...study,

@@ -1,7 +1,3 @@
-"use client";
-
-import { useState } from "react";
-
 export function ExportCsvButton({
   disabled = false,
   href
@@ -9,8 +5,7 @@ export function ExportCsvButton({
   disabled?: boolean;
   href: string;
 }) {
-  const [pending, setPending] = useState(false);
-  const isDisabled = disabled || pending;
+  const isDisabled = disabled;
 
   return (
     <a
@@ -24,14 +19,10 @@ export function ExportCsvButton({
       onClick={(event) => {
         if (isDisabled) {
           event.preventDefault();
-          return;
         }
-
-        setPending(true);
-        window.setTimeout(() => setPending(false), 2500);
       }}
     >
-      {pending ? "Exportando..." : "Exportar Excel"}
+      Exportar Excel
     </a>
   );
 }
