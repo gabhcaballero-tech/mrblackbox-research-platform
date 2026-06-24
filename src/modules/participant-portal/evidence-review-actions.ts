@@ -6,6 +6,7 @@ import { requireCapability } from "@/shared/auth/session";
 import { createEvidenceReviewRepository } from "./evidence-review-repository";
 import {
   approveParticipantEvidenceReview,
+  deleteParticipantEvidenceStudyParticipantTestRecords,
   deleteParticipantEvidenceTestRecord,
   markParticipantManualMessageSent,
   confirmParticipantEvidenceReplacement,
@@ -95,6 +96,33 @@ export async function deleteParticipantEvidenceTestRecordAction(
 ): Promise<void> {
   const actor = await requireCapability("screening:review");
   const result = await deleteParticipantEvidenceTestRecord({
+    actor,
+    attemptId,
+    confirmationText: String(formData.get("confirmationText") ?? ""),
+    reason: String(formData.get("deleteReason") ?? ""),
+    repository: createEvidenceReviewRepository(),
+    storage: createSupabaseEvidenceStorageClient()
+  });
+
+  revalidatePath(`/admin/screening-attempts/${attemptId}`);
+
+  if (!result.ok) {
+    redirect(reviewPath(attemptId, "evidenceError", result.message));
+  }
+
+  redirect(
+    `/admin/studies/${result.data.studyId}/screening-attempts?evidenceMessage=${encodeURIComponent(
+      result.data.storageWarning ?? result.data.successMessage
+    )}`
+  );
+}
+
+export async function deleteParticipantEvidenceStudyParticipantTestRecordsAction(
+  attemptId: string,
+  formData: FormData
+): Promise<void> {
+  const actor = await requireCapability("screening:review");
+  const result = await deleteParticipantEvidenceStudyParticipantTestRecords({
     actor,
     attemptId,
     confirmationText: String(formData.get("confirmationText") ?? ""),

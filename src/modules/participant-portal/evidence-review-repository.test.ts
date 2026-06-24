@@ -110,6 +110,7 @@ function createDeleteContext(options?: {
     participantConfirmation: {
       create: vi.fn(),
       delete: vi.fn(async () => ({})),
+      deleteMany: vi.fn(async () => ({ count: 1 })),
       findMany: vi.fn(async () => options?.folioSequences ?? []),
       findUnique: vi.fn(),
       update: vi.fn()
@@ -156,6 +157,7 @@ function createDeleteContext(options?: {
     },
     screeningAttempt: {
       delete: vi.fn(async () => ({})),
+      deleteMany: vi.fn(async () => ({ count: 1 })),
       findMany: vi.fn(async () => options?.attempts ?? []),
       findUnique: vi.fn(async () => buildAttempt()),
       update: vi.fn()
@@ -332,6 +334,174 @@ describe("participant evidence review repository cleanup", () => {
     expect(context.screeningAnswer.deleteMany).toHaveBeenCalled();
     expect(context.screeningAttempt.delete).toHaveBeenCalled();
     expect(context.participantProfile.delete).not.toHaveBeenCalled();
+  });
+
+  it("deletes all test attempts for the same StudyParticipant in one cleanup", async () => {
+    const context = createDeleteContext({
+      folioSequences: []
+    });
+    const base = buildAttempt();
+    context.screeningAttempt.findUnique = vi.fn(async () =>
+      buildAttempt({
+        studyParticipant: {
+          ...base.studyParticipant,
+          screeningAttempts: [
+            {
+              id: "attempt-1",
+              participantConfirmation: base.participantConfirmation,
+              participantEvidence: base.participantEvidence,
+              source: "PARTICIPANT_PORTAL",
+              status: "PASSED"
+            },
+            {
+              id: "attempt-2",
+              participantConfirmation: {
+                id: "confirmation-2",
+                folio: "NAV-002",
+                folioSequence: 2,
+                manualMessageMarkedSentAt: null,
+                manualMessageStatus: "NOT_SENT",
+                referenceCodes: [{ code: "1111", slot: 1 }]
+              },
+              participantEvidence: [
+                {
+                  ...base.participantEvidence[0],
+                  id: "evidence-2",
+                  privateStorageKey:
+                    "studies/study-1/participants/profile-1/screening-attempts/attempt-2/selfie_identification/selfie.jpg"
+                }
+              ],
+              source: "FIELD",
+              status: "TERMINATED"
+            }
+          ]
+        }
+      })
+    );
+    const repository = createRepositoryWithContext(context);
+
+    const result = await repository.deleteStudyParticipantTestRecords({
+      attemptId: "attempt-1",
+      deletedByUserId: "admin-1",
+      reason: "PRUEBAS AGRUPADAS"
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      studyId: "study-1"
+    });
+    expect(result.ok ? result.evidenceToDelete : []).toHaveLength(2);
+    expect(context.participantReferenceCode.deleteMany).toHaveBeenCalledWith({
+      where: {
+        confirmationId: {
+          in: ["confirmation-1", "confirmation-2"]
+        }
+      }
+    });
+    expect(context.participantConfirmation.deleteMany).toHaveBeenCalledWith({
+      where: {
+        id: {
+          in: ["confirmation-1", "confirmation-2"]
+        }
+      }
+    });
+    expect(context.screeningAnswer.deleteMany).toHaveBeenCalledWith({
+      where: {
+        screeningAttemptId: {
+          in: ["attempt-1", "attempt-2"]
+        }
+      }
+    });
+    expect(context.participantEvidence.deleteMany).toHaveBeenCalledWith({
+      where: {
+        screeningAttemptId: {
+          in: ["attempt-1", "attempt-2"]
+        }
+      }
+    });
+    expect(context.participantScreeningReview.deleteMany).toHaveBeenCalledWith({
+      where: {
+        screeningAttemptId: {
+          in: ["attempt-1", "attempt-2"]
+        }
+      }
+    });
+    expect(context.screeningAttempt.deleteMany).toHaveBeenCalledWith({
+      where: {
+        id: {
+          in: ["attempt-1", "attempt-2"]
+        }
+      }
+    });
+    expect(context.participantPortalStudyConfig.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          nextFolioSequence: 1
+        })
+      })
+    );
+  });
+
+  it("does not report additional screening attempts as the final blocker", async () => {
+    const context = createDeleteContext({
+      attempts: [{ id: "attempt-2" }]
+    });
+    const repository = createRepositoryWithContext(context);
+
+    const result = await repository.deleteTestRecord({
+      attemptId: "attempt-1",
+      deletedByUserId: "admin-1",
+      reason: "PRUEBA"
+    });
+
+    expect(result).toEqual({
+      message:
+        "No se puede eliminar porque existen relaciones no soportadas: otros intentos del mismo participante en este estudio.",
+      ok: false
+    });
+    expect(result.ok ? "" : result.message).not.toContain("screening_attempts adicionales");
+  });
+
+  it("blocks grouped cleanup only for unsupported relations outside additional attempts", async () => {
+    const context = createDeleteContext({
+      applicationTimeEvents: [{ id: "event-1" }]
+    });
+    const base = buildAttempt();
+    context.screeningAttempt.findUnique = vi.fn(async () =>
+      buildAttempt({
+        studyParticipant: {
+          ...base.studyParticipant,
+          screeningAttempts: [
+            {
+              id: "attempt-1",
+              participantConfirmation: base.participantConfirmation,
+              participantEvidence: base.participantEvidence,
+              source: "PARTICIPANT_PORTAL",
+              status: "PASSED"
+            },
+            {
+              id: "attempt-2",
+              participantConfirmation: null,
+              participantEvidence: [],
+              source: "FIELD",
+              status: "STARTED"
+            }
+          ]
+        }
+      })
+    );
+    const repository = createRepositoryWithContext(context);
+
+    const result = await repository.deleteStudyParticipantTestRecords({
+      attemptId: "attempt-1",
+      deletedByUserId: "admin-1",
+      reason: "PRUEBAS AGRUPADAS"
+    });
+
+    expect(result).toEqual({
+      message: "No se puede eliminar porque existen relaciones no soportadas: application_time_events.",
+      ok: false
+    });
   });
 
   it("blocks deletion with a specific unsupported relation name", async () => {

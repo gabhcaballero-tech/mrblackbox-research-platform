@@ -220,6 +220,23 @@ describe("ScreeningSupervisionComponents", () => {
         detail={{
           attemptId: "attempt-1",
           attemptStatus: "PASSED",
+          cleanupSummary: {
+            attemptCount: 1,
+            attempts: [
+              {
+                folio: "NAV-001",
+                id: "attempt-1",
+                referenceCodes: [
+                  { code: "4821", slot: 1 },
+                  { code: "7710", slot: 2 },
+                  { code: "9034", slot: 3 }
+                ],
+                source: "PARTICIPANT_PORTAL",
+                status: "PASSED"
+              }
+            ],
+            evidenceCount: 0
+          },
           confirmation: {
             folio: "NAV-001",
             manualMessageStatus: "NOT_SENT",
@@ -265,5 +282,71 @@ describe("ScreeningSupervisionComponents", () => {
         "Esta accion tambien puede eliminar intentos de prueba creados desde Campo. Si el perfil pertenece a un usuario interno, se conservara por seguridad."
       )
     ).toBeInTheDocument();
+  });
+
+  it("shows grouped cleanup action when the participant has multiple attempts in the study", () => {
+    render(
+      <EvidenceReviewPanel
+        canDeleteTestRecord
+        detail={{
+          attemptId: "attempt-1",
+          attemptStatus: "PASSED",
+          cleanupSummary: {
+            attemptCount: 2,
+            attempts: [
+              {
+                folio: "NAV-001",
+                id: "attempt-1",
+                referenceCodes: [{ code: "4821", slot: 1 }],
+                source: "PARTICIPANT_PORTAL",
+                status: "PASSED"
+              },
+              {
+                folio: null,
+                id: "attempt-2",
+                referenceCodes: [],
+                source: "FIELD",
+                status: "STARTED"
+              }
+            ],
+            evidenceCount: 3
+          },
+          confirmation: {
+            folio: "NAV-001",
+            manualMessageStatus: "NOT_SENT",
+            referenceCodes: [{ code: "4821", slot: 1 }],
+            whatsappMessage: "Mensaje WhatsApp",
+            whatsappUrl: null
+          },
+          evidence: [],
+          f6DeclaredBrands: "Navigo",
+          participant: {
+            email: "persona@example.com",
+            externalReference: "REF-1",
+            id: "profile-1",
+            name: "GABRIELA",
+            phone: "+525512345678"
+          },
+          review: {
+            internalNote: null,
+            rejectionReason: null,
+            status: "APPROVED"
+          },
+          study: {
+            code: study.code,
+            id: study.id,
+            name: study.name
+          }
+        }}
+      />
+    );
+
+    expect(screen.getAllByText("Eliminar todos los intentos de prueba de este participante").length).toBeGreaterThan(0);
+    expect(screen.getByText("Intentos a eliminar")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getAllByText("Evidencias").length).toBeGreaterThan(0);
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("Escribe ELIMINAR PRUEBAS DEL PARTICIPANTE para confirmar")).toBeInTheDocument();
+    expect(screen.getByText(/Esta accion elimina todos los intentos de prueba/)).toBeInTheDocument();
   });
 });

@@ -47,6 +47,17 @@ export type EvidenceReplacementSignedUpload = {
 export type ParticipantEvidenceReviewDetail = {
   attemptId: string;
   attemptStatus: EvidenceReviewAttemptRecord["status"];
+  cleanupSummary: {
+    attemptCount: number;
+    attempts: Array<{
+      folio: string | null;
+      id: string;
+      referenceCodes: Array<{ code: string; slot: number }>;
+      source: EvidenceReviewAttemptRecord["source"];
+      status: EvidenceReviewAttemptRecord["status"];
+    }>;
+    evidenceCount: number;
+  };
   confirmation: {
     folio: string;
     manualMessageStatus: "MARKED_SENT" | "NOT_SENT";
@@ -328,6 +339,77 @@ export async function deleteParticipantEvidenceTestRecord({
   };
 }
 
+export async function deleteParticipantEvidenceStudyParticipantTestRecords({
+  actor,
+  attemptId,
+  confirmationText,
+  reason,
+  repository,
+  storage
+}: {
+  actor: EvidenceReviewActor | null;
+  attemptId: string;
+  confirmationText: string;
+  reason: string;
+  repository: EvidenceReviewRepository;
+  storage: EvidenceStorageClient;
+}): Promise<
+  EvidenceReviewResult<{
+    successMessage: string;
+    storageWarning: string | null;
+    studyId: string;
+  }>
+> {
+  if (!actor || actor.status !== "ACTIVE" || actor.role !== "ADMIN") {
+    return {
+      message: "Solo ADMIN puede eliminar registros de prueba.",
+      ok: false
+    };
+  }
+
+  if (confirmationText.trim() !== "ELIMINAR PRUEBAS DEL PARTICIPANTE") {
+    return {
+      message: "Escribe ELIMINAR PRUEBAS DEL PARTICIPANTE para confirmar esta accion.",
+      ok: false
+    };
+  }
+
+  const normalizedReason = normalizeParticipantTextInput(reason);
+
+  if (!normalizedReason) {
+    return {
+      message: "Captura el motivo de eliminacion.",
+      ok: false
+    };
+  }
+
+  const result = await repository.deleteStudyParticipantTestRecords({
+    attemptId,
+    deletedByUserId: actor.id,
+    reason: normalizedReason
+  });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  const storageWarning = await deleteEvidenceObjects({
+    evidenceToDelete: result.evidenceToDelete,
+    storage
+  });
+
+  return {
+    data: {
+      successMessage: result.preservedInternalProfile
+        ? "Registros de prueba eliminados. El perfil interno se conservó por seguridad."
+        : "Registros de prueba eliminados correctamente.",
+      storageWarning,
+      studyId: result.studyId
+    },
+    ok: true
+  };
+}
+
 export async function rejectParticipantEvidenceReview({
   actor,
   attemptId,
@@ -592,6 +674,15 @@ async function toReviewDetail(
 ): Promise<ParticipantEvidenceReviewDetail> {
   const participant = attempt.studyParticipant.participantProfile;
   const study = attempt.questionnaireVersion.study;
+  const cleanupAttempts = attempt.studyParticipant.screeningAttempts ?? [
+    {
+      id: attempt.id,
+      participantConfirmation: attempt.participantConfirmation,
+      participantEvidence: attempt.participantEvidence,
+      source: attempt.source,
+      status: attempt.status
+    }
+  ];
   const confirmation = attempt.participantConfirmation
     ? {
         folio: attempt.participantConfirmation.folio,
@@ -618,6 +709,17 @@ async function toReviewDetail(
   return {
     attemptId: attempt.id,
     attemptStatus: attempt.status,
+    cleanupSummary: {
+      attemptCount: cleanupAttempts.length,
+      attempts: cleanupAttempts.map((item) => ({
+        folio: item.participantConfirmation?.folio ?? null,
+        id: item.id,
+        referenceCodes: item.participantConfirmation?.referenceCodes ?? [],
+        source: item.source,
+        status: item.status
+      })),
+      evidenceCount: cleanupAttempts.reduce((total, item) => total + item.participantEvidence.length, 0)
+    },
     confirmation,
     evidence: await Promise.all(
       attempt.participantEvidence.map(async (item) => ({
@@ -746,6 +848,39 @@ function formatF6Answer(answer: unknown): string {
   }
 
   return "Sin respuesta registrada.";
+}
+
+async function deleteEvidenceObjects({
+  evidenceToDelete,
+  storage
+}: {
+  evidenceToDelete: Array<{ bucket: string; privateStorageKey: string }>;
+  storage: EvidenceStorageClient;
+}): Promise<string | null> {
+  if (evidenceToDelete.length === 0 || !storage.deleteObjects) {
+    return null;
+  }
+
+  const byBucket = new Map<string, string[]>();
+
+  for (const item of evidenceToDelete) {
+    byBucket.set(item.bucket, [...(byBucket.get(item.bucket) ?? []), item.privateStorageKey]);
+  }
+
+  try {
+    await Promise.all(
+      [...byBucket.entries()].map(([bucket, privateStorageKeys]) =>
+        storage.deleteObjects?.({
+          bucket,
+          privateStorageKeys
+        })
+      )
+    );
+    return null;
+  } catch (error) {
+    logEvidenceReviewError("delete-test-record-storage", "PERFUME_PHOTO", error);
+    return "El registro se eliminó, pero algunas evidencias no pudieron borrarse de Storage. Revísalas manualmente.";
+  }
 }
 
 function validateReplacementTarget({

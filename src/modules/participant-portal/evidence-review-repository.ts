@@ -30,6 +30,14 @@ export type EvidenceReviewConfirmationRecord = {
   referenceCodes: ParticipantReferenceCodeDraft[];
 };
 
+export type EvidenceReviewCleanupAttemptRecord = {
+  id: string;
+  participantConfirmation: EvidenceReviewConfirmationRecord | null;
+  participantEvidence: PortalEvidenceRecord[];
+  source: "FIELD" | "PARTICIPANT_PORTAL";
+  status: EvidenceReviewAttemptStatus;
+};
+
 export type EvidenceReviewAttemptRecord = {
   answers: Array<{ answerJson: unknown; questionId: string }>;
   id: string;
@@ -63,6 +71,7 @@ export type EvidenceReviewAttemptRecord = {
       participantAuthUserId: string | null;
       phone: string | null;
     };
+    screeningAttempts?: EvidenceReviewCleanupAttemptRecord[];
   };
   studyParticipantId: string;
 };
@@ -81,6 +90,11 @@ export type EvidenceReviewRepository = {
     now?: Date;
   }) => Promise<void>;
   deleteTestRecord: (input: {
+    attemptId: string;
+    deletedByUserId: string;
+    reason: string;
+  }) => Promise<EvidenceReviewDeleteResult>;
+  deleteStudyParticipantTestRecords: (input: {
     attemptId: string;
     deletedByUserId: string;
     reason: string;
@@ -188,6 +202,7 @@ type EvidenceReviewTransactionClient = {
   participantConfirmation: {
     create: (args: unknown) => Promise<EvidenceReviewConfirmationRecord>;
     delete: (args: unknown) => Promise<unknown>;
+    deleteMany: (args: unknown) => Promise<unknown>;
     findMany: (args: unknown) => Promise<Array<{ folioSequence: number }>>;
     findUnique: (args: unknown) => Promise<EvidenceReviewConfirmationRecord | null>;
     update: (args: unknown) => Promise<EvidenceReviewConfirmationRecord>;
@@ -231,6 +246,7 @@ type EvidenceReviewTransactionClient = {
   };
   screeningAttempt: {
     delete: (args: unknown) => Promise<unknown>;
+    deleteMany: (args: unknown) => Promise<unknown>;
     findUnique: (args: unknown) => Promise<EvidenceReviewAttemptRecord | null>;
     findMany: (args: unknown) => Promise<Array<{ id: string }>>;
     update: (args: unknown) => Promise<unknown>;
@@ -345,6 +361,23 @@ const attemptReviewSelect = {
           name: true,
           participantAuthUserId: true,
           phone: true
+        }
+      },
+      screeningAttempts: {
+        orderBy: {
+          startedAt: "asc"
+        },
+        select: {
+          id: true,
+          participantConfirmation: {
+            select: confirmationSelect
+          },
+          participantEvidence: {
+            orderBy: { uploadedAt: "asc" },
+            select: evidenceSelect
+          },
+          source: true,
+          status: true
         }
       }
     }
@@ -714,6 +747,172 @@ export function createEvidenceReviewRepository(
         };
       }
     },
+    async deleteStudyParticipantTestRecords(input) {
+      const prisma = await getPrisma();
+
+      try {
+        return await prisma.$transaction(async (tx) => {
+          const attempt = await getAttemptReviewWithClient(tx, input.attemptId);
+
+          if (!attempt) {
+            return { message: "El intento no existe.", ok: false };
+          }
+
+          const participantProfileId = attempt.studyParticipant.participantProfile.id;
+          const studyParticipantId = attempt.studyParticipantId;
+          const studyId = attempt.questionnaireVersion.study.id;
+          const attempts = getStudyParticipantCleanupAttempts(attempt);
+          const attemptIds = attempts.map((item) => item.id);
+          const blockers = await diagnoseDeleteStudyParticipantTestRecordBlockers(tx, {
+            attemptIds,
+            studyParticipantId
+          });
+
+          if (blockers.length > 0) {
+            logDeleteTestRecordIssue("blocked", input.attemptId, blockers[0]);
+            return {
+              message: blockers[0],
+              ok: false
+            };
+          }
+
+          const evidenceToDelete = attempts.flatMap((cleanupAttempt) =>
+            cleanupAttempt.participantEvidence
+              .filter((item) =>
+                storageKeyBelongsToAttempt({
+                  attemptId: cleanupAttempt.id,
+                  participantProfileId,
+                  privateStorageKey: item.privateStorageKey,
+                  studyId
+                })
+              )
+              .map((item) => ({
+                bucket: item.storageBucket,
+                privateStorageKey: item.privateStorageKey
+              }))
+          );
+          const confirmationIds = attempts
+            .map((cleanupAttempt) => cleanupAttempt.participantConfirmation?.id)
+            .filter((id): id is string => Boolean(id));
+
+          if (confirmationIds.length > 0) {
+            await tx.participantReferenceCode.deleteMany({
+              where: {
+                confirmationId: {
+                  in: confirmationIds
+                }
+              }
+            });
+            await tx.participantConfirmation.deleteMany({
+              where: {
+                id: {
+                  in: confirmationIds
+                }
+              }
+            });
+          }
+
+          await tx.participantEvidence.deleteMany({
+            where: {
+              screeningAttemptId: {
+                in: attemptIds
+              }
+            }
+          });
+          await tx.participantScreeningReview.deleteMany({
+            where: {
+              screeningAttemptId: {
+                in: attemptIds
+              }
+            }
+          });
+          await tx.screeningAnswer.deleteMany({
+            where: {
+              screeningAttemptId: {
+                in: attemptIds
+              }
+            }
+          });
+          await tx.screeningAttempt.deleteMany({
+            where: {
+              id: {
+                in: attemptIds
+              }
+            }
+          });
+          await tx.participantConsent.deleteMany({
+            where: {
+              studyParticipantId
+            }
+          });
+          await tx.participantAccessToken.deleteMany({
+            where: {
+              studyParticipantId
+            }
+          });
+          await tx.studyParticipant.delete({
+            where: {
+              id: studyParticipantId
+            }
+          });
+
+          const profile = await tx.participantProfile.findUnique({
+            select: {
+              id: true,
+              participantAuthUserId: true,
+              participations: {
+                select: {
+                  id: true
+                }
+              }
+            },
+            where: {
+              id: participantProfileId
+            }
+          });
+
+          const preservedInternalProfile = Boolean(profile?.participantAuthUserId);
+
+          if (profile && !profile.participantAuthUserId && profile.participations.length === 0) {
+            await tx.participantProfile.delete({
+              where: {
+                id: participantProfileId
+              }
+            });
+          }
+
+          const config = attempt.questionnaireVersion.study.participantPortalConfig;
+
+          if (config) {
+            const usedFolioSequences = await listUsedFolioSequences(tx, studyId);
+            await tx.participantPortalStudyConfig.update({
+              data: {
+                nextFolioSequence: findFirstAvailableFolioSequence(usedFolioSequences, config.folioMaxSequence)
+              },
+              where: {
+                studyId
+              }
+            });
+          }
+
+          void input.deletedByUserId;
+          void input.reason;
+
+          return {
+            evidenceToDelete,
+            preservedInternalProfile,
+            ok: true,
+            studyId
+          };
+        });
+      } catch (error) {
+        logDeleteTestRecordIssue("failed", input.attemptId, buildDeleteTestRecordFailureMessage(error), error);
+        return {
+          message: buildDeleteTestRecordFailureMessage(error),
+          ok: false
+        };
+      }
+    },
     async rejectEvidence(input) {
       const prisma = await getPrisma();
 
@@ -978,13 +1177,45 @@ async function diagnoseDeleteTestRecordBlockers(
   return blockers;
 }
 
-async function findUnsupportedDeleteRelations(
+async function diagnoseDeleteStudyParticipantTestRecordBlockers(
   tx: EvidenceReviewTransactionClient,
   input: {
-    attemptId: string;
+    attemptIds: string[];
     studyParticipantId: string;
   }
 ): Promise<string[]> {
+  const blockers: string[] = [];
+  const unsupportedRelations = await findUnsupportedDeleteRelations(tx, {
+    attemptIds: input.attemptIds,
+    blockAdditionalAttempts: false,
+    studyParticipantId: input.studyParticipantId
+  });
+
+  if (unsupportedRelations.length > 0) {
+    blockers.push(
+      `No se puede eliminar porque existen relaciones no soportadas: ${unsupportedRelations.join(", ")}.`
+    );
+  }
+
+  return blockers;
+}
+
+async function findUnsupportedDeleteRelations(
+  tx: EvidenceReviewTransactionClient,
+  input: {
+    attemptId?: string;
+    attemptIds?: string[];
+    blockAdditionalAttempts?: boolean;
+    studyParticipantId: string;
+  }
+): Promise<string[]> {
+  const attemptIds = input.attemptIds ?? (input.attemptId ? [input.attemptId] : []);
+  const attemptFilter =
+    attemptIds.length > 0
+      ? {
+          notIn: attemptIds
+        }
+      : undefined;
   const [
     additionalAttempts,
     additionalEvidence,
@@ -1000,9 +1231,7 @@ async function findUnsupportedDeleteRelations(
         id: true
       },
       where: {
-        id: {
-          not: input.attemptId
-        },
+        ...(attemptFilter ? { id: attemptFilter } : {}),
         studyParticipantId: input.studyParticipantId
       }
     }),
@@ -1011,9 +1240,7 @@ async function findUnsupportedDeleteRelations(
         id: true
       },
       where: {
-        screeningAttemptId: {
-          not: input.attemptId
-        },
+        ...(attemptFilter ? { screeningAttemptId: attemptFilter } : {}),
         studyParticipantId: input.studyParticipantId
       }
     }),
@@ -1069,8 +1296,8 @@ async function findUnsupportedDeleteRelations(
 
   const relations: string[] = [];
 
-  if (additionalAttempts.length > 0) {
-    relations.push("screening_attempts adicionales");
+  if (input.blockAdditionalAttempts !== false && additionalAttempts.length > 0) {
+    relations.push("otros intentos del mismo participante en este estudio");
   }
 
   if (additionalEvidence.length > 0) {
@@ -1114,6 +1341,26 @@ export function findFirstAvailableFolioSequence(usedSequences: number[], folioMa
   }
 
   return folioMaxSequence + 1;
+}
+
+function getStudyParticipantCleanupAttempts(
+  attempt: EvidenceReviewAttemptRecord
+): EvidenceReviewCleanupAttemptRecord[] {
+  const relatedAttempts = attempt.studyParticipant.screeningAttempts ?? [];
+
+  if (relatedAttempts.length > 0) {
+    return relatedAttempts;
+  }
+
+  return [
+    {
+      id: attempt.id,
+      participantConfirmation: attempt.participantConfirmation,
+      participantEvidence: attempt.participantEvidence,
+      source: attempt.source,
+      status: attempt.status
+    }
+  ];
 }
 
 function storageKeyBelongsToAttempt({

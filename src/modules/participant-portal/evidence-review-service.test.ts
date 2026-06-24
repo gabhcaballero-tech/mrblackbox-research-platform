@@ -9,6 +9,7 @@ import {
   buildWhatsAppUrl,
   canReviewParticipantEvidence,
   confirmParticipantEvidenceReplacement,
+  deleteParticipantEvidenceStudyParticipantTestRecords,
   deleteParticipantEvidenceTestRecord,
   generateReferenceCode,
   getParticipantEvidenceReviewDetail,
@@ -103,6 +104,15 @@ function repository(currentAttempt = attempt()) {
       preservedInternalProfile: false,
       studyId: "study-1"
     })),
+    deleteStudyParticipantTestRecords: vi.fn(async () => ({
+      evidenceToDelete: [
+        { bucket: "participant-evidence", privateStorageKey: "private/selfie.jpg" },
+        { bucket: "participant-evidence", privateStorageKey: "private/perfume.jpg" }
+      ],
+      ok: true as const,
+      preservedInternalProfile: true,
+      studyId: "study-1"
+    })),
     getAttemptReview: vi.fn(async () => currentAttempt),
     markManualMessageSent: vi.fn(async () => undefined),
     rejectEvidence: vi.fn(async () => undefined),
@@ -148,6 +158,51 @@ describe("participant evidence review service", () => {
 
     expect(result.ok ? result.data.evidence[0]?.signedUrl : null).toBe("https://signed.example/evidence");
     expect(result.ok ? result.data.f6DeclaredBrands : "").toBe("Navigo y otra fragancia");
+  });
+
+  it("detects multiple screening attempts for participant cleanup summary", async () => {
+    const current = attempt();
+    const result = await getParticipantEvidenceReviewDetail({
+      actor: admin,
+      attemptId: "attempt-1",
+      repository: repository(
+        attempt({
+          studyParticipant: {
+            ...current.studyParticipant,
+            screeningAttempts: [
+              {
+                id: "attempt-1",
+                participantConfirmation: null,
+                participantEvidence: current.participantEvidence,
+                source: "PARTICIPANT_PORTAL",
+                status: "PENDING_REVIEW"
+              },
+              {
+                id: "attempt-2",
+                participantConfirmation: {
+                  folio: "NAV-001",
+                  folioSequence: 1,
+                  manualMessageMarkedSentAt: null,
+                  manualMessageStatus: "NOT_SENT",
+                  referenceCodes: [{ code: "4821", slot: 1 }]
+                },
+                participantEvidence: [],
+                source: "FIELD",
+                status: "PASSED"
+              }
+            ]
+          }
+        })
+      ),
+      storage: {
+        createSignedReadUrl: vi.fn(async () => "https://signed.example/evidence"),
+        createSignedUploadUrl: vi.fn()
+      }
+    });
+
+    expect(result.ok ? result.data.cleanupSummary.attemptCount : 0).toBe(2);
+    expect(result.ok ? result.data.cleanupSummary.evidenceCount : 0).toBe(1);
+    expect(result.ok ? result.data.cleanupSummary.attempts[1]?.folio : null).toBe("NAV-001");
   });
 
   it("rejects review actions for INTERVIEWER", async () => {
@@ -399,6 +454,104 @@ describe("participant evidence review service", () => {
       },
       ok: true
     });
+  });
+
+  it("requires ADMIN, exact confirmation and reason for grouped participant cleanup", async () => {
+    const storage = {
+      createSignedReadUrl: vi.fn(),
+      createSignedUploadUrl: vi.fn()
+    };
+    const deniedByRole = await deleteParticipantEvidenceStudyParticipantTestRecords({
+      actor: { id: "super-1", role: "SUPERVISOR", status: "ACTIVE" },
+      attemptId: "attempt-1",
+      confirmationText: "ELIMINAR PRUEBAS DEL PARTICIPANTE",
+      reason: "Prueba",
+      repository: repository(),
+      storage
+    });
+    const deniedByText = await deleteParticipantEvidenceStudyParticipantTestRecords({
+      actor: admin,
+      attemptId: "attempt-1",
+      confirmationText: "ELIMINAR PRUEBA",
+      reason: "Prueba",
+      repository: repository(),
+      storage
+    });
+    const deniedByReason = await deleteParticipantEvidenceStudyParticipantTestRecords({
+      actor: admin,
+      attemptId: "attempt-1",
+      confirmationText: "ELIMINAR PRUEBAS DEL PARTICIPANTE",
+      reason: "   ",
+      repository: repository(),
+      storage
+    });
+
+    expect(deniedByRole.ok).toBe(false);
+    expect(deniedByText).toMatchObject({
+      message: "Escribe ELIMINAR PRUEBAS DEL PARTICIPANTE para confirmar esta accion.",
+      ok: false
+    });
+    expect(deniedByReason).toMatchObject({
+      message: "Captura el motivo de eliminacion.",
+      ok: false
+    });
+  });
+
+  it("deletes grouped participant test records and requests Storage cleanup for all evidence", async () => {
+    const repo = repository();
+    const storage = {
+      createSignedReadUrl: vi.fn(),
+      createSignedUploadUrl: vi.fn(),
+      deleteObjects: vi.fn(async () => undefined)
+    };
+
+    const result = await deleteParticipantEvidenceStudyParticipantTestRecords({
+      actor: admin,
+      attemptId: "attempt-1",
+      confirmationText: "ELIMINAR PRUEBAS DEL PARTICIPANTE",
+      reason: "Registros de prueba",
+      repository: repo,
+      storage
+    });
+
+    expect(result.ok).toBe(true);
+    expect(repo.deleteStudyParticipantTestRecords).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attemptId: "attempt-1"
+      })
+    );
+    expect(storage.deleteObjects).toHaveBeenCalledWith({
+      bucket: "participant-evidence",
+      privateStorageKeys: ["private/selfie.jpg", "private/perfume.jpg"]
+    });
+    expect(result.ok ? result.data.successMessage : "").toContain("Registros de prueba eliminados");
+    expect(result.ok ? result.data.successMessage : "").toContain("perfil interno");
+  });
+
+  it("surfaces grouped cleanup blockers without using the old additional-attempts message", async () => {
+    const repo = repository();
+    vi.mocked(repo.deleteStudyParticipantTestRecords).mockResolvedValueOnce({
+      message: "No se puede eliminar porque existen relaciones no soportadas: participant_activities.",
+      ok: false
+    });
+
+    const result = await deleteParticipantEvidenceStudyParticipantTestRecords({
+      actor: admin,
+      attemptId: "attempt-1",
+      confirmationText: "ELIMINAR PRUEBAS DEL PARTICIPANTE",
+      reason: "Registros de prueba",
+      repository: repo,
+      storage: {
+        createSignedReadUrl: vi.fn(),
+        createSignedUploadUrl: vi.fn()
+      }
+    });
+
+    expect(result).toMatchObject({
+      message: "No se puede eliminar porque existen relaciones no soportadas: participant_activities.",
+      ok: false
+    });
+    expect(result.ok ? "" : result.message).not.toContain("screening_attempts adicionales");
   });
 
   it("shows the specific repository blocker when test-record deletion is not safe", async () => {

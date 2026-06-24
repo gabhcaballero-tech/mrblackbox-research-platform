@@ -9,6 +9,7 @@ import type {
 import type { ParticipantEvidenceReviewDetail } from "@/modules/participant-portal/evidence-review-service";
 import {
   approveParticipantEvidenceAction,
+  deleteParticipantEvidenceStudyParticipantTestRecordsAction,
   deleteParticipantEvidenceTestRecordAction,
   regenerateParticipantReferenceCodesAction,
   rejectParticipantEvidenceAction,
@@ -477,7 +478,10 @@ export function EvidenceReviewPanel({
       ) : null}
 
       {canDeleteTestRecord ? (
-        <DeleteTestRecordForm detail={detail} />
+        <>
+          <DeleteTestRecordForm detail={detail} />
+          {detail.cleanupSummary.attemptCount > 1 ? <DeleteParticipantTestRecordsForm detail={detail} /> : null}
+        </>
       ) : null}
     </section>
   );
@@ -612,6 +616,85 @@ function DeleteTestRecordForm({ detail }: { detail: ParticipantEvidenceReviewDet
       </div>
     </form>
   );
+}
+
+function DeleteParticipantTestRecordsForm({ detail }: { detail: ParticipantEvidenceReviewDetail }) {
+  const attempts = detail.cleanupSummary.attempts;
+  const statuses = [...new Set(attempts.map((item) => cleanupAttemptStatusLabel(item.status)))].join(", ");
+  const folios = attempts
+    .map((item) => {
+      const codes = [...item.referenceCodes].sort((left, right) => left.slot - right.slot);
+      const codeText = codes.length > 0 ? ` (${codes.map((code) => `${code.slot}: ${code.code}`).join(", ")})` : "";
+
+      return item.folio ? `${item.folio}${codeText}` : null;
+    })
+    .filter(Boolean)
+    .join("; ");
+
+  return (
+    <form
+      action={deleteParticipantEvidenceStudyParticipantTestRecordsAction.bind(null, detail.attemptId)}
+      className="mt-6 rounded-md border border-red-300 bg-red-50 p-4"
+    >
+      <h3 className="font-semibold text-red-950">Eliminar todos los intentos de prueba de este participante</h3>
+      <p className="mt-2 text-sm leading-6 text-red-900">
+        Esta accion elimina todos los intentos de prueba de este participante en este estudio y libera folios usados.
+        Usala solo antes de operacion real.
+      </p>
+      <dl className="mt-4 grid gap-3 rounded-md border border-red-200 bg-white p-3 text-sm md:grid-cols-2">
+        <SummaryItem label="Participante" value={detail.participant.name} />
+        <SummaryItem label="Estudio" value={detail.study.name} />
+        <SummaryItem label="Intentos a eliminar" value={String(detail.cleanupSummary.attemptCount)} />
+        <SummaryItem label="Estados" value={statuses || "Sin estado"} />
+        <SummaryItem label="Folios y codigos" value={folios || "Sin folios ni codigos"} mono={Boolean(folios)} />
+        <SummaryItem label="Evidencias" value={String(detail.cleanupSummary.evidenceCount)} />
+      </dl>
+      <ul className="mt-4 space-y-2 text-sm text-red-900">
+        {attempts.map((item) => (
+          <li key={item.id} className="rounded-md border border-red-100 bg-white px-3 py-2">
+            <span className="font-mono text-xs text-red-700">{item.id}</span>
+            <span className="ml-2">{cleanupAttemptStatusLabel(item.status)}</span>
+            <span className="ml-2 text-red-700">{sourceLabel(item.source)}</span>
+            {item.folio ? <span className="ml-2 font-mono text-red-800">{item.folio}</span> : null}
+          </li>
+        ))}
+      </ul>
+      <div className="mt-4 space-y-3">
+        <label className={labelClass}>
+          Escribe ELIMINAR PRUEBAS DEL PARTICIPANTE para confirmar
+          <input className={inputClass} name="confirmationText" />
+        </label>
+        <label className={labelClass}>
+          Motivo obligatorio
+          <textarea className={inputClass} name="deleteReason" required rows={3} />
+        </label>
+        <button className={secondaryButtonClass} type="submit">
+          Eliminar todos los intentos de prueba de este participante
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function cleanupAttemptStatusLabel(status: string): string {
+  switch (status) {
+    case "PASSED":
+      return "Elegible";
+    case "TERMINATED":
+      return "Terminado";
+    case "PENDING_REVIEW":
+      return "Pendiente de revision";
+    case "INCOMPLETE":
+      return "Incompleto";
+    case "STARTED":
+      return "Iniciado";
+    default:
+      return status;
+  }
+}
+
+function sourceLabel(source: string): string {
+  return source === "FIELD" ? "Campo" : "Portal participante";
 }
 
 function reviewStatusLabel(status: string | undefined): string {
