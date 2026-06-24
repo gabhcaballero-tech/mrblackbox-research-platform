@@ -21,6 +21,11 @@ declare global {
   }
 }
 
+const CAPTCHA_PENDING_MESSAGE = "Completa la verificación de seguridad.";
+const CAPTCHA_EXPIRED_MESSAGE = "La verificación de seguridad venció. Complétala nuevamente.";
+const CAPTCHA_ERROR_MESSAGE = "No fue posible validar la verificación de seguridad. Intenta nuevamente.";
+const CAPTCHA_SUCCESS_MESSAGE = "Verificación de seguridad completada.";
+
 export function TurnstileSubmitControl({
   buttonLabel,
   pendingLabel,
@@ -34,7 +39,8 @@ export function TurnstileSubmitControl({
   const widgetId = useRef<string | undefined>(undefined);
   const hasRenderedWidget = useRef(false);
   const [token, setToken] = useState("");
-  const [localError, setLocalError] = useState("");
+  const [localMessage, setLocalMessage] = useState(CAPTCHA_PENDING_MESSAGE);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
   useEffect(() => {
@@ -42,10 +48,15 @@ export function TurnstileSubmitControl({
       return;
     }
 
-    setToken("");
-    setLocalError("");
-    window.turnstile?.reset(widgetId.current);
+    resetWidget(CAPTCHA_PENDING_MESSAGE);
   }, [resetKey]);
+
+  function resetWidget(message: string) {
+    setToken("");
+    setIsSubmitting(false);
+    setLocalMessage(message);
+    window.turnstile?.reset(widgetId.current);
+  }
 
   function renderWidget() {
     if (!siteKey || !window.turnstile || widgetId.current) {
@@ -54,18 +65,15 @@ export function TurnstileSubmitControl({
 
     widgetId.current = window.turnstile.render(`#${id}`, {
       callback(nextToken) {
-        setLocalError("");
+        setIsSubmitting(false);
+        setLocalMessage(CAPTCHA_SUCCESS_MESSAGE);
         setToken(nextToken);
       },
       "error-callback"() {
-        setToken("");
-        setLocalError("No fue posible validar la verificación de seguridad. Intenta nuevamente.");
-        window.turnstile?.reset(widgetId.current);
+        resetWidget(CAPTCHA_ERROR_MESSAGE);
       },
       "expired-callback"() {
-        setToken("");
-        setLocalError("Completa la verificación de seguridad.");
-        window.turnstile?.reset(widgetId.current);
+        resetWidget(CAPTCHA_EXPIRED_MESSAGE);
       },
       sitekey: siteKey
     });
@@ -83,12 +91,14 @@ export function TurnstileSubmitControl({
           La verificación de seguridad no está configurada.
         </p>
       )}
-      <p className="text-sm text-zinc-600" role={localError ? "alert" : undefined}>
-        {localError || (token ? "Verificación de seguridad completada." : "Completa la verificación de seguridad.")}
+      <p className="text-sm text-zinc-600" role={localMessage !== CAPTCHA_SUCCESS_MESSAGE ? "alert" : undefined}>
+        {localMessage}
       </p>
       <TurnstileSubmitButton
         buttonLabel={buttonLabel}
-        disabled={!token}
+        disabled={!token || isSubmitting}
+        isSubmitting={isSubmitting}
+        onValidSubmitAttempt={() => setIsSubmitting(true)}
         pendingLabel={pendingLabel}
       />
     </div>
@@ -98,10 +108,14 @@ export function TurnstileSubmitControl({
 function TurnstileSubmitButton({
   buttonLabel,
   disabled,
+  isSubmitting,
+  onValidSubmitAttempt,
   pendingLabel
 }: {
   buttonLabel: string;
   disabled: boolean;
+  isSubmitting: boolean;
+  onValidSubmitAttempt: () => void;
   pendingLabel?: string;
 }) {
   const { pending } = useFormStatus();
@@ -110,20 +124,41 @@ function TurnstileSubmitButton({
     <button
       className="inline-flex w-full items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition enabled:hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
       disabled={disabled || pending}
+      onClick={(event) => {
+        const form = event.currentTarget.form;
+
+        if (!form || disabled || pending) {
+          return;
+        }
+
+        if (!form.reportValidity()) {
+          return;
+        }
+
+        onValidSubmitAttempt();
+      }}
       type="submit"
     >
-      {pending ? <LoadingLabel label={pendingLabel ?? buttonLabel} /> : buttonLabel}
+      {pending || isSubmitting ? <LoadingLabel label={pendingLabel ?? buttonLabel} showSpinner /> : buttonLabel}
     </button>
   );
 }
 
-function LoadingLabel({ label }: { label: string }) {
+function LoadingLabel({
+  label,
+  showSpinner
+}: {
+  label: string;
+  showSpinner: boolean;
+}) {
   return (
     <span className="inline-flex items-center justify-center gap-2">
-      <span
-        aria-hidden="true"
-        className="h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-t-transparent"
-      />
+      {showSpinner ? (
+        <span
+          aria-hidden="true"
+          className="h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-t-transparent"
+        />
+      ) : null}
       {label}
     </span>
   );

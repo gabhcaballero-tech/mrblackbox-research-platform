@@ -54,6 +54,7 @@ export async function registerParticipantPortalAction(
   const auth = await getParticipantPortalAuth({ repository: portalRepository, studyCode });
   let identity: ParticipantPortalIdentity | null = auth.status === "allowed" ? auth.identity : null;
   let shouldSetPublicSession = false;
+  const requiresTurnstile = auth.status === "no_session" && directMode;
 
   if (auth.status === "no_session") {
     if (!directMode) {
@@ -73,12 +74,14 @@ export async function registerParticipantPortalAction(
     const headerStore = await headers();
     const captcha = await verifyParticipantPortalTurnstile({
       ipAddress: extractClientIp(headerStore),
+      studyCode,
       token: String(formData.get("captchaToken") ?? "")
     });
 
     if (!captcha.ok) {
       logRegistrationEvent({
         code: captcha.code,
+        reason: captcha.reason,
         step: "captcha",
         studyCode
       });
@@ -86,7 +89,8 @@ export async function registerParticipantPortalAction(
       return {
         formValues,
         message: captcha.message,
-        status: "error"
+        status: "error",
+        turnstileResetKey: buildTurnstileResetKey()
       };
     }
 
@@ -108,7 +112,8 @@ export async function registerParticipantPortalAction(
     return {
       formValues,
       message: auth.message,
-      status: "error"
+      status: "error",
+      turnstileResetKey: requiresTurnstile ? buildTurnstileResetKey() : undefined
     };
   }
 
@@ -116,7 +121,8 @@ export async function registerParticipantPortalAction(
     return {
       formValues,
       message: "No fue posible validar tu acceso. Intenta de nuevo.",
-      status: "error"
+      status: "error",
+      turnstileResetKey: requiresTurnstile ? buildTurnstileResetKey() : undefined
     };
   }
 
@@ -145,7 +151,8 @@ export async function registerParticipantPortalAction(
       fieldErrors: result.fieldErrors,
       formValues,
       message: result.message,
-      status: "error"
+      status: "error",
+      turnstileResetKey: requiresTurnstile ? buildTurnstileResetKey() : undefined
     };
   }
 
@@ -200,11 +207,16 @@ function getParticipantPortalHashSecret(): string {
   return secret;
 }
 
+function buildTurnstileResetKey(): string {
+  return crypto.randomUUID();
+}
+
 function logRegistrationEvent({
   code,
   consentReused,
   createdParticipantProfile,
   createdStudyParticipant,
+  reason,
   screeningAttemptReused,
   step,
   studyCode
@@ -213,6 +225,7 @@ function logRegistrationEvent({
   consentReused?: boolean;
   createdParticipantProfile?: boolean;
   createdStudyParticipant?: boolean;
+  reason?: string;
   screeningAttemptReused?: boolean;
   step: "auth" | "availability" | "captcha" | "register";
   studyCode: string;
@@ -227,7 +240,8 @@ function logRegistrationEvent({
     typeof consentReused === "boolean" ? `consent=${consentReused ? "reused" : "created"}` : null,
     typeof screeningAttemptReused === "boolean"
       ? `screeningAttempt=${screeningAttemptReused ? "reused" : "created"}`
-      : null
+      : null,
+    reason ? `reason=${reason}` : null
   ]
     .filter(Boolean)
     .join(" ");

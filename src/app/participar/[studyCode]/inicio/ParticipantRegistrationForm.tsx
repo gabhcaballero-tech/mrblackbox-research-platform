@@ -96,7 +96,11 @@ export function ParticipantRegistrationForm({
       </ConsentCheckbox>
 
       {requireTurnstile ? (
-        <TurnstileSubmitControl buttonLabel="Comenzar registro" pendingLabel="Guardando..." />
+        <TurnstileSubmitControl
+          buttonLabel="Comenzar registro"
+          pendingLabel="Guardando..."
+          resetKey={state.turnstileResetKey}
+        />
       ) : (
         <PendingSubmitButton
           className={submitButtonClass}

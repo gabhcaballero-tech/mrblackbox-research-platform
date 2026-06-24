@@ -15,6 +15,7 @@ export type ParticipantPortalActionState = {
   formValues?: ParticipantPortalRegistrationFormValues;
   message?: string;
   status: "error" | "idle" | "success";
+  turnstileResetKey?: string;
 };
 
 export const initialParticipantPortalActionState: ParticipantPortalActionState = {

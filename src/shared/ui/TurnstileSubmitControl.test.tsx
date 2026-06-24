@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { TurnstileSubmitControl } from "./TurnstileSubmitControl";
 
@@ -15,9 +15,8 @@ describe("TurnstileSubmitControl", () => {
   });
 
   it("starts disabled until captcha token exists", async () => {
-    const renderMock = vi.fn(() => "widget-1");
     window.turnstile = {
-      render: renderMock,
+      render: vi.fn(() => "widget-1"),
       reset: vi.fn()
     };
 
@@ -52,9 +51,10 @@ describe("TurnstileSubmitControl", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Enviar código" })).toBeEnabled();
     });
+    expect(screen.getByText("Verificación de seguridad completada.")).toBeInTheDocument();
   });
 
-  it("resets the token and widget when resetKey changes after success or error", async () => {
+  it("resets the token and widget when resetKey changes after a server error", async () => {
     let callback: ((token: string) => void) | undefined;
     const reset = vi.fn();
     window.turnstile = {
@@ -84,6 +84,7 @@ describe("TurnstileSubmitControl", () => {
       expect(reset).toHaveBeenCalled();
       expect(screen.getByRole("button", { name: "Iniciar sesión" })).toBeDisabled();
     });
+    expect(screen.getByText("Completa la verificación de seguridad.")).toBeInTheDocument();
   });
 
   it("shows a visible captcha error and resets when the widget fails", async () => {
@@ -109,5 +110,59 @@ describe("TurnstileSubmitControl", () => {
       expect(screen.getByText("No fue posible validar la verificación de seguridad. Intenta nuevamente.")).toBeInTheDocument();
       expect(reset).toHaveBeenCalled();
     });
+  });
+
+  it("shows an expiration message and disables submit when the token expires", async () => {
+    let callback: ((token: string) => void) | undefined;
+    let expiredCallback: (() => void) | undefined;
+    const reset = vi.fn();
+    window.turnstile = {
+      render: vi.fn((_, options) => {
+        callback = options.callback;
+        expiredCallback = options["expired-callback"];
+        return "widget-1";
+      }),
+      reset
+    };
+
+    render(
+      <form>
+        <TurnstileSubmitControl buttonLabel="Comenzar registro" />
+      </form>
+    );
+
+    callback?.("token-1");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Comenzar registro" })).toBeEnabled());
+
+    expiredCallback?.();
+
+    await waitFor(() => {
+      expect(screen.getByText("La verificación de seguridad venció. Complétala nuevamente.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Comenzar registro" })).toBeDisabled();
+      expect(reset).toHaveBeenCalled();
+    });
+  });
+
+  it("disables the button immediately after a valid submit attempt to avoid double click", async () => {
+    let callback: ((token: string) => void) | undefined;
+    window.turnstile = {
+      render: vi.fn((_, options) => {
+        callback = options.callback;
+        return "widget-1";
+      }),
+      reset: vi.fn()
+    };
+
+    render(
+      <form>
+        <TurnstileSubmitControl buttonLabel="Comenzar registro" />
+      </form>
+    );
+
+    callback?.("token-1");
+    const button = await screen.findByRole("button", { name: "Comenzar registro" });
+    fireEvent.click(button);
+
+    expect(button).toBeDisabled();
   });
 });

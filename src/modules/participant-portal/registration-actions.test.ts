@@ -179,6 +179,7 @@ describe("registerParticipantPortalAction", () => {
     ).rejects.toThrow("redirect:/participar/FMASCULINA-NAVIGO-2026/inicio?registered=1");
 
     expect(verifyParticipantPortalTurnstile).toHaveBeenCalledWith(expect.objectContaining({
+      studyCode: "FMASCULINA-NAVIGO-2026",
       token: "captcha-token"
     }));
     expect(mocks.cookieSet).toHaveBeenCalledWith(
@@ -190,5 +191,29 @@ describe("registerParticipantPortalAction", () => {
         sameSite: "lax"
       })
     );
+  });
+
+  it("returns a visible retry message and a Turnstile reset key when Cloudflare reports timeout-or-duplicate", async () => {
+    const { getParticipantPortalAuth } = await import("@/shared/auth/participant-portal");
+    const { verifyParticipantPortalTurnstile } = await import("./turnstile");
+    vi.mocked(getParticipantPortalAuth).mockResolvedValueOnce({ status: "no_session" });
+    vi.mocked(verifyParticipantPortalTurnstile).mockResolvedValueOnce({
+      code: "TURNSTILE_ERROR",
+      message: "La verificación de seguridad venció. Vuelve a completar la verificación e intenta de nuevo.",
+      ok: false,
+      reason: "timeout-or-duplicate"
+    });
+    const formData = buildFormData();
+    formData.set("captchaToken", "stale-token");
+
+    const result = await registerParticipantPortalAction(
+      "FMASCULINA-NAVIGO-2026",
+      { status: "idle" },
+      formData
+    );
+
+    expect(result.status).toBe("error");
+    expect(result.message).toBe("La verificación de seguridad venció. Vuelve a completar la verificación e intenta de nuevo.");
+    expect(result.turnstileResetKey).toEqual(expect.any(String));
   });
 });
