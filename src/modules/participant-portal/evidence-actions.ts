@@ -15,7 +15,7 @@ import {
 } from "./evidence-storage";
 import { participantPortalStudyCodeSchema } from "./validation";
 
-export type ParticipantEvidenceActionResult<T = unknown> =
+type ParticipantEvidenceActionResult<T = unknown> =
   | {
       data: T;
       ok: true;
@@ -25,7 +25,7 @@ export type ParticipantEvidenceActionResult<T = unknown> =
       ok: false;
     };
 
-export type ParticipantSignedUploadActionResult = {
+type ParticipantSignedUploadActionResult = {
   metadata: EvidenceUploadMetadata;
   privateStorageKey: string;
   signedUrl: string;

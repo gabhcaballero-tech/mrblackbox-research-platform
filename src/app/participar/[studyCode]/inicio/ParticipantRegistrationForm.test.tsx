@@ -7,6 +7,18 @@ vi.mock("@/modules/participant-portal/registration-actions", () => ({
 }));
 
 describe("ParticipantRegistrationForm", () => {
+  it("uses the neutral initial action state without requiring extra exports from the server action file", () => {
+    render(
+      <ParticipantRegistrationForm
+        privacyNoticeText="Aviso de privacidad del estudio."
+        studyCode="FMASCULINA-NAVIGO-2026"
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Completar registro" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("renders required registration and consent fields", () => {
     render(
       <ParticipantRegistrationForm

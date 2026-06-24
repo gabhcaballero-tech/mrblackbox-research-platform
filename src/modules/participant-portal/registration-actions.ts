@@ -9,10 +9,7 @@ import {
 import type { ParticipantPortalActionState } from "./action-state";
 import { createParticipantPortalRepository } from "./repository";
 import { createParticipantPortalRegistrationRepository } from "./registration-repository";
-import {
-  PARTICIPANT_PORTAL_REGISTRATION_SUCCESS_MESSAGE,
-  registerParticipantInPortal
-} from "./registration-service";
+import { registerParticipantInPortal } from "./registration-service";
 
 export async function registerParticipantPortalAction(
   studyCode: string,
@@ -71,5 +68,3 @@ export async function registerParticipantPortalAction(
 
   redirect(`/participar/${encodeURIComponent(studyCode)}/inicio?registered=1`);
 }
-
-export { PARTICIPANT_PORTAL_REGISTRATION_SUCCESS_MESSAGE };
