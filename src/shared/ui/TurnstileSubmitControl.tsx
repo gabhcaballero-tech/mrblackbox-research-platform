@@ -40,7 +40,6 @@ export function TurnstileSubmitControl({
   const hasRenderedWidget = useRef(false);
   const [token, setToken] = useState("");
   const [localMessage, setLocalMessage] = useState(CAPTCHA_PENDING_MESSAGE);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
   useEffect(() => {
@@ -53,7 +52,6 @@ export function TurnstileSubmitControl({
 
   function resetWidget(message: string) {
     setToken("");
-    setIsSubmitting(false);
     setLocalMessage(message);
     window.turnstile?.reset(widgetId.current);
   }
@@ -65,7 +63,6 @@ export function TurnstileSubmitControl({
 
     widgetId.current = window.turnstile.render(`#${id}`, {
       callback(nextToken) {
-        setIsSubmitting(false);
         setLocalMessage(CAPTCHA_SUCCESS_MESSAGE);
         setToken(nextToken);
       },
@@ -94,13 +91,7 @@ export function TurnstileSubmitControl({
       <p className="text-sm text-zinc-600" role={localMessage !== CAPTCHA_SUCCESS_MESSAGE ? "alert" : undefined}>
         {localMessage}
       </p>
-      <TurnstileSubmitButton
-        buttonLabel={buttonLabel}
-        disabled={!token || isSubmitting}
-        isSubmitting={isSubmitting}
-        onValidSubmitAttempt={() => setIsSubmitting(true)}
-        pendingLabel={pendingLabel}
-      />
+      <TurnstileSubmitButton buttonLabel={buttonLabel} disabled={!token} pendingLabel={pendingLabel} />
     </div>
   );
 }
@@ -108,14 +99,10 @@ export function TurnstileSubmitControl({
 function TurnstileSubmitButton({
   buttonLabel,
   disabled,
-  isSubmitting,
-  onValidSubmitAttempt,
   pendingLabel
 }: {
   buttonLabel: string;
   disabled: boolean;
-  isSubmitting: boolean;
-  onValidSubmitAttempt: () => void;
   pendingLabel?: string;
 }) {
   const { pending } = useFormStatus();
@@ -124,22 +111,9 @@ function TurnstileSubmitButton({
     <button
       className="inline-flex w-full items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition enabled:hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
       disabled={disabled || pending}
-      onClick={(event) => {
-        const form = event.currentTarget.form;
-
-        if (!form || disabled || pending) {
-          return;
-        }
-
-        if (!form.reportValidity()) {
-          return;
-        }
-
-        onValidSubmitAttempt();
-      }}
       type="submit"
     >
-      {pending || isSubmitting ? <LoadingLabel label={pendingLabel ?? buttonLabel} showSpinner /> : buttonLabel}
+      {pending ? <LoadingLabel label={pendingLabel ?? buttonLabel} showSpinner /> : buttonLabel}
     </button>
   );
 }

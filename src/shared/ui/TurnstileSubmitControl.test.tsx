@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import type { FormEvent } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TurnstileSubmitControl } from "./TurnstileSubmitControl";
 
 vi.mock("next/script", () => ({
@@ -143,8 +144,9 @@ describe("TurnstileSubmitControl", () => {
     });
   });
 
-  it("disables the button immediately after a valid submit attempt to avoid double click", async () => {
+  it("submits the form when the token is valid without entering a fake pending state first", async () => {
     let callback: ((token: string) => void) | undefined;
+    const handleSubmit = vi.fn((event: FormEvent<HTMLFormElement>) => event.preventDefault());
     window.turnstile = {
       render: vi.fn((_, options) => {
         callback = options.callback;
@@ -154,15 +156,40 @@ describe("TurnstileSubmitControl", () => {
     };
 
     render(
-      <form>
-        <TurnstileSubmitControl buttonLabel="Comenzar registro" />
+      <form onSubmit={handleSubmit}>
+        <TurnstileSubmitControl buttonLabel="Comenzar registro" pendingLabel="Guardando..." />
       </form>
     );
 
     callback?.("token-1");
     const button = await screen.findByRole("button", { name: "Comenzar registro" });
+
     fireEvent.click(button);
 
+    expect(handleSubmit).toHaveBeenCalledTimes(1);
+    expect(button).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Guardando..." })).not.toBeInTheDocument();
+  });
+
+  it("does not submit or enter pending when the token is missing", () => {
+    const handleSubmit = vi.fn((event: FormEvent<HTMLFormElement>) => event.preventDefault());
+    window.turnstile = {
+      render: vi.fn(() => "widget-1"),
+      reset: vi.fn()
+    };
+
+    render(
+      <form onSubmit={handleSubmit}>
+        <TurnstileSubmitControl buttonLabel="Comenzar registro" pendingLabel="Guardando..." />
+      </form>
+    );
+
+    const button = screen.getByRole("button", { name: "Comenzar registro" });
+    fireEvent.click(button);
+
+    expect(handleSubmit).not.toHaveBeenCalled();
     expect(button).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Guardando..." })).not.toBeInTheDocument();
+    expect(screen.getByText("Completa la verificación de seguridad.")).toBeInTheDocument();
   });
 });
