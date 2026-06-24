@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { getParticipantPortalAvailability, PARTICIPANT_PORTAL_UNAVAILABLE_MESSAGE } from "@/modules/participant-portal/access";
+import { allowsDirectParticipantAccess } from "@/modules/participant-portal/access-mode";
 import { requestParticipantPortalOtpAction } from "@/modules/participant-portal/actions";
 import { createParticipantPortalRepository } from "@/modules/participant-portal/repository";
 import { participantPortalStudyCodeSchema } from "@/modules/participant-portal/validation";
@@ -27,6 +29,10 @@ export default async function ParticipantPortalPage({ params, searchParams }: Pa
 
   if (!availability.ok) {
     return <UnavailablePortal />;
+  }
+
+  if (allowsDirectParticipantAccess(availability.study.code)) {
+    redirect(`/participar/${encodeURIComponent(availability.study.code)}/inicio`);
   }
 
   const error = firstParam(search.error);

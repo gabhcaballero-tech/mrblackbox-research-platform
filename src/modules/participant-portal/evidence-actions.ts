@@ -39,8 +39,8 @@ export async function requestParticipantEvidenceUploadAction(
   metadata: EvidenceUploadMetadata
 ): Promise<ParticipantEvidenceActionResult<ParticipantSignedUploadActionResult>> {
   try {
-    const auth = await getParticipantEvidenceActionAuth();
     const studyCode = normalizeStudyCode(studyCodeInput);
+    const auth = await getParticipantEvidenceActionAuth(studyCode);
 
     if (!auth.ok) {
       return auth;
@@ -95,8 +95,8 @@ export async function confirmParticipantEvidenceUploadAction(
   }
 ): Promise<ParticipantEvidenceActionResult<ParticipantEvidenceUploadConfirmation>> {
   try {
-    const auth = await getParticipantEvidenceActionAuth();
     const studyCode = normalizeStudyCode(studyCodeInput);
+    const auth = await getParticipantEvidenceActionAuth(studyCode);
 
     if (!auth.ok) {
       return auth;
@@ -137,8 +137,8 @@ export async function confirmParticipantEvidenceUploadAction(
 export async function completeParticipantEvidenceSubmissionAction(
   studyCodeInput: string
 ): Promise<ParticipantEvidenceActionResult<{ redirectTo: string }>> {
-  const auth = await getParticipantEvidenceActionAuth();
   const studyCode = normalizeStudyCode(studyCodeInput);
+  const auth = await getParticipantEvidenceActionAuth(studyCode);
 
   if (!auth.ok) {
     return auth;
@@ -178,10 +178,10 @@ function normalizeStudyCode(value: string): string {
   return parsed.data;
 }
 
-async function getParticipantEvidenceActionAuth(): Promise<
+async function getParticipantEvidenceActionAuth(studyCode: string): Promise<
   ParticipantEvidenceActionResult<{ identity: { email: string | null; id: string } }>
 > {
-  const auth = await getParticipantPortalAuth({ repository: createParticipantPortalRepository() });
+  const auth = await getParticipantPortalAuth({ repository: createParticipantPortalRepository(), studyCode });
 
   if (auth.status === "no_session") {
     return {

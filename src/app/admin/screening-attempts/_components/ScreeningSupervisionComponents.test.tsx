@@ -142,6 +142,23 @@ describe("ScreeningSupervisionComponents", () => {
     );
   });
 
+  it("shows an Excel export action that preserves current filters", () => {
+    render(<ScreeningAttemptFilters data={{ ...listData, filters: { ...listData.filters, code: "PASSED" } }} />);
+
+    expect(screen.getByRole("link", { name: "Exportar Excel" })).toHaveAttribute(
+      "href",
+      "/admin/studies/study-1/screening-attempts/export?participantQuery=Gabriela&code=PASSED"
+    );
+    expect(screen.getByText("La exportación descarga un CSV compatible con Excel y respeta los filtros actuales.")).toBeInTheDocument();
+  });
+
+  it("disables the export action when there are no attempts to export", () => {
+    render(<ScreeningAttemptFilters data={{ ...listData, attempts: [] }} />);
+
+    expect(screen.getByRole("link", { name: "Exportar Excel" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByText("No hay intentos con los filtros actuales para exportar.")).toBeInTheDocument();
+  });
+
   it("keeps Ver detalle visible in the participant column without a separate action column", () => {
     render(<ScreeningAttemptTable attempts={listData.attempts} studyId={study.id} />);
 

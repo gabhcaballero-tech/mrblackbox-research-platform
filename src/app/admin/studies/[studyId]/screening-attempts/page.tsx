@@ -54,7 +54,7 @@ export default async function StudyScreeningAttemptsPage({
     <AppShell>
       <PageHeader
         actions={<StatusBadge status="ready">Solo lectura</StatusBadge>}
-        description={`Revisión de intentos aplicados para ${result.data.study.code}. No permite editar respuestas, reabrir intentos ni exportar.`}
+        description={`Revisión de intentos aplicados para ${result.data.study.code}. No permite editar respuestas ni reabrir intentos.`}
         eyebrow="Supervisión"
         title={`Intentos de screener · ${result.data.study.name}`}
       />

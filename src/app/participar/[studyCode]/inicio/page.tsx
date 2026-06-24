@@ -4,6 +4,7 @@ import {
   getParticipantPortalAvailability,
   PARTICIPANT_PORTAL_UNAVAILABLE_MESSAGE
 } from "@/modules/participant-portal/access";
+import { allowsDirectParticipantAccess } from "@/modules/participant-portal/access-mode";
 import { createParticipantPortalEvidenceRepository } from "@/modules/participant-portal/evidence-repository";
 import { getParticipantPortalSelfieScreen } from "@/modules/participant-portal/evidence-service";
 import { createParticipantPortalRepository } from "@/modules/participant-portal/repository";
@@ -42,10 +43,32 @@ export default async function ParticipantPortalHomePage({
     return <PortalMessage title={PARTICIPANT_PORTAL_UNAVAILABLE_MESSAGE} />;
   }
 
-  const auth = await getParticipantPortalAuth({ repository });
+  const directMode = allowsDirectParticipantAccess(studyCode);
+  const auth = await getParticipantPortalAuth({ repository, studyCode });
 
   if (auth.status === "no_session") {
-    return <PortalMessage title="Inicia sesion con el codigo enviado a tu correo para continuar." />;
+    if (!directMode) {
+      return <PortalMessage title="Inicia sesión con el código enviado a tu correo para continuar." />;
+    }
+
+    return (
+      <main className="min-h-screen bg-zinc-50 px-4 py-6 sm:py-10">
+        <section className="mx-auto w-full max-w-2xl rounded-lg border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
+          <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Portal de participación</p>
+          <h1 className="mt-2 text-2xl font-semibold text-zinc-950">Comienza tu registro</h1>
+          <p className="mt-2 text-sm leading-6 text-zinc-600">
+            Para iniciar tu registro, captura tus datos de contacto.
+          </p>
+          <div className="mt-6">
+            <ParticipantRegistrationForm
+              privacyNoticeText={availability.study.portalConfig.privacyNoticeText}
+              requireTurnstile
+              studyCode={studyCode}
+            />
+          </div>
+        </section>
+      </main>
+    );
   }
 
   if (auth.status === "internal_user_blocked") {
@@ -105,10 +128,10 @@ export default async function ParticipantPortalHomePage({
   return (
     <main className="min-h-screen bg-zinc-50 px-4 py-6 sm:py-10">
       <section className="mx-auto w-full max-w-2xl rounded-lg border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
-        <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Portal de participacion</p>
+        <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Portal de participación</p>
         <h1 className="mt-2 text-2xl font-semibold text-zinc-950">Completa tu registro</h1>
         <p className="mt-2 text-sm leading-6 text-zinc-600">
-          Tu correo fue verificado correctamente. Captura tus datos de contacto, acepta el aviso y luego toma tu selfie para continuar.
+          Captura tus datos de contacto, acepta el aviso y luego toma tu selfie para continuar.
         </p>
         <div className="mt-6">
           <ParticipantRegistrationForm

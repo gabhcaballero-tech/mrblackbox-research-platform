@@ -13,7 +13,7 @@ export type PortalRegistrationStudyParticipant = {
   createdByUserId: string | null;
   id: string;
   participantProfileId: string;
-  screeningAttempts: Array<{ id: string }>;
+  screeningAttempts: Array<{ id: string; source: "FIELD" | "PARTICIPANT_PORTAL"; status: string }>;
   studyId: string;
 };
 
@@ -52,9 +52,20 @@ export type CreatePortalConsentInput = {
   studyParticipantId: string;
 };
 
+export type PortalRegistrationScreeningAttempt = {
+  id: string;
+  source: "FIELD" | "PARTICIPANT_PORTAL";
+  status: string;
+  studyParticipantId: string;
+};
+
 export type ParticipantPortalRegistrationRepository = {
   createParticipantConsent: (input: CreatePortalConsentInput) => Promise<PortalRegistrationConsent>;
   createParticipantProfile: (input: CreatePortalParticipantProfileInput) => Promise<PortalRegistrationParticipantProfile>;
+  createPortalScreeningAttempt: (input: {
+    questionnaireVersionId: string;
+    studyParticipantId: string;
+  }) => Promise<PortalRegistrationScreeningAttempt>;
   createStudyParticipant: (input: CreatePortalStudyParticipantInput) => Promise<PortalRegistrationStudyParticipant>;
   findParticipantConsent: (input: {
     noticeVersion: string;
@@ -82,6 +93,9 @@ type ParticipantPortalRegistrationPrismaClient = PrismaClientLike & {
     findMany: (args: unknown) => Promise<PortalRegistrationParticipantProfile[]>;
     update: (args: unknown) => Promise<PortalRegistrationParticipantProfile>;
   };
+  screeningAttempt: {
+    create: (args: unknown) => Promise<PortalRegistrationScreeningAttempt>;
+  };
   studyParticipant: {
     create: (args: unknown) => Promise<PortalRegistrationStudyParticipant>;
     findUnique: (args: unknown) => Promise<PortalRegistrationStudyParticipant | null>;
@@ -102,8 +116,8 @@ const studyParticipantSelect = {
   id: true,
   participantProfileId: true,
   screeningAttempts: {
-    select: { id: true },
-    take: 1
+    orderBy: { startedAt: "desc" },
+    select: { id: true, source: true, status: true }
   },
   studyId: true
 } as const;
@@ -143,6 +157,25 @@ export function createParticipantPortalRegistrationRepository(
           status: "ACTIVE"
         },
         select: profileSelect
+      });
+    },
+    async createPortalScreeningAttempt(input) {
+      const prisma = await getPrisma();
+
+      return prisma.screeningAttempt.create({
+        data: {
+          fieldUserId: null,
+          questionnaireVersionId: input.questionnaireVersionId,
+          source: "PARTICIPANT_PORTAL",
+          status: "STARTED",
+          studyParticipantId: input.studyParticipantId
+        },
+        select: {
+          id: true,
+          source: true,
+          status: true,
+          studyParticipantId: true
+        }
       });
     },
     async createStudyParticipant(input) {

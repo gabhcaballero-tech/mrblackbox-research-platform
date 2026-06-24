@@ -10,6 +10,7 @@ import type {
   ParticipantPortalRegistrationRepository,
   PortalRegistrationConsent,
   PortalRegistrationParticipantProfile,
+  PortalRegistrationScreeningAttempt,
   PortalRegistrationStudyParticipant
 } from "./registration-repository";
 
@@ -55,6 +56,7 @@ function validForm(overrides: Record<string, unknown> = {}) {
     consentPrivacy: "on",
     consentSensitive: "on",
     confirmPhone: "5512345678",
+    email: "",
     name: "Persona Participante",
     phone: "5512345678",
     ...overrides
@@ -63,10 +65,12 @@ function validForm(overrides: Record<string, unknown> = {}) {
 
 function createRepository({
   consents = [],
+  screeningAttempts = [],
   profiles = [],
   participants = []
 }: {
   consents?: PortalRegistrationConsent[];
+  screeningAttempts?: PortalRegistrationScreeningAttempt[];
   profiles?: PortalRegistrationParticipantProfile[];
   participants?: PortalRegistrationStudyParticipant[];
 } = {}) {
@@ -94,6 +98,18 @@ function createRepository({
       profiles.push(profile);
       return profile;
     }),
+    createPortalScreeningAttempt: vi.fn(async (input) => {
+      const attempt = {
+        id: `attempt-${screeningAttempts.length + 1}`,
+        source: "PARTICIPANT_PORTAL" as const,
+        status: "STARTED",
+        studyParticipantId: input.studyParticipantId
+      };
+      screeningAttempts.push(attempt);
+      const participant = participants.find((item) => item.id === input.studyParticipantId);
+      participant?.screeningAttempts.push(attempt);
+      return attempt;
+    }),
     createStudyParticipant: vi.fn(async (input) => {
       const participant = {
         createdByUserId: null,
@@ -116,7 +132,7 @@ function createRepository({
       profiles.filter(
         (profile) =>
           profile.participantAuthUserId === input.participantAuthUserId ||
-          profile.email === input.email ||
+          (input.email ? profile.email === input.email : false) ||
           profile.phone === input.phone
       )
     ),
@@ -136,7 +152,7 @@ function createRepository({
     })
   };
 
-  return { consentInputs, consents, participants, profiles, repository };
+  return { consentInputs, consents, participants, profiles, repository, screeningAttempts };
 }
 
 describe("participant portal registration service", () => {
@@ -228,8 +244,8 @@ describe("participant portal registration service", () => {
     );
   });
 
-  it("creates ParticipantProfile and StudyParticipant with createdByUserId null", async () => {
-    const { participants, profiles, repository } = createRepository();
+  it("creates ParticipantProfile, StudyParticipant and initial portal attempt without InternalUser", async () => {
+    const { participants, profiles, repository, screeningAttempts } = createRepository();
     const result = await registerParticipantInPortal({
       formInput: validForm(),
       identity,
@@ -250,6 +266,35 @@ describe("participant portal registration service", () => {
       createdByUserId: null,
       participantProfileId: profiles[0]?.id,
       studyId: "study-1"
+    });
+    expect(screeningAttempts[0]).toMatchObject({
+      source: "PARTICIPANT_PORTAL",
+      status: "STARTED",
+      studyParticipantId: participants[0]?.id
+    });
+    expect(result.ok ? result.data.screeningAttemptId : null).toBe(screeningAttempts[0]?.id);
+  });
+
+  it("allows direct public registration without email and without creating InternalUser", async () => {
+    const publicIdentity: ParticipantPortalIdentity = {
+      email: null,
+      id: "33333333-3333-4333-8333-333333333333",
+      source: "PUBLIC_SESSION"
+    };
+    const { profiles, repository } = createRepository();
+    const result = await registerParticipantInPortal({
+      formInput: validForm({ email: "" }),
+      identity: publicIdentity,
+      now,
+      repository,
+      study: portalStudy()
+    });
+
+    expect(result.ok).toBe(true);
+    expect(profiles[0]).toMatchObject({
+      createdByUserId: null,
+      email: null,
+      participantAuthUserId: publicIdentity.id
     });
   });
 
@@ -377,7 +422,7 @@ describe("participant portal registration service", () => {
       createdByUserId: null,
       id: "study-participant-1",
       participantProfileId: existingProfile.id,
-      screeningAttempts: [{ id: "attempt-1" }],
+      screeningAttempts: [{ id: "attempt-1", source: "PARTICIPANT_PORTAL", status: "TERMINATED" }],
       studyId: "study-1"
     };
     const { repository } = createRepository({
@@ -421,7 +466,7 @@ describe("participant portal registration service", () => {
   });
 
   it("does not duplicate consent on repeated submit", async () => {
-    const { consents, participants, profiles, repository } = createRepository();
+    const { consents, participants, profiles, repository, screeningAttempts } = createRepository();
 
     const first = await registerParticipantInPortal({
       formInput: validForm(),
@@ -440,8 +485,10 @@ describe("participant portal registration service", () => {
 
     expect(first.ok).toBe(true);
     expect(second.ok ? second.data.consentReused : false).toBe(true);
+    expect(second.ok ? second.data.screeningAttemptReused : false).toBe(true);
     expect(consents).toHaveLength(1);
     expect(profiles).toHaveLength(1);
     expect(participants).toHaveLength(1);
+    expect(screeningAttempts).toHaveLength(1);
   });
 });

@@ -29,7 +29,7 @@ export default async function ParticipantPortalFilterPage({
 
   const studyCode = parsedStudyCode.data;
   const portalRepository = createParticipantPortalRepository();
-  const auth = await getParticipantPortalAuth({ repository: portalRepository });
+  const auth = await getParticipantPortalAuth({ repository: portalRepository, studyCode });
 
   if (auth.status === "no_session") {
     return <PortalMessage title="Inicia sesión con el código enviado a tu correo para continuar." />;

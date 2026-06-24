@@ -16,6 +16,7 @@ import {
   updateParticipantEvidenceParticipantAction
 } from "@/modules/participant-portal/evidence-review-actions";
 import { EvidenceReplacementForm } from "./EvidenceReplacementForm";
+import { ExportCsvButton } from "./ExportCsvButton";
 import { WhatsAppManualBlock } from "./WhatsAppManualBlock";
 
 const dateFormatter = new Intl.DateTimeFormat("es-MX", {
@@ -75,6 +76,39 @@ function compactVersion(version: number): string {
   return `v${version}`;
 }
 
+function exportHref(data: ScreeningAttemptListData): string {
+  const params = new URLSearchParams();
+
+  if (data.filters.participantQuery) {
+    params.set("participantQuery", data.filters.participantQuery);
+  }
+
+  if (data.filters.status) {
+    params.set("status", data.filters.status);
+  }
+
+  if (data.filters.fieldUserId) {
+    params.set("fieldUserId", data.filters.fieldUserId);
+  }
+
+  if (data.filters.dateFrom) {
+    params.set("dateFrom", formatInputDate(data.filters.dateFrom));
+  }
+
+  if (data.filters.dateTo) {
+    params.set("dateTo", formatInputDate(data.filters.dateTo));
+  }
+
+  if (data.filters.code) {
+    params.set("code", data.filters.code);
+  }
+
+  const queryString = params.toString();
+  const path = `/admin/studies/${data.study.id}/screening-attempts/export`;
+
+  return queryString ? `${path}?${queryString}` : path;
+}
+
 export function ScreeningAttemptFilters({ data }: { data: ScreeningAttemptListData }) {
   return (
     <form className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm" method="get">
@@ -130,7 +164,13 @@ export function ScreeningAttemptFilters({ data }: { data: ScreeningAttemptListDa
         <Link className={secondaryButtonClass} href={`/admin/studies/${data.study.id}/screening-attempts`}>
           Limpiar filtros
         </Link>
+        <ExportCsvButton disabled={data.attempts.length === 0} href={exportHref(data)} />
       </div>
+      <p className="mt-3 text-xs leading-5 text-zinc-500">
+        {data.attempts.length === 0
+          ? "No hay intentos con los filtros actuales para exportar."
+          : "La exportación descarga un CSV compatible con Excel y respeta los filtros actuales."}
+      </p>
     </form>
   );
 }

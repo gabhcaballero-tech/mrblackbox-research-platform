@@ -79,6 +79,12 @@ export const participantPortalRegistrationSchema = z
     consentPrivacy: checkboxSchema.refine((value) => value, "Debes aceptar el aviso de privacidad."),
     consentSensitive: checkboxSchema.refine((value) => value, "Debes otorgar el consentimiento expreso para continuar."),
     confirmPhone: z.string().trim().min(1, "Confirma el celular."),
+    email: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => (value && value.length > 0 ? value.toLowerCase() : null))
+      .pipe(z.string().email("Ingresa un correo válido.").nullable()),
     name: z.string().trim().min(1, "Ingresa tu nombre completo."),
     phone: z.string().trim().min(1, "Ingresa tu celular.")
   })

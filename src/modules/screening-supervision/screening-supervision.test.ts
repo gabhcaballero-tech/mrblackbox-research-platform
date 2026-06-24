@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { InternalUserRole } from "@/shared/auth/permissions";
 import type { ScreenerDefinition } from "@/modules/screener";
+import { exportScreeningAttemptsCsvForStudy } from "./export";
 import {
   getScreeningAttemptSupervisionDetail,
   listScreeningAttemptsForStudy,
@@ -9,6 +10,7 @@ import {
 import type {
   ScreeningSupervisionRepository,
   SupervisionAttemptDetailRecord,
+  SupervisionAttemptExportRecord,
   SupervisionFieldUserRecord,
   SupervisionStudyRecord
 } from "./repository";
@@ -166,6 +168,7 @@ function attempt(input: Partial<SupervisionAttemptDetailRecord> = {}): Supervisi
       participantProfile: {
         email: "participante@example.com",
         externalReference: "REF-1",
+        createdAt: new Date("2026-06-23T14:30:00Z"),
         id: "profile-1",
         name: "Participante Uno",
         phone: "5550000000"
@@ -173,12 +176,24 @@ function attempt(input: Partial<SupervisionAttemptDetailRecord> = {}): Supervisi
       studyId: study.id
     },
     studyParticipantId: "study-participant-1",
+    source: input.source ?? "FIELD",
     terminationCode: input.terminationCode ?? (status === "TERMINATED" ? "GENERO_NO_ELEGIBLE" : null),
     terminationReason: input.terminationReason ?? (status === "TERMINATED" ? "No califica." : null)
   };
 }
 
-function repository(records: SupervisionAttemptDetailRecord[] = [attempt()]): ScreeningSupervisionRepository {
+function exportAttempt(input: Partial<SupervisionAttemptExportRecord> = {}): SupervisionAttemptExportRecord {
+  const detailInput = input as Partial<SupervisionAttemptDetailRecord>;
+
+  return {
+    ...attempt(detailInput),
+    participantEvidence: input.participantEvidence ?? []
+  };
+}
+
+function repository(
+  records: Array<SupervisionAttemptDetailRecord | SupervisionAttemptExportRecord> = [attempt()]
+): ScreeningSupervisionRepository {
   return {
     async getAttemptDetail(attemptId) {
       return records.find((record) => record.id === attemptId) ?? null;
@@ -194,6 +209,16 @@ function repository(records: SupervisionAttemptDetailRecord[] = [attempt()]): Sc
         .filter((record) => record.studyParticipant.studyId === studyId)
         .filter((record) => matchesFilters(record, filters))
         .sort((left, right) => right.startedAt.getTime() - left.startedAt.getTime());
+    },
+    async listStudyAttemptsForExport({ filters, studyId }) {
+      return records
+        .filter((record) => record.studyParticipant.studyId === studyId)
+        .filter((record) => matchesFilters(record, filters))
+        .sort((left, right) => right.startedAt.getTime() - left.startedAt.getTime())
+        .map((record) => ({
+          ...record,
+          participantEvidence: "participantEvidence" in record ? record.participantEvidence : []
+        }));
     }
   };
 }
@@ -317,6 +342,7 @@ describe("screening supervision service", () => {
         studyParticipant: {
           id: "study-participant-2",
           participantProfile: {
+            createdAt: new Date("2026-06-23T14:45:00Z"),
             email: "otra@example.com",
             externalReference: "REF-77",
             id: "profile-2",
@@ -452,5 +478,119 @@ describe("screening supervision service", () => {
     });
 
     expect(result.ok ? result.data.answers.find((answer) => answer.questionId === "F9A_VECES_AL_DIA")?.missing : null).toBe(true);
+  });
+
+  it("exports CSV compatible with Excel using filters and readable answers", async () => {
+    const record = exportAttempt({
+      participantConfirmation: {
+        folio: "NAV-001",
+        manualMessageMarkedSentAt: new Date("2026-06-24T18:00:00Z"),
+        manualMessageMarkedSentBy: { email: "sup@example.com", id: "supervisor-1", name: "Supervisor Uno" },
+        manualMessageStatus: "MARKED_SENT",
+        referenceCodes: [
+          { code: "A7K4", slot: 1 },
+          { code: "M3P9", slot: 2 },
+          { code: "T8R2", slot: 3 }
+        ]
+      },
+      participantEvidence: [
+        {
+          internalNote: null,
+          rejectionReason: null,
+          reviewStatus: "APPROVED",
+          reviewedAt: new Date("2026-06-24T17:00:00Z"),
+          reviewedBy: { email: "sup@example.com", id: "supervisor-1", name: "Supervisor Uno" },
+          type: "SELFIE_IDENTIFICATION"
+        },
+        {
+          internalNote: null,
+          rejectionReason: null,
+          reviewStatus: "APPROVED",
+          reviewedAt: new Date("2026-06-24T17:05:00Z"),
+          reviewedBy: { email: "sup@example.com", id: "supervisor-1", name: "Supervisor Uno" },
+          type: "PERFUME_PHOTO"
+        }
+      ],
+      participantScreeningReview: {
+        internalNote: "Evidencia clara.",
+        rejectionReason: null,
+        reviewedAt: new Date("2026-06-24T17:10:00Z"),
+        reviewedBy: { email: "sup@example.com", id: "supervisor-1", name: "Supervisor Uno" },
+        status: "APPROVED"
+      },
+      source: "PARTICIPANT_PORTAL"
+    });
+    const result = await exportScreeningAttemptsCsvForStudy({
+      actor: admin,
+      filters: { participantQuery: "Participante" },
+      now: new Date("2026-06-24T12:00:00Z"),
+      repository: repository([
+        record,
+        exportAttempt({
+          id: "other-attempt",
+          studyParticipant: {
+            id: "study-participant-other",
+            participantProfile: {
+              createdAt: new Date("2026-06-23T14:55:00Z"),
+              email: "otra@example.com",
+              externalReference: "OTRA-1",
+              id: "profile-other",
+              name: "Otra Persona",
+              phone: "5551112222"
+            },
+            studyId: study.id
+          }
+        })
+      ]),
+      studyId: study.id
+    });
+
+    expect(result.ok ? result.data.filename : null).toBe("FMASCULINA-NAVIGO-2026_intentos_screener_2026-06-24.csv");
+    expect(result.ok ? result.data.contentType : null).toBe("text/csv; charset=utf-8");
+    expect(result.ok ? result.data.rowCount : null).toBe(1);
+    expect(result.ok ? result.data.csv.startsWith("\uFEFF") : false).toBe(true);
+    expect(result.ok ? result.data.csv : "").toContain("Código del estudio;Nombre del estudio");
+    expect(result.ok ? result.data.csv : "").toContain("FMASCULINA-NAVIGO-2026");
+    expect(result.ok ? result.data.csv : "").toContain("Portal participante");
+    expect(result.ok ? result.data.csv : "").toContain("Elegible confirmado");
+    expect(result.ok ? result.data.csv : "").toContain("144;C típico;RANGO-3");
+    expect(result.ok ? result.data.csv : "").toContain("Sí;1;Sí;NAV-001;A7K4;M3P9;T8R2");
+    expect(result.ok ? result.data.csv : "").toContain("Navigo|Otra - Especificación: Marca local");
+    expect(result.ok ? result.data.csv : "").not.toContain("other-attempt");
+    expect(result.ok ? result.data.csv : "").not.toContain("privateStorageKey");
+    expect(result.ok ? result.data.csv : "").not.toContain("signedUrl");
+  });
+
+  it("exports headers only when there are no matching attempts", async () => {
+    const result = await exportScreeningAttemptsCsvForStudy({
+      actor: supervisor,
+      filters: { participantQuery: "NO_EXISTE" },
+      now: new Date("2026-06-24T12:00:00Z"),
+      repository: repository([exportAttempt()]),
+      studyId: study.id
+    });
+
+    expect(result.ok ? result.data.rowCount : null).toBe(0);
+    expect(result.ok ? result.data.csv.split("\r\n").filter(Boolean).length : null).toBe(1);
+    expect(result.ok ? result.data.csv : "").toContain("Código del estudio");
+  });
+
+  it("denies CSV export to roles without screening review permission", async () => {
+    await expect(
+      exportScreeningAttemptsCsvForStudy({
+        actor: interviewer,
+        filters: {},
+        repository: repository([exportAttempt()]),
+        studyId: study.id
+      })
+    ).resolves.toMatchObject({ code: "UNAUTHORIZED", ok: false });
+    await expect(
+      exportScreeningAttemptsCsvForStudy({
+        actor: analyst,
+        filters: {},
+        repository: repository([exportAttempt()]),
+        studyId: study.id
+      })
+    ).resolves.toMatchObject({ code: "UNAUTHORIZED", ok: false });
   });
 });

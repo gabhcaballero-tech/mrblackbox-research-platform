@@ -22,7 +22,7 @@ export default async function ParticipantEvidencePage({ params }: ParticipantEvi
   }
 
   const studyCode = parsedStudyCode.data;
-  const auth = await getParticipantPortalAuth({ repository: createParticipantPortalRepository() });
+  const auth = await getParticipantPortalAuth({ repository: createParticipantPortalRepository(), studyCode });
 
   if (auth.status === "no_session") {
     return <PortalMessage title="Inicia sesion con el codigo enviado a tu correo para continuar." />;

@@ -27,7 +27,6 @@ export type ParticipantPortalRegistrationFieldErrors = Partial<
 export type ParticipantPortalRegistrationErrorCode =
   | "DUPLICATE_PROFILE_CONFLICT"
   | "DUPLICATE_WITH_ATTEMPT"
-  | "MISSING_AUTH_EMAIL"
   | "PORTAL_UNAVAILABLE"
   | "VALIDATION_ERROR"
   | "UNKNOWN_ERROR";
@@ -39,6 +38,8 @@ export type ParticipantPortalRegistrationResult =
         createdParticipantProfile: boolean;
         createdStudyParticipant: boolean;
         participantProfile: PortalRegistrationParticipantProfile;
+        screeningAttemptId: string;
+        screeningAttemptReused: boolean;
         studyParticipant: PortalRegistrationStudyParticipant;
       };
       ok: true;
@@ -74,14 +75,6 @@ export async function registerParticipantInPortal({
     };
   }
 
-  if (!identity.email) {
-    return {
-      code: "MISSING_AUTH_EMAIL",
-      message: "No se pudo confirmar el correo de acceso. Solicita un código nuevo.",
-      ok: false
-    };
-  }
-
   const parsed = participantPortalRegistrationSchema.safeParse(formInput);
 
   if (!parsed.success) {
@@ -94,7 +87,7 @@ export async function registerParticipantInPortal({
   }
 
   try {
-    const email = normalizePortalEmail(identity.email);
+    const email = normalizeOptionalRegistrationEmail(parsed.data.email ?? identity.email);
     const profileResult = await findOrCreateParticipantProfile({
       email,
       identity,
@@ -108,10 +101,39 @@ export async function registerParticipantInPortal({
     });
 
     if (studyParticipantResult.studyParticipant.screeningAttempts.length > 0) {
+      const reusableAttempt = selectReusableOpenAttemptForIdentity({
+        identity,
+        profile: profileResult.profile,
+        studyParticipant: studyParticipantResult.studyParticipant
+      });
+
+      if (!reusableAttempt) {
+        return {
+          code: "DUPLICATE_WITH_ATTEMPT",
+          message: PARTICIPANT_PORTAL_DUPLICATE_REGISTRATION_MESSAGE,
+          ok: false
+        };
+      }
+
+      const consent = await createOrReuseConsent({
+        identity,
+        now,
+        repository,
+        studyParticipantId: studyParticipantResult.studyParticipant.id,
+        portalConfig: study.portalConfig
+      });
+
       return {
-        code: "DUPLICATE_WITH_ATTEMPT",
-        message: PARTICIPANT_PORTAL_DUPLICATE_REGISTRATION_MESSAGE,
-        ok: false
+        data: {
+          consentReused: consent.reused,
+          createdParticipantProfile: profileResult.created,
+          createdStudyParticipant: studyParticipantResult.created,
+          participantProfile: profileResult.profile,
+          screeningAttemptId: reusableAttempt.id,
+          screeningAttemptReused: true,
+          studyParticipant: studyParticipantResult.studyParticipant
+        },
+        ok: true
       };
     }
 
@@ -122,6 +144,10 @@ export async function registerParticipantInPortal({
       studyParticipantId: studyParticipantResult.studyParticipant.id,
       portalConfig: study.portalConfig
     });
+    const attempt = await repository.createPortalScreeningAttempt({
+      questionnaireVersionId: study.activeScreenerVersionId,
+      studyParticipantId: studyParticipantResult.studyParticipant.id
+    });
 
     return {
       data: {
@@ -129,6 +155,8 @@ export async function registerParticipantInPortal({
         createdParticipantProfile: profileResult.created,
         createdStudyParticipant: studyParticipantResult.created,
         participantProfile: profileResult.profile,
+        screeningAttemptId: attempt.id,
+        screeningAttemptReused: false,
         studyParticipant: studyParticipantResult.studyParticipant
       },
       ok: true
@@ -156,7 +184,7 @@ async function findOrCreateParticipantProfile({
   input,
   repository
 }: {
-  email: string;
+  email: string | null;
   identity: ParticipantPortalIdentity;
   input: ParticipantPortalRegistrationInput;
   repository: ParticipantPortalRegistrationRepository;
@@ -227,7 +255,7 @@ async function reuseOrConflictExistingProfile({
   input,
   repository
 }: {
-  email: string;
+  email: string | null;
   existing: PortalRegistrationParticipantProfile;
   identity: ParticipantPortalIdentity;
   input: ParticipantPortalRegistrationInput;
@@ -380,17 +408,45 @@ async function createOrReuseConsent({
 function selectBestProfileMatch(
   matches: PortalRegistrationParticipantProfile[],
   identity: {
-    email: string;
+    email: string | null;
     participantAuthUserId: string;
     phone: string;
   }
 ): PortalRegistrationParticipantProfile | null {
   return (
     matches.find((profile) => profile.participantAuthUserId === identity.participantAuthUserId) ??
-    matches.find((profile) => profile.email?.toLowerCase() === identity.email.toLowerCase()) ??
+    (identity.email
+      ? matches.find((profile) => profile.email?.toLowerCase() === identity.email?.toLowerCase())
+      : null) ??
     matches.find((profile) => profile.phone === identity.phone) ??
     null
   );
+}
+
+function normalizeOptionalRegistrationEmail(value: string | null | undefined): string | null {
+  const normalized = value ? normalizePortalEmail(value) : "";
+
+  return normalized.length > 0 ? normalized : null;
+}
+
+function selectReusableOpenAttemptForIdentity({
+  identity,
+  profile,
+  studyParticipant
+}: {
+  identity: ParticipantPortalIdentity;
+  profile: PortalRegistrationParticipantProfile;
+  studyParticipant: PortalRegistrationStudyParticipant;
+}) {
+  if (profile.participantAuthUserId !== identity.id) {
+    return null;
+  }
+
+  return studyParticipant.screeningAttempts.find(
+    (attempt) =>
+      attempt.source === "PARTICIPANT_PORTAL" &&
+      (attempt.status === "STARTED" || attempt.status === "INCOMPLETE")
+  ) ?? null;
 }
 
 class PortalRegistrationConflictError extends Error {}

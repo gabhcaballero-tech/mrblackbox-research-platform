@@ -15,6 +15,7 @@ export type SupervisionFieldUserRecord = {
 };
 
 export type SupervisionParticipantProfileRecord = {
+  createdAt: Date;
   email: string | null;
   externalReference: string | null;
   id: string;
@@ -30,6 +31,17 @@ export type SupervisionQuestionnaireVersionRecord = {
   study: SupervisionStudyRecord;
 };
 
+export type SupervisionAttemptSource = "FIELD" | "PARTICIPANT_PORTAL";
+
+export type SupervisionParticipantEvidenceRecord = {
+  internalNote: string | null;
+  rejectionReason: string | null;
+  reviewStatus: "APPROVED" | "PENDING" | "REJECTED";
+  reviewedAt: Date | null;
+  reviewedBy: SupervisionFieldUserRecord | null;
+  type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION";
+};
+
 export type SupervisionAttemptRecord = {
   completedAt: Date | null;
   evaluationJson: unknown;
@@ -40,14 +52,21 @@ export type SupervisionAttemptRecord = {
   nseScore: number | null;
   participantConfirmation: {
     folio: string;
+    manualMessageMarkedSentAt?: Date | null;
+    manualMessageMarkedSentBy?: SupervisionFieldUserRecord | null;
     manualMessageStatus: "MARKED_SENT" | "NOT_SENT";
     referenceCodes: Array<{ code: string; slot: number }>;
   } | null;
   participantScreeningReview: {
+    internalNote?: string | null;
+    rejectionReason?: string | null;
+    reviewedAt?: Date | null;
+    reviewedBy?: SupervisionFieldUserRecord | null;
     status: "APPROVED" | "PENDING" | "REJECTED";
   } | null;
   questionnaireVersion: SupervisionQuestionnaireVersionRecord;
   questionnaireVersionId: string;
+  source: SupervisionAttemptSource;
   startedAt: Date;
   status: SupervisionAttemptStatus;
   studyParticipant: {
@@ -69,10 +88,18 @@ export type SupervisionAttemptDetailRecord = SupervisionAttemptRecord & {
   answers: SupervisionAnswerRecord[];
 };
 
+export type SupervisionAttemptExportRecord = SupervisionAttemptDetailRecord & {
+  participantEvidence: SupervisionParticipantEvidenceRecord[];
+};
+
 export type ScreeningSupervisionRepository = {
   getAttemptDetail: (attemptId: string) => Promise<SupervisionAttemptDetailRecord | null>;
   getStudy: (studyId: string) => Promise<SupervisionStudyRecord | null>;
   listAttemptFieldUsers: (studyId: string) => Promise<SupervisionFieldUserRecord[]>;
+  listStudyAttemptsForExport: (input: {
+    filters: ScreeningAttemptFilters;
+    studyId: string;
+  }) => Promise<SupervisionAttemptExportRecord[]>;
   listStudyAttempts: (input: {
     filters: ScreeningAttemptFilters;
     studyId: string;
@@ -84,7 +111,7 @@ type ScreeningSupervisionPrismaClient = PrismaClientLike & {
     findMany: (args: unknown) => Promise<SupervisionFieldUserRecord[]>;
   };
   screeningAttempt: {
-    findMany: (args: unknown) => Promise<SupervisionAttemptRecord[]>;
+    findMany: (args: unknown) => Promise<unknown[]>;
     findUnique: (args: unknown) => Promise<SupervisionAttemptDetailRecord | null>;
   };
   study: {
@@ -106,6 +133,7 @@ const fieldUserSelect = {
 } as const;
 
 const participantProfileSelect = {
+  createdAt: true,
   email: true,
   externalReference: true,
   id: true,
@@ -126,6 +154,10 @@ const attemptSelect = {
   participantConfirmation: {
     select: {
       folio: true,
+      manualMessageMarkedSentAt: true,
+      manualMessageMarkedSentBy: {
+        select: fieldUserSelect
+      },
       manualMessageStatus: true,
       referenceCodes: {
         orderBy: { slot: "asc" },
@@ -138,6 +170,12 @@ const attemptSelect = {
   },
   participantScreeningReview: {
     select: {
+      internalNote: true,
+      rejectionReason: true,
+      reviewedAt: true,
+      reviewedBy: {
+        select: fieldUserSelect
+      },
       status: true
     }
   },
@@ -153,6 +191,7 @@ const attemptSelect = {
     }
   },
   questionnaireVersionId: true,
+  source: true,
   startedAt: true,
   status: true,
   studyParticipant: {
@@ -172,6 +211,17 @@ const attemptSelect = {
 const answerSelect = {
   answerJson: true,
   questionId: true
+} as const;
+
+const participantEvidenceSelect = {
+  internalNote: true,
+  rejectionReason: true,
+  reviewStatus: true,
+  reviewedAt: true,
+  reviewedBy: {
+    select: fieldUserSelect
+  },
+  type: true
 } as const;
 
 export function createScreeningSupervisionRepository(
@@ -230,7 +280,27 @@ export function createScreeningSupervisionRepository(
         select: attemptSelect,
         take: 100,
         where
-      });
+      }) as Promise<SupervisionAttemptRecord[]>;
+    },
+    async listStudyAttemptsForExport(input) {
+      const prisma = await getPrisma();
+      const where = buildAttemptWhere(input.studyId, input.filters);
+
+      return prisma.screeningAttempt.findMany({
+        orderBy: { startedAt: "desc" },
+        select: {
+          ...attemptSelect,
+          answers: {
+            orderBy: { createdAt: "asc" },
+            select: answerSelect
+          },
+          participantEvidence: {
+            orderBy: { uploadedAt: "asc" },
+            select: participantEvidenceSelect
+          }
+        },
+        where
+      }) as Promise<SupervisionAttemptExportRecord[]>;
     }
   };
 }

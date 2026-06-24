@@ -1,10 +1,16 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createParticipantPortalRepository, type ParticipantPortalRepository } from "@/modules/participant-portal/repository";
+import {
+  participantPortalPublicSessionCookieName,
+  readPublicPortalSessionToken
+} from "@/modules/participant-portal/public-session";
 import { createServerSupabaseClient } from "./supabase/server";
 
 export type ParticipantPortalIdentity = {
   email: string | null;
   id: string;
+  source?: "PUBLIC_SESSION" | "SUPABASE";
 };
 
 export type ParticipantPortalAuthResult =
@@ -37,15 +43,26 @@ type ParticipantPortalSupabaseSessionClient = {
 
 export async function getParticipantPortalAuth({
   repository = createParticipantPortalRepository(),
+  studyCode,
   supabase
 }: {
   repository?: ParticipantPortalRepository;
+  studyCode?: string;
   supabase?: ParticipantPortalSupabaseSessionClient;
 } = {}): Promise<ParticipantPortalAuthResult> {
   const client = supabase ?? ((await createServerSupabaseClient()) as ParticipantPortalSupabaseSessionClient);
   const identity = await getPortalIdentity(client);
 
   if (!identity) {
+    const publicIdentity = studyCode ? await getPublicPortalIdentity(studyCode) : null;
+
+    if (publicIdentity) {
+      return {
+        identity: publicIdentity,
+        status: "allowed"
+      };
+    }
+
     return { status: "no_session" };
   }
 
@@ -60,7 +77,7 @@ export async function getParticipantPortalAuth({
   }
 
   return {
-    identity,
+    identity: { ...identity, source: "SUPABASE" },
     status: "allowed"
   };
 }
@@ -74,7 +91,7 @@ export async function requireParticipantPortalAuth({
   studyCode: string;
   supabase?: ParticipantPortalSupabaseSessionClient;
 }): Promise<Extract<ParticipantPortalAuthResult, { status: "allowed" }>> {
-  const auth = await getParticipantPortalAuth({ repository, supabase });
+  const auth = await getParticipantPortalAuth({ repository, studyCode, supabase });
 
   if (auth.status === "allowed") {
     return auth;
@@ -122,5 +139,30 @@ async function getPortalIdentity(
   return {
     email: data.user.email ?? null,
     id: data.user.id
+  };
+}
+
+async function getPublicPortalIdentity(studyCode: string): Promise<ParticipantPortalIdentity | null> {
+  const secret = process.env.PARTICIPANT_PORTAL_HASH_SECRET;
+
+  if (!secret) {
+    return null;
+  }
+
+  const cookieStore = await cookies();
+  const session = readPublicPortalSessionToken({
+    secret,
+    studyCode,
+    token: cookieStore.get(participantPortalPublicSessionCookieName(studyCode))?.value
+  });
+
+  if (!session) {
+    return null;
+  }
+
+  return {
+    email: null,
+    id: session.identityId,
+    source: "PUBLIC_SESSION"
   };
 }

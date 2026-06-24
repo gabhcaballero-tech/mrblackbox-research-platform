@@ -20,6 +20,10 @@ import {
   PARTICIPANT_REFERENCE_CODE_PATTERN,
   type ParticipantConfirmationDraft
 } from ".";
+import {
+  createPublicPortalSessionToken,
+  readPublicPortalSessionToken
+} from "./public-session";
 
 const now = new Date("2026-06-23T12:00:00.000Z");
 const participantAuthUserId = "11111111-1111-4111-8111-111111111111";
@@ -63,6 +67,43 @@ describe("participant portal foundation", () => {
       ok: false
     });
     expect(canStartPublicParticipation({ existingStudyParticipantId: null })).toEqual({ ok: true });
+  });
+
+  it("creates a signed public portal session limited to one study", () => {
+    const token = createPublicPortalSessionToken({
+      identityId: participantAuthUserId,
+      now: new Date("2026-06-24T12:00:00Z"),
+      secret: "test-secret",
+      studyCode: "FMASCULINA-NAVIGO-2026"
+    });
+
+    expect(readPublicPortalSessionToken({
+      now: new Date("2026-06-24T12:01:00Z"),
+      secret: "test-secret",
+      studyCode: "FMASCULINA-NAVIGO-2026",
+      token
+    })).toMatchObject({
+      identityId: participantAuthUserId,
+      studyCode: "FMASCULINA-NAVIGO-2026"
+    });
+    expect(readPublicPortalSessionToken({
+      now: new Date("2026-06-24T12:01:00Z"),
+      secret: "test-secret",
+      studyCode: "OTRO-ESTUDIO",
+      token
+    })).toBeNull();
+    expect(readPublicPortalSessionToken({
+      now: new Date("2026-06-25T12:01:00Z"),
+      secret: "test-secret",
+      studyCode: "FMASCULINA-NAVIGO-2026",
+      token
+    })).toBeNull();
+    expect(readPublicPortalSessionToken({
+      now: new Date("2026-06-24T12:01:00Z"),
+      secret: "test-secret",
+      studyCode: "FMASCULINA-NAVIGO-2026",
+      token: `${token}tampered`
+    })).toBeNull();
   });
 
   it("preserves the exact consent notice snapshot", () => {

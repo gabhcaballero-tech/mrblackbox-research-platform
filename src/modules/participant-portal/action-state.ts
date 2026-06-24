@@ -2,6 +2,7 @@ import type { ParticipantPortalAdminFieldErrors } from "./admin-service";
 import type { ParticipantPortalRegistrationFieldErrors } from "./registration-service";
 
 export type ParticipantPortalRegistrationFormValues = {
+  email?: string;
   confirmPhone?: string;
   consentPrivacy?: boolean;
   consentSensitive?: boolean;

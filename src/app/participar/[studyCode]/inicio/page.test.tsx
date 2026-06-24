@@ -61,6 +61,22 @@ vi.mock("./ParticipantSelfieStep", () => ({
 }));
 
 describe("ParticipantPortalHomePage", () => {
+  it("shows direct public registration without asking for OTP when there is no session", async () => {
+    const { getParticipantPortalAuth } = await import("@/shared/auth/participant-portal");
+    vi.mocked(getParticipantPortalAuth).mockResolvedValueOnce({ status: "no_session" });
+
+    render(
+      await ParticipantPortalHomePage({
+        params: Promise.resolve({ studyCode: "FMASCULINA-NAVIGO-2026" }),
+        searchParams: Promise.resolve({})
+      })
+    );
+
+    expect(screen.getByText("Para iniciar tu registro, captura tus datos de contacto.")).toBeInTheDocument();
+    expect(screen.getByTestId("registration-form")).toBeInTheDocument();
+    expect(screen.queryByText(/código enviado/i)).not.toBeInTheDocument();
+  });
+
   it("shows the selfie step after a successful 303 redirect instead of returning to an empty form", async () => {
     const { getParticipantPortalSelfieScreen } = await import("@/modules/participant-portal/evidence-service");
     vi.mocked(getParticipantPortalSelfieScreen).mockResolvedValueOnce({

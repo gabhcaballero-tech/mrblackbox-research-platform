@@ -4,16 +4,19 @@ import { useActionState } from "react";
 import { initialParticipantPortalActionState } from "@/modules/participant-portal/action-state";
 import { registerParticipantPortalAction } from "@/modules/participant-portal/registration-actions";
 import type { ParticipantPortalActionState } from "@/modules/participant-portal/action-state";
+import { TurnstileSubmitControl } from "@/shared/ui/TurnstileSubmitControl";
 import { NormalizedParticipantTextInput } from "../_components/NormalizedParticipantTextField";
 import { PendingSubmitButton } from "../_components/PendingSubmitButton";
 
 type ParticipantRegistrationFormProps = {
   privacyNoticeText: string;
+  requireTurnstile?: boolean;
   studyCode: string;
 };
 
 export function ParticipantRegistrationForm({
   privacyNoticeText,
+  requireTurnstile = false,
   studyCode
 }: ParticipantRegistrationFormProps) {
   const action = registerParticipantPortalAction.bind(null, studyCode);
@@ -57,6 +60,16 @@ export function ParticipantRegistrationForm({
         />
       </div>
 
+      <TextField
+        autoComplete="email"
+        error={fieldError(state, "email")}
+        inputMode="email"
+        label="Correo electrónico opcional"
+        name="email"
+        defaultValue={values?.email}
+        placeholder="Ej. nombre@correo.com"
+      />
+
       <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
         <p className="text-sm font-semibold text-zinc-950">Aviso de privacidad</p>
         <div className="mt-3 max-h-72 overflow-y-auto whitespace-pre-wrap rounded-md border border-zinc-200 bg-white p-3 text-sm leading-6 text-zinc-700">
@@ -82,11 +95,15 @@ export function ParticipantRegistrationForm({
         en el aviso de privacidad.
       </ConsentCheckbox>
 
-      <PendingSubmitButton
-        className={submitButtonClass}
-        label="Completar registro"
-        pendingLabel="Guardando..."
-      />
+      {requireTurnstile ? (
+        <TurnstileSubmitControl buttonLabel="Comenzar registro" pendingLabel="Guardando..." />
+      ) : (
+        <PendingSubmitButton
+          className={submitButtonClass}
+          label="Completar registro"
+          pendingLabel="Guardando..."
+        />
+      )}
     </form>
   );
 }

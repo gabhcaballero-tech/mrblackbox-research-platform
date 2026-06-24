@@ -31,7 +31,7 @@ export async function saveParticipantPortalScreenerAnswerAction(
 ): Promise<void> {
   const studyCode = normalizeStudyCodeOrRedirect(studyCodeInput);
   const portalRepository = createParticipantPortalRepository();
-  const auth = await getParticipantPortalAuth({ repository: portalRepository });
+  const auth = await getParticipantPortalAuth({ repository: portalRepository, studyCode });
 
   if (auth.status === "no_session") {
     redirect(`/participar/${encodeURIComponent(studyCode)}`);
