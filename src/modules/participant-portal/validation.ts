@@ -4,8 +4,8 @@ export const participantEvidenceTypeSchema = z.enum(["SELFIE_IDENTIFICATION", "P
 
 export const participantPortalOtpRequestSchema = z
   .object({
-    captchaToken: z.string().trim().min(1, "Confirma la verificacion antes de solicitar el codigo."),
-    email: z.string().trim().email("Ingresa un correo valido.")
+    captchaToken: z.string().trim().min(1, "Confirma la verificación antes de solicitar el código."),
+    email: z.string().trim().email("Ingresa un correo válido.")
   })
   .strict();
 
@@ -13,17 +13,22 @@ export const participantPortalStudyCodeSchema = z
   .string()
   .trim()
   .toUpperCase()
-  .regex(/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/, "El codigo de estudio no es valido.");
+  .regex(/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/, "El código de estudio no es válido.");
 
 export const participantPortalVerifyOtpSchema = z
   .object({
-    token: z.string().trim().regex(/^\d{6}$/, "Ingresa el codigo de seis digitos.")
+    token: z
+      .string()
+      .trim()
+      .transform((value) => value.replace(/\s+/g, ""))
+      .refine((value) => /^\d+$/.test(value), "Ingresa el código numérico que recibiste por correo.")
+      .refine((value) => value.length >= 6 && value.length <= 8, "Ingresa el código numérico que recibiste por correo.")
   })
   .strict();
 
 export const participantPortalIdentitySchema = z
   .object({
-    captchaToken: z.string().trim().min(1, "Confirma la verificacion antes de continuar."),
+    captchaToken: z.string().trim().min(1, "Confirma la verificación antes de continuar."),
     confirmPhone: z.string().trim().min(1, "Confirma el celular."),
     name: z.string().trim().min(1, "Ingresa tu nombre."),
     phone: z.string().trim().min(1, "Ingresa tu celular.")
@@ -44,7 +49,7 @@ export const participantPortalIdentitySchema = z
     if (phone !== confirmPhone) {
       context.addIssue({
         code: "custom",
-        message: "El celular y la confirmacion deben coincidir.",
+        message: "El celular y la confirmación deben coincidir.",
         path: ["confirmPhone"]
       });
     }
@@ -84,11 +89,11 @@ export const participantPortalConfigSchema = z
   })
   .strict()
   .refine((input) => input.maxPerfumePhotos >= input.minPerfumePhotos, {
-    message: "El maximo de fotos de perfume no puede ser menor al minimo.",
+      message: "El máximo de fotos de perfume no puede ser menor al mínimo.",
     path: ["maxPerfumePhotos"]
   })
   .refine((input) => input.nextFolioSequence <= input.folioMaxSequence + 1, {
-    message: "La siguiente secuencia de folio no puede exceder el limite configurado mas uno.",
+    message: "La siguiente secuencia de folio no puede exceder el límite configurado más uno.",
     path: ["nextFolioSequence"]
   });
 
@@ -201,7 +206,7 @@ export function validateParticipantEvidenceSet({
 
   if (selfieCount !== 1) {
     return {
-      message: "Debe existir exactamente una selfie de identificacion por intento.",
+      message: "Debe existir exactamente una selfie de identificación por intento.",
       ok: false
     };
   }
@@ -237,7 +242,7 @@ export function canStartPublicParticipation({
     } {
   if (existingStudyParticipantId) {
     return {
-      message: "Ya existe una participacion registrada para este estudio.",
+      message: "Ya existe una participación registrada para este estudio.",
       ok: false
     };
   }
@@ -251,7 +256,7 @@ export function publicPortalResultMessage({
   status: "PENDING_REVIEW" | "TERMINATED";
 }): string {
   if (status === "PENDING_REVIEW") {
-    return "Tus respuestas y evidencias estan en revision.";
+    return "Tus respuestas y evidencias están en revisión.";
   }
 
   return "Gracias por tu tiempo. En este momento no es posible continuar con el proceso.";

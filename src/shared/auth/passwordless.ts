@@ -7,6 +7,8 @@ import {
 
 export const OTP_GENERIC_SENT_MESSAGE = "Si el correo está autorizado, recibirás un código de acceso.";
 export const OTP_INVALID_MESSAGE = "El código no es válido o ya venció. Solicita uno nuevo.";
+export const OTP_INVALID_FORMAT_MESSAGE = "Ingresa el código numérico que recibiste por correo.";
+export const OTP_SPAM_HINT_MESSAGE = "Revisa también la carpeta de spam o correo no deseado.";
 export const OTP_UNAUTHORIZED_MESSAGE = "Tu usuario no está autorizado para acceder. Contacta a un administrador.";
 export const OTP_INVALID_EMAIL_MESSAGE = "Ingresa un correo electrónico válido.";
 export const CAPTCHA_REQUIRED_MESSAGE = "Completa la verificación de seguridad.";
@@ -197,11 +199,10 @@ export async function verifyOtpLogin({
 }: VerifyOtpLoginInput): Promise<VerifyOtpLoginResult> {
   const nextPath = sanitizeInternalNextPath(next);
   const normalizedEmail = normalizeEmail(email);
-  const normalizedToken = token.trim();
 
-  if (!isValidEmail(normalizedEmail) || !/^\d{6}$/.test(normalizedToken)) {
+  if (!isValidEmail(normalizedEmail) || !isValidOtpToken(token)) {
     return {
-      message: OTP_INVALID_MESSAGE,
+      message: OTP_INVALID_FORMAT_MESSAGE,
       nextPath,
       ok: false,
       reason: "VALIDATION_ERROR"
@@ -210,7 +211,7 @@ export async function verifyOtpLogin({
 
   const { error } = await supabase.auth.verifyOtp({
     email: normalizedEmail,
-    token: normalizedToken,
+    token: compactOtpToken(token),
     type: "email"
   });
 
@@ -257,6 +258,15 @@ function normalizeEmail(email: string): string {
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+export function compactOtpToken(token: string): string {
+  return token.replace(/\s+/g, "");
+}
+
+export function isValidOtpToken(token: string): boolean {
+  const compactToken = compactOtpToken(token);
+  return /^\d{6,8}$/.test(compactToken);
 }
 
 function isCaptchaError(error: unknown): boolean {

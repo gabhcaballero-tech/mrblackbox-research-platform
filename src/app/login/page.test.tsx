@@ -5,7 +5,9 @@ import {
   OTP_COOLDOWN_MESSAGE,
   OTP_GENERIC_SENT_MESSAGE,
   OTP_INVALID_EMAIL_MESSAGE,
+  OTP_INVALID_FORMAT_MESSAGE,
   OTP_INVALID_MESSAGE,
+  OTP_SPAM_HINT_MESSAGE,
   OTP_UNAUTHORIZED_MESSAGE
 } from "@/shared/auth/passwordless";
 import LoginPage from "./page";
@@ -59,9 +61,10 @@ describe("LoginPage", () => {
     expect(screen.getByLabelText("Correo electrónico")).toBeInTheDocument();
     expect(screen.getByLabelText("Verificación de seguridad")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Enviar código" })).toBeDisabled();
+    expect(screen.getByText(OTP_SPAM_HINT_MESSAGE)).toBeInTheDocument();
   });
 
-  it("shows generic sent message on verify step", async () => {
+  it("shows generic sent message on verify step without mentioning six digits", async () => {
     render(
       await LoginPage({
         searchParams: Promise.resolve({
@@ -76,12 +79,14 @@ describe("LoginPage", () => {
 
     expect(screen.getByText(OTP_GENERIC_SENT_MESSAGE)).toBeInTheDocument();
     expect(screen.getByLabelText("Correo electrónico")).toHaveValue("entrevistador@example.com");
-    expect(screen.getByLabelText("Código de 6 dígitos")).toBeInTheDocument();
+    expect(screen.getByLabelText("Código de acceso")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Código de acceso")).toBeInTheDocument();
+    expect(screen.queryByText(/6 dígitos/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Entrar" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Solicitar nuevo código" })).toBeDisabled();
   });
 
-  it("shows invalid email, captcha, cooldown, invalid code and unauthorized messages", async () => {
+  it("shows invalid email, captcha, cooldown, invalid code, format and unauthorized messages", async () => {
     const invalidEmail = await LoginPage({
       searchParams: Promise.resolve({ mode: "otp", otpError: "email" })
     });
@@ -100,6 +105,13 @@ describe("LoginPage", () => {
       })
     );
     expect(screen.getByText(OTP_INVALID_MESSAGE)).toBeInTheDocument();
+
+    rerender(
+      await LoginPage({
+        searchParams: Promise.resolve({ mode: "otp", otpError: "format", step: "verify" })
+      })
+    );
+    expect(screen.getByText(OTP_INVALID_FORMAT_MESSAGE)).toBeInTheDocument();
 
     rerender(
       await LoginPage({

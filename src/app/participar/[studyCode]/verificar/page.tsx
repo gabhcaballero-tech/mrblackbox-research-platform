@@ -5,9 +5,11 @@ import type { ReactNode } from "react";
 import {
   PARTICIPANT_PORTAL_INTERNAL_USER_MESSAGE,
   PARTICIPANT_PORTAL_INVALID_CODE_MESSAGE,
+  PARTICIPANT_PORTAL_INVALID_FORMAT_MESSAGE,
   PARTICIPANT_PORTAL_MAX_ATTEMPTS_MESSAGE,
   PARTICIPANT_PORTAL_OTP_SENT_MESSAGE,
-  PARTICIPANT_PORTAL_REQUEST_NEW_CODE_MESSAGE
+  PARTICIPANT_PORTAL_REQUEST_NEW_CODE_MESSAGE,
+  PARTICIPANT_PORTAL_SPAM_HINT_MESSAGE
 } from "@/modules/participant-portal/access";
 import {
   verifyParticipantPortalOtpAction
@@ -60,21 +62,22 @@ export default async function ParticipantPortalVerifyPage({
             {PARTICIPANT_PORTAL_INVALID_CODE_MESSAGE} {PARTICIPANT_PORTAL_REQUEST_NEW_CODE_MESSAGE}
           </Message>
         ) : null}
+        {error === "format" ? (
+          <Message tone="error">{PARTICIPANT_PORTAL_INVALID_FORMAT_MESSAGE}</Message>
+        ) : null}
         {error === "max" ? <Message tone="error">{PARTICIPANT_PORTAL_MAX_ATTEMPTS_MESSAGE}</Message> : null}
         {error === "internal" ? <Message tone="error">{PARTICIPANT_PORTAL_INTERNAL_USER_MESSAGE}</Message> : null}
 
         <form action={verifyParticipantPortalOtpAction} className="mt-6 space-y-4">
           <input name="studyCode" type="hidden" value={studyCode} />
           <label className="block">
-            <span className="text-sm font-medium text-zinc-800">Código de 6 dígitos</span>
+            <span className="text-sm font-medium text-zinc-800">Código de acceso</span>
             <input
               autoComplete="one-time-code"
               className={inputClass}
               inputMode="numeric"
-              maxLength={6}
-              minLength={6}
               name="token"
-              pattern="[0-9]{6}"
+              placeholder="Código de acceso"
               required
             />
           </label>
@@ -82,6 +85,8 @@ export default async function ParticipantPortalVerifyPage({
             Verificar código
           </button>
         </form>
+
+        <p className="mt-3 text-sm text-zinc-600">{PARTICIPANT_PORTAL_SPAM_HINT_MESSAGE}</p>
 
         <div className="mt-3">
           <Link className={secondaryButtonClass} href={`/participar/${encodeURIComponent(studyCode)}`}>

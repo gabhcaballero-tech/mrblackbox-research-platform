@@ -3,6 +3,7 @@ import { getInternalRouteDecision } from "@/shared/auth/routes";
 import { resolveInternalUserAccess } from "@/shared/auth/session";
 import {
   PARTICIPANT_PORTAL_INVALID_CODE_MESSAGE,
+  PARTICIPANT_PORTAL_INVALID_FORMAT_MESSAGE,
   PARTICIPANT_PORTAL_MAX_ATTEMPTS_MESSAGE,
   PARTICIPANT_PORTAL_OTP_SENT_MESSAGE,
   PARTICIPANT_PORTAL_UNAVAILABLE_MESSAGE,
@@ -216,7 +217,7 @@ describe("participant portal access", () => {
     expect(logs[0]?.ipHash).not.toBe("203.0.113.10");
   });
 
-  it("valid code verifies the Supabase session without creating ParticipantProfile", async () => {
+  it("valid 6-digit code verifies the Supabase session without creating ParticipantProfile", async () => {
     const { repository } = createRepository();
     const supabase = supabaseMock();
     const result = await verifyParticipantPortalOtp({
@@ -241,6 +242,30 @@ describe("participant portal access", () => {
     expect(Object.keys(repository)).not.toContain("createParticipantProfile");
   });
 
+  it("accepts an 8-digit participant OTP and removes spaces before verifying", async () => {
+    const { repository } = createRepository();
+    const supabase = supabaseMock();
+    const result = await verifyParticipantPortalOtp({
+      email: "persona@example.com",
+      hashSecret,
+      now,
+      repository,
+      studyCode,
+      supabase,
+      token: "12 34 56 78"
+    });
+
+    expect(result).toEqual({
+      message: "Código verificado correctamente.",
+      ok: true
+    });
+    expect(supabase.auth.verifyOtp).toHaveBeenCalledWith({
+      email: "persona@example.com",
+      token: "12345678",
+      type: "email"
+    });
+  });
+
   it("invalid code logs failure and shows generic message", async () => {
     const { logs, repository } = createRepository();
     const result = await verifyParticipantPortalOtp({
@@ -259,6 +284,28 @@ describe("participant portal access", () => {
       reason: "INVALID_CODE"
     });
     expect(logs[0]?.purpose).toBe("OTP_VERIFY_FAILED");
+  });
+
+  it("rejects letters and symbols in participant OTP format", async () => {
+    const { logs, repository } = createRepository();
+    const supabase = supabaseMock();
+    const result = await verifyParticipantPortalOtp({
+      email: "persona@example.com",
+      hashSecret,
+      now,
+      repository,
+      studyCode,
+      supabase,
+      token: "12A4-678"
+    });
+
+    expect(result).toEqual({
+      message: PARTICIPANT_PORTAL_INVALID_FORMAT_MESSAGE,
+      ok: false,
+      reason: "VALIDATION_ERROR"
+    });
+    expect(logs[0]?.purpose).toBe("OTP_VERIFY_FAILED");
+    expect(supabase.auth.verifyOtp).not.toHaveBeenCalled();
   });
 
   it("blocks verification after maximum attempts", async () => {

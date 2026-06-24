@@ -67,6 +67,8 @@ export async function verifyParticipantPortalOtpAction(formData: FormData): Prom
     const error =
       result.reason === "MAX_ATTEMPTS"
         ? "max"
+        : result.reason === "VALIDATION_ERROR"
+          ? "format"
         : result.reason === "INTERNAL_USER"
           ? "internal"
           : result.reason === "PORTAL_UNAVAILABLE"

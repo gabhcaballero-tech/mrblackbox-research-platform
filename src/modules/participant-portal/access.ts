@@ -16,7 +16,10 @@ export const PARTICIPANT_PORTAL_UNAVAILABLE_MESSAGE =
 export const PARTICIPANT_PORTAL_OTP_SENT_MESSAGE =
   "Si los datos son válidos, recibirás un código de acceso por correo.";
 export const PARTICIPANT_PORTAL_INVALID_CODE_MESSAGE = "El código no es válido o ya venció.";
+export const PARTICIPANT_PORTAL_INVALID_FORMAT_MESSAGE =
+  "Ingresa el código numérico que recibiste por correo.";
 export const PARTICIPANT_PORTAL_REQUEST_NEW_CODE_MESSAGE = "Solicita un código nuevo.";
+export const PARTICIPANT_PORTAL_SPAM_HINT_MESSAGE = "Revisa también la carpeta de spam o correo no deseado.";
 export const PARTICIPANT_PORTAL_MAX_ATTEMPTS_MESSAGE =
   "Se alcanzó el número máximo de intentos. Solicita un código nuevo.";
 export const PARTICIPANT_PORTAL_VERIFIED_MESSAGE = "Código verificado correctamente.";
@@ -259,7 +262,12 @@ export async function verifyParticipantPortalOtp({
     await logOtpVerifyFailure({ emailHash, hashSecret, ipAddress, now, repository });
 
     return {
-      message: invalidCodeMessage(failedAttempts + 1, availability.study.portalConfig.maxOtpAttempts),
+      message:
+        failedAttempts + 1 >= availability.study.portalConfig.maxOtpAttempts
+          ? PARTICIPANT_PORTAL_MAX_ATTEMPTS_MESSAGE
+          : !parsed.success
+            ? PARTICIPANT_PORTAL_INVALID_FORMAT_MESSAGE
+            : PARTICIPANT_PORTAL_INVALID_CODE_MESSAGE,
       ok: false,
       reason: failedAttempts + 1 >= availability.study.portalConfig.maxOtpAttempts ? "MAX_ATTEMPTS" : "VALIDATION_ERROR"
     };

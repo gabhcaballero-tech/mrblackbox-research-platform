@@ -5,7 +5,9 @@ import {
   OTP_COOLDOWN_MESSAGE,
   OTP_GENERIC_SENT_MESSAGE,
   OTP_INVALID_EMAIL_MESSAGE,
+  OTP_INVALID_FORMAT_MESSAGE,
   OTP_INVALID_MESSAGE,
+  OTP_SPAM_HINT_MESSAGE,
   OTP_UNAUTHORIZED_MESSAGE
 } from "@/shared/auth/passwordless";
 import { sanitizeInternalNextPath } from "@/shared/auth/routes";
@@ -144,12 +146,18 @@ function OtpLoginForm({
   if (step === "verify") {
     return (
       <>
-        <Message tone={error === "unauthorized" || error === "invalid" ? "error" : "success"}>
+        <Message
+          tone={
+            error === "unauthorized" || error === "invalid" || error === "format" ? "error" : "success"
+          }
+        >
           {error === "unauthorized"
             ? OTP_UNAUTHORIZED_MESSAGE
             : error === "invalid"
               ? OTP_INVALID_MESSAGE
-              : OTP_GENERIC_SENT_MESSAGE}
+              : error === "format"
+                ? OTP_INVALID_FORMAT_MESSAGE
+                : OTP_GENERIC_SENT_MESSAGE}
         </Message>
 
         <form action={verifyOtpLoginAction} className="mt-6 space-y-4">
@@ -159,15 +167,13 @@ function OtpLoginForm({
             <input autoComplete="email" className={inputClass} defaultValue={email} name="email" required type="email" />
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-zinc-800">Código de 6 dígitos</span>
+            <span className="text-sm font-medium text-zinc-800">Código de acceso</span>
             <input
               autoComplete="one-time-code"
               className={inputClass}
               inputMode="numeric"
-              maxLength={6}
-              minLength={6}
               name="token"
-              pattern="[0-9]{6}"
+              placeholder="Código de acceso"
               required
             />
           </label>
@@ -175,6 +181,8 @@ function OtpLoginForm({
             Entrar
           </button>
         </form>
+
+        <p className="mt-3 text-sm text-zinc-600">{OTP_SPAM_HINT_MESSAGE}</p>
 
         <form action={requestOtpLoginAction} className="mt-3 space-y-4">
           <input name="email" type="hidden" value={email} />
@@ -207,6 +215,7 @@ function OtpLoginForm({
         />
       </form>
       <p className="mt-3 text-sm text-zinc-600">{CAPTCHA_REQUIRED_MESSAGE}</p>
+      <p className="mt-2 text-sm text-zinc-600">{OTP_SPAM_HINT_MESSAGE}</p>
     </>
   );
 }

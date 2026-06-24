@@ -9,6 +9,7 @@ import {
   buildFolio,
   participantPortalIdentitySchema,
   participantPortalOtpRequestSchema,
+  participantPortalVerifyOtpSchema,
   publicPortalResultMessage,
   rejectParticipantReview,
   validateParticipantEvidenceSet,
@@ -365,6 +366,18 @@ describe("participant portal foundation", () => {
         phone: "+52 55 1234 5678"
       })
     ).toMatchObject({ phone: "+525512345678" });
+
+    expect(
+      participantPortalVerifyOtpSchema.parse({
+        token: "12 34 56 78"
+      })
+    ).toMatchObject({ token: "12345678" });
+
+    expect(() =>
+      participantPortalVerifyOtpSchema.parse({
+        token: "12A4-5678"
+      })
+    ).toThrow("Ingresa el código numérico que recibiste por correo.");
 
     expect(() =>
       participantPortalIdentitySchema.parse({

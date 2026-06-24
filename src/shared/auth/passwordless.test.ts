@@ -4,6 +4,7 @@ import {
   CAPTCHA_REQUIRED_MESSAGE,
   OTP_GENERIC_SENT_MESSAGE,
   OTP_INVALID_EMAIL_MESSAGE,
+  OTP_INVALID_FORMAT_MESSAGE,
   OTP_INVALID_MESSAGE,
   OTP_UNAUTHORIZED_MESSAGE,
   requestOtpLogin,
@@ -166,7 +167,7 @@ describe("passwordless login helpers", () => {
     expect(supabase.auth.signInWithOtp).not.toHaveBeenCalled();
   });
 
-  it("verifies a correct OTP and preserves the redirect", async () => {
+  it("verifies a correct 6-digit OTP and preserves the redirect", async () => {
     const supabase = supabaseMock();
     const result = await verifyOtpLogin({
       email: "entrevistador@example.com",
@@ -185,6 +186,29 @@ describe("passwordless login helpers", () => {
     expect(supabase.auth.verifyOtp).toHaveBeenCalledWith({
       email: "entrevistador@example.com",
       token: "123456",
+      type: "email"
+    });
+  });
+
+  it("accepts an 8-digit OTP and removes spaces before verification", async () => {
+    const supabase = supabaseMock();
+    const result = await verifyOtpLogin({
+      email: "entrevistador@example.com",
+      internalUserReader: {
+        findByAuthUserId: vi.fn(async () => activeInternalUser())
+      },
+      next: "/field",
+      supabase,
+      token: "12 34 56 78"
+    });
+
+    expect(result).toEqual({
+      nextPath: "/field",
+      ok: true
+    });
+    expect(supabase.auth.verifyOtp).toHaveBeenCalledWith({
+      email: "entrevistador@example.com",
+      token: "12345678",
       type: "email"
     });
   });
@@ -227,16 +251,21 @@ describe("passwordless login helpers", () => {
     expect(supabase.auth.signOut).toHaveBeenCalled();
   });
 
-  it("rejects invalid token format without verifying against Supabase", async () => {
+  it("rejects letters and symbols without verifying against Supabase", async () => {
     const supabase = supabaseMock();
     const result = await verifyOtpLogin({
       email: "entrevistador@example.com",
       next: "/field",
       supabase,
-      token: "12"
+      token: "12A4-678"
     });
 
-    expect(result.ok).toBe(false);
+    expect(result).toEqual({
+      message: OTP_INVALID_FORMAT_MESSAGE,
+      nextPath: "/field",
+      ok: false,
+      reason: "VALIDATION_ERROR"
+    });
     expect(supabase.auth.verifyOtp).not.toHaveBeenCalled();
   });
 });

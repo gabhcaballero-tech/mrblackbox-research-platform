@@ -6,6 +6,7 @@ import {
   CAPTCHA_ERROR_MESSAGE,
   CAPTCHA_REQUIRED_MESSAGE,
   OTP_INVALID_EMAIL_MESSAGE,
+  OTP_INVALID_FORMAT_MESSAGE,
   OTP_INVALID_MESSAGE,
   OTP_UNAUTHORIZED_MESSAGE,
   requestOtpLogin,
@@ -45,7 +46,7 @@ function otpRequestPath(input: {
 
 function otpVerifyPath(input: {
   email: string;
-  error?: "invalid" | "unauthorized";
+  error?: "format" | "invalid" | "unauthorized";
   nextPath: string;
   sent?: boolean;
 }) {
@@ -153,6 +154,16 @@ export async function verifyOtpLoginAction(formData: FormData): Promise<void> {
         otpVerifyPath({
           email: String(formData.get("email") ?? "").trim().toLowerCase(),
           error: "invalid",
+          nextPath: result.nextPath
+        })
+      );
+    }
+
+    if (result.message === OTP_INVALID_FORMAT_MESSAGE) {
+      redirect(
+        otpVerifyPath({
+          email: String(formData.get("email") ?? "").trim().toLowerCase(),
+          error: "format",
           nextPath: result.nextPath
         })
       );
