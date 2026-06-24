@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getParticipantPortalAvailability, PARTICIPANT_PORTAL_UNAVAILABLE_MESSAGE } from "@/modules/participant-portal/access";
 import type { ReactNode } from "react";
 import { createParticipantPortalRepository } from "@/modules/participant-portal/repository";
@@ -56,7 +57,7 @@ export default async function ParticipantPortalHomePage({
         eyebrow="Portal de participación"
         title={PARTICIPANT_PORTAL_REGISTRATION_SUCCESS_MESSAGE}
         description="En el siguiente paso continuarás con el filtro."
-        action={<button className={disabledButtonClass} disabled>Continuar al filtro</button>}
+        action={<Link className={primaryButtonClass} href={`/participar/${studyCode}/filtro`}>Continuar al filtro</Link>}
       />
     );
   }
@@ -107,5 +108,5 @@ function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-const disabledButtonClass =
-  "inline-flex w-full cursor-not-allowed items-center justify-center rounded-md bg-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-500";
+const primaryButtonClass =
+  "inline-flex w-full items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800";
