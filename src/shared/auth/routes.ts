@@ -14,6 +14,7 @@ export function isPublicPath(pathname: string): boolean {
     pathname === "/unauthorized" ||
     pathname === "/api/health" ||
     pathname.startsWith("/p/") ||
+    pathname.startsWith("/participar/") ||
     pathname.startsWith("/_next/") ||
     pathname === "/favicon.ico" ||
     PUBLIC_FILE_PATTERN.test(pathname)

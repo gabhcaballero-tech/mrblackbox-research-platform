@@ -13,6 +13,7 @@
 - `questionnaire-engine`: esquema minimo de snapshot publicado e inmutable.
 - `responses`: construccion determinista de `responseKey` para guardados parciales o autosave sin duplicados.
 - `testing`: fixtures genericos para pruebas unitarias de dominio.
+- `participant-portal`: contratos puros para identidad publica, consentimiento, evidencias, revision pendiente, folio, codigos de referencia y mensaje manual de WhatsApp.
 
 ## Decisiones de diseno
 
@@ -20,6 +21,8 @@
 - La administracion V1 de estudios agrega repositorio Prisma server-only, pero conserva reglas de validacion y servicio probables sin conexion real en pruebas.
 - `ParticipantProfile` contiene datos personales y no acepta `studyId`.
 - `StudyParticipant` representa la participacion operativa en un estudio especifico.
+- El portal participante no crea `InternalUser`; vincula identidad publica con `ParticipantProfile.participantAuthUserId`.
+- Los intentos del portal se distinguen con `ScreeningAttempt.source = PARTICIPANT_PORTAL` y pueden tener `fieldUserId` nulo.
 - Los filtros devuelven resultados estructurados con estado `passed`, `terminated` o `incomplete`.
 - El screener builder V1 usa `screening.v1`, editor guiado y versiones publicadas inmutables.
 - El evaluador nuevo de screener devuelve estados persistibles `PASSED`, `TERMINATED`, `INCOMPLETE` o `PENDING_REVIEW`.
@@ -58,6 +61,12 @@
 - Actividades recurrentes de video pueden materializar `DAY_1`, `DAY_2` y `DAY_3`.
 - `responseKey` se construye desde pregunta, bloque y contexto; no debe incluir PII.
 - La consistencia de rotacion valida que plan, participante, brazos y productos pertenezcan al mismo estudio antes de persistir.
+- El portal solicita evidencias solo despues de pase preliminar de reglas y NSE.
+- Un pase preliminar del portal crea revision `PENDING`, no confirmacion automatica.
+- Una terminacion publica usa mensaje generico y no revela codigo ni motivo interno.
+- La aprobacion futura debe ser transaccional, idempotente, incrementar folio atomicamente y crear exactamente tres codigos unicos.
+- Los folios del portal usan formato `NAV-001` a `NAV-999`; si la secuencia queda en 1000, la aprobacion nueva se bloquea sin reiniciar automaticamente.
+- El consentimiento del portal es idempotente por participacion y version de aviso.
 
 ## Pruebas ejecutadas
 

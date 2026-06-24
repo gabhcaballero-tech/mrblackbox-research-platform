@@ -68,6 +68,33 @@ enum ScreeningStatus {
   PENDING_REVIEW
 }
 
+enum ScreeningAttemptSource {
+  FIELD
+  PARTICIPANT_PORTAL
+}
+
+enum ParticipantEvidenceType {
+  SELFIE_IDENTIFICATION
+  PERFUME_PHOTO
+}
+
+enum ParticipantEvidenceReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ParticipantScreeningReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ManualMessageStatus {
+  NOT_SENT
+  MARKED_SENT
+}
+
 enum ApplicationTimeEventType {
   REGISTERED
   CORRECTED
@@ -302,6 +329,10 @@ model InternalUser {
   retiredLibraryRevisions     LibraryItemRevision[]            @relation("LibraryItemRevisionRetiredBy")
   insertedLibraryUses         QuestionnaireDraftLibraryUse[]    @relation("QuestionnaireDraftLibraryUseInsertedBy")
   screeningAttempts           ScreeningAttempt[]               @relation("ScreeningAttemptFieldUser")
+  reviewedParticipantEvidence ParticipantEvidence[]             @relation("ParticipantEvidenceReviewedBy")
+  reviewedParticipantScreeningReviews ParticipantScreeningReview[] @relation("ParticipantScreeningReviewReviewedBy")
+  approvedParticipantConfirmations ParticipantConfirmation[]     @relation("ParticipantConfirmationApprovedBy")
+  manualParticipantMessagesMarkedSent ParticipantConfirmation[]  @relation("ParticipantConfirmationManualMessageMarkedSentBy")
   rotationAssignments         ParticipantRotationAssignment[]  @relation("ParticipantRotationAssignedBy")
   reopenedActivities          ParticipantActivity[]            @relation("ParticipantActivityReopenedBy")
   reviewedMediaEvidence       MediaEvidencePlaceholder[]       @relation("MediaEvidenceReviewedBy")
@@ -329,6 +360,8 @@ model Study {
   arms                StudyArm[]
   rotationPlans       RotationPlan[]
   participants        StudyParticipant[]
+  participantPortalConfig ParticipantPortalStudyConfig?
+  participantConfirmations ParticipantConfirmation[]
   questionnaireDrafts QuestionnaireDraft[]
   questionnaireVersions QuestionnaireVersion[]
   libraryItems        LibraryItem[]
@@ -339,6 +372,30 @@ model Study {
   @@index([status])
   @@index([createdByUserId])
   @@map("studies")
+}
+
+model ParticipantPortalStudyConfig {
+  id                    String   @id @default(uuid()) @db.Uuid
+  studyId               String   @unique @db.Uuid
+  enabled               Boolean  @default(false)
+  privacyNoticeVersion  String
+  privacyNoticeText     String
+  privacyNoticeHash     String
+  evidenceRetentionDays Int      @default(30)
+  otpCooldownSeconds    Int      @default(60)
+  maxOtpAttempts        Int      @default(5)
+  folioPrefix           String
+  nextFolioSequence     Int      @default(1)
+  folioMaxSequence      Int      @default(999)
+  minPerfumePhotos      Int      @default(1)
+  maxPerfumePhotos      Int      @default(5)
+  maxImageBytes         Int      @default(8388608)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  study Study @relation(fields: [studyId], references: [id])
+
+  @@map("participant_portal_study_configs")
 }
 
 model StudyProduct {
@@ -418,6 +475,7 @@ model RotationPlanArm {
 
 model ParticipantProfile {
   id                String                   @id @default(uuid()) @db.Uuid
+  participantAuthUserId String?              @unique @db.Uuid
   externalReference String?
   name              String
   phone             String?
@@ -427,11 +485,11 @@ model ParticipantProfile {
   age               Int?
   gender            String?
   status            ParticipantProfileStatus @default(ACTIVE)
-  createdByUserId   String                   @db.Uuid
+  createdByUserId   String?                  @db.Uuid
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
 
-  createdBy      InternalUser       @relation("ParticipantProfileCreatedBy", fields: [createdByUserId], references: [id])
+  createdBy      InternalUser?      @relation("ParticipantProfileCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
   participations StudyParticipant[]
 
   @@index([externalReference])
@@ -451,17 +509,21 @@ model StudyParticipant {
   applicationStartedAtRegisteredByUserId String?                           @db.Uuid
   applicationStartedAtRegisteredAt       DateTime?
   applicationStartedAtCorrectedAt        DateTime?
-  createdByUserId                        String                            @db.Uuid
+  createdByUserId                        String?                           @db.Uuid
   createdAt                              DateTime                          @default(now())
   updatedAt                              DateTime                          @updatedAt
 
   participantProfile             ParticipantProfile             @relation(fields: [participantProfileId], references: [id])
   study                          Study                          @relation(fields: [studyId], references: [id])
-  createdBy                      InternalUser                   @relation("StudyParticipantCreatedBy", fields: [createdByUserId], references: [id])
+  createdBy                      InternalUser?                  @relation("StudyParticipantCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
   applicationStartedAtRegisteredBy InternalUser?                @relation("ApplicationTimeRegisteredBy", fields: [applicationStartedAtRegisteredByUserId], references: [id])
   applicationTimeEvents          ApplicationTimeEvent[]
   accessTokens                   ParticipantAccessToken[]
   screeningAttempts              ScreeningAttempt[]
+  participantConsents            ParticipantConsent[]
+  participantEvidence            ParticipantEvidence[]
+  participantScreeningReviews    ParticipantScreeningReview[]
+  participantConfirmation        ParticipantConfirmation?
   quotaEvaluations               QuotaEvaluation[]
   rotationAssignment             ParticipantRotationAssignment?
   armAssignments                 ParticipantArmAssignment[]
@@ -659,8 +721,9 @@ model QuestionnaireAttributeSet {
 model ScreeningAttempt {
   id                     String          @id @default(uuid()) @db.Uuid
   studyParticipantId     String          @db.Uuid
-  fieldUserId            String          @db.Uuid
+  fieldUserId            String?         @db.Uuid
   questionnaireVersionId String          @db.Uuid
+  source                 ScreeningAttemptSource @default(FIELD)
   status                 ScreeningStatus @default(STARTED)
   terminationCode        String?
   terminationReason      String?
@@ -671,13 +734,17 @@ model ScreeningAttempt {
   completedAt            DateTime?
 
   studyParticipant     StudyParticipant    @relation(fields: [studyParticipantId], references: [id])
-  fieldUser            InternalUser        @relation("ScreeningAttemptFieldUser", fields: [fieldUserId], references: [id])
+  fieldUser            InternalUser?       @relation("ScreeningAttemptFieldUser", fields: [fieldUserId], references: [id], onDelete: Restrict)
   questionnaireVersion QuestionnaireVersion @relation(fields: [questionnaireVersionId], references: [id])
   answers              ScreeningAnswer[]
+  participantEvidence  ParticipantEvidence[]
+  participantScreeningReview ParticipantScreeningReview?
+  participantConfirmation ParticipantConfirmation?
 
   @@index([studyParticipantId, status])
   @@index([fieldUserId, startedAt])
   @@index([questionnaireVersionId])
+  @@index([source, status])
   @@map("screening_attempts")
 }
 
@@ -693,6 +760,127 @@ model ScreeningAnswer {
 
   @@unique([screeningAttemptId, questionId])
   @@map("screening_answers")
+}
+
+model ParticipantConsent {
+  id                    String   @id @default(uuid()) @db.Uuid
+  studyParticipantId    String   @db.Uuid
+  participantAuthUserId String   @db.Uuid
+  noticeVersion         String
+  noticeHash            String
+  noticeTextSnapshot    String
+  consentedAt           DateTime
+  createdAt             DateTime @default(now())
+
+  studyParticipant StudyParticipant @relation(fields: [studyParticipantId], references: [id])
+
+  @@unique([studyParticipantId, noticeVersion])
+  @@index([studyParticipantId, consentedAt])
+  @@index([participantAuthUserId])
+  @@map("participant_consents")
+}
+
+model ParticipantEvidence {
+  id                 String                          @id @default(uuid()) @db.Uuid
+  studyParticipantId String                          @db.Uuid
+  screeningAttemptId String                          @db.Uuid
+  type               ParticipantEvidenceType
+  relatedQuestionId  String?
+  storageBucket      String
+  privateStorageKey  String                          @unique
+  originalFilename   String?
+  mimeType           String
+  extension          String
+  sizeBytes          Int
+  reviewStatus       ParticipantEvidenceReviewStatus @default(PENDING)
+  reviewedByUserId   String?                         @db.Uuid
+  reviewedAt         DateTime?
+  rejectionReason    String?
+  internalNote       String?
+  uploadedAt         DateTime                        @default(now())
+
+  studyParticipant StudyParticipant @relation(fields: [studyParticipantId], references: [id])
+  screeningAttempt ScreeningAttempt @relation(fields: [screeningAttemptId], references: [id])
+  reviewedBy       InternalUser?    @relation("ParticipantEvidenceReviewedBy", fields: [reviewedByUserId], references: [id])
+
+  @@index([studyParticipantId, uploadedAt])
+  @@index([screeningAttemptId, type])
+  @@index([reviewStatus])
+  @@index([reviewedByUserId])
+  @@map("participant_evidence")
+}
+
+model ParticipantScreeningReview {
+  id                 String                           @id @default(uuid()) @db.Uuid
+  screeningAttemptId String                           @unique @db.Uuid
+  studyParticipantId String                           @db.Uuid
+  status             ParticipantScreeningReviewStatus @default(PENDING)
+  internalNote       String?
+  rejectionReason    String?
+  reviewedByUserId   String?                          @db.Uuid
+  reviewedAt         DateTime?
+  createdAt          DateTime                         @default(now())
+  updatedAt          DateTime                         @updatedAt
+
+  screeningAttempt ScreeningAttempt @relation(fields: [screeningAttemptId], references: [id])
+  studyParticipant StudyParticipant @relation(fields: [studyParticipantId], references: [id])
+  reviewedBy       InternalUser?    @relation("ParticipantScreeningReviewReviewedBy", fields: [reviewedByUserId], references: [id])
+
+  @@index([studyParticipantId, status])
+  @@index([reviewedByUserId])
+  @@map("participant_screening_reviews")
+}
+
+model ParticipantConfirmation {
+  id                              String              @id @default(uuid()) @db.Uuid
+  studyId                         String              @db.Uuid
+  studyParticipantId              String              @unique @db.Uuid
+  screeningAttemptId              String              @unique @db.Uuid
+  folioSequence                   Int
+  folio                           String
+  approvedByUserId                String              @db.Uuid
+  approvedAt                      DateTime            @default(now())
+  manualMessageStatus             ManualMessageStatus @default(NOT_SENT)
+  manualMessageMarkedSentByUserId String?             @db.Uuid
+  manualMessageMarkedSentAt       DateTime?
+
+  study                     Study                     @relation(fields: [studyId], references: [id])
+  studyParticipant          StudyParticipant          @relation(fields: [studyParticipantId], references: [id])
+  screeningAttempt          ScreeningAttempt          @relation(fields: [screeningAttemptId], references: [id])
+  approvedBy                InternalUser              @relation("ParticipantConfirmationApprovedBy", fields: [approvedByUserId], references: [id])
+  manualMessageMarkedSentBy InternalUser?             @relation("ParticipantConfirmationManualMessageMarkedSentBy", fields: [manualMessageMarkedSentByUserId], references: [id])
+  referenceCodes            ParticipantReferenceCode[]
+
+  @@unique([studyId, folioSequence])
+  @@unique([studyId, folio])
+  @@index([approvedByUserId, approvedAt])
+  @@index([manualMessageMarkedSentByUserId])
+  @@map("participant_confirmations")
+}
+
+model ParticipantReferenceCode {
+  id             String   @id @default(uuid()) @db.Uuid
+  confirmationId String   @db.Uuid
+  slot           Int
+  code           String   @unique
+  createdAt      DateTime @default(now())
+
+  confirmation ParticipantConfirmation @relation(fields: [confirmationId], references: [id])
+
+  @@unique([confirmationId, slot])
+  @@map("participant_reference_codes")
+}
+
+model ParticipantPortalOtpRequestLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  emailHash   String
+  ipHash      String?
+  requestedAt DateTime @default(now())
+  purpose     String
+
+  @@index([emailHash, requestedAt])
+  @@index([ipHash, requestedAt])
+  @@map("participant_portal_otp_request_logs")
 }
 
 model QuotaDefinition {

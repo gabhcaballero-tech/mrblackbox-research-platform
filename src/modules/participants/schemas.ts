@@ -17,6 +17,7 @@ export const participantPersonalDataSchema = z
 export const participantProfileSchema = z
   .object({
     id: z.string().trim().min(1),
+    participantAuthUserId: z.string().uuid().optional(),
     externalReference: z.string().trim().min(1).optional(),
     personalData: participantPersonalDataSchema,
     status: participantProfileStatusSchema,
@@ -56,7 +57,7 @@ export const studyParticipantSchema = z
     applicationStartedAtRegisteredByUserId: z.string().trim().min(1).optional(),
     applicationStartedAtRegisteredAt: z.string().datetime().optional(),
     applicationStartedAtCorrectedAt: z.string().datetime().optional(),
-    createdByUserId: z.string().trim().min(1),
+    createdByUserId: z.string().trim().min(1).optional(),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime()
   })

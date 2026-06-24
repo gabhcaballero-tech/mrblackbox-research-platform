@@ -7,6 +7,13 @@ describe("auth route rules", () => {
     expect(getInternalRouteDecision("/p/token-generico", false)).toEqual({ action: "allow" });
   });
 
+  it("keeps participant portal routes public at proxy level", () => {
+    expect(isPublicPath("/participar/FMASCULINA-NAVIGO-2026")).toBe(true);
+    expect(getInternalRouteDecision("/participar/FMASCULINA-NAVIGO-2026/verificar", false)).toEqual({
+      action: "allow"
+    });
+  });
+
   it("redirects unauthenticated internal routes to login", () => {
     expect(getInternalRouteDecision("/admin", false)).toEqual({
       action: "redirect",

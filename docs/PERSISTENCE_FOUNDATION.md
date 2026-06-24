@@ -191,6 +191,31 @@ Resumen:
 
 No se aplico a Supabase ni a ninguna base de datos. Queda pendiente revisar y aplicar en entorno controlado.
 
+## Portal autoaplicable de participante - Bloque 1
+
+Migracion creada y no aplicada:
+
+- `20260623204421_add_participant_portal_foundation`
+
+Resumen:
+
+- agrega enums propios del portal para origen de intento, evidencias, revision y estado de mensaje manual;
+- agrega `participant_profiles.participantAuthUserId` unico y permite `createdByUserId` nullable para perfiles y participaciones publicas;
+- permite `screening_attempts.fieldUserId` nullable y agrega `source` con default `FIELD`;
+- crea `participant_portal_study_configs`;
+- crea `participant_consents` para preservar version, hash y texto exacto del aviso aceptado;
+- crea `participant_evidence` independiente de `MediaEvidencePlaceholder`, sin URL publica persistida;
+- crea `participant_screening_reviews`;
+- crea `participant_confirmations` y `participant_reference_codes`;
+- crea `participant_portal_otp_request_logs` con correo/IP hasheados;
+- agrega check para slots 1/2/3 y un indice unico parcial para una sola selfie por intento.
+- agrega `folioMaxSequence` con default 999 y valida `nextFolioSequence <= folioMaxSequence + 1`;
+- usa `maxPerfumePhotos` default 5;
+- agrega unicidad por `ParticipantConsent(studyParticipantId, noticeVersion)`;
+- agrega unicidad para `ParticipantEvidence.privateStorageKey`.
+
+No se aplico a Supabase ni a ninguna base de datos. El detalle de decisiones queda en `docs/PARTICIPANT_PORTAL_FOUNDATION.md`.
+
 ## Validaciones ejecutadas
 
 - `npm.cmd exec prisma validate`:
