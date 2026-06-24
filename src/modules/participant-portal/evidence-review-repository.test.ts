@@ -81,10 +81,10 @@ function createDeleteContext(options?: {
   evidence?: Array<{ id: string }>;
   folioSequences?: Array<{ folioSequence: number }>;
   internalUser?: { id: string } | null;
+  participantActivities?: Array<{ id: string }>;
   participantArmAssignments?: Array<{ id: string }>;
   participantAttributeOrders?: Array<{ id: string }>;
   participantRotationAssignments?: Array<{ id: string }>;
-  participantActivities?: Array<{ id: string }>;
   profileParticipations?: Array<{ id: string }>;
   quotaEvaluations?: Array<{ id: string }>;
 }) {
@@ -181,7 +181,7 @@ function createRepositoryWithContext(context: ReturnType<typeof createDeleteCont
 }
 
 describe("participant evidence review repository cleanup", () => {
-  it("deletes an approved test record with folio, codes and WhatsApp marked sent", async () => {
+  it("deletes an approved participant-portal test record with folio, codes and WhatsApp marked sent", async () => {
     const context = createDeleteContext({
       folioSequences: []
     });
@@ -233,7 +233,68 @@ describe("participant evidence review repository cleanup", () => {
     expect(context.participantScreeningReview.deleteMany).toHaveBeenCalled();
   });
 
-  it("blocks deletion when the participant belongs to another study", async () => {
+  it("deletes a FIELD test attempt without blocking on its source", async () => {
+    const context = createDeleteContext({
+      folioSequences: []
+    });
+    context.screeningAttempt.findUnique = vi.fn(async () =>
+      buildAttempt({
+        source: "FIELD",
+        status: "TERMINATED"
+      })
+    );
+    const repository = createRepositoryWithContext(context);
+
+    const result = await repository.deleteTestRecord({
+      attemptId: "attempt-1",
+      deletedByUserId: "admin-1",
+      reason: "PRUEBA FIELD"
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      studyId: "study-1"
+    });
+    expect(context.screeningAnswer.deleteMany).toHaveBeenCalledWith({
+      where: {
+        screeningAttemptId: "attempt-1"
+      }
+    });
+    expect(context.screeningAttempt.delete).toHaveBeenCalledWith({
+      where: {
+        id: "attempt-1"
+      }
+    });
+    expect(context.studyParticipant.delete).toHaveBeenCalled();
+  });
+
+  it("does not block a FIELD test attempt because it came from an internal field user", async () => {
+    const context = createDeleteContext({
+      internalUser: { id: "internal-1" }
+    });
+    context.screeningAttempt.findUnique = vi.fn(async () =>
+      buildAttempt({
+        source: "FIELD",
+        status: "PASSED"
+      })
+    );
+    const repository = createRepositoryWithContext(context);
+
+    const result = await repository.deleteTestRecord({
+      attemptId: "attempt-1",
+      deletedByUserId: "admin-1",
+      reason: "PRUEBA CAMPO"
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      preservedInternalProfile: true
+    });
+    expect(context.internalUser.findFirst).not.toHaveBeenCalled();
+    expect(context.participantProfile.delete).not.toHaveBeenCalled();
+  });
+
+  it("deletes the study test record and preserves the profile when it belongs to another study", async () => {
     const context = createDeleteContext({
       profileParticipations: [{ id: "study-participant-1" }, { id: "study-participant-2" }]
     });
@@ -245,10 +306,11 @@ describe("participant evidence review repository cleanup", () => {
       reason: "PRUEBA"
     });
 
-    expect(result).toEqual({
-      message: "No se puede eliminar porque el participante está asociado a otro estudio.",
-      ok: false
+    expect(result).toMatchObject({
+      ok: true
     });
+    expect(context.studyParticipant.delete).toHaveBeenCalled();
+    expect(context.participantProfile.delete).not.toHaveBeenCalled();
   });
 
   it("deletes the test attempt and preserves the profile when it is linked to an internal user", async () => {
@@ -267,6 +329,8 @@ describe("participant evidence review repository cleanup", () => {
       ok: true,
       preservedInternalProfile: true
     });
+    expect(context.screeningAnswer.deleteMany).toHaveBeenCalled();
+    expect(context.screeningAttempt.delete).toHaveBeenCalled();
     expect(context.participantProfile.delete).not.toHaveBeenCalled();
   });
 
@@ -283,8 +347,7 @@ describe("participant evidence review repository cleanup", () => {
     });
 
     expect(result).toEqual({
-      message:
-        "No se puede eliminar porque existen relaciones no soportadas: application_time_events.",
+      message: "No se puede eliminar porque existen relaciones no soportadas: application_time_events.",
       ok: false
     });
   });

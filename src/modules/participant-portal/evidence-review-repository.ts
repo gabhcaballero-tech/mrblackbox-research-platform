@@ -577,13 +577,6 @@ export function createEvidenceReviewRepository(
             return { message: "El intento no existe.", ok: false };
           }
 
-          if (attempt.source !== "PARTICIPANT_PORTAL") {
-            return {
-              message: "No se puede eliminar porque el intento no pertenece al portal de participantes.",
-              ok: false
-            };
-          }
-
           const participantProfileId = attempt.studyParticipant.participantProfile.id;
           const studyParticipantId = attempt.studyParticipantId;
           const studyId = attempt.questionnaireVersion.study.id;
@@ -973,25 +966,6 @@ async function diagnoseDeleteTestRecordBlockers(
   }
 ): Promise<string[]> {
   const blockers: string[] = [];
-
-  const profile = await tx.participantProfile.findUnique({
-    select: {
-      id: true,
-      participantAuthUserId: true,
-      participations: {
-        select: {
-          id: true
-        }
-      }
-    },
-    where: {
-      id: input.participantProfileId
-    }
-  });
-
-  if (profile && profile.participations.length > 1) {
-    blockers.push("No se puede eliminar porque el participante está asociado a otro estudio.");
-  }
 
   const unsupportedRelations = await findUnsupportedDeleteRelations(tx, input);
 

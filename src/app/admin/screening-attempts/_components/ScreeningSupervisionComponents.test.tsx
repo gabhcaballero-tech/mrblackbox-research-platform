@@ -262,7 +262,7 @@ describe("ScreeningSupervisionComponents", () => {
     expect(screen.getByText("1: 4821, 2: 7710, 3: 9034")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Si este registro fue creado con un usuario interno, se eliminara el intento de prueba, pero se conservara el perfil interno y la cuenta de acceso."
+        "Esta accion tambien puede eliminar intentos de prueba creados desde Campo. Si el perfil pertenece a un usuario interno, se conservara por seguridad."
       )
     ).toBeInTheDocument();
   });
