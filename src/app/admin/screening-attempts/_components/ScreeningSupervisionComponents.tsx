@@ -9,7 +9,10 @@ import type {
 import type { ParticipantEvidenceReviewDetail } from "@/modules/participant-portal/evidence-review-service";
 import {
   approveParticipantEvidenceAction,
-  rejectParticipantEvidenceAction
+  deleteParticipantEvidenceTestRecordAction,
+  regenerateParticipantReferenceCodesAction,
+  rejectParticipantEvidenceAction,
+  updateParticipantEvidenceParticipantAction
 } from "@/modules/participant-portal/evidence-review-actions";
 import { EvidenceReplacementForm } from "./EvidenceReplacementForm";
 import { WhatsAppManualBlock } from "./WhatsAppManualBlock";
@@ -37,6 +40,18 @@ function badgeTone(status: ScreeningAttemptListItem["status"]) {
   }
 
   return "planned";
+}
+
+function badgeToneForAttempt(status: ScreeningAttemptListItem["status"], label: string) {
+  if (label === "Elegible confirmado" || label === "Aprobado") {
+    return "ready";
+  }
+
+  if (label === "Evidencia rechazada") {
+    return "blocked";
+  }
+
+  return badgeTone(status);
 }
 
 function compactNse(attempt: ScreeningAttemptListItem): string {
@@ -170,7 +185,7 @@ export function ScreeningAttemptTable({ attempts, studyId }: { attempts: Screeni
                   </span>
                 </td>
                 <td className={`${tdClass} whitespace-nowrap`}>
-                  <StatusBadge status={badgeTone(attempt.status)}>{attempt.statusLabel}</StatusBadge>
+                  <StatusBadge status={badgeToneForAttempt(attempt.status, attempt.statusLabel)}>{attempt.statusLabel}</StatusBadge>
                 </td>
                 <td className={`${tdClass} max-w-[120px] font-mono text-xs`}>
                   <span className="block truncate" title={attempt.terminationCode ?? "No aplica"}>
@@ -210,7 +225,7 @@ export function ScreeningAttemptDetailView({ detail }: { detail: ScreeningAttemp
             <h2 className="mt-2 text-2xl font-semibold text-zinc-950">{detail.resultLabel}</h2>
             <p className="mt-2 text-sm text-zinc-600">{detail.terminationReason ?? "Sin motivo registrado."}</p>
           </div>
-          <StatusBadge status={badgeTone(detail.status)}>{detail.statusLabel}</StatusBadge>
+          <StatusBadge status={badgeToneForAttempt(detail.status, detail.statusLabel)}>{detail.statusLabel}</StatusBadge>
         </div>
         <dl className="mt-6 grid gap-4 text-sm md:grid-cols-3">
           <SummaryItem label="Estudio" value={`${detail.study.name} · ${detail.study.code}`} />
@@ -219,6 +234,9 @@ export function ScreeningAttemptDetailView({ detail }: { detail: ScreeningAttemp
           <SummaryItem label="Teléfono" value={detail.participant.phone ?? "Sin teléfono"} />
           <SummaryItem label="Correo" value={detail.participant.email ?? "Sin correo"} />
           <SummaryItem label="Entrevistador" value={detail.fieldUser?.name ?? "Portal participante"} />
+          <SummaryItem label="Revision de evidencia" value={reviewStatusLabel(detail.evidenceReviewStatus ?? undefined)} />
+          <SummaryItem label="Confirmacion final" value={detail.confirmation ? "Confirmada" : "Sin confirmacion"} />
+          <SummaryItem label="Folio" value={detail.confirmation?.folio ?? "No generado"} mono />
           <SummaryItem label="Código" value={detail.terminationCode ?? "No aplica"} />
           <SummaryItem label="Inicio" value={formatDate(detail.startedAt)} />
           <SummaryItem label="Cierre" value={formatDate(detail.closedAt)} />
@@ -325,10 +343,12 @@ function SummaryItem({ label, mono, value }: { label: string; mono?: boolean; va
 }
 
 export function EvidenceReviewPanel({
+  canDeleteTestRecord = false,
   detail,
   error,
   message
 }: {
+  canDeleteTestRecord?: boolean;
   detail: ParticipantEvidenceReviewDetail;
   error?: string;
   message?: string;
@@ -362,8 +382,11 @@ export function EvidenceReviewPanel({
       <dl className="mt-5 grid gap-4 text-sm md:grid-cols-3">
         <SummaryItem label="Celular" value={detail.participant.phone ?? "Sin celular"} />
         <SummaryItem label="Correo" value={detail.participant.email ?? "Sin correo"} />
+        <SummaryItem label="Referencia externa" value={detail.participant.externalReference ?? "Sin referencia"} />
         <SummaryItem label="Intento" value={detail.attemptId} mono />
       </dl>
+
+      <ParticipantDataForm detail={detail} />
 
       <div className="mt-5 rounded-md border border-zinc-200 bg-zinc-50 p-4">
         <h3 className="text-sm font-semibold text-zinc-800">Marcas declaradas en F6</h3>
@@ -442,7 +465,8 @@ export function EvidenceReviewPanel({
       ) : null}
 
       {detail.confirmation ? (
-        <div className="mt-5">
+        <div className="mt-5 space-y-4">
+          <ConfirmationSummary detail={detail} />
           <WhatsAppManualBlock
             attemptId={detail.attemptId}
             manualMessageStatus={detail.confirmation.manualMessageStatus}
@@ -451,7 +475,126 @@ export function EvidenceReviewPanel({
           />
         </div>
       ) : null}
+
+      {canDeleteTestRecord ? (
+        <DeleteTestRecordForm
+          attemptId={detail.attemptId}
+          blocked={Boolean(detail.confirmation || detail.review?.status === "APPROVED")}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function ParticipantDataForm({ detail }: { detail: ParticipantEvidenceReviewDetail }) {
+  return (
+    <form
+      action={updateParticipantEvidenceParticipantAction.bind(null, detail.attemptId)}
+      className="mt-5 rounded-md border border-zinc-200 bg-zinc-50 p-4"
+    >
+      <h3 className="text-sm font-semibold text-zinc-900">Datos del participante</h3>
+      <p className="mt-2 text-sm leading-6 text-zinc-600">
+        Cambiar el correo operativo no cambia el correo de acceso usado para OTP.
+      </p>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <label className={labelClass}>
+          Nombre
+          <input className={inputClass} defaultValue={detail.participant.name} name="name" required />
+        </label>
+        <label className={labelClass}>
+          Celular
+          <input className={inputClass} defaultValue={detail.participant.phone ?? ""} name="phone" />
+        </label>
+        <label className={labelClass}>
+          Correo operativo
+          <input className={inputClass} defaultValue={detail.participant.email ?? ""} name="email" type="email" />
+        </label>
+        <label className={labelClass}>
+          Referencia externa
+          <input className={inputClass} defaultValue={detail.participant.externalReference ?? ""} name="externalReference" />
+        </label>
+      </div>
+      <p className="mt-3 text-xs leading-5 text-zinc-500">
+        V1 no cuenta con una bitacora dedicada para esta correccion; el cambio queda reflejado en el perfil operativo.
+      </p>
+      <button className={`${primaryButtonClass} mt-4`} type="submit">
+        Guardar datos del participante
+      </button>
+    </form>
+  );
+}
+
+function ConfirmationSummary({ detail }: { detail: ParticipantEvidenceReviewDetail }) {
+  if (!detail.confirmation) {
+    return null;
+  }
+
+  const codes = [...detail.confirmation.referenceCodes].sort((left, right) => left.slot - right.slot);
+
+  return (
+    <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h3 className="font-semibold text-emerald-950">Confirmacion final</h3>
+          <p className="mt-2 text-sm text-emerald-900">Folio {detail.confirmation.folio}</p>
+        </div>
+        <StatusBadge status="ready">Elegible confirmado</StatusBadge>
+      </div>
+      <dl className="mt-4 grid gap-3 text-sm md:grid-cols-4">
+        <SummaryItem label="Folio" value={detail.confirmation.folio} mono />
+        {codes.map((item) => (
+          <SummaryItem key={item.slot} label={`Codigo ${item.slot}`} value={item.code} mono />
+        ))}
+      </dl>
+      <form action={regenerateParticipantReferenceCodesAction.bind(null, detail.attemptId)} className="mt-4">
+        <button
+          className={`${secondaryButtonClass} disabled:cursor-not-allowed disabled:opacity-60`}
+          disabled={detail.confirmation.manualMessageStatus === "MARKED_SENT"}
+          type="submit"
+        >
+          Regenerar codigos de 4 digitos
+        </button>
+        {detail.confirmation.manualMessageStatus === "MARKED_SENT" ? (
+          <p className="mt-2 text-xs text-amber-800">
+            No se pueden regenerar codigos porque el mensaje ya fue marcado como enviado.
+          </p>
+        ) : null}
+      </form>
+    </div>
+  );
+}
+
+function DeleteTestRecordForm({ attemptId, blocked }: { attemptId: string; blocked: boolean }) {
+  return (
+    <form
+      action={deleteParticipantEvidenceTestRecordAction.bind(null, attemptId)}
+      className="mt-6 rounded-md border border-rose-200 bg-rose-50 p-4"
+    >
+      <h3 className="font-semibold text-rose-950">Eliminar registro de prueba</h3>
+      <p className="mt-2 text-sm leading-6 text-rose-900">
+        Accion exclusiva para limpiar pruebas o registros creados por error. No debe usarse como gestion legal de
+        derechos ARCO.
+      </p>
+      {blocked ? (
+        <p className="mt-3 rounded-md border border-rose-300 bg-white px-3 py-2 text-sm text-rose-800">
+          No se puede eliminar este registro porque ya tiene informacion final o relaciones activas.
+        </p>
+      ) : (
+        <div className="mt-4 space-y-3">
+          <label className={labelClass}>
+            Escribe ELIMINAR para confirmar
+            <input className={inputClass} name="confirmationText" />
+          </label>
+          <label className={labelClass}>
+            Motivo obligatorio
+            <textarea className={inputClass} name="deleteReason" required rows={3} />
+          </label>
+          <button className={secondaryButtonClass} type="submit">
+            Eliminar registro de prueba
+          </button>
+        </div>
+      )}
+    </form>
   );
 }
 

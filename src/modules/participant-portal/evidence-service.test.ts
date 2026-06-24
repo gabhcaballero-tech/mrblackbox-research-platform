@@ -484,9 +484,9 @@ describe("participant portal evidence service", () => {
             manualMessageMarkedSentAt: null,
             manualMessageStatus: "NOT_SENT",
             referenceCodes: [
-              { code: "ABC12345", slot: 1 },
-              { code: "DEF12345", slot: 2 },
-              { code: "GHI12345", slot: 3 }
+              { code: "4821", slot: 1 },
+              { code: "7710", slot: 2 },
+              { code: "9034", slot: 3 }
             ]
           }
         })
@@ -495,7 +495,9 @@ describe("participant portal evidence service", () => {
     });
 
     expect(rejected.ok ? rejected.data.message : "").not.toContain("Imagen borrosa");
+    expect(rejected.ok ? rejected.data.message : "").toContain("reclutador");
     expect(approved.ok ? approved.data.confirmation?.folio : null).toBe("NAV-001");
     expect(approved.ok ? approved.data.confirmation?.codes : []).toHaveLength(3);
+    expect(approved.ok ? approved.data.confirmation?.codes.every((item) => /^[1-9]\d{3}$/.test(item.code)) : false).toBe(true);
   });
 });

@@ -50,6 +50,12 @@ export type SupervisionStatusLabel = {
 
 export type ScreeningAttemptListItem = {
   closedAt: Date | null;
+  confirmation: {
+    folio: string;
+    manualMessageStatus: "MARKED_SENT" | "NOT_SENT";
+    referenceCodes: Array<{ code: string; slot: number }>;
+  } | null;
+  evidenceReviewStatus: "APPROVED" | "PENDING" | "REJECTED" | null;
   fieldUser: SupervisionFieldUserRecord | null;
   id: string;
   nseClassCode: string | null;
@@ -90,7 +96,13 @@ export type ScreeningAttemptAnswerView = {
 export type ScreeningAttemptDetail = {
   answers: ScreeningAttemptAnswerView[];
   closedAt: Date | null;
+  confirmation: {
+    folio: string;
+    manualMessageStatus: "MARKED_SENT" | "NOT_SENT";
+    referenceCodes: Array<{ code: string; slot: number }>;
+  } | null;
   definitionHash: string;
+  evidenceReviewStatus: "APPROVED" | "PENDING" | "REJECTED" | null;
   evaluation: {
     flags: Array<{ code: string; label?: string; requiresReview?: boolean }>;
     missingQuestionIds: string[];
@@ -223,11 +235,13 @@ function unauthorizedResult<T>(): ScreeningSupervisionResult<T> {
 
 function toListItem(attempt: SupervisionAttemptRecord): ScreeningAttemptListItem {
   const definition = parseScreenerDefinition(attempt.questionnaireVersion.definitionJson);
-  const labels = statusLabels(attempt.status);
+  const labels = statusLabelsForAttempt(attempt);
   const nseClassLabel = resolveNseClassLabel(definition, attempt.nseClass);
 
   return {
     closedAt: attempt.completedAt,
+    confirmation: attempt.participantConfirmation,
+    evidenceReviewStatus: attempt.participantScreeningReview?.status ?? null,
     fieldUser: attempt.fieldUser,
     id: attempt.id,
     nseClassCode: attempt.nseClass,
@@ -251,13 +265,15 @@ function toListItem(attempt: SupervisionAttemptRecord): ScreeningAttemptListItem
 
 function toDetail(attempt: SupervisionAttemptDetailRecord): ScreeningAttemptDetail {
   const definition = parseScreenerDefinition(attempt.questionnaireVersion.definitionJson);
-  const labels = statusLabels(attempt.status);
+  const labels = statusLabelsForAttempt(attempt);
   const evaluation = parseEvaluation(attempt.evaluationJson);
 
   return {
     answers: buildAnswerViews(definition, attempt.answers, evaluation.missingQuestionIds),
     closedAt: attempt.completedAt,
+    confirmation: attempt.participantConfirmation,
     definitionHash: attempt.questionnaireVersion.definitionHash,
+    evidenceReviewStatus: attempt.participantScreeningReview?.status ?? null,
     evaluation,
     fieldUser: attempt.fieldUser,
     id: attempt.id,
@@ -296,6 +312,20 @@ function statusLabels(status: SupervisionAttemptStatus): SupervisionStatusLabel 
     case "PENDING_REVIEW":
       return { label: "Pendiente de revisión", resultLabel: "Pendiente de revisión" };
   }
+}
+
+function statusLabelsForAttempt(
+  attempt: Pick<SupervisionAttemptRecord, "participantConfirmation" | "participantScreeningReview" | "status">
+): SupervisionStatusLabel {
+  if (attempt.participantConfirmation || attempt.participantScreeningReview?.status === "APPROVED") {
+    return { label: "Elegible confirmado", resultLabel: "Elegible confirmado" };
+  }
+
+  if (attempt.participantScreeningReview?.status === "REJECTED") {
+    return { label: "Evidencia rechazada", resultLabel: "Evidencia rechazada" };
+  }
+
+  return statusLabels(attempt.status);
 }
 
 function resolveNseClassLabel(definition: ScreenerDefinition, classCode: string | null): string | null {

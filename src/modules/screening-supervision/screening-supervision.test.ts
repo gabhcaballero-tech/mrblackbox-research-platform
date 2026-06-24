@@ -147,6 +147,8 @@ function attempt(input: Partial<SupervisionAttemptDetailRecord> = {}): Supervisi
     id: input.id ?? "attempt-1",
     nseClass: input.nseClass ?? "RANGO-3",
     nseScore: input.nseScore ?? 144,
+    participantConfirmation: input.participantConfirmation ?? null,
+    participantScreeningReview: input.participantScreeningReview ?? null,
     questionnaireVersion:
       input.questionnaireVersion ??
       {
@@ -357,6 +359,31 @@ describe("screening supervision service", () => {
     );
     expect(result.ok ? result.data.nseClassLabel : null).toBe("C típico");
     expect(JSON.stringify(result)).not.toContain("StudyProduct.realName");
+  });
+
+  it("prioritizes approved participant evidence review as confirmed in supervision labels", async () => {
+    const record = attempt({
+      participantConfirmation: {
+        folio: "NAV-001",
+        manualMessageStatus: "NOT_SENT",
+        referenceCodes: [
+          { code: "4821", slot: 1 },
+          { code: "7710", slot: 2 },
+          { code: "9034", slot: 3 }
+        ]
+      },
+      participantScreeningReview: { status: "APPROVED" },
+      status: "PENDING_REVIEW"
+    });
+    const result = await getScreeningAttemptSupervisionDetail({
+      actor: admin,
+      attemptId: record.id,
+      repository: repository([record])
+    });
+
+    expect(result.ok ? result.data.statusLabel : null).toBe("Elegible confirmado");
+    expect(result.ok ? result.data.resultLabel : null).toBe("Elegible confirmado");
+    expect(result.ok ? result.data.confirmation?.folio : null).toBe("NAV-001");
   });
 
   it("rejects missing attempts", async () => {

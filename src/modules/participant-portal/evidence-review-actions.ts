@@ -6,10 +6,13 @@ import { requireCapability } from "@/shared/auth/session";
 import { createEvidenceReviewRepository } from "./evidence-review-repository";
 import {
   approveParticipantEvidenceReview,
+  deleteParticipantEvidenceTestRecord,
   markParticipantManualMessageSent,
   confirmParticipantEvidenceReplacement,
+  regenerateParticipantReferenceCodes,
   rejectParticipantEvidenceReview,
-  requestParticipantEvidenceReplacementUpload
+  requestParticipantEvidenceReplacementUpload,
+  updateParticipantEvidenceParticipant
 } from "./evidence-review-service";
 import {
   createSupabaseEvidenceStorageClient,
@@ -41,6 +44,76 @@ export async function approveParticipantEvidenceAction(attemptId: string): Promi
   }
 
   redirect(reviewPath(attemptId, "evidenceMessage", "Evidencia aprobada correctamente."));
+}
+
+export async function regenerateParticipantReferenceCodesAction(attemptId: string): Promise<void> {
+  const actor = await requireCapability("screening:review");
+  const result = await regenerateParticipantReferenceCodes({
+    actor,
+    attemptId,
+    repository: createEvidenceReviewRepository()
+  });
+
+  revalidatePath(`/admin/screening-attempts/${attemptId}`);
+
+  if (!result.ok) {
+    redirect(reviewPath(attemptId, "evidenceError", result.message));
+  }
+
+  redirect(reviewPath(attemptId, "evidenceMessage", "CÃ³digos regenerados correctamente."));
+}
+
+export async function updateParticipantEvidenceParticipantAction(
+  attemptId: string,
+  formData: FormData
+): Promise<void> {
+  const actor = await requireCapability("screening:review");
+  const result = await updateParticipantEvidenceParticipant({
+    actor,
+    attemptId,
+    input: {
+      email: String(formData.get("email") ?? ""),
+      externalReference: String(formData.get("externalReference") ?? ""),
+      name: String(formData.get("name") ?? ""),
+      phone: String(formData.get("phone") ?? "")
+    },
+    repository: createEvidenceReviewRepository()
+  });
+
+  revalidatePath(`/admin/screening-attempts/${attemptId}`);
+
+  if (!result.ok) {
+    redirect(reviewPath(attemptId, "evidenceError", result.message));
+  }
+
+  redirect(reviewPath(attemptId, "evidenceMessage", "Datos del participante actualizados correctamente."));
+}
+
+export async function deleteParticipantEvidenceTestRecordAction(
+  attemptId: string,
+  formData: FormData
+): Promise<void> {
+  const actor = await requireCapability("screening:review");
+  const result = await deleteParticipantEvidenceTestRecord({
+    actor,
+    attemptId,
+    confirmationText: String(formData.get("confirmationText") ?? ""),
+    reason: String(formData.get("deleteReason") ?? ""),
+    repository: createEvidenceReviewRepository(),
+    storage: createSupabaseEvidenceStorageClient()
+  });
+
+  revalidatePath(`/admin/screening-attempts/${attemptId}`);
+
+  if (!result.ok) {
+    redirect(reviewPath(attemptId, "evidenceError", result.message));
+  }
+
+  redirect(
+    `/admin/studies/${result.data.studyId}/screening-attempts?evidenceMessage=${encodeURIComponent(
+      result.data.storageWarning ?? "Registro de prueba eliminado correctamente."
+    )}`
+  );
 }
 
 export async function rejectParticipantEvidenceAction(

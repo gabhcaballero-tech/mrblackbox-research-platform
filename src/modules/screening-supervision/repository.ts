@@ -38,6 +38,14 @@ export type SupervisionAttemptRecord = {
   id: string;
   nseClass: string | null;
   nseScore: number | null;
+  participantConfirmation: {
+    folio: string;
+    manualMessageStatus: "MARKED_SENT" | "NOT_SENT";
+    referenceCodes: Array<{ code: string; slot: number }>;
+  } | null;
+  participantScreeningReview: {
+    status: "APPROVED" | "PENDING" | "REJECTED";
+  } | null;
   questionnaireVersion: SupervisionQuestionnaireVersionRecord;
   questionnaireVersionId: string;
   startedAt: Date;
@@ -115,6 +123,24 @@ const attemptSelect = {
   id: true,
   nseClass: true,
   nseScore: true,
+  participantConfirmation: {
+    select: {
+      folio: true,
+      manualMessageStatus: true,
+      referenceCodes: {
+        orderBy: { slot: "asc" },
+        select: {
+          code: true,
+          slot: true
+        }
+      }
+    }
+  },
+  participantScreeningReview: {
+    select: {
+      status: true
+    }
+  },
   questionnaireVersion: {
     select: {
       definitionHash: true,

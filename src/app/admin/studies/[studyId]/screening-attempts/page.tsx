@@ -20,6 +20,8 @@ type StudyScreeningAttemptsPageProps = {
     code?: string;
     dateFrom?: string;
     dateTo?: string;
+    evidenceError?: string;
+    evidenceMessage?: string;
     fieldUserId?: string;
     participantQuery?: string;
     status?: string;
@@ -58,6 +60,16 @@ export default async function StudyScreeningAttemptsPage({
       />
 
       <div className="space-y-6">
+        {filters?.evidenceMessage ? (
+          <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            {filters.evidenceMessage}
+          </p>
+        ) : null}
+        {filters?.evidenceError ? (
+          <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+            {filters.evidenceError}
+          </p>
+        ) : null}
         <ScreeningAttemptFilters data={result.data} />
         <ScreeningAttemptTable attempts={result.data.attempts} studyId={studyId} />
       </div>

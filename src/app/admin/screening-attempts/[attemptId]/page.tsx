@@ -77,6 +77,7 @@ export default async function ScreeningAttemptDetailPage({ params, searchParams 
       {evidenceResult.ok ? (
         <div className="mt-6">
           <EvidenceReviewPanel
+            canDeleteTestRecord={actor.role === "ADMIN"}
             detail={evidenceResult.data}
             message={firstParam(search.evidenceMessage)}
             error={firstParam(search.evidenceError)}

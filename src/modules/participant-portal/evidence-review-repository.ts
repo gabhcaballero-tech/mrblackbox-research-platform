@@ -1,6 +1,10 @@
 import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
 import type { PortalEvidenceRecord } from "./evidence-repository";
-import type { ParticipantReferenceCodeDraft } from "./review";
+import {
+  isParticipantReferenceCode,
+  normalizeParticipantReferenceCode,
+  type ParticipantReferenceCodeDraft
+} from "./review";
 
 export type EvidenceReviewAttemptStatus =
   | "INCOMPLETE"
@@ -18,6 +22,7 @@ export type EvidenceReviewRecord = {
 };
 
 export type EvidenceReviewConfirmationRecord = {
+  id?: string;
   folio: string;
   folioSequence: number;
   manualMessageMarkedSentAt: Date | null;
@@ -52,8 +57,10 @@ export type EvidenceReviewAttemptRecord = {
     id: string;
     participantProfile: {
       email: string | null;
+      externalReference: string | null;
       id: string;
       name: string;
+      participantAuthUserId: string | null;
       phone: string | null;
     };
   };
@@ -73,6 +80,11 @@ export type EvidenceReviewRepository = {
     markedByUserId: string;
     now?: Date;
   }) => Promise<void>;
+  deleteTestRecord: (input: {
+    attemptId: string;
+    deletedByUserId: string;
+    reason: string;
+  }) => Promise<EvidenceReviewDeleteResult>;
   rejectEvidence: (input: {
     attemptId: string;
     internalNote?: string | null;
@@ -80,7 +92,20 @@ export type EvidenceReviewRepository = {
     reviewedByUserId: string;
     now?: Date;
   }) => Promise<void>;
+  regenerateReferenceCodes: (input: {
+    attemptId: string;
+    codeGenerator: () => string;
+    regeneratedByUserId: string;
+  }) => Promise<EvidenceReviewRegenerateCodesResult>;
   replaceEvidence: (input: ReplaceParticipantEvidenceInput) => Promise<EvidenceReviewReplacementResult>;
+  updateParticipantProfile: (input: {
+    attemptId: string;
+    email: string | null;
+    externalReference: string | null;
+    name: string;
+    phone: string | null;
+    updatedByUserId: string;
+  }) => Promise<EvidenceReviewUpdateParticipantResult>;
 };
 
 export type EvidenceReviewApprovalResult =
@@ -118,6 +143,36 @@ export type EvidenceReviewReplacementResult =
       ok: false;
     };
 
+export type EvidenceReviewRegenerateCodesResult =
+  | {
+      confirmation: EvidenceReviewConfirmationRecord;
+      ok: true;
+    }
+  | {
+      message: string;
+      ok: false;
+    };
+
+export type EvidenceReviewUpdateParticipantResult =
+  | {
+      ok: true;
+    }
+  | {
+      message: string;
+      ok: false;
+    };
+
+export type EvidenceReviewDeleteResult =
+  | {
+      evidenceToDelete: Array<{ bucket: string; privateStorageKey: string }>;
+      ok: true;
+      studyId: string;
+    }
+  | {
+      message: string;
+      ok: false;
+    };
+
 type EvidenceReviewPrismaClient = PrismaClientLike & {
   $transaction: <T>(callback: (tx: EvidenceReviewTransactionClient) => Promise<T>) => Promise<T>;
   screeningAttempt: {
@@ -126,6 +181,9 @@ type EvidenceReviewPrismaClient = PrismaClientLike & {
 };
 
 type EvidenceReviewTransactionClient = {
+  participantAccessToken: {
+    deleteMany: (args: unknown) => Promise<unknown>;
+  };
   participantConfirmation: {
     create: (args: unknown) => Promise<EvidenceReviewConfirmationRecord>;
     findUnique: (args: unknown) => Promise<EvidenceReviewConfirmationRecord | null>;
@@ -133,21 +191,45 @@ type EvidenceReviewTransactionClient = {
   };
   participantEvidence: {
     create: (args: unknown) => Promise<PortalEvidenceRecord>;
+    deleteMany: (args: unknown) => Promise<unknown>;
     update: (args: unknown) => Promise<PortalEvidenceRecord>;
     updateMany: (args: unknown) => Promise<unknown>;
+  };
+  participantConsent: {
+    deleteMany: (args: unknown) => Promise<unknown>;
+  };
+  participantProfile: {
+    delete: (args: unknown) => Promise<unknown>;
+    findUnique: (args: unknown) => Promise<{
+      id: string;
+      participantAuthUserId: string | null;
+      participations: Array<{ id: string }>;
+    } | null>;
+    update: (args: unknown) => Promise<unknown>;
   };
   participantPortalStudyConfig: {
     update: (args: unknown) => Promise<unknown>;
   };
   participantReferenceCode: {
+    deleteMany: (args: unknown) => Promise<unknown>;
     findMany: (args: unknown) => Promise<Array<{ code: string }>>;
   };
   participantScreeningReview: {
+    deleteMany: (args: unknown) => Promise<unknown>;
     upsert: (args: unknown) => Promise<EvidenceReviewRecord>;
     update: (args: unknown) => Promise<EvidenceReviewRecord>;
   };
+  screeningAnswer: {
+    deleteMany: (args: unknown) => Promise<unknown>;
+  };
   screeningAttempt: {
+    delete: (args: unknown) => Promise<unknown>;
     findUnique: (args: unknown) => Promise<EvidenceReviewAttemptRecord | null>;
+    update: (args: unknown) => Promise<unknown>;
+  };
+  studyParticipant: {
+    delete: (args: unknown) => Promise<unknown>;
+    update: (args: unknown) => Promise<unknown>;
   };
 };
 
@@ -166,6 +248,7 @@ const evidenceSelect = {
 } as const;
 
 const confirmationSelect = {
+  id: true,
   folio: true,
   folioSequence: true,
   manualMessageMarkedSentAt: true,
@@ -231,8 +314,10 @@ const attemptReviewSelect = {
       participantProfile: {
         select: {
           email: true,
+          externalReference: true,
           id: true,
           name: true,
+          participantAuthUserId: true,
           phone: true
         }
       }
@@ -260,6 +345,56 @@ export function createEvidenceReviewRepository(
         }
 
         if (attempt.participantConfirmation) {
+          const now = input.now ?? new Date();
+
+          await tx.participantScreeningReview.upsert({
+            create: {
+              reviewedAt: now,
+              reviewedByUserId: input.approvedByUserId,
+              screeningAttemptId: attempt.id,
+              status: "APPROVED",
+              studyParticipantId: attempt.studyParticipantId
+            },
+            update: {
+              internalNote: null,
+              rejectionReason: null,
+              reviewedAt: now,
+              reviewedByUserId: input.approvedByUserId,
+              status: "APPROVED"
+            },
+            where: {
+              screeningAttemptId: attempt.id
+            }
+          });
+          await tx.participantEvidence.updateMany({
+            data: {
+              reviewStatus: "APPROVED",
+              reviewedAt: now,
+              reviewedByUserId: input.approvedByUserId
+            },
+            where: {
+              screeningAttemptId: attempt.id
+            }
+          });
+          await tx.screeningAttempt.update({
+            data: {
+              completedAt: now,
+              status: "PASSED"
+            },
+            where: {
+              id: attempt.id
+            }
+          });
+          await tx.studyParticipant.update({
+            data: {
+              operationalStatus: "SCREENING_PASSED",
+              screeningStatus: "PASSED"
+            },
+            where: {
+              id: attempt.studyParticipantId
+            }
+          });
+
           return {
             confirmation: attempt.participantConfirmation,
             created: false,
@@ -333,6 +468,24 @@ export function createEvidenceReviewRepository(
             screeningAttemptId: attempt.id
           }
         });
+        await tx.screeningAttempt.update({
+          data: {
+            completedAt: now,
+            status: "PASSED"
+          },
+          where: {
+            id: attempt.id
+          }
+        });
+        await tx.studyParticipant.update({
+          data: {
+            operationalStatus: "SCREENING_PASSED",
+            screeningStatus: "PASSED"
+          },
+          where: {
+            id: attempt.studyParticipantId
+          }
+        });
 
         const confirmation = await tx.participantConfirmation.create({
           data: {
@@ -381,6 +534,113 @@ export function createEvidenceReviewRepository(
         });
       });
     },
+    async deleteTestRecord(input) {
+      const prisma = await getPrisma();
+
+      try {
+        return await prisma.$transaction(async (tx) => {
+        const attempt = await getAttemptReviewWithClient(tx, input.attemptId);
+
+        if (!attempt) {
+          return { message: "El intento no existe.", ok: false };
+        }
+
+        if (attempt.participantConfirmation || attempt.participantScreeningReview?.status === "APPROVED") {
+          return {
+            message: "No se puede eliminar este registro porque ya tiene informacion final o relaciones activas.",
+            ok: false
+          };
+        }
+
+        if (attempt.source !== "PARTICIPANT_PORTAL") {
+          return {
+            message: "No se puede eliminar este registro porque ya tiene informacion final o relaciones activas.",
+            ok: false
+          };
+        }
+
+        const participantProfileId = attempt.studyParticipant.participantProfile.id;
+        const studyParticipantId = attempt.studyParticipantId;
+        const evidenceToDelete = attempt.participantEvidence.map((item) => ({
+          bucket: item.storageBucket,
+          privateStorageKey: item.privateStorageKey
+        }));
+
+        await tx.participantEvidence.deleteMany({
+          where: {
+            screeningAttemptId: attempt.id
+          }
+        });
+        await tx.participantScreeningReview.deleteMany({
+          where: {
+            screeningAttemptId: attempt.id
+          }
+        });
+        await tx.screeningAnswer.deleteMany({
+          where: {
+            screeningAttemptId: attempt.id
+          }
+        });
+        await tx.screeningAttempt.delete({
+          where: {
+            id: attempt.id
+          }
+        });
+        await tx.participantConsent.deleteMany({
+          where: {
+            studyParticipantId
+          }
+        });
+        await tx.participantAccessToken.deleteMany({
+          where: {
+            studyParticipantId
+          }
+        });
+        await tx.studyParticipant.delete({
+          where: {
+            id: studyParticipantId
+          }
+        });
+
+        const profile = await tx.participantProfile.findUnique({
+          select: {
+            id: true,
+            participantAuthUserId: true,
+            participations: {
+              select: {
+                id: true
+              }
+            }
+          },
+          where: {
+            id: participantProfileId
+          }
+        });
+
+        if (profile && !profile.participantAuthUserId && profile.participations.length === 0) {
+          await tx.participantProfile.delete({
+            where: {
+              id: participantProfileId
+            }
+          });
+        }
+
+        void input.deletedByUserId;
+        void input.reason;
+
+          return {
+            evidenceToDelete,
+            ok: true,
+            studyId: attempt.questionnaireVersion.study.id
+          };
+        });
+      } catch {
+        return {
+          message: "No se puede eliminar este registro porque ya tiene informacion final o relaciones activas.",
+          ok: false
+        };
+      }
+    },
     async rejectEvidence(input) {
       const prisma = await getPrisma();
 
@@ -409,6 +669,57 @@ export function createEvidenceReviewRepository(
             screeningAttemptId: input.attemptId
           }
         });
+      });
+    },
+    async regenerateReferenceCodes(input) {
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const attempt = await getAttemptReviewWithClient(tx, input.attemptId);
+
+        if (!attempt) {
+          return { message: "El intento no existe.", ok: false };
+        }
+
+        if (!attempt.participantConfirmation) {
+          return { message: "No existe una confirmaciÃ³n para regenerar cÃ³digos.", ok: false };
+        }
+
+        if (!attempt.participantConfirmation.id) {
+          return { message: "La confirmaciÃ³n no tiene identificador para regenerar cÃ³digos.", ok: false };
+        }
+
+        if (attempt.participantConfirmation.manualMessageStatus === "MARKED_SENT") {
+          return {
+            message: "No se pueden regenerar cÃ³digos porque el mensaje ya fue marcado como enviado.",
+            ok: false
+          };
+        }
+
+        const codes = await generateUniqueCodes(tx, input.codeGenerator);
+        await tx.participantReferenceCode.deleteMany({
+          where: {
+            confirmationId: attempt.participantConfirmation.id
+          }
+        });
+        const confirmation = await tx.participantConfirmation.update({
+          data: {
+            referenceCodes: {
+              create: codes
+            }
+          },
+          select: confirmationSelect,
+          where: {
+            screeningAttemptId: attempt.id
+          }
+        });
+
+        void input.regeneratedByUserId;
+
+        return {
+          confirmation,
+          ok: true
+        };
       });
     },
     async replaceEvidence(input) {
@@ -516,6 +827,33 @@ export function createEvidenceReviewRepository(
 
         return { ok: true };
       });
+    },
+    async updateParticipantProfile(input) {
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const attempt = await getAttemptReviewWithClient(tx, input.attemptId);
+
+        if (!attempt) {
+          return { message: "El intento no existe.", ok: false };
+        }
+
+        await tx.participantProfile.update({
+          data: {
+            email: input.email,
+            externalReference: input.externalReference,
+            name: input.name,
+            phone: input.phone
+          },
+          where: {
+            id: attempt.studyParticipant.participantProfile.id
+          }
+        });
+
+        void input.updatedByUserId;
+
+        return { ok: true };
+      });
     }
   };
 }
@@ -545,9 +883,9 @@ async function generateUniqueCodes(
       throw new Error("No fue posible generar tres códigos de referencia únicos.");
     }
 
-    const code = codeGenerator().trim().toUpperCase();
+    const code = normalizeParticipantReferenceCode(codeGenerator());
 
-    if (!code || generated.has(code)) {
+    if (!isParticipantReferenceCode(code) || generated.has(code)) {
       continue;
     }
 

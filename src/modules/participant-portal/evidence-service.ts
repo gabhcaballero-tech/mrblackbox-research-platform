@@ -1,6 +1,7 @@
 import { PARTICIPANT_PORTAL_UNAVAILABLE_MESSAGE } from "./access";
 import { PARTICIPANT_PORTAL_DUPLICATE_REGISTRATION_MESSAGE } from "./registration-service";
 import {
+  PARTICIPANT_PORTAL_PUBLIC_REJECTED_MESSAGE,
   PARTICIPANT_PORTAL_PUBLIC_TERMINATED_MESSAGE,
   PARTICIPANT_PORTAL_REGISTRATION_REQUIRED_MESSAGE
 } from "./screener-service";
@@ -373,10 +374,12 @@ export async function getParticipantPortalEvidenceResult({
   }
 
   if (attempt.status === "TERMINATED" || attempt.participantScreeningReview?.status === "REJECTED") {
+    const rejected = attempt.participantScreeningReview?.status === "REJECTED";
+
     return {
       data: {
-        kind: attempt.status === "TERMINATED" ? "TERMINATED" : "REJECTED",
-        message: PARTICIPANT_PORTAL_PUBLIC_TERMINATED_MESSAGE,
+        kind: rejected ? "REJECTED" : "TERMINATED",
+        message: rejected ? PARTICIPANT_PORTAL_PUBLIC_REJECTED_MESSAGE : PARTICIPANT_PORTAL_PUBLIC_TERMINATED_MESSAGE,
         showEvidenceLink: false,
         study: publicStudy(study)
       },

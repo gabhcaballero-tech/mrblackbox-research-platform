@@ -1,15 +1,22 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type {
   ScreeningAttemptDetail,
   ScreeningAttemptListData,
   ScreeningAttemptListItem
 } from "@/modules/screening-supervision";
 import {
+  EvidenceReviewPanel,
   ScreeningAttemptDetailView,
   ScreeningAttemptFilters,
   ScreeningAttemptTable
 } from "./ScreeningSupervisionComponents";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    refresh: vi.fn()
+  })
+}));
 
 const study = {
   code: "FMASCULINA-NAVIGO-2026",
@@ -23,6 +30,8 @@ const longReason =
 
 const listItem: ScreeningAttemptListItem = {
   closedAt: new Date("2026-06-23T16:00:00Z"),
+  confirmation: null,
+  evidenceReviewStatus: null,
   fieldUser: {
     email: "ana@example.com",
     id: "field-1",
@@ -83,7 +92,9 @@ const detail: ScreeningAttemptDetail = {
     }
   ],
   closedAt: new Date("2026-06-23T16:00:00Z"),
+  confirmation: null,
   definitionHash: "hash-version-1",
+  evidenceReviewStatus: null,
   evaluation: {
     flags: [],
     missingQuestionIds: [],
@@ -173,5 +184,79 @@ describe("ScreeningSupervisionComponents", () => {
     );
 
     expect(screen.getByText("Pendiente de revisión")).toBeInTheDocument();
+  });
+
+  it("shows confirmed supervision attempts with folio and review state", () => {
+    render(
+      <ScreeningAttemptDetailView
+        detail={{
+          ...detail,
+          confirmation: {
+            folio: "NAV-001",
+            manualMessageStatus: "NOT_SENT",
+            referenceCodes: [
+              { code: "4821", slot: 1 },
+              { code: "7710", slot: 2 },
+              { code: "9034", slot: 3 }
+            ]
+          },
+          evidenceReviewStatus: "APPROVED",
+          resultLabel: "Elegible confirmado",
+          status: "PENDING_REVIEW",
+          statusLabel: "Elegible confirmado"
+        }}
+      />
+    );
+
+    expect(screen.getAllByText("Elegible confirmado").length).toBeGreaterThan(0);
+    expect(screen.getByText("NAV-001")).toBeInTheDocument();
+    expect(screen.queryByText("Pendiente de revisión")).not.toBeInTheDocument();
+  });
+
+  it("renders participant edit, confirmation codes and dangerous delete action for ADMIN", () => {
+    render(
+      <EvidenceReviewPanel
+        canDeleteTestRecord
+        detail={{
+          attemptId: "attempt-1",
+          confirmation: {
+            folio: "NAV-001",
+            manualMessageStatus: "NOT_SENT",
+            referenceCodes: [
+              { code: "4821", slot: 1 },
+              { code: "7710", slot: 2 },
+              { code: "9034", slot: 3 }
+            ],
+            whatsappMessage: "Mensaje WhatsApp",
+            whatsappUrl: null
+          },
+          evidence: [],
+          f6DeclaredBrands: "Navigo",
+          participant: {
+            email: "persona@example.com",
+            externalReference: "REF-1",
+            id: "profile-1",
+            name: "GABRIELA",
+            phone: "+525512345678"
+          },
+          review: {
+            internalNote: null,
+            rejectionReason: null,
+            status: "APPROVED"
+          },
+          study: {
+            code: study.code,
+            id: study.id,
+            name: study.name
+          }
+        }}
+      />
+    );
+
+    expect(screen.getByText("Datos del participante")).toBeInTheDocument();
+    expect(screen.getByText("Confirmacion final")).toBeInTheDocument();
+    expect(screen.getByText("4821")).toBeInTheDocument();
+    expect(screen.getByText("Eliminar registro de prueba")).toBeInTheDocument();
+    expect(screen.getByText("No se puede eliminar este registro porque ya tiene informacion final o relaciones activas.")).toBeInTheDocument();
   });
 });

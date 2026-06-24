@@ -9,9 +9,9 @@ describe("ParticipantResultCard", () => {
         result={{
           confirmation: {
             codes: [
-              { code: "ABC12345", slot: 1 },
-              { code: "DEF12345", slot: 2 },
-              { code: "GHI12345", slot: 3 }
+              { code: "4821", slot: 1 },
+              { code: "7710", slot: 2 },
+              { code: "9034", slot: 3 }
             ],
             folio: "NAV-001",
             participantName: "Gabriela"
@@ -29,9 +29,9 @@ describe("ParticipantResultCard", () => {
     );
 
     expect(screen.getByText("NAV-001")).toBeInTheDocument();
-    expect(screen.getByText("ABC12345")).toBeInTheDocument();
-    expect(screen.getByText("DEF12345")).toBeInTheDocument();
-    expect(screen.getByText("GHI12345")).toBeInTheDocument();
+    expect(screen.getByText("4821")).toBeInTheDocument();
+    expect(screen.getByText("7710")).toBeInTheDocument();
+    expect(screen.getByText("9034")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copiar datos" })).toBeInTheDocument();
     expect(screen.queryByText(/answerJson|rejectionReason|NO_USUARIO_NAVIGO/)).not.toBeInTheDocument();
   });

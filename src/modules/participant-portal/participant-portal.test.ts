@@ -198,12 +198,12 @@ describe("participant portal foundation", () => {
     });
   });
 
-  it("approval generates a folio and exactly three globally unique codes", () => {
-    const codes = ["COD-1", "COD-1", "COD-2", "COD-3", "COD-4"];
+  it("approval generates a folio and exactly three globally unique four-digit codes", () => {
+    const codes = ["1001", "1001", "1002", "1003", "1004"];
     const result = approveParticipantReview({
       approvedByUserId: "admin-1",
-      codeGenerator: () => codes.shift() ?? "COD-X",
-      existingReferenceCodes: ["COD-1"],
+      codeGenerator: () => codes.shift() ?? "1005",
+      existingReferenceCodes: ["1001"],
       folioMaxSequence: 999,
       folioPrefix: "NAV",
       nextFolioSequence: 7,
@@ -217,6 +217,7 @@ describe("participant portal foundation", () => {
     expect(result.ok ? result.confirmation.folio : null).toBe("NAV-007");
     expect(result.ok ? result.confirmation.referenceCodes : []).toHaveLength(3);
     expect(new Set(result.ok ? result.confirmation.referenceCodes.map((item) => item.code) : []).size).toBe(3);
+    expect(result.ok ? result.confirmation.referenceCodes.every((item) => /^[1-9]\d{3}$/.test(item.code)) : false).toBe(true);
     expect(result.ok ? result.confirmation.referenceCodes.map((item) => item.slot) : []).toEqual([1, 2, 3]);
   });
 
@@ -229,7 +230,7 @@ describe("participant portal foundation", () => {
   it("blocks approval when folio sequence is exhausted", () => {
     const result = approveParticipantReview({
       approvedByUserId: "admin-1",
-      codeGenerator: () => "COD-1",
+      codeGenerator: () => "1001",
       folioMaxSequence: 999,
       folioPrefix: "NAV",
       nextFolioSequence: 1000,
@@ -252,9 +253,9 @@ describe("participant portal foundation", () => {
       folioSequence: 7,
       manualMessageStatus: "NOT_SENT",
       referenceCodes: [
-        { code: "COD-2", slot: 1 },
-        { code: "COD-3", slot: 2 },
-        { code: "COD-4", slot: 3 }
+        { code: "1002", slot: 1 },
+        { code: "1003", slot: 2 },
+        { code: "1004", slot: 3 }
       ],
       screeningAttemptId: "attempt-1",
       studyId: "study-1",
@@ -263,7 +264,7 @@ describe("participant portal foundation", () => {
 
     const result = approveParticipantReview({
       approvedByUserId: "admin-1",
-      codeGenerator: () => "COD-NEW",
+      codeGenerator: () => "1005",
       existingConfirmation,
       folioMaxSequence: 999,
       folioPrefix: "NAV",
@@ -279,9 +280,10 @@ describe("participant portal foundation", () => {
   });
 
   it("returns the next folio sequence for atomic persistence", () => {
+    const codes = ["2001", "2002", "2003"];
     const result = approveParticipantReview({
       approvedByUserId: "admin-1",
-      codeGenerator: () => `COD-${Math.random()}`,
+      codeGenerator: () => codes.shift() ?? "2004",
       folioMaxSequence: 999,
       folioPrefix: "NAV",
       nextFolioSequence: 11,
@@ -302,9 +304,9 @@ describe("participant portal foundation", () => {
       folioSequence: 999,
       manualMessageStatus: "NOT_SENT",
       referenceCodes: [
-        { code: "COD-1", slot: 1 },
-        { code: "COD-2", slot: 2 },
-        { code: "COD-3", slot: 3 }
+        { code: "1001", slot: 1 },
+        { code: "1002", slot: 2 },
+        { code: "1003", slot: 3 }
       ],
       screeningAttemptId: "attempt-1",
       studyId: "study-1",
@@ -313,7 +315,7 @@ describe("participant portal foundation", () => {
 
     const result = approveParticipantReview({
       approvedByUserId: "admin-1",
-      codeGenerator: () => "COD-4",
+      codeGenerator: () => "1004",
       existingConfirmation,
       folioMaxSequence: 999,
       folioPrefix: "NAV",
@@ -337,9 +339,9 @@ describe("participant portal foundation", () => {
   it("formats the manual WhatsApp message", () => {
     const message = buildManualWhatsAppMessage({
       codes: [
-        { code: "COD-3", slot: 3 },
-        { code: "COD-1", slot: 1 },
-        { code: "COD-2", slot: 2 }
+        { code: "1003", slot: 3 },
+        { code: "1001", slot: 1 },
+        { code: "1002", slot: 2 }
       ],
       folio: "NAV-001",
       participantName: "Gabriela",
@@ -347,9 +349,9 @@ describe("participant portal foundation", () => {
     });
 
     expect(message).toContain("Folio: NAV-001.");
-    expect(message).toContain("Código 1: COD-1");
-    expect(message).toContain("Código 2: COD-2");
-    expect(message).toContain("Código 3: COD-3");
+    expect(message).toContain("Código 1: 1001");
+    expect(message).toContain("Código 2: 1002");
+    expect(message).toContain("Código 3: 1003");
     expect(message).toContain("Conserva este mensaje y tus códigos");
   });
 

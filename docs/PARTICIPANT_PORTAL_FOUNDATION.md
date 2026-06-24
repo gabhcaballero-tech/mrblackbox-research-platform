@@ -180,6 +180,25 @@ Variables requeridas adicionales:
 
 - `SUPABASE_SECRET_KEY`
 
+## Correccion operativa de aprobacion y pruebas
+
+La aprobacion de evidencias ahora tambien actualiza el estado operativo:
+
+- `ParticipantScreeningReview.status = APPROVED`.
+- Evidencias del intento en `ParticipantEvidence.reviewStatus = APPROVED`.
+- `ScreeningAttempt.status = PASSED`.
+- `StudyParticipant.screeningStatus = PASSED`.
+- `StudyParticipant.operationalStatus = SCREENING_PASSED`.
+- Se crea o reutiliza `ParticipantConfirmation`.
+
+Los codigos de referencia nuevos son exactamente tres codigos numericos de cuatro digitos, en rango `1000` a `9999`, globalmente unicos y en slots 1, 2 y 3. El folio sigue siendo el identificador principal, por ejemplo `NAV-001`.
+
+ADMIN y SUPERVISOR pueden regenerar codigos de cuatro digitos para confirmaciones existentes mientras el mensaje manual de WhatsApp no haya sido marcado como enviado. La regeneracion conserva el folio.
+
+ADMIN y SUPERVISOR pueden corregir datos operativos del participante desde supervision: nombre, celular, correo operativo y referencia externa. Esta pantalla no cambia `participantAuthUserId` ni la cuenta Auth usada para OTP. En V1 no existe una bitacora dedicada para estas correcciones; queda documentada esta limitacion.
+
+ADMIN puede usar `Eliminar registro de prueba` solo para limpiar pruebas o registros capturados por error antes de una aprobacion final. Requiere escribir `ELIMINAR` y capturar motivo. Se bloquea si ya existe confirmacion, WhatsApp marcado como enviado, aprobacion final o relaciones activas. Esta accion es hard delete operativo de pruebas, no gestion legal de derechos ARCO.
+
 ## Checklist movil del portal
 
 Pruebas manuales recomendadas:

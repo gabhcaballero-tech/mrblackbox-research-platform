@@ -14,6 +14,12 @@ import type {
   EvidenceReviewRepository
 } from "./evidence-review-repository";
 import { buildManualWhatsAppMessage } from "./review";
+import {
+  isMexicoPhone,
+  normalizeMexicoPhone,
+  normalizePortalEmail
+} from "./validation";
+import { normalizeParticipantTextInput } from "./text-normalization";
 
 export type EvidenceReviewActor = {
   id: string;
@@ -51,6 +57,7 @@ export type ParticipantEvidenceReviewDetail = {
   f6DeclaredBrands: string;
   participant: {
     email: string | null;
+    externalReference: string | null;
     id: string;
     name: string;
     phone: string | null;
@@ -76,6 +83,13 @@ export type EvidenceReviewResult<T> =
       message: string;
       ok: false;
     };
+
+export type ParticipantEvidenceParticipantUpdateInput = {
+  email?: string | null;
+  externalReference?: string | null;
+  name: string;
+  phone?: string | null;
+};
 
 export function canReviewParticipantEvidence(actor: EvidenceReviewActor | null): actor is EvidenceReviewActor {
   return Boolean(actor && actor.status === "ACTIVE" && hasCapability(actor.role, "screening:review"));
@@ -143,6 +157,162 @@ export async function approveParticipantEvidenceReview({
   return {
     data: {
       created: result.created
+    },
+    ok: true
+  };
+}
+
+export async function regenerateParticipantReferenceCodes({
+  actor,
+  attemptId,
+  repository
+}: {
+  actor: EvidenceReviewActor | null;
+  attemptId: string;
+  repository: EvidenceReviewRepository;
+}): Promise<EvidenceReviewResult<null>> {
+  if (!canReviewParticipantEvidence(actor)) {
+    return {
+      message: "No tienes permiso para regenerar cÃ³digos.",
+      ok: false
+    };
+  }
+
+  const result = await repository.regenerateReferenceCodes({
+    attemptId,
+    codeGenerator: generateReferenceCode,
+    regeneratedByUserId: actor.id
+  });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  return {
+    data: null,
+    ok: true
+  };
+}
+
+export async function updateParticipantEvidenceParticipant({
+  actor,
+  attemptId,
+  input,
+  repository
+}: {
+  actor: EvidenceReviewActor | null;
+  attemptId: string;
+  input: ParticipantEvidenceParticipantUpdateInput;
+  repository: EvidenceReviewRepository;
+}): Promise<EvidenceReviewResult<null>> {
+  if (!canReviewParticipantEvidence(actor)) {
+    return {
+      message: "No tienes permiso para editar datos del participante.",
+      ok: false
+    };
+  }
+
+  const normalized = normalizeParticipantProfileInput(input);
+
+  if (!normalized.ok) {
+    return normalized;
+  }
+
+  const result = await repository.updateParticipantProfile({
+    attemptId,
+    email: normalized.data.email,
+    externalReference: normalized.data.externalReference,
+    name: normalized.data.name,
+    phone: normalized.data.phone,
+    updatedByUserId: actor.id
+  });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  return {
+    data: null,
+    ok: true
+  };
+}
+
+export async function deleteParticipantEvidenceTestRecord({
+  actor,
+  attemptId,
+  confirmationText,
+  reason,
+  repository,
+  storage
+}: {
+  actor: EvidenceReviewActor | null;
+  attemptId: string;
+  confirmationText: string;
+  reason: string;
+  repository: EvidenceReviewRepository;
+  storage: EvidenceStorageClient;
+}): Promise<EvidenceReviewResult<{ storageWarning: string | null; studyId: string }>> {
+  if (!actor || actor.status !== "ACTIVE" || actor.role !== "ADMIN") {
+    return {
+      message: "Solo ADMIN puede eliminar registros de prueba.",
+      ok: false
+    };
+  }
+
+  if (confirmationText.trim() !== "ELIMINAR") {
+    return {
+      message: "Escribe ELIMINAR para confirmar esta acciÃ³n.",
+      ok: false
+    };
+  }
+
+  const normalizedReason = normalizeParticipantTextInput(reason);
+
+  if (!normalizedReason) {
+    return {
+      message: "Captura el motivo de eliminaciÃ³n.",
+      ok: false
+    };
+  }
+
+  const result = await repository.deleteTestRecord({
+    attemptId,
+    deletedByUserId: actor.id,
+    reason: normalizedReason
+  });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  let storageWarning: string | null = null;
+
+  if (result.evidenceToDelete.length > 0 && storage.deleteObjects) {
+    const byBucket = new Map<string, string[]>();
+
+    for (const item of result.evidenceToDelete) {
+      byBucket.set(item.bucket, [...(byBucket.get(item.bucket) ?? []), item.privateStorageKey]);
+    }
+
+    try {
+      await Promise.all(
+        [...byBucket.entries()].map(([bucket, privateStorageKeys]) =>
+          storage.deleteObjects?.({
+            bucket,
+            privateStorageKeys
+          })
+        )
+      );
+    } catch (error) {
+      logEvidenceReviewError("delete-test-record-storage", "PERFUME_PHOTO", error);
+      storageWarning = "El registro se eliminÃ³, pero no fue posible borrar evidencias en Storage.";
+    }
+  }
+
+  return {
+    data: {
+      storageWarning,
+      studyId: result.studyId
     },
     ok: true
   };
@@ -456,6 +626,7 @@ async function toReviewDetail(
     f6DeclaredBrands: formatF6Answer(attempt.answers.find((answer) => answer.questionId === F6_PERFUME_EVIDENCE_QUESTION_ID)?.answerJson),
     participant: {
       email: participant.email,
+      externalReference: participant.externalReference,
       id: participant.id,
       name: participant.name,
       phone: participant.phone
@@ -490,14 +661,60 @@ export function buildWhatsAppUrl({
 }
 
 export function generateReferenceCode(): string {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
+  return String(randomInt(1000, 10000));
+}
 
-  for (let index = 0; index < 8; index += 1) {
-    code += alphabet[randomInt(0, alphabet.length)];
+function normalizeParticipantProfileInput(input: ParticipantEvidenceParticipantUpdateInput): EvidenceReviewResult<{
+  email: string | null;
+  externalReference: string | null;
+  name: string;
+  phone: string | null;
+}> {
+  const name = normalizeParticipantTextInput(input.name);
+  const phone = normalizeNullable(input.phone);
+  const email = normalizeNullable(input.email);
+  const externalReference = normalizeNullable(input.externalReference);
+
+  if (!name) {
+    return {
+      message: "Captura el nombre del participante.",
+      ok: false
+    };
   }
 
-  return code;
+  const normalizedPhone = phone ? normalizeMexicoPhone(phone) : null;
+
+  if (normalizedPhone && !isMexicoPhone(normalizedPhone)) {
+    return {
+      message: "Captura un celular vÃ¡lido a 10 dÃ­gitos o con clave +52.",
+      ok: false
+    };
+  }
+
+  const normalizedEmail = email ? normalizePortalEmail(email) : null;
+
+  if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return {
+      message: "Captura un correo vÃ¡lido.",
+      ok: false
+    };
+  }
+
+  return {
+    data: {
+      email: normalizedEmail,
+      externalReference: externalReference ? normalizeParticipantTextInput(externalReference) : null,
+      name,
+      phone: normalizedPhone
+    },
+    ok: true
+  };
+}
+
+function normalizeNullable(value: string | null | undefined): string | null {
+  const normalized = value?.trim() ?? "";
+
+  return normalized.length > 0 ? normalized : null;
 }
 
 function formatF6Answer(answer: unknown): string {

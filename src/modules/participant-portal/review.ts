@@ -12,6 +12,8 @@ export type ParticipantReferenceCodeDraft = {
   slot: 1 | 2 | 3;
 };
 
+export const PARTICIPANT_REFERENCE_CODE_PATTERN = /^[1-9]\d{3}$/;
+
 export type ParticipantConfirmationDraft = {
   approvedAt: Date;
   approvedByUserId: string;
@@ -136,7 +138,7 @@ export function generateReferenceCodes({
   codeGenerator: () => string;
   existingReferenceCodes: string[];
 }): ParticipantReferenceCodeDraft[] {
-  const existing = new Set(existingReferenceCodes);
+  const existing = new Set(existingReferenceCodes.map(normalizeParticipantReferenceCode));
   const codes: ParticipantReferenceCodeDraft[] = [];
   const generated = new Set<string>();
   let attempts = 0;
@@ -148,9 +150,9 @@ export function generateReferenceCodes({
       throw new Error("No fue posible generar tres códigos de referencia únicos.");
     }
 
-    const code = codeGenerator().trim().toUpperCase();
+    const code = normalizeParticipantReferenceCode(codeGenerator());
 
-    if (!code || existing.has(code) || generated.has(code)) {
+    if (!isParticipantReferenceCode(code) || existing.has(code) || generated.has(code)) {
       continue;
     }
 
@@ -162,6 +164,14 @@ export function generateReferenceCodes({
   }
 
   return codes;
+}
+
+export function normalizeParticipantReferenceCode(value: string): string {
+  return value.trim();
+}
+
+export function isParticipantReferenceCode(value: string): boolean {
+  return PARTICIPANT_REFERENCE_CODE_PATTERN.test(normalizeParticipantReferenceCode(value));
 }
 
 export function buildManualWhatsAppMessage({

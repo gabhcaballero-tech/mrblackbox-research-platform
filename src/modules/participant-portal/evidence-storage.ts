@@ -43,6 +43,10 @@ export type EvidenceStorageClient = {
     contentType: string;
     privateStorageKey: string;
   }) => Promise<{ signedUrl: string; token?: string }>;
+  deleteObjects?: (input: {
+    bucket: string;
+    privateStorageKeys: string[];
+  }) => Promise<void>;
 };
 
 export class EvidenceStorageError extends Error {
@@ -228,6 +232,20 @@ export function createSupabaseEvidenceStorageClient(): EvidenceStorageClient {
         signedUrl: data.signedUrl,
         token: "token" in data && typeof data.token === "string" ? data.token : undefined
       };
+    },
+    async deleteObjects(input) {
+      if (input.privateStorageKeys.length === 0) {
+        return;
+      }
+
+      const { error } = await client.storage.from(input.bucket).remove(input.privateStorageKeys);
+
+      if (error) {
+        throw new EvidenceStorageError(
+          classifyStorageErrorCode(error),
+          storageErrorMessage(error, "No fue posible eliminar evidencias en Storage.")
+        );
+      }
     }
   };
 }

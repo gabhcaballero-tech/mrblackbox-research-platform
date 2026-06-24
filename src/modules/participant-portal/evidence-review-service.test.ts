@@ -5,9 +5,13 @@ import {
   buildWhatsAppUrl,
   canReviewParticipantEvidence,
   confirmParticipantEvidenceReplacement,
+  deleteParticipantEvidenceTestRecord,
+  generateReferenceCode,
   getParticipantEvidenceReviewDetail,
+  regenerateParticipantReferenceCodes,
   rejectParticipantEvidenceReview,
-  requestParticipantEvidenceReplacementUpload
+  requestParticipantEvidenceReplacementUpload,
+  updateParticipantEvidenceParticipant
 } from "./evidence-review-service";
 
 const admin = { id: "admin-1", role: "ADMIN" as const, status: "ACTIVE" as const };
@@ -60,8 +64,10 @@ function attempt(overrides: Partial<EvidenceReviewAttemptRecord> = {}): Evidence
       id: "study-participant-1",
       participantProfile: {
         email: "persona@example.com",
+        externalReference: "REF-1",
         id: "profile-1",
         name: "Gabriela",
+        participantAuthUserId: "11111111-1111-4111-8111-111111111111",
         phone: "+52 55 1234 5678"
       }
     },
@@ -79,18 +85,38 @@ function repository(currentAttempt = attempt()) {
         manualMessageMarkedSentAt: null,
         manualMessageStatus: "NOT_SENT" as const,
         referenceCodes: [
-          { code: "ABC12345", slot: 1 as const },
-          { code: "DEF12345", slot: 2 as const },
-          { code: "GHI12345", slot: 3 as const }
+          { code: "4821", slot: 1 as const },
+          { code: "7710", slot: 2 as const },
+          { code: "9034", slot: 3 as const }
         ]
       },
       created: true,
       ok: true as const
     })),
+    deleteTestRecord: vi.fn(async () => ({
+      evidenceToDelete: [{ bucket: "participant-evidence", privateStorageKey: "private/selfie.jpg" }],
+      ok: true as const,
+      studyId: "study-1"
+    })),
     getAttemptReview: vi.fn(async () => currentAttempt),
     markManualMessageSent: vi.fn(async () => undefined),
     rejectEvidence: vi.fn(async () => undefined),
-    replaceEvidence: vi.fn(async () => ({ ok: true as const }))
+    regenerateReferenceCodes: vi.fn(async () => ({
+      confirmation: {
+        folio: "NAV-001",
+        folioSequence: 1,
+        manualMessageMarkedSentAt: null,
+        manualMessageStatus: "NOT_SENT" as const,
+        referenceCodes: [
+          { code: "1001", slot: 1 as const },
+          { code: "1002", slot: 2 as const },
+          { code: "1003", slot: 3 as const }
+        ]
+      },
+      ok: true as const
+    })),
+    replaceEvidence: vi.fn(async () => ({ ok: true as const })),
+    updateParticipantProfile: vi.fn(async () => ({ ok: true as const }))
   };
 
   return repo;
@@ -153,6 +179,169 @@ describe("participant evidence review service", () => {
     expect(rejectedWithoutReason.ok).toBe(false);
     expect(rejected.ok).toBe(true);
     expect(repo.rejectEvidence).toHaveBeenCalledWith(expect.objectContaining({ rejectionReason: "Selfie borrosa" }));
+  });
+
+  it("generates exactly four numeric digits for new reference codes", () => {
+    expect(generateReferenceCode()).toMatch(/^[1-9]\d{3}$/);
+  });
+
+  it("regenerates codes through repository and keeps message-sent blocks in service response", async () => {
+    const repo = repository();
+    const regenerated = await regenerateParticipantReferenceCodes({
+      actor: admin,
+      attemptId: "attempt-1",
+      repository: repo
+    });
+
+    expect(regenerated.ok).toBe(true);
+    expect(repo.regenerateReferenceCodes).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attemptId: "attempt-1",
+        regeneratedByUserId: "admin-1"
+      })
+    );
+  });
+
+  it("surfaces the server-side block when regenerating after WhatsApp was marked sent", async () => {
+    const repo = repository();
+    vi.mocked(repo.regenerateReferenceCodes).mockResolvedValueOnce({
+      message: "No se pueden regenerar cÃ³digos porque el mensaje ya fue marcado como enviado.",
+      ok: false
+    });
+
+    const result = await regenerateParticipantReferenceCodes({
+      actor: admin,
+      attemptId: "attempt-1",
+      repository: repo
+    });
+
+    expect(result).toMatchObject({
+      message: "No se pueden regenerar cÃ³digos porque el mensaje ya fue marcado como enviado.",
+      ok: false
+    });
+  });
+
+  it("normalizes participant data without changing participantAuthUserId", async () => {
+    const repo = repository();
+    const result = await updateParticipantEvidenceParticipant({
+      actor: admin,
+      attemptId: "attempt-1",
+      input: {
+        email: "PERSONA@EXAMPLE.COM",
+        externalReference: " ref-77 ",
+        name: "gabriela ✨",
+        phone: "55 1234 5678"
+      },
+      repository: repo
+    });
+
+    expect(result.ok).toBe(true);
+    expect(repo.updateParticipantProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: "persona@example.com",
+        externalReference: "REF-77",
+        name: "GABRIELA",
+        phone: "+525512345678"
+      })
+    );
+    expect(repo.updateParticipantProfile).not.toHaveBeenCalledWith(
+      expect.objectContaining({ participantAuthUserId: expect.anything() })
+    );
+  });
+
+  it("denies participant profile edits to INTERVIEWER", async () => {
+    const repo = repository();
+    const result = await updateParticipantEvidenceParticipant({
+      actor: interviewer,
+      attemptId: "attempt-1",
+      input: {
+        email: "persona@example.com",
+        externalReference: "REF-1",
+        name: "Persona",
+        phone: "5512345678"
+      },
+      repository: repo
+    });
+
+    expect(result.ok).toBe(false);
+    expect(repo.updateParticipantProfile).not.toHaveBeenCalled();
+  });
+
+  it("requires ADMIN and confirmation text for test-record deletion", async () => {
+    const deniedByRole = await deleteParticipantEvidenceTestRecord({
+      actor: { id: "super-1", role: "SUPERVISOR", status: "ACTIVE" },
+      attemptId: "attempt-1",
+      confirmationText: "ELIMINAR",
+      reason: "Prueba",
+      repository: repository(),
+      storage: {
+        createSignedReadUrl: vi.fn(),
+        createSignedUploadUrl: vi.fn()
+      }
+    });
+    const deniedByText = await deleteParticipantEvidenceTestRecord({
+      actor: admin,
+      attemptId: "attempt-1",
+      confirmationText: "BORRAR",
+      reason: "Prueba",
+      repository: repository(),
+      storage: {
+        createSignedReadUrl: vi.fn(),
+        createSignedUploadUrl: vi.fn()
+      }
+    });
+
+    expect(deniedByRole.ok).toBe(false);
+    expect(deniedByText.ok).toBe(false);
+  });
+
+  it("deletes safe test records and requests private Storage cleanup", async () => {
+    const repo = repository();
+    const storage = {
+      createSignedReadUrl: vi.fn(),
+      createSignedUploadUrl: vi.fn(),
+      deleteObjects: vi.fn(async () => undefined)
+    };
+    const result = await deleteParticipantEvidenceTestRecord({
+      actor: admin,
+      attemptId: "attempt-1",
+      confirmationText: "ELIMINAR",
+      reason: "Registro de prueba",
+      repository: repo,
+      storage
+    });
+
+    expect(result.ok).toBe(true);
+    expect(repo.deleteTestRecord).toHaveBeenCalled();
+    expect(storage.deleteObjects).toHaveBeenCalledWith({
+      bucket: "participant-evidence",
+      privateStorageKeys: ["private/selfie.jpg"]
+    });
+  });
+
+  it("blocks test-record deletion when the repository detects final information", async () => {
+    const repo = repository();
+    vi.mocked(repo.deleteTestRecord).mockResolvedValueOnce({
+      message: "No se puede eliminar este registro porque ya tiene informacion final o relaciones activas.",
+      ok: false
+    });
+
+    const result = await deleteParticipantEvidenceTestRecord({
+      actor: admin,
+      attemptId: "attempt-1",
+      confirmationText: "ELIMINAR",
+      reason: "Registro confirmado",
+      repository: repo,
+      storage: {
+        createSignedReadUrl: vi.fn(),
+        createSignedUploadUrl: vi.fn()
+      }
+    });
+
+    expect(result).toMatchObject({
+      message: "No se puede eliminar este registro porque ya tiene informacion final o relaciones activas.",
+      ok: false
+    });
   });
 
   it("builds WhatsApp URL with normalized phone", () => {
