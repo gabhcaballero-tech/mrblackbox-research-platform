@@ -11,6 +11,7 @@ import {
   approveParticipantEvidenceAction,
   rejectParticipantEvidenceAction
 } from "@/modules/participant-portal/evidence-review-actions";
+import { EvidenceReplacementForm } from "./EvidenceReplacementForm";
 import { WhatsAppManualBlock } from "./WhatsAppManualBlock";
 
 const dateFormatter = new Intl.DateTimeFormat("es-MX", {
@@ -394,8 +395,22 @@ export function EvidenceReviewPanel({
             <p className="mt-2 text-xs text-zinc-500">
               {item.mimeType} · {Math.round(item.sizeBytes / 1024)} KB
             </p>
+            <EvidenceReplacementForm
+              attemptId={detail.attemptId}
+              evidenceId={item.id}
+              evidenceType={item.type}
+              label={item.type === "SELFIE_IDENTIFICATION" ? "Reemplazar selfie" : "Reemplazar foto de perfume"}
+            />
           </article>
         ))}
+      </div>
+
+      <div className="mt-5">
+        <EvidenceReplacementForm
+          attemptId={detail.attemptId}
+          evidenceType="PERFUME_PHOTO"
+          label="Agregar foto de perfume"
+        />
       </div>
 
       {detail.review?.status === "PENDING" ? (

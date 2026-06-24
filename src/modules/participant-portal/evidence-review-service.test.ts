@@ -4,8 +4,10 @@ import {
   approveParticipantEvidenceReview,
   buildWhatsAppUrl,
   canReviewParticipantEvidence,
+  confirmParticipantEvidenceReplacement,
   getParticipantEvidenceReviewDetail,
-  rejectParticipantEvidenceReview
+  rejectParticipantEvidenceReview,
+  requestParticipantEvidenceReplacementUpload
 } from "./evidence-review-service";
 
 const admin = { id: "admin-1", role: "ADMIN" as const, status: "ACTIVE" as const };
@@ -45,6 +47,7 @@ function attempt(overrides: Partial<EvidenceReviewAttemptRecord> = {}): Evidence
         participantPortalConfig: {
           folioMaxSequence: 999,
           folioPrefix: "NAV",
+          maxImageBytes: 1000,
           maxPerfumePhotos: 5,
           minPerfumePhotos: 1,
           nextFolioSequence: 1
@@ -86,7 +89,8 @@ function repository(currentAttempt = attempt()) {
     })),
     getAttemptReview: vi.fn(async () => currentAttempt),
     markManualMessageSent: vi.fn(async () => undefined),
-    rejectEvidence: vi.fn(async () => undefined)
+    rejectEvidence: vi.fn(async () => undefined),
+    replaceEvidence: vi.fn(async () => ({ ok: true as const }))
   };
 
   return repo;
@@ -158,5 +162,101 @@ describe("participant evidence review service", () => {
     });
 
     expect(url).toBe("https://wa.me/525512345678?text=Hola%20mundo");
+  });
+
+  it("lets ADMIN prepare replacement upload without exposing a signed URL", async () => {
+    const storage = {
+      createSignedReadUrl: vi.fn(),
+      createSignedUploadUrl: vi.fn(async () => ({
+        signedUrl: "https://signed.example/upload",
+        token: "token-1"
+      }))
+    };
+    const result = await requestParticipantEvidenceReplacementUpload({
+      actor: admin,
+      attemptId: "attempt-1",
+      evidenceId: "evidence-1",
+      metadata: {
+        evidenceType: "SELFIE_IDENTIFICATION",
+        mimeType: "image/jpeg",
+        originalFilename: "selfie.jpg",
+        sizeBytes: 100
+      },
+      repository: repository(),
+      storage
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.token : null).toBe("token-1");
+    expect(result.ok ? "signedUrl" in result.data : true).toBe(false);
+  });
+
+  it("requires review permission and internal reason for replacement", async () => {
+    const repo = repository();
+    const denied = await requestParticipantEvidenceReplacementUpload({
+      actor: interviewer,
+      attemptId: "attempt-1",
+      evidenceId: "evidence-1",
+      metadata: {
+        evidenceType: "SELFIE_IDENTIFICATION",
+        mimeType: "image/jpeg",
+        originalFilename: "selfie.jpg",
+        sizeBytes: 100
+      },
+      repository: repo,
+      storage: {
+        createSignedReadUrl: vi.fn(),
+        createSignedUploadUrl: vi.fn()
+      }
+    });
+    const withoutReason = await confirmParticipantEvidenceReplacement({
+      actor: admin,
+      attemptId: "attempt-1",
+      input: {
+        evidenceId: "evidence-1",
+        evidenceType: "SELFIE_IDENTIFICATION",
+        mimeType: "image/jpeg",
+        originalFilename: "selfie.jpg",
+        privateStorageKey: "studies/study-1/participants/profile-1/screening-attempts/attempt-1/selfie_identification/key.jpg",
+        replacementReason: "",
+        sizeBytes: 100,
+        storageBucket: "participant-evidence"
+      },
+      repository: repo
+    });
+
+    expect(denied.ok).toBe(false);
+    expect(withoutReason.ok).toBe(false);
+    expect(repo.replaceEvidence).not.toHaveBeenCalled();
+  });
+
+  it("confirms replacement through repository with private bucket/key metadata", async () => {
+    const repo = repository();
+    const result = await confirmParticipantEvidenceReplacement({
+      actor: admin,
+      attemptId: "attempt-1",
+      input: {
+        evidenceId: "evidence-1",
+        evidenceType: "SELFIE_IDENTIFICATION",
+        mimeType: "image/jpeg",
+        originalFilename: "selfie.jpg",
+        privateStorageKey: "studies/study-1/participants/profile-1/screening-attempts/attempt-1/selfie_identification/key.jpg",
+        replacementReason: "Foto borrosa",
+        sizeBytes: 100,
+        storageBucket: "participant-evidence"
+      },
+      repository: repo
+    });
+
+    expect(result.ok).toBe(true);
+    expect(repo.replaceEvidence).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evidenceId: "evidence-1",
+        evidenceType: "SELFIE_IDENTIFICATION",
+        replacementReason: "Foto borrosa",
+        reviewedByUserId: "admin-1",
+        storageBucket: "participant-evidence"
+      })
+    );
   });
 });

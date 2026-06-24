@@ -2,6 +2,11 @@ import { randomInt } from "node:crypto";
 import { hasCapability, type InternalUserRole, type InternalUserStatus } from "@/shared/auth/permissions";
 import {
   F6_PERFUME_EVIDENCE_QUESTION_ID,
+  PARTICIPANT_EVIDENCE_BUCKET,
+  assertEvidenceStorageKeyBelongsToAttempt,
+  createSignedEvidenceUpload,
+  validateEvidenceUploadMetadata,
+  type EvidenceUploadMetadata,
   type EvidenceStorageClient
 } from "./evidence-storage";
 import type {
@@ -24,6 +29,13 @@ export type EvidenceReviewImage = {
   signedUrl: string | null;
   sizeBytes: number;
   type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION";
+};
+
+export type EvidenceReplacementSignedUpload = {
+  metadata: EvidenceUploadMetadata;
+  privateStorageKey: string;
+  storageBucket: string;
+  token: string;
 };
 
 export type ParticipantEvidenceReviewDetail = {
@@ -176,6 +188,197 @@ export async function rejectParticipantEvidenceReview({
   };
 }
 
+export async function requestParticipantEvidenceReplacementUpload({
+  actor,
+  attemptId,
+  evidenceId,
+  metadata,
+  repository,
+  storage
+}: {
+  actor: EvidenceReviewActor | null;
+  attemptId: string;
+  evidenceId?: string | null;
+  metadata: EvidenceUploadMetadata;
+  repository: EvidenceReviewRepository;
+  storage: EvidenceStorageClient;
+}): Promise<EvidenceReviewResult<EvidenceReplacementSignedUpload>> {
+  if (!canReviewParticipantEvidence(actor)) {
+    return {
+      message: "No tienes permiso para corregir evidencias.",
+      ok: false
+    };
+  }
+
+  const attempt = await repository.getAttemptReview(attemptId);
+
+  if (!attempt) {
+    return {
+      message: "El intento no existe.",
+      ok: false
+    };
+  }
+
+  const validation = validateReplacementTarget({
+    attempt,
+    evidenceId,
+    evidenceType: metadata.evidenceType
+  });
+
+  if (!validation.ok) {
+    return validation;
+  }
+
+  const config = attempt.questionnaireVersion.study.participantPortalConfig;
+
+  if (!config) {
+    return {
+      message: "El portal no está configurado para este estudio.",
+      ok: false
+    };
+  }
+
+  try {
+    const signed = await createSignedEvidenceUpload({
+      attemptId: attempt.id,
+      maxImageBytes: config.maxImageBytes,
+      metadata,
+      participantProfileId: attempt.studyParticipant.participantProfile.id,
+      storage,
+      studyId: attempt.questionnaireVersion.study.id
+    });
+
+    if (!signed.token) {
+      return {
+        message: "No fue posible preparar la carga. Intenta de nuevo.",
+        ok: false
+      };
+    }
+
+    return {
+      data: {
+        metadata: signed.metadata,
+        privateStorageKey: signed.privateStorageKey,
+        storageBucket: signed.storageBucket,
+        token: signed.token
+      },
+      ok: true
+    };
+  } catch (error) {
+    logEvidenceReviewError("prepare-replacement-upload", metadata.evidenceType, error);
+    return {
+      message: error instanceof Error ? error.message : "No fue posible preparar la carga. Intenta de nuevo.",
+      ok: false
+    };
+  }
+}
+
+export async function confirmParticipantEvidenceReplacement({
+  actor,
+  attemptId,
+  input,
+  repository
+}: {
+  actor: EvidenceReviewActor | null;
+  attemptId: string;
+  input: EvidenceUploadMetadata & {
+    evidenceId?: string | null;
+    privateStorageKey: string;
+    replacementReason: string;
+    storageBucket: string;
+  };
+  repository: EvidenceReviewRepository;
+}): Promise<EvidenceReviewResult<null>> {
+  if (!canReviewParticipantEvidence(actor)) {
+    return {
+      message: "No tienes permiso para corregir evidencias.",
+      ok: false
+    };
+  }
+
+  if (!input.replacementReason.trim()) {
+    return {
+      message: "Captura el motivo interno de reemplazo.",
+      ok: false
+    };
+  }
+
+  const attempt = await repository.getAttemptReview(attemptId);
+
+  if (!attempt) {
+    return {
+      message: "El intento no existe.",
+      ok: false
+    };
+  }
+
+  const targetValidation = validateReplacementTarget({
+    attempt,
+    evidenceId: input.evidenceId,
+    evidenceType: input.evidenceType
+  });
+
+  if (!targetValidation.ok) {
+    return targetValidation;
+  }
+
+  const config = attempt.questionnaireVersion.study.participantPortalConfig;
+
+  if (!config) {
+    return {
+      message: "El portal no está configurado para este estudio.",
+      ok: false
+    };
+  }
+
+  try {
+    const metadata = validateEvidenceUploadMetadata({
+      maxImageBytes: config.maxImageBytes,
+      metadata: input
+    });
+
+    if (input.storageBucket !== PARTICIPANT_EVIDENCE_BUCKET) {
+      throw new Error("No fue posible validar la evidencia cargada.");
+    }
+
+    assertEvidenceStorageKeyBelongsToAttempt({
+      attemptId: attempt.id,
+      participantProfileId: attempt.studyParticipant.participantProfile.id,
+      privateStorageKey: input.privateStorageKey,
+      studyId: attempt.questionnaireVersion.study.id
+    });
+
+    const result = await repository.replaceEvidence({
+      attemptId: attempt.id,
+      evidenceId: input.evidenceId,
+      evidenceType: metadata.evidenceType,
+      extension: metadata.extension,
+      mimeType: metadata.mimeType,
+      originalFilename: metadata.originalFilename,
+      privateStorageKey: input.privateStorageKey,
+      replacementReason: input.replacementReason,
+      reviewedByUserId: actor.id,
+      sizeBytes: metadata.sizeBytes,
+      storageBucket: input.storageBucket
+    });
+
+    if (!result.ok) {
+      return result;
+    }
+
+    return {
+      data: null,
+      ok: true
+    };
+  } catch (error) {
+    logEvidenceReviewError("confirm-replacement-upload", input.evidenceType, error);
+    return {
+      message: error instanceof Error ? error.message : "No fue posible registrar la evidencia.",
+      ok: false
+    };
+  }
+}
+
 export async function markParticipantManualMessageSent({
   actor,
   attemptId,
@@ -315,4 +518,66 @@ function formatF6Answer(answer: unknown): string {
   }
 
   return "Sin respuesta registrada.";
+}
+
+function validateReplacementTarget({
+  attempt,
+  evidenceId,
+  evidenceType
+}: {
+  attempt: EvidenceReviewAttemptRecord;
+  evidenceId?: string | null;
+  evidenceType: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION";
+}):
+  | {
+      ok: true;
+    }
+  | {
+      message: string;
+      ok: false;
+    } {
+  const evidence = attempt.participantEvidence;
+  const target = evidenceId ? evidence.find((item) => item.id === evidenceId) : null;
+
+  if (evidenceId && !target) {
+    return { message: "La evidencia seleccionada no existe en este intento.", ok: false };
+  }
+
+  if (target && target.type !== evidenceType) {
+    return { message: "La evidencia seleccionada no coincide con el tipo indicado.", ok: false };
+  }
+
+  if (evidenceType === "PERFUME_PHOTO" && !target) {
+    const maxPerfumePhotos = attempt.questionnaireVersion.study.participantPortalConfig?.maxPerfumePhotos ?? 5;
+    const perfumeCount = evidence.filter((item) => item.type === "PERFUME_PHOTO").length;
+
+    if (perfumeCount >= maxPerfumePhotos) {
+      return { message: `Puedes registrar máximo ${maxPerfumePhotos} fotos de perfumes.`, ok: false };
+    }
+  }
+
+  return { ok: true };
+}
+
+function logEvidenceReviewError(step: string, evidenceType: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION", error: unknown) {
+  console.error("[participant-evidence-review]", {
+    code: readSafeErrorCode(error),
+    evidenceType,
+    step
+  });
+}
+
+function readSafeErrorCode(error: unknown): string {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "string") {
+      return code;
+    }
+  }
+
+  if (error instanceof Error) {
+    return error.name;
+  }
+
+  return "unknown";
 }

@@ -39,6 +39,7 @@ export type EvidenceReviewAttemptRecord = {
       participantPortalConfig: {
         folioMaxSequence: number;
         folioPrefix: string;
+        maxImageBytes: number;
         maxPerfumePhotos: number;
         minPerfumePhotos: number;
         nextFolioSequence: number;
@@ -79,12 +80,37 @@ export type EvidenceReviewRepository = {
     reviewedByUserId: string;
     now?: Date;
   }) => Promise<void>;
+  replaceEvidence: (input: ReplaceParticipantEvidenceInput) => Promise<EvidenceReviewReplacementResult>;
 };
 
 export type EvidenceReviewApprovalResult =
   | {
       confirmation: EvidenceReviewConfirmationRecord;
       created: boolean;
+      ok: true;
+    }
+  | {
+      message: string;
+      ok: false;
+    };
+
+export type ReplaceParticipantEvidenceInput = {
+  attemptId: string;
+  evidenceId?: string | null;
+  evidenceType: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION";
+  extension: "jpeg" | "jpg" | "png" | "webp";
+  mimeType: string;
+  originalFilename: string;
+  privateStorageKey: string;
+  replacementReason: string;
+  reviewedByUserId: string;
+  sizeBytes: number;
+  storageBucket: string;
+  now?: Date;
+};
+
+export type EvidenceReviewReplacementResult =
+  | {
       ok: true;
     }
   | {
@@ -106,6 +132,8 @@ type EvidenceReviewTransactionClient = {
     update: (args: unknown) => Promise<EvidenceReviewConfirmationRecord>;
   };
   participantEvidence: {
+    create: (args: unknown) => Promise<PortalEvidenceRecord>;
+    update: (args: unknown) => Promise<PortalEvidenceRecord>;
     updateMany: (args: unknown) => Promise<unknown>;
   };
   participantPortalStudyConfig: {
@@ -115,6 +143,7 @@ type EvidenceReviewTransactionClient = {
     findMany: (args: unknown) => Promise<Array<{ code: string }>>;
   };
   participantScreeningReview: {
+    upsert: (args: unknown) => Promise<EvidenceReviewRecord>;
     update: (args: unknown) => Promise<EvidenceReviewRecord>;
   };
   screeningAttempt: {
@@ -184,6 +213,7 @@ const attemptReviewSelect = {
             select: {
               folioMaxSequence: true,
               folioPrefix: true,
+              maxImageBytes: true,
               maxPerfumePhotos: true,
               minPerfumePhotos: true,
               nextFolioSequence: true
@@ -380,6 +410,112 @@ export function createEvidenceReviewRepository(
           }
         });
       });
+    },
+    async replaceEvidence(input) {
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const attempt = await getAttemptReviewWithClient(tx, input.attemptId);
+
+        if (!attempt) {
+          return { message: "El intento no existe.", ok: false };
+        }
+
+        const reason = input.replacementReason.trim();
+        if (!reason) {
+          return { message: "Captura el motivo interno de reemplazo.", ok: false };
+        }
+
+        const target = input.evidenceId
+          ? attempt.participantEvidence.find((item) => item.id === input.evidenceId)
+          : input.evidenceType === "SELFIE_IDENTIFICATION"
+            ? attempt.participantEvidence.find((item) => item.type === "SELFIE_IDENTIFICATION")
+            : null;
+
+        if (input.evidenceId && !target) {
+          return { message: "La evidencia seleccionada no existe en este intento.", ok: false };
+        }
+
+        if (target && target.type !== input.evidenceType) {
+          return { message: "La evidencia seleccionada no coincide con el tipo indicado.", ok: false };
+        }
+
+        if (input.evidenceType === "PERFUME_PHOTO" && !target) {
+          const maxPerfumePhotos = attempt.questionnaireVersion.study.participantPortalConfig?.maxPerfumePhotos ?? 5;
+          const perfumeCount = attempt.participantEvidence.filter((item) => item.type === "PERFUME_PHOTO").length;
+
+          if (perfumeCount >= maxPerfumePhotos) {
+            return { message: `Puedes registrar máximo ${maxPerfumePhotos} fotos de perfumes.`, ok: false };
+          }
+        }
+
+        const now = input.now ?? new Date();
+        const reviewAlreadyApproved = attempt.participantScreeningReview?.status === "APPROVED";
+        const correctionNote = buildEvidenceReplacementNote({
+          evidenceType: input.evidenceType,
+          reason,
+          reviewedByUserId: input.reviewedByUserId
+        });
+        const evidenceData = {
+          extension: input.extension,
+          internalNote: correctionNote,
+          mimeType: input.mimeType,
+          originalFilename: input.originalFilename,
+          privateStorageKey: input.privateStorageKey,
+          rejectionReason: null,
+          reviewStatus: reviewAlreadyApproved ? "APPROVED" : "PENDING",
+          reviewedAt: reviewAlreadyApproved ? now : null,
+          reviewedByUserId: reviewAlreadyApproved ? input.reviewedByUserId : null,
+          sizeBytes: input.sizeBytes,
+          storageBucket: input.storageBucket
+        };
+
+        if (target) {
+          await tx.participantEvidence.update({
+            data: evidenceData,
+            select: evidenceSelect,
+            where: {
+              id: target.id
+            }
+          });
+        } else {
+          await tx.participantEvidence.create({
+            data: {
+              ...evidenceData,
+              relatedQuestionId: input.evidenceType === "PERFUME_PHOTO" ? "F6_MARCAS_UTILIZA" : null,
+              screeningAttemptId: attempt.id,
+              studyParticipantId: attempt.studyParticipantId,
+              type: input.evidenceType
+            },
+            select: evidenceSelect
+          });
+        }
+
+        await tx.participantScreeningReview.upsert({
+          create: {
+            internalNote: correctionNote,
+            screeningAttemptId: attempt.id,
+            status: "PENDING",
+            studyParticipantId: attempt.studyParticipantId
+          },
+          update: reviewAlreadyApproved
+            ? {
+                internalNote: appendInternalNote(attempt.participantScreeningReview?.internalNote, correctionNote)
+              }
+            : {
+                internalNote: appendInternalNote(attempt.participantScreeningReview?.internalNote, correctionNote),
+                rejectionReason: null,
+                reviewedAt: null,
+                reviewedByUserId: null,
+                status: "PENDING"
+              },
+          where: {
+            screeningAttemptId: attempt.id
+          }
+        });
+
+        return { ok: true };
+      });
     }
   };
 }
@@ -462,4 +598,22 @@ function validateEvidenceForApproval({
   }
 
   return { ok: true };
+}
+
+function buildEvidenceReplacementNote({
+  evidenceType,
+  reason,
+  reviewedByUserId
+}: {
+  evidenceType: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION";
+  reason: string;
+  reviewedByUserId: string;
+}): string {
+  const label = evidenceType === "SELFIE_IDENTIFICATION" ? "selfie" : "foto de perfume";
+
+  return `Corrección manual de ${label} por ${reviewedByUserId}: ${reason}`;
+}
+
+function appendInternalNote(current: string | null | undefined, next: string): string {
+  return [current?.trim(), next].filter(Boolean).join("\n");
 }

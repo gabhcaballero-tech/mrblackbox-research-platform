@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
   confirmParticipantEvidenceUploadAction,
   requestParticipantEvidenceUploadAction
 } from "@/modules/participant-portal/evidence-actions";
 import type { ParticipantEvidenceKind } from "@/modules/participant-portal/evidence-storage";
+import { createBrowserSupabaseClient } from "@/shared/auth/supabase/browser";
 
 type PortalEvidenceCaptureProps = {
   buttonLabel: string;
@@ -38,58 +39,22 @@ export function PortalEvidenceCapture({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraState, setCameraState] = useState<"idle" | "opening" | "ready">("idle");
+  const [capturedFile, setCapturedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [activeStream, setActiveStream] = useState<MediaStream | null>(null);
   const [cameraSupported] = useState(
     () =>
       typeof navigator !== "undefined" &&
       !!navigator.mediaDevices &&
       typeof navigator.mediaDevices.getUserMedia === "function"
   );
-  const fileInputId = useId();
   const streamRef = useRef<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
 
-  useEffect(() => stopCamera, []);
-
-  const count = onCountChange ? currentCount : internalCount;
-  const remaining = Math.max(0, maxCount - count);
-  const canUploadMore = remaining > 0 && !isPending;
-
-  async function openCamera() {
-    setError(null);
-    setMessage(null);
-
-    if (!cameraSupported) {
-      setError(
-        "Tu navegador no permitio abrir la camara. Intenta desde un celular o permite acceso a camara."
-      );
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: captureFacingMode
-        }
-      });
-
-      stopCamera();
-      streamRef.current = stream;
-      setCameraOpen(true);
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-    } catch {
-      setError(
-        "Tu navegador no permitio abrir la camara. Intenta desde un celular o permite acceso a camara."
-      );
-    }
-  }
-
-  function stopCamera() {
+  const stopCameraTracks = useCallback((updateState = true) => {
     const stream = streamRef.current;
 
     if (stream) {
@@ -99,10 +64,118 @@ export function PortalEvidenceCapture({
     }
 
     streamRef.current = null;
-    setCameraOpen(false);
+    if (updateState) {
+      setActiveStream(null);
+    }
 
     if (videoRef.current) {
       videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  const stopCamera = useCallback(() => {
+    stopCameraTracks();
+    setCameraState("idle");
+  }, [stopCameraTracks]);
+
+  useEffect(
+    () => () => {
+      stopCameraTracks(false);
+      revokePreview();
+    },
+    [stopCameraTracks]
+  );
+
+  useEffect(() => {
+    const stream = activeStream;
+    const video = videoRef.current;
+
+    if (!stream || !video || cameraState === "idle") {
+      return;
+    }
+
+    let settled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    function markReady() {
+      if (!video || settled) {
+        return;
+      }
+
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        settled = true;
+        setCameraState("ready");
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      }
+    }
+
+    function failCamera() {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      stopCamera();
+      setError("No fue posible abrir la cámara. Permite el acceso a la cámara o intenta desde un celular.");
+    }
+
+    video.srcObject = stream;
+    video.muted = true;
+    video.playsInline = true;
+    video.addEventListener("loadedmetadata", markReady);
+    video.addEventListener("canplay", markReady);
+
+    void video.play().then(markReady).catch(failCamera);
+
+    timeoutId = setTimeout(() => {
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        failCamera();
+      }
+    }, 4000);
+
+    return () => {
+      video.removeEventListener("loadedmetadata", markReady);
+      video.removeEventListener("canplay", markReady);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [activeStream, cameraState, stopCamera]);
+
+  const count = onCountChange ? currentCount : internalCount;
+  const remaining = Math.max(0, maxCount - count);
+  const canUploadMore = remaining > 0 && !isPending;
+  const counterText =
+    evidenceType === "SELFIE_IDENTIFICATION"
+      ? `Selfie registrada: ${count}/${maxCount}`
+      : `Fotos registradas: ${count}/${maxCount}. Mínimo requerido: ${minRequired}.`;
+
+  async function openCamera() {
+    setError(null);
+    setMessage(null);
+    clearCapturedPhoto();
+
+    if (!cameraSupported) {
+      setError("Para continuar necesitas usar un dispositivo con cámara.");
+      return;
+    }
+
+    try {
+      setCameraState("opening");
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: captureFacingMode
+        }
+      });
+
+      stopCameraTracks();
+      streamRef.current = stream;
+      setActiveStream(stream);
+    } catch {
+      stopCamera();
+      setError("No fue posible abrir la cámara. Permite el acceso a la cámara o intenta desde un celular.");
     }
   }
 
@@ -110,13 +183,13 @@ export function PortalEvidenceCapture({
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
-    if (!video || !canvas) {
+    if (!video || !canvas || cameraState !== "ready" || video.videoWidth === 0 || video.videoHeight === 0) {
       setError("No fue posible capturar la imagen. Intenta nuevamente.");
       return;
     }
 
-    const width = video.videoWidth || 1280;
-    const height = video.videoHeight || 720;
+    const width = video.videoWidth;
+    const height = video.videoHeight;
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d");
@@ -139,24 +212,24 @@ export function PortalEvidenceCapture({
         { type: "image/jpeg" }
       );
 
-      await uploadFile(file);
       stopCamera();
+      setCapturedFile(file);
+      setPreviewUrlFromFile(file);
     }, "image/jpeg", 0.92);
   }
 
-  function onFallbackFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0];
-
-    if (!file) {
+  function useCapturedPhoto() {
+    if (!capturedFile) {
+      setError("No hay una foto lista para usar.");
       return;
     }
 
+    const file = capturedFile;
     startTransition(async () => {
       const result = await uploadEvidenceFile(studyCode, evidenceType, file);
 
       if (!result.ok) {
         setError(result.message);
-        event.currentTarget.value = "";
         return;
       }
 
@@ -169,33 +242,35 @@ export function PortalEvidenceCapture({
 
         return nextCount;
       });
-      setMessage("Evidencia subida correctamente.");
+      setMessage("Evidencia registrada correctamente.");
       setError(null);
-      event.currentTarget.value = "";
+      clearCapturedPhoto();
     });
   }
 
-  async function uploadFile(file: File) {
-    startTransition(async () => {
-      const result = await uploadEvidenceFile(studyCode, evidenceType, file);
+  function repeatPhoto() {
+    clearCapturedPhoto();
+    void openCamera();
+  }
 
-      if (!result.ok) {
-        setError(result.message);
-        return;
-      }
+  function setPreviewUrlFromFile(file: File) {
+    revokePreview();
+    const nextUrl = URL.createObjectURL(file);
+    previewUrlRef.current = nextUrl;
+    setPreviewUrl(nextUrl);
+  }
 
-      setInternalCount((current) => {
-        const nextCount = Math.min(maxCount, current + 1);
-        if (onCountChange) {
-          onCountChange(nextCount);
-          return current;
-        }
+  function revokePreview() {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+  }
 
-        return nextCount;
-      });
-      setMessage("Evidencia subida correctamente.");
-      setError(null);
-    });
+  function clearCapturedPhoto() {
+    revokePreview();
+    setPreviewUrl(null);
+    setCapturedFile(null);
   }
 
   return (
@@ -203,9 +278,7 @@ export function PortalEvidenceCapture({
       <div className="space-y-2">
         <h3 className="text-base font-semibold text-zinc-950">{title}</h3>
         <p className="text-sm leading-6 text-zinc-600">{description}</p>
-        <p className="text-sm text-zinc-500">
-          Registradas: {count}/{maxCount}. Minimo requerido: {minRequired}.
-        </p>
+        <p className="text-sm text-zinc-500">{counterText}</p>
       </div>
 
       {message ? (
@@ -221,49 +294,67 @@ export function PortalEvidenceCapture({
 
       {count === 0 ? <p className="mt-4 text-sm text-zinc-500">{emptyState}</p> : null}
 
-      <div className="mt-4 flex flex-col gap-3">
-        <button
-          className={primaryButtonClass}
-          disabled={!canUploadMore}
-          onClick={openCamera}
-          type="button"
-        >
-          {buttonLabel}
-        </button>
+      {cameraState === "idle" && !previewUrl ? (
+        <div className="mt-4 flex flex-col gap-3">
+          <button
+            className={primaryButtonClass}
+            disabled={!canUploadMore}
+            onClick={openCamera}
+            type="button"
+          >
+            {buttonLabel}
+          </button>
+        </div>
+      ) : null}
 
-        <label className="text-sm font-medium text-zinc-700" htmlFor={fileInputId}>
-          Si la camara no se abre, usa este respaldo
-        </label>
-        <input
-          accept="image/*"
-          capture={captureFacingMode}
-          className={inputClass}
-          disabled={!canUploadMore}
-          id={fileInputId}
-          inputMode="none"
-          onChange={onFallbackFileChange}
-          type="file"
-        />
-      </div>
-
-      {cameraOpen ? (
+      {cameraState !== "idle" ? (
         <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-950 p-3">
           <video
             autoPlay
-            className="h-72 w-full rounded-md object-cover"
+            className="max-h-[70vh] min-h-64 w-full rounded-md object-cover"
             muted
             playsInline
             ref={videoRef}
           />
           <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-            <button className={primaryButtonClass} disabled={isPending} onClick={captureFromCamera} type="button">
-              Tomar foto
+            <button
+              className={primaryButtonClass}
+              disabled={isPending || cameraState !== "ready"}
+              onClick={captureFromCamera}
+              type="button"
+            >
+              {cameraState === "ready" ? "Tomar foto" : "Preparando cámara..."}
             </button>
             <button className={secondaryButtonClass} onClick={stopCamera} type="button">
-              Cancelar camara
+              Cancelar cámara
             </button>
           </div>
         </div>
+      ) : null}
+
+      {previewUrl ? (
+        <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            alt="Vista previa de la foto capturada"
+            className="max-h-[70vh] w-full rounded-md object-contain"
+            src={previewUrl}
+          />
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+            <button className={secondaryButtonClass} disabled={isPending} onClick={repeatPhoto} type="button">
+              Repetir foto
+            </button>
+            <button className={primaryButtonClass} disabled={isPending} onClick={useCapturedPhoto} type="button">
+              {isPending ? "Subiendo foto..." : "Usar esta foto"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {count >= maxCount ? (
+        <p className="mt-4 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
+          Ya registraste el máximo permitido para esta evidencia.
+        </p>
       ) : null}
 
       <canvas className="hidden" ref={canvasRef} />
@@ -288,17 +379,23 @@ async function uploadEvidenceFile(
     return signed;
   }
 
-  const uploadResponse = await fetch(signed.data.signedUrl, {
-    body: file,
-    headers: {
-      "content-type": file.type
-    },
-    method: "PUT"
-  });
-
-  if (!uploadResponse.ok) {
+  if (!signed.data.token) {
     return {
-      message: "No fue posible subir la evidencia. Intenta nuevamente.",
+      message: "No fue posible preparar la carga. Intenta de nuevo.",
+      ok: false
+    };
+  }
+
+  const { error } = await createBrowserSupabaseClient().storage
+    .from(signed.data.storageBucket)
+    .uploadToSignedUrl(signed.data.privateStorageKey, signed.data.token, file, {
+      contentType: file.type,
+      upsert: false
+    });
+
+  if (error) {
+    return {
+      message: "No fue posible subir la foto. Revisa tu conexión e intenta nuevamente.",
       ok: false
     };
   }
@@ -309,12 +406,15 @@ async function uploadEvidenceFile(
     storageBucket: signed.data.storageBucket
   });
 
-  return confirmed.ok ? { ok: true } : confirmed;
+  return confirmed.ok
+    ? { ok: true }
+    : {
+        message: "La foto se subió, pero no fue posible registrarla. Contacta al administrador.",
+        ok: false
+      };
 }
 
-const inputClass =
-  "min-h-12 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-950 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100";
 const primaryButtonClass =
   "inline-flex w-full items-center justify-center rounded-md bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300";
 const secondaryButtonClass =
-  "inline-flex w-full items-center justify-center rounded-md border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50";
+  "inline-flex w-full items-center justify-center rounded-md border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400";

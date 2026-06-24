@@ -95,6 +95,8 @@ Se implemento el flujo publico de evidencias posterior al pase preliminar del sc
 - Ruta publica: `/participar/[studyCode]/evidencias`.
 - Requiere sesion de participante, portal habilitado, consentimiento vigente, `StudyParticipant` y un intento de portal en `PENDING_REVIEW`.
 - Solicita exactamente una selfie y entre una y cinco fotos de perfumes, segun configuracion del estudio.
+- En la UI publica el participante solo puede capturar con camara; no se muestra selector de biblioteca/archivo.
+- La carga usa `createSignedUploadUrl` en servidor y `uploadToSignedUrl` en cliente contra Storage privado.
 - Las fotos de perfumes se registran con `relatedQuestionId = F6_MARCAS_UTILIZA`.
 - Al completar evidencias, se asegura una `ParticipantScreeningReview` en estado `PENDING`.
 - El resultado publico no expone razones internas, NSE, codigos de terminacion ni notas de revision.
@@ -134,6 +136,14 @@ La revision de evidencias se integra al detalle de intento de supervision para A
 - Muestra selfie y fotos de perfumes mediante URLs firmadas temporales.
 - Permite aprobar o rechazar solo si la revision esta pendiente.
 - INTERVIEWER no tiene permiso para revisar evidencias.
+
+Correccion manual V1:
+
+- ADMIN y SUPERVISOR pueden reemplazar la selfie o agregar/reemplazar fotos de perfume desde supervision.
+- La correccion exige motivo interno obligatorio.
+- La carga usa Storage privado con URL firmada de subida y no publica el bucket.
+- Si la revision no estaba aprobada, la correccion la deja en `PENDING`.
+- Sin migracion adicional no existe historial completo de reemplazos; se conserva la nota interna y la evidencia apunta al objeto privado vigente.
 
 Al aprobar:
 

@@ -7,8 +7,24 @@ import { createEvidenceReviewRepository } from "./evidence-review-repository";
 import {
   approveParticipantEvidenceReview,
   markParticipantManualMessageSent,
-  rejectParticipantEvidenceReview
+  confirmParticipantEvidenceReplacement,
+  rejectParticipantEvidenceReview,
+  requestParticipantEvidenceReplacementUpload
 } from "./evidence-review-service";
+import {
+  createSupabaseEvidenceStorageClient,
+  type EvidenceUploadMetadata
+} from "./evidence-storage";
+
+type EvidenceReviewActionResult<T = unknown> =
+  | {
+      data: T;
+      ok: true;
+    }
+  | {
+      message: string;
+      ok: false;
+    };
 
 export async function approveParticipantEvidenceAction(attemptId: string): Promise<void> {
   const actor = await requireCapability("screening:review");
@@ -47,6 +63,86 @@ export async function rejectParticipantEvidenceAction(
   }
 
   redirect(reviewPath(attemptId, "evidenceMessage", "Evidencia rechazada correctamente."));
+}
+
+export async function requestParticipantEvidenceReplacementUploadAction(
+  attemptId: string,
+  input: EvidenceUploadMetadata & { evidenceId?: string | null }
+): Promise<
+  EvidenceReviewActionResult<{
+    metadata: EvidenceUploadMetadata;
+    privateStorageKey: string;
+    storageBucket: string;
+    token: string;
+  }>
+> {
+  try {
+    const actor = await requireCapability("screening:review");
+    const metadata = {
+      evidenceType: input.evidenceType,
+      mimeType: input.mimeType,
+      originalFilename: input.originalFilename,
+      sizeBytes: input.sizeBytes
+    };
+    const result = await requestParticipantEvidenceReplacementUpload({
+      actor,
+      attemptId,
+      evidenceId: input.evidenceId,
+      metadata,
+      repository: createEvidenceReviewRepository(),
+      storage: createSupabaseEvidenceStorageClient()
+    });
+
+    if (!result.ok) {
+      return result;
+    }
+
+    return {
+      data: result.data,
+      ok: true
+    };
+  } catch {
+    return {
+      message: "No fue posible preparar la carga. Intenta de nuevo.",
+      ok: false
+    };
+  }
+}
+
+export async function confirmParticipantEvidenceReplacementAction(
+  attemptId: string,
+  input: EvidenceUploadMetadata & {
+    evidenceId?: string | null;
+    privateStorageKey: string;
+    replacementReason: string;
+    storageBucket: string;
+  }
+): Promise<EvidenceReviewActionResult<null>> {
+  try {
+    const actor = await requireCapability("screening:review");
+    const result = await confirmParticipantEvidenceReplacement({
+      actor,
+      attemptId,
+      input,
+      repository: createEvidenceReviewRepository()
+    });
+
+    revalidatePath(`/admin/screening-attempts/${attemptId}`);
+
+    if (!result.ok) {
+      return result;
+    }
+
+    return {
+      data: null,
+      ok: true
+    };
+  } catch {
+    return {
+      message: "No fue posible registrar la evidencia.",
+      ok: false
+    };
+  }
 }
 
 export async function markParticipantManualMessageSentAction(attemptId: string): Promise<void> {

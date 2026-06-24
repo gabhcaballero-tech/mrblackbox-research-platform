@@ -210,6 +210,7 @@ export async function requestParticipantEvidenceUpload({
       ok: true
     };
   } catch (error) {
+    logEvidenceServiceError("prepare-signed-upload", metadata.evidenceType, error);
     return {
       code: "VALIDATION_ERROR",
       message: error instanceof Error ? error.message : "No fue posible preparar la evidencia.",
@@ -275,6 +276,7 @@ export async function confirmParticipantEvidenceUpload({
       ok: true
     };
   } catch (error) {
+    logEvidenceServiceError("register-evidence", input.evidenceType, error);
     return {
       code: "VALIDATION_ERROR",
       message: error instanceof Error ? error.message : "No fue posible registrar la evidencia.",
@@ -771,4 +773,27 @@ function selectCurrentEvidenceAttempt(
         (attempt.status === "PENDING_REVIEW" || attempt.status === "PASSED")
     ) ?? null
   );
+}
+
+function logEvidenceServiceError(step: string, evidenceType: ParticipantEvidenceKind, error: unknown) {
+  console.error("[participant-evidence]", {
+    code: readSafeErrorCode(error),
+    evidenceType,
+    step
+  });
+}
+
+function readSafeErrorCode(error: unknown): string {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "string") {
+      return code;
+    }
+  }
+
+  if (error instanceof Error) {
+    return error.name;
+  }
+
+  return "unknown";
 }

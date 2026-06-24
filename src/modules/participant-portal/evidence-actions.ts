@@ -28,9 +28,8 @@ type ParticipantEvidenceActionResult<T = unknown> =
 type ParticipantSignedUploadActionResult = {
   metadata: EvidenceUploadMetadata;
   privateStorageKey: string;
-  signedUrl: string;
   storageBucket: string;
-  token?: string;
+  token: string;
 };
 
 export async function requestParticipantEvidenceUploadAction(
@@ -60,11 +59,25 @@ export async function requestParticipantEvidenceUploadAction(
       };
     }
 
+    if (!result.data.token) {
+      logEvidenceActionError("prepare-signed-upload", metadata.evidenceType, { code: "missing_signed_upload_token" });
+      return {
+        message: "No fue posible preparar la carga. Intenta de nuevo.",
+        ok: false
+      };
+    }
+
     return {
-      data: result.data,
+      data: {
+        metadata: result.data.metadata,
+        privateStorageKey: result.data.privateStorageKey,
+        storageBucket: result.data.storageBucket,
+        token: result.data.token
+      },
       ok: true
     };
   } catch (error) {
+    logEvidenceActionError("prepare-signed-upload", metadata.evidenceType, error);
     return {
       message: error instanceof Error ? error.message : "No fue posible preparar la carga. Intenta de nuevo.",
       ok: false
@@ -79,36 +92,44 @@ export async function confirmParticipantEvidenceUploadAction(
     storageBucket: string;
   }
 ): Promise<ParticipantEvidenceActionResult> {
-  const auth = await getParticipantEvidenceActionAuth();
-  const studyCode = normalizeStudyCode(studyCodeInput);
+  try {
+    const auth = await getParticipantEvidenceActionAuth();
+    const studyCode = normalizeStudyCode(studyCodeInput);
 
-  if (!auth.ok) {
-    return auth;
-  }
+    if (!auth.ok) {
+      return auth;
+    }
 
-  const result = await confirmParticipantEvidenceUpload({
-    identity: auth.data.identity,
-    input,
-    repository: createParticipantPortalEvidenceRepository(),
-    studyCode
-  });
+    const result = await confirmParticipantEvidenceUpload({
+      identity: auth.data.identity,
+      input,
+      repository: createParticipantPortalEvidenceRepository(),
+      studyCode
+    });
 
-  if (!result.ok) {
+    if (!result.ok) {
+      return {
+        message: result.message,
+        ok: false
+      };
+    }
+
+    revalidatePath(`/participar/${studyCode}/evidencias`);
+    revalidatePath(`/participar/${studyCode}/inicio`);
+    revalidatePath(`/participar/${studyCode}/filtro`);
+    revalidatePath(`/participar/${studyCode}/resultado`);
+
     return {
-      message: result.message,
+      data: null,
+      ok: true
+    };
+  } catch (error) {
+    logEvidenceActionError("confirm-upload", input.evidenceType, error);
+    return {
+      message: "No fue posible registrar la evidencia.",
       ok: false
     };
   }
-
-  revalidatePath(`/participar/${studyCode}/evidencias`);
-  revalidatePath(`/participar/${studyCode}/inicio`);
-  revalidatePath(`/participar/${studyCode}/filtro`);
-  revalidatePath(`/participar/${studyCode}/resultado`);
-
-  return {
-    data: null,
-    ok: true
-  };
 }
 
 export async function completeParticipantEvidenceSubmissionAction(
@@ -180,4 +201,27 @@ async function getParticipantEvidenceActionAuth(): Promise<
     },
     ok: true
   };
+}
+
+function logEvidenceActionError(step: string, evidenceType: EvidenceUploadMetadata["evidenceType"], error: unknown) {
+  console.error("[participant-evidence]", {
+    code: readSafeErrorCode(error),
+    evidenceType,
+    step
+  });
+}
+
+function readSafeErrorCode(error: unknown): string {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "string") {
+      return code;
+    }
+  }
+
+  if (error instanceof Error) {
+    return error.name;
+  }
+
+  return "unknown";
 }
