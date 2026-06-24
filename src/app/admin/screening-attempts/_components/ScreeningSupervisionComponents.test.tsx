@@ -155,8 +155,18 @@ describe("ScreeningSupervisionComponents", () => {
   it("disables the export action when there are no attempts to export", () => {
     render(<ScreeningAttemptFilters data={{ ...listData, attempts: [] }} />);
 
-    expect(screen.getByRole("link", { name: "Exportar Excel" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.queryByRole("link", { name: "Exportar Excel" })).not.toBeInTheDocument();
+    expect(screen.getByText("Exportar Excel")).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByText("No hay intentos con los filtros actuales para exportar.")).toBeInTheDocument();
+  });
+
+  it("renders the export control without client event handlers", () => {
+    render(<ScreeningAttemptFilters data={listData} />);
+
+    const exportLink = screen.getByRole("link", { name: "Exportar Excel" });
+
+    expect(exportLink.getAttribute("href")).toBe("/admin/studies/study-1/screening-attempts/export?participantQuery=Gabriela");
+    expect(exportLink.getAttribute("onClick")).toBeNull();
   });
 
   it("keeps Ver detalle visible in the participant column without a separate action column", () => {
