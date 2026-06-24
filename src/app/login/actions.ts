@@ -1,25 +1,31 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import {
-  requestOtpLogin,
-  verifyOtpLogin,
+  CAPTCHA_ERROR_MESSAGE,
+  CAPTCHA_REQUIRED_MESSAGE,
   OTP_INVALID_EMAIL_MESSAGE,
   OTP_INVALID_MESSAGE,
-  OTP_UNAUTHORIZED_MESSAGE
+  OTP_UNAUTHORIZED_MESSAGE,
+  requestOtpLogin,
+  signInWithPasswordWithCaptcha,
+  verifyOtpLogin
 } from "@/shared/auth/passwordless";
 import { sanitizeInternalNextPath } from "@/shared/auth/routes";
 import { createServerSupabaseClient } from "@/shared/auth/supabase/server";
 
-function loginPathWithError(nextPath: string) {
-  return `/login?error=credentials&next=${encodeURIComponent(nextPath)}`;
+const INTERNAL_OTP_COOLDOWN_COOKIE = "internal_login_otp_cooldown_until";
+const INTERNAL_OTP_COOLDOWN_SECONDS = 60;
+
+function loginPathWithError(nextPath: string, error: "captcha" | "credentials") {
+  return `/login?error=${error}&next=${encodeURIComponent(nextPath)}`;
 }
 
 function otpRequestPath(input: {
   email?: string;
-  error?: "email";
+  error?: "captcha" | "cooldown" | "email";
   nextPath: string;
-  sent?: boolean;
 }) {
   const params = new URLSearchParams({
     mode: "otp",
@@ -28,10 +34,6 @@ function otpRequestPath(input: {
 
   if (input.email) {
     params.set("email", input.email);
-  }
-
-  if (input.sent) {
-    params.set("sent", "1");
   }
 
   if (input.error) {
@@ -45,6 +47,7 @@ function otpVerifyPath(input: {
   email: string;
   error?: "invalid" | "unauthorized";
   nextPath: string;
+  sent?: boolean;
 }) {
   const params = new URLSearchParams({
     email: input.email,
@@ -57,44 +60,72 @@ function otpVerifyPath(input: {
     params.set("otpError", input.error);
   }
 
+  if (input.sent) {
+    params.set("sent", "1");
+  }
+
   return `/login?${params.toString()}`;
 }
 
 export async function signInWithPasswordAction(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const captchaToken = String(formData.get("captchaToken") ?? "");
   const nextPath = sanitizeInternalNextPath(formData.get("next"));
-
-  if (!email || !password) {
-    redirect(loginPathWithError(nextPath));
-  }
-
   const supabase = await createServerSupabaseClient();
-  const { error } = await supabase.auth.signInWithPassword({
+
+  const result = await signInWithPasswordWithCaptcha({
+    captchaToken,
     email,
-    password
+    password,
+    supabase
   });
 
-  if (error) {
-    redirect(loginPathWithError(nextPath));
+  if (result === "SUCCESS") {
+    redirect(nextPath);
   }
 
-  redirect(nextPath);
+  redirect(loginPathWithError(nextPath, result === "CAPTCHA_ERROR" ? "captcha" : "credentials"));
 }
 
 export async function requestOtpLoginAction(formData: FormData): Promise<void> {
   const supabase = await createServerSupabaseClient();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const nextPath = sanitizeInternalNextPath(formData.get("next"));
+  const cookieStore = await cookies();
+  const cooldownUntil = Number(cookieStore.get(INTERNAL_OTP_COOLDOWN_COOKIE)?.value ?? "0");
+
+  if (cooldownUntil > Date.now()) {
+    redirect(otpRequestPath({ email, error: "cooldown", nextPath }));
+  }
+
   const result = await requestOtpLogin({
-    email: String(formData.get("email") ?? ""),
+    captchaToken: String(formData.get("captchaToken") ?? ""),
+    email,
     next: formData.get("next"),
     supabase
   });
 
   if (!result.ok) {
-    redirect(otpRequestPath({ error: "email", nextPath: result.nextPath }));
+    const error =
+      result.message === OTP_INVALID_EMAIL_MESSAGE
+        ? "email"
+        : result.message === CAPTCHA_REQUIRED_MESSAGE || result.message === CAPTCHA_ERROR_MESSAGE
+          ? "captcha"
+          : "email";
+
+    redirect(otpRequestPath({ email, error, nextPath: result.nextPath }));
   }
 
-  redirect(otpVerifyPath({ email: result.email, nextPath: result.nextPath }));
+  cookieStore.set(INTERNAL_OTP_COOLDOWN_COOKIE, String(Date.now() + INTERNAL_OTP_COOLDOWN_SECONDS * 1000), {
+    httpOnly: true,
+    maxAge: INTERNAL_OTP_COOLDOWN_SECONDS,
+    path: "/login",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production"
+  });
+
+  redirect(otpVerifyPath({ email: result.email, nextPath: result.nextPath, sent: true }));
 }
 
 export async function verifyOtpLoginAction(formData: FormData): Promise<void> {
@@ -117,13 +148,15 @@ export async function verifyOtpLoginAction(formData: FormData): Promise<void> {
       );
     }
 
-    redirect(
-      otpVerifyPath({
-        email: String(formData.get("email") ?? "").trim().toLowerCase(),
-        error: result.message === OTP_INVALID_EMAIL_MESSAGE || result.message === OTP_INVALID_MESSAGE ? "invalid" : "invalid",
-        nextPath: result.nextPath
-      })
-    );
+    if (result.message === OTP_INVALID_MESSAGE) {
+      redirect(
+        otpVerifyPath({
+          email: String(formData.get("email") ?? "").trim().toLowerCase(),
+          error: "invalid",
+          nextPath: result.nextPath
+        })
+      );
+    }
   }
 
   redirect(result.nextPath);

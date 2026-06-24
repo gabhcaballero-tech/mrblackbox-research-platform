@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  CAPTCHA_ERROR_MESSAGE,
+  CAPTCHA_REQUIRED_MESSAGE,
   OTP_GENERIC_SENT_MESSAGE,
   OTP_INVALID_EMAIL_MESSAGE,
   OTP_INVALID_MESSAGE,
   OTP_UNAUTHORIZED_MESSAGE,
   requestOtpLogin,
+  signInWithPasswordWithCaptcha,
   verifyOtpLogin
 } from "./passwordless";
 import type { InternalUserRecord } from "./session";
@@ -26,21 +29,22 @@ function activeInternalUser(): InternalUserRecord {
 }
 
 function supabaseMock({
-  getUser = identity,
+  passwordError = null,
   otpError = null,
   verifyError = null
 }: {
-  getUser?: typeof identity | null;
+  passwordError?: unknown;
   otpError?: unknown;
   verifyError?: unknown;
 } = {}) {
   return {
     auth: {
       getUser: vi.fn(async () => ({
-        data: { user: getUser },
+        data: { user: identity },
         error: null
       })),
       signInWithOtp: vi.fn(async () => ({ error: otpError })),
+      signInWithPassword: vi.fn(async () => ({ error: passwordError })),
       signOut: vi.fn(async () => ({ error: null })),
       verifyOtp: vi.fn(async () => ({ error: verifyError }))
     }
@@ -48,9 +52,40 @@ function supabaseMock({
 }
 
 describe("passwordless login helpers", () => {
-  it("requests OTP with shouldCreateUser false", async () => {
+  it("sends captchaToken in password login", async () => {
+    const supabase = supabaseMock();
+    const result = await signInWithPasswordWithCaptcha({
+      captchaToken: "turnstile-token",
+      email: " Entrevistador@Example.com ",
+      password: "secret",
+      supabase
+    });
+
+    expect(result).toBe("SUCCESS");
+    expect(supabase.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: "entrevistador@example.com",
+      options: { captchaToken: "turnstile-token" },
+      password: "secret"
+    });
+  });
+
+  it("requires captcha for password login", async () => {
+    const supabase = supabaseMock();
+    const result = await signInWithPasswordWithCaptcha({
+      captchaToken: "",
+      email: "entrevistador@example.com",
+      password: "secret",
+      supabase
+    });
+
+    expect(result).toBe("CAPTCHA_ERROR");
+    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("requests OTP with shouldCreateUser false and captchaToken", async () => {
     const supabase = supabaseMock();
     const result = await requestOtpLogin({
+      captchaToken: "turnstile-token",
       email: " Entrevistador@Example.com ",
       next: "/field",
       supabase
@@ -64,13 +99,47 @@ describe("passwordless login helpers", () => {
     });
     expect(supabase.auth.signInWithOtp).toHaveBeenCalledWith({
       email: "entrevistador@example.com",
-      options: { shouldCreateUser: false }
+      options: { captchaToken: "turnstile-token", shouldCreateUser: false }
+    });
+  });
+
+  it("requires captcha before requesting internal OTP", async () => {
+    const supabase = supabaseMock();
+    const result = await requestOtpLogin({
+      captchaToken: "",
+      email: "entrevistador@example.com",
+      next: "/field",
+      supabase
+    });
+
+    expect(result).toEqual({
+      message: CAPTCHA_REQUIRED_MESSAGE,
+      nextPath: "/field",
+      ok: false
+    });
+    expect(supabase.auth.signInWithOtp).not.toHaveBeenCalled();
+  });
+
+  it("surfaces captcha validation errors without exposing Supabase internals", async () => {
+    const supabase = supabaseMock({ otpError: new Error("captcha protection: request disallowed") });
+    const result = await requestOtpLogin({
+      captchaToken: "turnstile-token",
+      email: "entrevistador@example.com",
+      next: "/field",
+      supabase
+    });
+
+    expect(result).toEqual({
+      message: CAPTCHA_ERROR_MESSAGE,
+      nextPath: "/field",
+      ok: false
     });
   });
 
   it("does not reveal whether the email exists", async () => {
     const supabase = supabaseMock({ otpError: new Error("User not found") });
     const result = await requestOtpLogin({
+      captchaToken: "turnstile-token",
       email: "nadie@example.com",
       next: "/field",
       supabase
@@ -83,6 +152,7 @@ describe("passwordless login helpers", () => {
   it("validates email format before requesting OTP", async () => {
     const supabase = supabaseMock();
     const result = await requestOtpLogin({
+      captchaToken: "turnstile-token",
       email: "correo-invalido",
       next: "/field",
       supabase

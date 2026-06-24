@@ -1,11 +1,15 @@
 import Link from "next/link";
 import {
+  CAPTCHA_ERROR_MESSAGE,
+  CAPTCHA_REQUIRED_MESSAGE,
+  OTP_COOLDOWN_MESSAGE,
   OTP_GENERIC_SENT_MESSAGE,
   OTP_INVALID_EMAIL_MESSAGE,
   OTP_INVALID_MESSAGE,
   OTP_UNAUTHORIZED_MESSAGE
 } from "@/shared/auth/passwordless";
 import { sanitizeInternalNextPath } from "@/shared/auth/routes";
+import { TurnstileSubmitControl } from "@/shared/ui/TurnstileSubmitControl";
 import { UI_LABELS } from "@/shared/ui/labels";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import {
@@ -25,7 +29,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const step = firstParam(params.step) === "verify" ? "verify" : "request";
   const otpError = firstParam(params.otpError);
   const email = firstParam(params.email) ?? "";
-  const hasPasswordError = params.error === "credentials";
+  const passwordError = firstParam(params.error);
+  const hasPasswordError = passwordError === "credentials";
+  const hasPasswordCaptchaError = passwordError === "captcha";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-10">
@@ -49,7 +55,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </div>
 
         {mode === "password" ? (
-          <PasswordLoginForm hasError={hasPasswordError} nextPath={nextPath} />
+          <PasswordLoginForm
+            hasCaptchaError={hasPasswordCaptchaError}
+            hasError={hasPasswordError}
+            nextPath={nextPath}
+            resetKey={passwordError ?? "idle"}
+          />
         ) : (
           <OtpLoginForm email={email} error={otpError} nextPath={nextPath} step={step} />
         )}
@@ -66,14 +77,23 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   );
 }
 
-function PasswordLoginForm({ hasError, nextPath }: { hasError: boolean; nextPath: string }) {
+function PasswordLoginForm({
+  hasCaptchaError,
+  hasError,
+  nextPath,
+  resetKey
+}: {
+  hasCaptchaError: boolean;
+  hasError: boolean;
+  nextPath: string;
+  resetKey: string;
+}) {
   return (
     <>
       {hasError ? (
-        <div className="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {UI_LABELS.login.signInError}
-        </div>
+        <Message tone="error">{UI_LABELS.login.signInError}</Message>
       ) : null}
+      {hasCaptchaError ? <Message tone="error">{CAPTCHA_ERROR_MESSAGE}</Message> : null}
 
       <form action={signInWithPasswordAction} className="mt-6 space-y-4">
         <input name="next" type="hidden" value={nextPath} />
@@ -100,9 +120,11 @@ function PasswordLoginForm({ hasError, nextPath }: { hasError: boolean; nextPath
           />
         </label>
 
-        <button className={primaryButtonClass} type="submit">
-          {UI_LABELS.login.signIn}
-        </button>
+        <TurnstileSubmitControl
+          buttonLabel={UI_LABELS.login.signIn}
+          pendingLabel="Iniciando sesión..."
+          resetKey={`password-${resetKey}`}
+        />
       </form>
     </>
   );
@@ -122,7 +144,7 @@ function OtpLoginForm({
   if (step === "verify") {
     return (
       <>
-        <Message tone={error === "unauthorized" ? "error" : error === "invalid" ? "error" : "success"}>
+        <Message tone={error === "unauthorized" || error === "invalid" ? "error" : "success"}>
           {error === "unauthorized"
             ? OTP_UNAUTHORIZED_MESSAGE
             : error === "invalid"
@@ -154,12 +176,14 @@ function OtpLoginForm({
           </button>
         </form>
 
-        <form action={requestOtpLoginAction} className="mt-3">
+        <form action={requestOtpLoginAction} className="mt-3 space-y-4">
           <input name="email" type="hidden" value={email} />
           <input name="next" type="hidden" value={nextPath} />
-          <button className={secondaryButtonClass} type="submit">
-            Solicitar nuevo código
-          </button>
+          <TurnstileSubmitControl
+            buttonLabel="Solicitar nuevo código"
+            pendingLabel="Solicitando código..."
+            resetKey={`otp-resend-${error ?? "idle"}`}
+          />
         </form>
       </>
     );
@@ -168,16 +192,21 @@ function OtpLoginForm({
   return (
     <>
       {error === "email" ? <Message tone="error">{OTP_INVALID_EMAIL_MESSAGE}</Message> : null}
+      {error === "captcha" ? <Message tone="error">{CAPTCHA_ERROR_MESSAGE}</Message> : null}
+      {error === "cooldown" ? <Message tone="error">{OTP_COOLDOWN_MESSAGE}</Message> : null}
       <form action={requestOtpLoginAction} className="mt-6 space-y-4">
         <input name="next" type="hidden" value={nextPath} />
         <label className="block">
           <span className="text-sm font-medium text-zinc-800">Correo electrónico</span>
           <input autoComplete="email" className={inputClass} defaultValue={email} name="email" required type="email" />
         </label>
-        <button className={primaryButtonClass} type="submit">
-          Enviar código
-        </button>
+        <TurnstileSubmitControl
+          buttonLabel="Enviar código"
+          pendingLabel="Enviando código..."
+          resetKey={`otp-request-${error ?? "idle"}`}
+        />
       </form>
+      <p className="mt-3 text-sm text-zinc-600">{CAPTCHA_REQUIRED_MESSAGE}</p>
     </>
   );
 }
@@ -205,5 +234,3 @@ const inputClass =
   "mt-2 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-950 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100";
 const primaryButtonClass =
   "w-full rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2";
-const secondaryButtonClass =
-  "w-full rounded-md border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50";

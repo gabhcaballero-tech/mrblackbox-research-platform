@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
+  CAPTCHA_ERROR_MESSAGE,
+  OTP_COOLDOWN_MESSAGE,
   OTP_GENERIC_SENT_MESSAGE,
   OTP_INVALID_EMAIL_MESSAGE,
   OTP_INVALID_MESSAGE,
@@ -14,15 +16,27 @@ vi.mock("./actions", () => ({
   verifyOtpLoginAction: vi.fn()
 }));
 
+vi.mock("@/shared/ui/TurnstileSubmitControl", () => ({
+  TurnstileSubmitControl: ({ buttonLabel }: { buttonLabel: string }) => (
+    <div>
+      <div aria-label="Verificación de seguridad">Turnstile</div>
+      <p>Completa la verificación de seguridad.</p>
+      <button disabled type="submit">
+        {buttonLabel}
+      </button>
+    </div>
+  )
+}));
+
 describe("LoginPage", () => {
-  it("keeps password login visible", async () => {
+  it("shows Turnstile on password login and keeps submit disabled without captcha token", async () => {
     render(await LoginPage({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByRole("link", { name: "Contraseña" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Entrar con código" })).toBeInTheDocument();
     expect(screen.getByLabelText("Correo electrónico")).toBeInTheDocument();
     expect(screen.getByLabelText("Contraseña")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Iniciar sesión" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Verificación de seguridad")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Iniciar sesión" })).toBeDisabled();
   });
 
   it("shows password errors without removing the password form", async () => {
@@ -32,12 +46,19 @@ describe("LoginPage", () => {
     expect(screen.getByLabelText("Contraseña")).toBeInTheDocument();
   });
 
-  it("shows the request-code form", async () => {
+  it("shows captcha error on password login", async () => {
+    render(await LoginPage({ searchParams: Promise.resolve({ error: "captcha" }) }));
+
+    expect(screen.getByText(CAPTCHA_ERROR_MESSAGE)).toBeInTheDocument();
+  });
+
+  it("shows the request-code form with Turnstile and disabled OTP button", async () => {
     render(await LoginPage({ searchParams: Promise.resolve({ mode: "otp", next: "/field" }) }));
 
     expect(screen.getByRole("link", { name: "Entrar con código" })).toBeInTheDocument();
     expect(screen.getByLabelText("Correo electrónico")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Enviar código" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Verificación de seguridad")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enviar código" })).toBeDisabled();
   });
 
   it("shows generic sent message on verify step", async () => {
@@ -47,6 +68,7 @@ describe("LoginPage", () => {
           email: "entrevistador@example.com",
           mode: "otp",
           next: "/field",
+          sent: "1",
           step: "verify"
         })
       })
@@ -56,15 +78,21 @@ describe("LoginPage", () => {
     expect(screen.getByLabelText("Correo electrónico")).toHaveValue("entrevistador@example.com");
     expect(screen.getByLabelText("Código de 6 dígitos")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Entrar" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Solicitar nuevo código" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Solicitar nuevo código" })).toBeDisabled();
   });
 
-  it("shows invalid email, invalid code and unauthorized messages", async () => {
+  it("shows invalid email, captcha, cooldown, invalid code and unauthorized messages", async () => {
     const invalidEmail = await LoginPage({
       searchParams: Promise.resolve({ mode: "otp", otpError: "email" })
     });
     const { rerender } = render(invalidEmail);
     expect(screen.getByText(OTP_INVALID_EMAIL_MESSAGE)).toBeInTheDocument();
+
+    rerender(await LoginPage({ searchParams: Promise.resolve({ mode: "otp", otpError: "captcha" }) }));
+    expect(screen.getByText(CAPTCHA_ERROR_MESSAGE)).toBeInTheDocument();
+
+    rerender(await LoginPage({ searchParams: Promise.resolve({ mode: "otp", otpError: "cooldown" }) }));
+    expect(screen.getByText(OTP_COOLDOWN_MESSAGE)).toBeInTheDocument();
 
     rerender(
       await LoginPage({

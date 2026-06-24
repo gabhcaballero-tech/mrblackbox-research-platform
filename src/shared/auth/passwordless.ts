@@ -9,6 +9,10 @@ export const OTP_GENERIC_SENT_MESSAGE = "Si el correo está autorizado, recibir�
 export const OTP_INVALID_MESSAGE = "El código no es válido o ya venció. Solicita uno nuevo.";
 export const OTP_UNAUTHORIZED_MESSAGE = "Tu usuario no está autorizado para acceder. Contacta a un administrador.";
 export const OTP_INVALID_EMAIL_MESSAGE = "Ingresa un correo electrónico válido.";
+export const CAPTCHA_REQUIRED_MESSAGE = "Completa la verificación de seguridad.";
+export const CAPTCHA_ERROR_MESSAGE =
+  "No fue posible validar la verificación de seguridad. Intenta nuevamente.";
+export const OTP_COOLDOWN_MESSAGE = "Espera antes de solicitar un código nuevo.";
 
 type OtpSupabaseClient = {
   auth: {
@@ -20,9 +24,17 @@ type OtpSupabaseClient = {
       data: { user: { email?: string | null; id: string } | null };
       error: unknown;
     }>;
+    signInWithPassword: (input: {
+      email: string;
+      options: { captchaToken: string };
+      password: string;
+    }) => Promise<{ error: unknown }>;
     signInWithOtp: (input: {
       email: string;
-      options: { shouldCreateUser: false };
+      options: {
+        captchaToken: string;
+        shouldCreateUser: false;
+      };
     }) => Promise<{ error: unknown }>;
     signOut: () => Promise<unknown>;
     verifyOtp: (input: {
@@ -59,6 +71,7 @@ export type VerifyOtpLoginResult =
     };
 
 type RequestOtpLoginInput = {
+  captchaToken: string;
   email: string;
   next: unknown;
   supabase: OtpSupabaseClient;
@@ -72,13 +85,54 @@ type VerifyOtpLoginInput = {
   token: string;
 };
 
+type SignInWithPasswordInput = {
+  captchaToken: string;
+  email: string;
+  password: string;
+  supabase: OtpSupabaseClient;
+};
+
+export async function signInWithPasswordWithCaptcha({
+  captchaToken,
+  email,
+  password,
+  supabase
+}: SignInWithPasswordInput): Promise<"CAPTCHA_ERROR" | "CREDENTIALS_ERROR" | "SUCCESS" | "VALIDATION_ERROR"> {
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedCaptchaToken = captchaToken.trim();
+
+  if (!normalizedEmail || !password) {
+    return "VALIDATION_ERROR";
+  }
+
+  if (!normalizedCaptchaToken) {
+    return "CAPTCHA_ERROR";
+  }
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email: normalizedEmail,
+    options: {
+      captchaToken: normalizedCaptchaToken
+    },
+    password
+  });
+
+  if (!error) {
+    return "SUCCESS";
+  }
+
+  return isCaptchaError(error) ? "CAPTCHA_ERROR" : "CREDENTIALS_ERROR";
+}
+
 export async function requestOtpLogin({
+  captchaToken,
   email,
   next,
   supabase
 }: RequestOtpLoginInput): Promise<RequestOtpLoginResult> {
   const nextPath = sanitizeInternalNextPath(next);
   const normalizedEmail = normalizeEmail(email);
+  const normalizedCaptchaToken = captchaToken.trim();
 
   if (!isValidEmail(normalizedEmail)) {
     return {
@@ -88,14 +142,41 @@ export async function requestOtpLogin({
     };
   }
 
+  if (!normalizedCaptchaToken) {
+    return {
+      message: CAPTCHA_REQUIRED_MESSAGE,
+      nextPath,
+      ok: false
+    };
+  }
+
   try {
-    await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithOtp({
       email: normalizedEmail,
       options: {
+        captchaToken: normalizedCaptchaToken,
         shouldCreateUser: false
       }
     });
-  } catch {
+
+    if (error) {
+      if (isCaptchaError(error)) {
+        return {
+          message: CAPTCHA_ERROR_MESSAGE,
+          nextPath,
+          ok: false
+        };
+      }
+    }
+  } catch (error) {
+    if (isCaptchaError(error)) {
+      return {
+        message: CAPTCHA_ERROR_MESSAGE,
+        nextPath,
+        ok: false
+      };
+    }
+
     // Keep the response indistinguishable from an unknown or unauthorized email.
   }
 
@@ -164,7 +245,9 @@ export async function verifyOtpLogin({
   };
 }
 
-function isDeniedInternalAccess(access: InternalAccessResult): access is Extract<InternalAccessResult, { status: "denied" }> {
+function isDeniedInternalAccess(
+  access: InternalAccessResult
+): access is Extract<InternalAccessResult, { status: "denied" }> {
   return access.status === "denied";
 }
 
@@ -174,4 +257,18 @@ function normalizeEmail(email: string): string {
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isCaptchaError(error: unknown): boolean {
+  if (error instanceof Error) {
+    return error.message.toLowerCase().includes("captcha");
+  }
+
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message.toLowerCase().includes("captcha")
+  );
 }
