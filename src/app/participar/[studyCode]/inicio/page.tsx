@@ -61,15 +61,23 @@ export default async function ParticipantPortalHomePage({
   });
 
   if (selfie.ok) {
+    const showContinue = selfie.data.selfieComplete;
+
     return (
       <main className="min-h-screen bg-zinc-50 px-4 py-6 sm:py-10">
         <section className="mx-auto w-full max-w-2xl rounded-lg border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
           <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Portal de participacion</p>
           <h1 className="mt-2 text-2xl font-semibold text-zinc-950">
-            {registered ? PARTICIPANT_PORTAL_REGISTRATION_SUCCESS_MESSAGE : "Verifica tu selfie"}
+            {showContinue
+              ? "Registro completo"
+              : registered
+                ? PARTICIPANT_PORTAL_REGISTRATION_SUCCESS_MESSAGE
+                : "Verifica tu selfie"}
           </h1>
           <p className="mt-2 text-sm leading-6 text-zinc-600">
-            Toma una selfie clara de identificacion. Se usara unicamente para validar que la misma persona continue durante el estudio.
+            {showContinue
+              ? "Tu registro ya fue validado. Si tu selfie ya aparece registrada, puedes continuar al filtro."
+              : "Toma una selfie clara de identificacion. Se usara unicamente para validar que la misma persona continue durante el estudio."}
           </p>
           <div className="mt-6">
             <ParticipantSelfieStep screen={selfie.data} showRegistrationSuccess={registered} />

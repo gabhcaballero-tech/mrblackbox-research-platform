@@ -481,6 +481,28 @@ describe("participant portal screener service", () => {
     });
   });
 
+  it("creates new portal attempts with the current ACTIVE screener version", async () => {
+    const { attempts, repository } = createMemoryRepository({
+      study: activeStudy({
+        activeScreenerVersion: {
+          ...activeStudy().activeScreenerVersion!,
+          id: "version-2",
+          versionNumber: 2
+        }
+      })
+    });
+
+    await start(repository);
+
+    expect(attempts[0]).toMatchObject({
+      questionnaireVersionId: "version-2",
+      questionnaireVersion: {
+        id: "version-2",
+        versionNumber: 2
+      }
+    });
+  });
+
   it("continues a STARTED attempt", async () => {
     const { attempts, repository } = createMemoryRepository();
     const attemptId = await start(repository);

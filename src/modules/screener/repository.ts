@@ -184,7 +184,7 @@ export function createScreenerRepository(prismaClient?: ScreenerPrismaClient): S
       }
 
       const draft = await prisma.questionnaireDraft.findFirst({
-        orderBy: { createdAt: "asc" },
+        orderBy: { createdAt: "desc" },
         select: draftSelect,
         where: {
           purpose: "SCREENER",
@@ -216,7 +216,10 @@ export function createScreenerRepository(prismaClient?: ScreenerPrismaClient): S
           orderBy: { versionNumber: "desc" },
           select: { versionNumber: true },
           where: {
-            questionnaireDraftId: input.draftId
+            questionnaireDraft: {
+              purpose: "SCREENER"
+            },
+            studyId: input.studyId
           }
         });
         const versionNumber = (latestVersion?.versionNumber ?? 0) + 1;

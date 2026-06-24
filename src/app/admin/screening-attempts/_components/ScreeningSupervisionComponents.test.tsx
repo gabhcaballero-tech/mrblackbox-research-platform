@@ -274,6 +274,7 @@ describe("ScreeningSupervisionComponents", () => {
     expect(screen.getByText("Datos del participante")).toBeInTheDocument();
     expect(screen.getByText("Confirmacion final")).toBeInTheDocument();
     expect(screen.getByText("4821")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Regenerar codigos de 4 caracteres" })).toBeInTheDocument();
     expect(screen.getAllByText("Eliminar registro de prueba y liberar folio").length).toBeGreaterThan(0);
     expect(screen.getByText("Escribe ELIMINAR PRUEBA para confirmar")).toBeInTheDocument();
     expect(screen.getByText("1: 4821, 2: 7710, 3: 9034")).toBeInTheDocument();
@@ -348,5 +349,55 @@ describe("ScreeningSupervisionComponents", () => {
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText("Escribe ELIMINAR PRUEBAS DEL PARTICIPANTE para confirmar")).toBeInTheDocument();
     expect(screen.getByText(/Esta accion elimina todos los intentos de prueba/)).toBeInTheDocument();
+  });
+
+  it("shows focused cleanup errors in the dangerous cleanup zone", () => {
+    render(
+      <EvidenceReviewPanel
+        canDeleteTestRecord
+        error="No se puede eliminar porque existen relaciones no soportadas: participant_activities."
+        focus="zona-peligro"
+        detail={{
+          attemptId: "attempt-1",
+          attemptStatus: "PASSED",
+          cleanupSummary: {
+            attemptCount: 1,
+            attempts: [
+              {
+                folio: null,
+                id: "attempt-1",
+                referenceCodes: [],
+                source: "FIELD",
+                status: "PASSED"
+              }
+            ],
+            evidenceCount: 0
+          },
+          confirmation: null,
+          evidence: [],
+          f6DeclaredBrands: "Navigo",
+          participant: {
+            email: "persona@example.com",
+            externalReference: "REF-1",
+            id: "profile-1",
+            name: "GABRIELA",
+            phone: "+525512345678"
+          },
+          review: null,
+          study: {
+            code: study.code,
+            id: study.id,
+            name: study.name
+          }
+        }}
+      />
+    );
+
+    const dangerZone = document.getElementById("zona-peligro");
+
+    expect(dangerZone).not.toBeNull();
+    expect(dangerZone?.textContent).toContain(
+      "No se puede eliminar porque existen relaciones no soportadas: participant_activities."
+    );
   });
 });

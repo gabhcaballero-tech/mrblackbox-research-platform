@@ -18,6 +18,7 @@ export function ParticipantRegistrationForm({
 }: ParticipantRegistrationFormProps) {
   const action = registerParticipantPortalAction.bind(null, studyCode);
   const [state, formAction] = useActionState(action, initialParticipantPortalActionState);
+  const values = state.formValues;
 
   return (
     <form action={formAction} className="space-y-5">
@@ -29,6 +30,7 @@ export function ParticipantRegistrationForm({
         label="Nombre completo"
         name="name"
         normalizeParticipantText
+        defaultValue={values?.name}
         required
       />
 
@@ -39,6 +41,7 @@ export function ParticipantRegistrationForm({
           inputMode="tel"
           label="Celular"
           name="phone"
+          defaultValue={values?.phone}
           placeholder="Ej. 5512345678 o +525512345678"
           required
         />
@@ -48,6 +51,7 @@ export function ParticipantRegistrationForm({
           inputMode="tel"
           label="Confirmar celular"
           name="confirmPhone"
+          defaultValue={values?.confirmPhone}
           placeholder="Repite tu celular"
           required
         />
@@ -61,6 +65,7 @@ export function ParticipantRegistrationForm({
       </div>
 
       <ConsentCheckbox
+        defaultChecked={values?.consentPrivacy}
         error={fieldError(state, "consentPrivacy")}
         name="consentPrivacy"
       >
@@ -68,6 +73,7 @@ export function ParticipantRegistrationForm({
       </ConsentCheckbox>
 
       <ConsentCheckbox
+        defaultChecked={values?.consentSensitive}
         error={fieldError(state, "consentSensitive")}
         name="consentSensitive"
       >
@@ -87,6 +93,7 @@ export function ParticipantRegistrationForm({
 
 function TextField({
   autoComplete,
+  defaultValue,
   error,
   inputMode,
   label,
@@ -96,6 +103,7 @@ function TextField({
   required = false
 }: {
   autoComplete?: string;
+  defaultValue?: string;
   error?: string;
   inputMode?: "email" | "numeric" | "tel" | "text";
   label: string;
@@ -111,6 +119,7 @@ function TextField({
         <NormalizedParticipantTextInput
           autoComplete={autoComplete}
           className={inputClass}
+          defaultValue={defaultValue}
           inputMode="text"
           name={name}
           placeholder={placeholder}
@@ -120,6 +129,7 @@ function TextField({
         <input
           autoComplete={autoComplete}
           className={inputClass}
+          defaultValue={defaultValue}
           inputMode={inputMode}
           name={name}
           placeholder={placeholder}
@@ -138,10 +148,12 @@ const submitButtonClass =
 
 function ConsentCheckbox({
   children,
+  defaultChecked = false,
   error,
   name
 }: {
   children: string;
+  defaultChecked?: boolean;
   error?: string;
   name: string;
 }) {
@@ -150,6 +162,7 @@ function ConsentCheckbox({
       <span className="flex items-start gap-3">
         <input
           className="mt-1 h-4 w-4 rounded border-zinc-300 text-teal-700 focus:ring-teal-600"
+          defaultChecked={defaultChecked}
           name={name}
           type="checkbox"
         />
@@ -166,7 +179,7 @@ function FormMessage({ state }: { state: ParticipantPortalActionState }) {
   }
 
   return (
-    <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+    <p aria-live="polite" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
       {state.message}
     </p>
   );

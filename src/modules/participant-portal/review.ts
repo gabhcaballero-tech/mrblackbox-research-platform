@@ -12,7 +12,8 @@ export type ParticipantReferenceCodeDraft = {
   slot: 1 | 2 | 3;
 };
 
-export const PARTICIPANT_REFERENCE_CODE_PATTERN = /^[1-9]\d{3}$/;
+export const PARTICIPANT_REFERENCE_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ2346789";
+export const PARTICIPANT_REFERENCE_CODE_PATTERN = /^[ABCDEFGHJKMNPQRSTUVWXYZ2346789]{4}$/;
 
 export type ParticipantConfirmationDraft = {
   approvedAt: Date;
@@ -167,7 +168,7 @@ export function generateReferenceCodes({
 }
 
 export function normalizeParticipantReferenceCode(value: string): string {
-  return value.trim();
+  return value.trim().toUpperCase();
 }
 
 export function isParticipantReferenceCode(value: string): boolean {

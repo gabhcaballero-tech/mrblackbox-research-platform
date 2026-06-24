@@ -19,6 +19,7 @@ import {
   createSupabaseEvidenceStorageClient,
   type EvidenceUploadMetadata
 } from "./evidence-storage";
+import { buildEvidenceReviewPath, type EvidenceReviewFocus } from "./evidence-review-navigation";
 
 type EvidenceReviewActionResult<T = unknown> =
   | {
@@ -41,10 +42,10 @@ export async function approveParticipantEvidenceAction(attemptId: string): Promi
   revalidatePath(`/admin/screening-attempts/${attemptId}`);
 
   if (!result.ok) {
-    redirect(reviewPath(attemptId, "evidenceError", result.message));
+    redirect(reviewPath(attemptId, "evidenceError", result.message, "evidencias"));
   }
 
-  redirect(reviewPath(attemptId, "evidenceMessage", "Evidencia aprobada correctamente."));
+  redirect(reviewPath(attemptId, "evidenceMessage", "Evidencia aprobada correctamente.", "confirmacion-final"));
 }
 
 export async function regenerateParticipantReferenceCodesAction(attemptId: string): Promise<void> {
@@ -58,10 +59,10 @@ export async function regenerateParticipantReferenceCodesAction(attemptId: strin
   revalidatePath(`/admin/screening-attempts/${attemptId}`);
 
   if (!result.ok) {
-    redirect(reviewPath(attemptId, "evidenceError", result.message));
+    redirect(reviewPath(attemptId, "evidenceError", result.message, "confirmacion-final"));
   }
 
-  redirect(reviewPath(attemptId, "evidenceMessage", "CÃ³digos regenerados correctamente."));
+  redirect(reviewPath(attemptId, "evidenceMessage", "Códigos regenerados correctamente.", "confirmacion-final"));
 }
 
 export async function updateParticipantEvidenceParticipantAction(
@@ -84,10 +85,10 @@ export async function updateParticipantEvidenceParticipantAction(
   revalidatePath(`/admin/screening-attempts/${attemptId}`);
 
   if (!result.ok) {
-    redirect(reviewPath(attemptId, "evidenceError", result.message));
+    redirect(reviewPath(attemptId, "evidenceError", result.message, "datos-participante"));
   }
 
-  redirect(reviewPath(attemptId, "evidenceMessage", "Datos del participante actualizados correctamente."));
+  redirect(reviewPath(attemptId, "evidenceMessage", "Datos del participante actualizados correctamente.", "datos-participante"));
 }
 
 export async function deleteParticipantEvidenceTestRecordAction(
@@ -107,7 +108,7 @@ export async function deleteParticipantEvidenceTestRecordAction(
   revalidatePath(`/admin/screening-attempts/${attemptId}`);
 
   if (!result.ok) {
-    redirect(reviewPath(attemptId, "evidenceError", result.message));
+    redirect(reviewPath(attemptId, "evidenceError", result.message, "zona-peligro"));
   }
 
   redirect(
@@ -134,7 +135,7 @@ export async function deleteParticipantEvidenceStudyParticipantTestRecordsAction
   revalidatePath(`/admin/screening-attempts/${attemptId}`);
 
   if (!result.ok) {
-    redirect(reviewPath(attemptId, "evidenceError", result.message));
+    redirect(reviewPath(attemptId, "evidenceError", result.message, "zona-peligro"));
   }
 
   redirect(
@@ -160,10 +161,10 @@ export async function rejectParticipantEvidenceAction(
   revalidatePath(`/admin/screening-attempts/${attemptId}`);
 
   if (!result.ok) {
-    redirect(reviewPath(attemptId, "evidenceError", result.message));
+    redirect(reviewPath(attemptId, "evidenceError", result.message, "evidencias"));
   }
 
-  redirect(reviewPath(attemptId, "evidenceMessage", "Evidencia rechazada correctamente."));
+  redirect(reviewPath(attemptId, "evidenceMessage", "Evidencia rechazada correctamente.", "evidencias"));
 }
 
 export async function requestParticipantEvidenceReplacementUploadAction(
@@ -257,14 +258,22 @@ export async function markParticipantManualMessageSentAction(attemptId: string):
   revalidatePath(`/admin/screening-attempts/${attemptId}`);
 
   if (!result.ok) {
-    redirect(reviewPath(attemptId, "evidenceError", result.message));
+    redirect(reviewPath(attemptId, "evidenceError", result.message, "whatsapp"));
   }
 
-  redirect(reviewPath(attemptId, "evidenceMessage", "Mensaje marcado como enviado."));
+  redirect(reviewPath(attemptId, "evidenceMessage", "Mensaje marcado como enviado.", "whatsapp"));
 }
 
-function reviewPath(attemptId: string, key: "evidenceError" | "evidenceMessage", value: string): string {
-  const params = new URLSearchParams({ [key]: value });
-
-  return `/admin/screening-attempts/${attemptId}?${params.toString()}`;
+function reviewPath(
+  attemptId: string,
+  key: "evidenceError" | "evidenceMessage",
+  value: string,
+  focus?: EvidenceReviewFocus
+): string {
+  return buildEvidenceReviewPath({
+    attemptId,
+    focus,
+    key,
+    value
+  });
 }

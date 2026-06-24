@@ -50,7 +50,8 @@ export default async function ScreenerPage({ params, searchParams }: ScreenerPag
   }
 
   const { draft, study, versions } = result.data;
-  const readOnly = study.status !== "DRAFT";
+  const readOnly = study.status !== "DRAFT" && !(study.status === "ACTIVE" && draft);
+  const isPreparingNewVersion = study.status === "ACTIVE" && Boolean(draft);
   const definition = draft ? parseScreenerDefinition(draft.definitionJson) : null;
 
   return (
@@ -58,7 +59,11 @@ export default async function ScreenerPage({ params, searchParams }: ScreenerPag
       <PageHeader
         actions={
           <StatusBadge status={readOnly ? "planned" : "ready"}>
-            {readOnly ? UI_LABELS.common.readOnly : STUDY_STATUS_LABELS.DRAFT}
+            {readOnly
+              ? UI_LABELS.common.readOnly
+              : isPreparingNewVersion
+                ? "Nueva versión editable"
+                : STUDY_STATUS_LABELS.DRAFT}
           </StatusBadge>
         }
         description="Crea y publica el cuestionario de filtro. Esta fase no registra participantes ni intentos reales."

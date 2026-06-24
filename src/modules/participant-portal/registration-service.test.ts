@@ -337,6 +337,33 @@ describe("participant portal registration service", () => {
     expect(repository.createParticipantProfile).not.toHaveBeenCalled();
   });
 
+  it("blocks reuse when the matched profile belongs to another auth user", async () => {
+    const conflictingProfile: PortalRegistrationParticipantProfile = {
+      createdByUserId: null,
+      email: identity.email,
+      id: "profile-conflict",
+      name: "Nombre previo",
+      participantAuthUserId: "22222222-2222-4222-8222-222222222222",
+      phone: "+525512345678"
+    };
+    const { repository } = createRepository({ profiles: [conflictingProfile] });
+    const result = await registerParticipantInPortal({
+      formInput: validForm(),
+      identity,
+      now,
+      repository,
+      study: portalStudy()
+    });
+
+    expect(result).toEqual({
+      code: "DUPLICATE_PROFILE_CONFLICT",
+      message: PARTICIPANT_PORTAL_DUPLICATE_REGISTRATION_MESSAGE,
+      ok: false
+    });
+    expect(repository.updateParticipantProfile).not.toHaveBeenCalled();
+    expect(repository.createStudyParticipant).not.toHaveBeenCalled();
+  });
+
   it("blocks duplicate public registration when study participant already has an attempt", async () => {
     const existingProfile: PortalRegistrationParticipantProfile = {
       createdByUserId: null,
@@ -394,7 +421,7 @@ describe("participant portal registration service", () => {
   });
 
   it("does not duplicate consent on repeated submit", async () => {
-    const { consents, repository } = createRepository();
+    const { consents, participants, profiles, repository } = createRepository();
 
     const first = await registerParticipantInPortal({
       formInput: validForm(),
@@ -414,5 +441,7 @@ describe("participant portal registration service", () => {
     expect(first.ok).toBe(true);
     expect(second.ok ? second.data.consentReused : false).toBe(true);
     expect(consents).toHaveLength(1);
+    expect(profiles).toHaveLength(1);
+    expect(participants).toHaveLength(1);
   });
 });

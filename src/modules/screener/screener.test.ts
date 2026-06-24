@@ -21,11 +21,13 @@ import {
   addScreenerQuestionForAdmin,
   addScreenerRuleForAdmin,
   createScreenerDraftForAdmin,
+  getScreenerBuilderForAdmin,
   moveScreenerQuestionForAdmin,
   projectScreenerVersionForAdmin,
   publishScreenerForAdmin,
   saveScreenerNseForAdmin,
   updateScreenerOptionForAdmin,
+  updateScreenerQuestionForAdmin,
   updateScreenerRuleForAdmin,
   type ScreenerAdminActor
 } from "./service";
@@ -279,12 +281,14 @@ function draft(definitionJson: ScreenerDefinition = definition()): ScreenerDraft
   };
 }
 
-function version(versionNumber: number, status: "ACTIVE" | "RETIRED" = "ACTIVE"): ScreenerVersionRecord {
-  const currentDefinition = definition();
-
+function version(
+  versionNumber: number,
+  status: "ACTIVE" | "RETIRED" = "ACTIVE",
+  definitionJson: ScreenerDefinition = definition()
+): ScreenerVersionRecord {
   return {
     definitionHash: `hash-${versionNumber}`,
-    definitionJson: currentDefinition,
+    definitionJson,
     id: `version-${versionNumber}`,
     publishedAt: new Date("2026-01-01T10:00:00Z"),
     publishedByUserId: adminActor.id,
@@ -300,7 +304,13 @@ function version(versionNumber: number, status: "ACTIVE" | "RETIRED" = "ACTIVE")
 function fakeRepository(builder: ScreenerBuilderData): ScreenerRepository {
   return {
     async createDraft(input) {
-      const created = draft(input.definitionJson);
+      const created = {
+        ...draft(input.definitionJson),
+        createdAt: new Date("2026-01-03T10:00:00Z"),
+        id: `draft-created-${builder.versions.length + 1}`,
+        name: input.name,
+        updatedAt: new Date("2026-01-03T10:00:00Z")
+      };
       builder.draft = created;
       return created;
     },
@@ -319,7 +329,7 @@ function fakeRepository(builder: ScreenerBuilderData): ScreenerRepository {
             }
           : item
       );
-      const nextVersion = version(builder.versions.length + 1, "ACTIVE");
+      const nextVersion = version(builder.versions.length + 1, "ACTIVE", input.definitionJson);
       nextVersion.definitionHash = input.definitionHash;
       nextVersion.definitionJson = input.definitionJson;
       builder.versions.unshift(nextVersion);
@@ -684,7 +694,7 @@ describe("screener admin service", () => {
     ).resolves.toMatchObject({ code: "UNAUTHORIZED", ok: false });
   });
 
-  it("rejects mutations when study is not DRAFT", async () => {
+  it("rejects mutations when the study is not editable", async () => {
     const result = await addScreenerQuestionForAdmin({
       actor: adminActor,
       formInput: {
@@ -696,13 +706,142 @@ describe("screener admin service", () => {
       },
       repository: fakeRepository({
         draft: draft(),
-        study: study({ status: "ACTIVE" }),
+        study: study({ status: "PAUSED" }),
         versions: []
       }),
       studyId
     });
 
     expect(result).toMatchObject({ code: "STUDY_NOT_DRAFT", ok: false });
+  });
+
+  it("does not expose the published draft as editable for an ACTIVE study", async () => {
+    const activeDefinition = definitionWithConditionalQuestion({
+      questionId: "q-choice",
+      type: "ANSWER_EQUALS",
+      value: "yes"
+    });
+    const builder = {
+      draft: draft(activeDefinition),
+      study: study({ status: "ACTIVE" }),
+      versions: [version(1, "ACTIVE", activeDefinition)]
+    };
+
+    const result = await getScreenerBuilderForAdmin({
+      actor: adminActor,
+      repository: fakeRepository(builder),
+      studyId
+    });
+
+    expect(result).toMatchObject({ ok: true });
+    expect(result.ok ? result.data.draft : null).toBeNull();
+  });
+
+  it("creates an editable draft from the active published version", async () => {
+    const activeDefinition = definitionWithConditionalQuestion({
+      questionId: "q-choice",
+      type: "ANSWER_EQUALS",
+      value: "yes"
+    });
+    const activeVersion = version(1, "ACTIVE", activeDefinition);
+    const builder = {
+      draft: draft(definition({ questions: [], rules: [] })),
+      study: study({ status: "ACTIVE" }),
+      versions: [activeVersion]
+    };
+
+    const result = await createScreenerDraftForAdmin({
+      actor: adminActor,
+      repository: fakeRepository(builder),
+      studyId
+    });
+
+    const newDraftDefinition = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+
+    expect(result).toMatchObject({ ok: true });
+    expect(newDraftDefinition).toEqual(activeDefinition);
+    expect(newDraftDefinition.questions.find((question) => question.id === "q-follow")).toMatchObject({
+      visibilityCondition: {
+        questionId: "q-choice",
+        type: "ANSWER_EQUALS",
+        value: "yes"
+      }
+    });
+    expect(newDraftDefinition.rules).toEqual(activeDefinition.rules);
+    expect(newDraftDefinition.nse).toEqual(activeDefinition.nse);
+    expect(activeVersion.definitionJson).toEqual(activeDefinition);
+  });
+
+  it("rejects editing an ACTIVE study until a new-version draft exists", async () => {
+    const activeDefinition = definition();
+    const result = await updateScreenerQuestionForAdmin({
+      actor: adminActor,
+      formInput: {
+        dataDestination: "SCREENING",
+        id: "q-choice",
+        required: true,
+        text: "Texto editado",
+        type: "SINGLE_CHOICE"
+      },
+      questionId: "q-choice",
+      repository: fakeRepository({
+        draft: draft(activeDefinition),
+        study: study({ status: "ACTIVE" }),
+        versions: [version(1, "ACTIVE", activeDefinition)]
+      }),
+      studyId
+    });
+
+    expect(result).toMatchObject({ code: "DRAFT_NOT_FOUND", ok: false });
+  });
+
+  it("allows editing the new-version draft while keeping the active version intact", async () => {
+    const activeDefinition = definitionWithConditionalQuestion({
+      questionId: "q-choice",
+      type: "ANSWER_EQUALS",
+      value: "yes"
+    });
+    const activeVersion = version(1, "ACTIVE", activeDefinition);
+    const newVersionDraft = {
+      ...draft(activeDefinition),
+      createdAt: new Date("2026-01-03T10:00:00Z"),
+      id: "draft-new-version",
+      updatedAt: new Date("2026-01-03T10:00:00Z")
+    };
+    const builder = {
+      draft: newVersionDraft,
+      study: study({ status: "ACTIVE" }),
+      versions: [activeVersion]
+    };
+
+    const result = await updateScreenerQuestionForAdmin({
+      actor: adminActor,
+      formInput: {
+        dataDestination: "SCREENING",
+        id: "q-follow",
+        required: true,
+        text: "Pregunta condicional corregida",
+        type: "INTEGER",
+        validationMin: "1",
+        validationMax: "10"
+      },
+      questionId: "q-follow",
+      repository: fakeRepository(builder),
+      studyId
+    });
+
+    const nextDraftDefinition = screenerDefinitionSchema.parse(builder.draft?.definitionJson);
+    const publishedDefinition = screenerDefinitionSchema.parse(activeVersion.definitionJson);
+
+    expect(result).toMatchObject({ ok: true });
+    expect(nextDraftDefinition.questions.find((question) => question.id === "q-follow")).toMatchObject({
+      text: "Pregunta condicional corregida",
+      visibilityCondition: activeDefinition.questions.find((question) => question.id === "q-follow")
+        ?.visibilityCondition
+    });
+    expect(publishedDefinition.questions.find((question) => question.id === "q-follow")).toMatchObject({
+      text: "Pregunta condicional"
+    });
   });
 
   it("creates default SI and NO options for a new consent question", async () => {
@@ -920,10 +1059,22 @@ describe("screener admin service", () => {
   });
 
   it("publishes consecutive versions and retires the previous active version", async () => {
+    const activeDefinition = definition();
+    const editedDefinition = definition({
+      title: "Filtro corregido"
+    });
+    const priorAttempt = {
+      questionnaireVersionId: "version-1"
+    };
     const builder = {
-      draft: draft(),
-      study: study(),
-      versions: [version(1, "ACTIVE")]
+      draft: {
+        ...draft(editedDefinition),
+        createdAt: new Date("2026-01-03T10:00:00Z"),
+        id: "draft-new-version",
+        updatedAt: new Date("2026-01-03T10:00:00Z")
+      },
+      study: study({ status: "ACTIVE" }),
+      versions: [version(1, "ACTIVE", activeDefinition)]
     };
     const result = await publishScreenerForAdmin({
       actor: adminActor,
@@ -936,6 +1087,25 @@ describe("screener admin service", () => {
     expect(result.ok ? result.data.retiredCount : null).toBe(1);
     expect(builder.versions.filter((item) => item.status === "ACTIVE")).toHaveLength(1);
     expect(builder.versions.find((item) => item.versionNumber === 1)?.status).toBe("RETIRED");
+    expect(builder.versions.find((item) => item.versionNumber === 2)).toMatchObject({
+      definitionJson: editedDefinition,
+      status: "ACTIVE"
+    });
+    expect(priorAttempt.questionnaireVersionId).toBe("version-1");
+  });
+
+  it("denies publishing a new screener version to non ADMIN roles", async () => {
+    const result = await publishScreenerForAdmin({
+      actor: actor("SUPERVISOR"),
+      repository: fakeRepository({
+        draft: draft(),
+        study: study({ status: "ACTIVE" }),
+        versions: [version(1, "ACTIVE")]
+      }),
+      studyId
+    });
+
+    expect(result).toMatchObject({ code: "UNAUTHORIZED", ok: false });
   });
 
   it("saves guided NSE values into the existing definition contract", async () => {

@@ -81,6 +81,7 @@ export default async function ScreeningAttemptDetailPage({ params, searchParams 
             detail={evidenceResult.data}
             message={firstParam(search.evidenceMessage)}
             error={firstParam(search.evidenceError)}
+            focus={firstParam(search.evidenceFocus)}
           />
         </div>
       ) : null}

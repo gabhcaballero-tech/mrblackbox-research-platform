@@ -99,15 +99,23 @@ export function ScreenerBuilder({
   study,
   versions
 }: ScreenerBuilderProps) {
+  const activeVersion = versions.find((version) => version.status === "ACTIVE") ?? null;
+  const isPreparingNewVersion = study.status === "ACTIVE" && Boolean(draft);
+
   return (
     <div className="space-y-6">
-      <StudySummary study={study} />
+      <StudySummary isPreparingNewVersion={isPreparingNewVersion} study={study} />
 
       {!draft || !definition ? (
-        <CreateDraftPanel readOnly={readOnly} studyId={study.id} />
+        <CreateDraftPanel activeVersion={activeVersion} study={study} studyId={study.id} />
       ) : (
         <>
-          <DraftStatusPanel draft={draft} definition={definition} />
+          <DraftStatusPanel
+            activeVersion={activeVersion}
+            draft={draft}
+            definition={definition}
+            isPreparingNewVersion={isPreparingNewVersion}
+          />
           <MetadataPanel definition={definition} readOnly={readOnly} studyId={study.id} />
           <QuestionPanel
             definition={definition}
@@ -117,16 +125,27 @@ export function ScreenerBuilder({
           />
           <RulePanel definition={definition} readOnly={readOnly} studyId={study.id} />
           <NsePanel definition={definition} readOnly={readOnly} studyId={study.id} />
-          <PublishPanel definition={definition} readOnly={readOnly} studyId={study.id} />
+          <PublishPanel
+            definition={definition}
+            isPreparingNewVersion={isPreparingNewVersion}
+            readOnly={readOnly}
+            studyId={study.id}
+          />
         </>
       )}
 
-      <VersionHistory readOnly={readOnly} studyId={study.id} versions={versions} />
+      <VersionHistory canRetire={study.status === "DRAFT"} studyId={study.id} versions={versions} />
     </div>
   );
 }
 
-function StudySummary({ study }: { study: ScreenerStudySummary }) {
+function StudySummary({
+  isPreparingNewVersion,
+  study
+}: {
+  isPreparingNewVersion: boolean;
+  study: ScreenerStudySummary;
+}) {
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
       <h2 className="text-lg font-semibold text-zinc-950">{study.name}</h2>
@@ -146,7 +165,11 @@ function StudySummary({ study }: { study: ScreenerStudySummary }) {
         <div>
           <dt className="font-medium text-zinc-500">{UI_LABELS.common.editing}</dt>
           <dd className="mt-1 text-zinc-900">
-            {study.status === "DRAFT" ? UI_LABELS.common.available : UI_LABELS.common.readOnly}
+            {study.status === "DRAFT" || isPreparingNewVersion
+              ? isPreparingNewVersion
+                ? "Nueva versión editable"
+                : UI_LABELS.common.available
+              : UI_LABELS.common.readOnly}
           </dd>
         </div>
       </dl>
@@ -154,16 +177,41 @@ function StudySummary({ study }: { study: ScreenerStudySummary }) {
   );
 }
 
-function CreateDraftPanel({ readOnly, studyId }: { readOnly: boolean; studyId: string }) {
+function CreateDraftPanel({
+  activeVersion,
+  study,
+  studyId
+}: {
+  activeVersion: ScreenerVersionRecord | null;
+  study: ScreenerStudySummary;
+  studyId: string;
+}) {
+  const canCreate = study.status === "DRAFT" || (study.status === "ACTIVE" && Boolean(activeVersion));
+  const isNewVersion = study.status === "ACTIVE" && Boolean(activeVersion);
+
   return (
     <section className="rounded-lg border border-dashed border-teal-300 bg-teal-50 p-5">
-      <h2 className="text-lg font-semibold text-zinc-950">{UI_LABELS.screener.screenerDraft}</h2>
+      <h2 className="text-lg font-semibold text-zinc-950">
+        {isNewVersion ? "Crear nueva versión del filtro" : UI_LABELS.screener.screenerDraft}
+      </h2>
       <p className="mt-2 text-sm leading-6 text-zinc-700">
         Crea un borrador reutilizable para este estudio. La versión publicada se generará después.
       </p>
+      {isNewVersion ? (
+        <p className="mt-2 text-sm leading-6 text-teal-900">
+          Se creará un borrador editable a partir de la versión publicada actual. Los cambios no afectarán intentos
+          anteriores.
+        </p>
+      ) : null}
+      {activeVersion ? (
+        <p className="mt-2 text-sm text-teal-900">
+          Versión activa actual: v{activeVersion.versionNumber}. Los cambios solo aplicarán a nuevos intentos después
+          de publicar.
+        </p>
+      ) : null}
       <form action={createScreenerDraftAction.bind(null, studyId)} className="mt-4">
-        <button className={primaryButtonClass} disabled={readOnly} type="submit">
-          {UI_LABELS.actions.createDraft}
+        <button className={primaryButtonClass} disabled={!canCreate} type="submit">
+          {isNewVersion ? "Crear nueva versión del filtro" : UI_LABELS.actions.createDraft}
         </button>
       </form>
     </section>
@@ -171,15 +219,27 @@ function CreateDraftPanel({ readOnly, studyId }: { readOnly: boolean; studyId: s
 }
 
 function DraftStatusPanel({
+  activeVersion,
   definition,
-  draft
+  draft,
+  isPreparingNewVersion
 }: {
+  activeVersion: ScreenerVersionRecord | null;
   definition: ScreenerDefinition;
   draft: ScreenerDraftRecord;
+  isPreparingNewVersion: boolean;
 }) {
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-zinc-950">{UI_LABELS.screener.draftStatus}</h2>
+      <h2 className="text-lg font-semibold text-zinc-950">
+        {isPreparingNewVersion ? "Borrador de nueva versión" : UI_LABELS.screener.draftStatus}
+      </h2>
+      {activeVersion ? (
+        <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Versión activa actual: v{activeVersion.versionNumber}. Los cambios solo aplicarán a nuevos intentos después
+          de publicar.
+        </p>
+      ) : null}
       <dl className="mt-4 grid gap-3 text-sm md:grid-cols-4">
         <div>
           <dt className="font-medium text-zinc-500">{UI_LABELS.screener.title}</dt>
@@ -574,10 +634,12 @@ function NsePanel({
 
 function PublishPanel({
   definition,
+  isPreparingNewVersion,
   readOnly,
   studyId
 }: {
   definition: ScreenerDefinition;
+  isPreparingNewVersion: boolean;
   readOnly: boolean;
   studyId: string;
 }) {
@@ -601,9 +663,15 @@ function PublishPanel({
           {definition.nse ? UI_LABELS.common.configured : UI_LABELS.screener.notConfigured}
         </li>
       </ul>
+      {isPreparingNewVersion ? (
+        <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Al publicar, esta será la nueva versión activa del filtro. Los intentos anteriores conservarán la versión con
+          la que fueron creados.
+        </p>
+      ) : null}
       <form action={publishScreenerAction.bind(null, studyId)}>
         <button className={primaryButtonClass} disabled={readOnly || !canPublish} type="submit">
-          {UI_LABELS.actions.publishVersion}
+          {isPreparingNewVersion ? "Publicar nueva versión" : UI_LABELS.actions.publishVersion}
         </button>
       </form>
     </section>
@@ -611,11 +679,11 @@ function PublishPanel({
 }
 
 function VersionHistory({
-  readOnly,
+  canRetire,
   studyId,
   versions
 }: {
-  readOnly: boolean;
+  canRetire: boolean;
   studyId: string;
   versions: ScreenerVersionRecord[];
 }) {
@@ -649,7 +717,7 @@ function VersionHistory({
                 {version.status === "ACTIVE" ? (
                   <FormButton
                     action={retireScreenerVersionAction.bind(null, studyId, version.id)}
-                    disabled={readOnly}
+                    disabled={!canRetire}
                   >
                     {UI_LABELS.actions.retireVersion}
                   </FormButton>

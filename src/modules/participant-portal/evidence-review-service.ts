@@ -13,7 +13,7 @@ import type {
   EvidenceReviewAttemptRecord,
   EvidenceReviewRepository
 } from "./evidence-review-repository";
-import { buildManualWhatsAppMessage } from "./review";
+import { buildManualWhatsAppMessage, PARTICIPANT_REFERENCE_CODE_ALPHABET } from "./review";
 import {
   isMexicoPhone,
   normalizeMexicoPhone,
@@ -774,7 +774,13 @@ export function buildWhatsAppUrl({
 }
 
 export function generateReferenceCode(): string {
-  return String(randomInt(1000, 10000));
+  let code = "";
+
+  for (let index = 0; index < 4; index += 1) {
+    code += PARTICIPANT_REFERENCE_CODE_ALPHABET[randomInt(0, PARTICIPANT_REFERENCE_CODE_ALPHABET.length)];
+  }
+
+  return code;
 }
 
 function normalizeParticipantProfileInput(input: ParticipantEvidenceParticipantUpdateInput): EvidenceReviewResult<{

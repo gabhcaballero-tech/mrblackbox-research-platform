@@ -26,9 +26,16 @@ export function EvidenceReplacementForm({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const formRef = useRef<HTMLFormElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const reasonInputRef = useRef<HTMLTextAreaElement | null>(null);
   const router = useRouter();
+
+  function revealForm() {
+    window.requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -40,11 +47,13 @@ export function EvidenceReplacementForm({
 
     if (!file) {
       setError("Selecciona una imagen para reemplazar la evidencia.");
+      revealForm();
       return;
     }
 
     if (!replacementReason) {
       setError("Captura el motivo interno de reemplazo.");
+      revealForm();
       return;
     }
 
@@ -60,6 +69,7 @@ export function EvidenceReplacementForm({
 
       if (!signed.ok) {
         setError(signed.message);
+        revealForm();
         return;
       }
 
@@ -72,6 +82,7 @@ export function EvidenceReplacementForm({
 
       if (uploadError) {
         setError("No fue posible subir la foto. Revisa tu conexión e intenta nuevamente.");
+        revealForm();
         return;
       }
 
@@ -84,6 +95,7 @@ export function EvidenceReplacementForm({
 
       if (!confirmed.ok) {
         setError("La foto se subió, pero no fue posible registrarla. Contacta al administrador.");
+        revealForm();
         return;
       }
 
@@ -95,11 +107,12 @@ export function EvidenceReplacementForm({
       }
       setMessage("Evidencia corregida correctamente.");
       router.refresh();
+      revealForm();
     });
   }
 
   return (
-    <form className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3" onSubmit={onSubmit}>
+    <form ref={formRef} className="mt-4 scroll-mt-24 rounded-md border border-amber-200 bg-amber-50 p-3" onSubmit={onSubmit}>
       <h4 className="text-sm font-semibold text-amber-950">{label}</h4>
       <p className="mt-1 text-xs leading-5 text-amber-900">
         Disponible solo para ADMIN/SUPERVISOR. Selecciona archivo desde tu equipo y registra el motivo interno.

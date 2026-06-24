@@ -347,11 +347,13 @@ export function EvidenceReviewPanel({
   canDeleteTestRecord = false,
   detail,
   error,
+  focus,
   message
 }: {
   canDeleteTestRecord?: boolean;
   detail: ParticipantEvidenceReviewDetail;
   error?: string;
+  focus?: string;
   message?: string;
 }) {
   return (
@@ -369,16 +371,7 @@ export function EvidenceReviewPanel({
         </StatusBadge>
       </div>
 
-      {message ? (
-        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-          {message}
-        </p>
-      ) : null}
-      {error ? (
-        <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
-          {error}
-        </p>
-      ) : null}
+      {!focus ? <ActionFeedback error={error} message={message} /> : null}
 
       <dl className="mt-5 grid gap-4 text-sm md:grid-cols-3">
         <SummaryItem label="Celular" value={detail.participant.phone ?? "Sin celular"} />
@@ -387,11 +380,18 @@ export function EvidenceReviewPanel({
         <SummaryItem label="Intento" value={detail.attemptId} mono />
       </dl>
 
-      <ParticipantDataForm detail={detail} />
+      <div id="datos-participante" className="scroll-mt-24">
+        {focus === "datos-participante" ? <ActionFeedback error={error} message={message} /> : null}
+        <ParticipantDataForm detail={detail} />
+      </div>
 
       <div className="mt-5 rounded-md border border-zinc-200 bg-zinc-50 p-4">
         <h3 className="text-sm font-semibold text-zinc-800">Marcas declaradas en F6</h3>
         <p className="mt-2 text-sm leading-6 text-zinc-700">{detail.f6DeclaredBrands}</p>
+      </div>
+
+      <div id="evidencias" className="mt-5 scroll-mt-24">
+        {focus === "evidencias" ? <ActionFeedback error={error} message={message} /> : null}
       </div>
 
       <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -442,7 +442,7 @@ export function EvidenceReviewPanel({
           <form action={approveParticipantEvidenceAction.bind(null, detail.attemptId)} className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
             <h3 className="font-semibold text-emerald-950">Aprobar evidencia</h3>
             <p className="mt-2 text-sm leading-6 text-emerald-900">
-              Al aprobar se generará folio y exactamente tres códigos únicos.
+              Al aprobar se generará folio y exactamente tres códigos únicos de 4 caracteres.
             </p>
             <button className={`${primaryButtonClass} mt-4`} type="submit">
               Aprobar evidencia
@@ -467,23 +467,45 @@ export function EvidenceReviewPanel({
 
       {detail.confirmation ? (
         <div className="mt-5 space-y-4">
+          {focus === "confirmacion-final" ? <ActionFeedback error={error} message={message} /> : null}
           <ConfirmationSummary detail={detail} />
-          <WhatsAppManualBlock
-            attemptId={detail.attemptId}
-            manualMessageStatus={detail.confirmation.manualMessageStatus}
-            message={detail.confirmation.whatsappMessage}
-            whatsappUrl={detail.confirmation.whatsappUrl}
-          />
+          <div id="whatsapp" className="scroll-mt-24">
+            {focus === "whatsapp" ? <ActionFeedback error={error} message={message} /> : null}
+            <WhatsAppManualBlock
+              attemptId={detail.attemptId}
+              manualMessageStatus={detail.confirmation.manualMessageStatus}
+              message={detail.confirmation.whatsappMessage}
+              whatsappUrl={detail.confirmation.whatsappUrl}
+            />
+          </div>
         </div>
       ) : null}
 
       {canDeleteTestRecord ? (
-        <>
+        <div id="zona-peligro" className="scroll-mt-24">
+          {focus === "zona-peligro" ? <ActionFeedback error={error} message={message} /> : null}
           <DeleteTestRecordForm detail={detail} />
           {detail.cleanupSummary.attemptCount > 1 ? <DeleteParticipantTestRecordsForm detail={detail} /> : null}
-        </>
+        </div>
       ) : null}
     </section>
+  );
+}
+
+function ActionFeedback({ error, message }: { error?: string; message?: string }) {
+  return (
+    <>
+      {message ? (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {message}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+          {error}
+        </p>
+      ) : null}
+    </>
   );
 }
 
@@ -533,7 +555,7 @@ function ConfirmationSummary({ detail }: { detail: ParticipantEvidenceReviewDeta
   const codes = [...detail.confirmation.referenceCodes].sort((left, right) => left.slot - right.slot);
 
   return (
-    <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
+    <div id="confirmacion-final" className="scroll-mt-24 rounded-md border border-emerald-200 bg-emerald-50 p-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <h3 className="font-semibold text-emerald-950">Confirmacion final</h3>
@@ -553,7 +575,7 @@ function ConfirmationSummary({ detail }: { detail: ParticipantEvidenceReviewDeta
           disabled={detail.confirmation.manualMessageStatus === "MARKED_SENT"}
           type="submit"
         >
-          Regenerar codigos de 4 digitos
+          Regenerar codigos de 4 caracteres
         </button>
         {detail.confirmation.manualMessageStatus === "MARKED_SENT" ? (
           <p className="mt-2 text-xs text-amber-800">

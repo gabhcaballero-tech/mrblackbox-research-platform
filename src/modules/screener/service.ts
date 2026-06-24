@@ -172,7 +172,7 @@ export async function getScreenerBuilderForAdmin({
   }
 
   return {
-    data: builder,
+    data: projectBuilderForSafeEditing(builder),
     ok: true
   };
 }
@@ -182,26 +182,53 @@ export async function createScreenerDraftForAdmin({
   repository,
   studyId
 }: ServiceInput): Promise<ScreenerServiceResult<{ draftId: string }>> {
-  const builderResult = await loadDraftCapableBuilder<{ draftId: string }>({
-    actor,
-    repository,
-    studyId
-  });
+  const denied = ensureAdmin<{ draftId: string }>(actor);
 
-  if (!builderResult.ok) {
-    return builderResult;
+  if (denied) {
+    return denied;
   }
 
-  if (builderResult.data.draft) {
+  const builder = await repository.getBuilderData(studyId);
+
+  if (!builder) {
     return {
-      data: { draftId: builderResult.data.draft.id },
+      code: "STUDY_NOT_FOUND",
+      message: "El estudio no existe.",
+      ok: false
+    };
+  }
+
+  const editableBuilder = projectBuilderForSafeEditing(builder);
+
+  if (editableBuilder.draft) {
+    return {
+      data: { draftId: editableBuilder.draft.id },
       ok: true
     };
   }
 
-  const definition = createEmptyScreenerDefinition(
-    `Filtro ${builderResult.data.study.code}`
-  );
+  if (builder.study.status !== "DRAFT" && builder.study.status !== "ACTIVE") {
+    return {
+      code: "STUDY_NOT_DRAFT",
+      message: "Solo se puede crear un borrador si el estudio está en borrador o activo con una versión publicada.",
+      ok: false
+    };
+  }
+
+  const activeVersion = getActiveScreenerVersion(builder);
+
+  if (builder.study.status === "ACTIVE" && !activeVersion) {
+    return {
+      code: "VERSION_NOT_FOUND",
+      message: "No existe una versión activa para crear un nuevo borrador.",
+      ok: false
+    };
+  }
+
+  const definition =
+    builder.study.status === "ACTIVE" && activeVersion
+      ? parseScreenerDefinition(activeVersion.definitionJson)
+      : createEmptyScreenerDefinition(`Filtro ${builder.study.code}`);
   const draft = await repository.createDraft({
     createdByUserId: actor!.id,
     definitionJson: definition,
@@ -838,6 +865,14 @@ export async function retireScreenerVersionForAdmin({
     return builderResult;
   }
 
+  if (builderResult.data.study.status !== "DRAFT") {
+    return {
+      code: "STUDY_NOT_DRAFT",
+      message: "Solo se puede retirar manualmente una versión mientras el estudio está en borrador.",
+      ok: false
+    };
+  }
+
   const retired = await repository.retireVersion({
     retiredByUserId: actor!.id,
     studyId,
@@ -896,16 +931,26 @@ async function loadDraftCapableBuilder<T>({
     };
   }
 
-  if (builder.study.status !== "DRAFT") {
+  const safeBuilder = projectBuilderForSafeEditing(builder);
+
+  if (safeBuilder.study.status === "ACTIVE" && !safeBuilder.draft) {
+    return {
+      code: "DRAFT_NOT_FOUND",
+      message: "Crea primero un borrador de nueva versión desde la versión activa.",
+      ok: false
+    };
+  }
+
+  if (safeBuilder.study.status !== "DRAFT" && safeBuilder.study.status !== "ACTIVE") {
     return {
       code: "STUDY_NOT_DRAFT",
-      message: "El cuestionario de filtro solo puede modificarse mientras el estudio está en borrador.",
+      message: "El cuestionario de filtro solo puede modificarse mientras el estudio está en borrador o preparando una nueva versión.",
       ok: false
     };
   }
 
   return {
-    data: builder,
+    data: safeBuilder,
     ok: true
   };
 }
@@ -937,6 +982,31 @@ async function loadDraftContextForMutation<T>(
     },
     ok: true
   };
+}
+
+function projectBuilderForSafeEditing(builder: ScreenerBuilderData): ScreenerBuilderData {
+  if (builder.study.status !== "ACTIVE") {
+    return {
+      ...builder
+    };
+  }
+
+  const activeVersion = getActiveScreenerVersion(builder);
+  const draft =
+    builder.draft && activeVersion && builder.draft.createdAt > activeVersion.publishedAt ? builder.draft : null;
+
+  return {
+    ...builder,
+    draft
+  };
+}
+
+function getActiveScreenerVersion(builder: ScreenerBuilderData): ScreenerVersionRecord | null {
+  return (
+    [...builder.versions]
+      .filter((version) => version.status === "ACTIVE")
+      .sort((left, right) => right.versionNumber - left.versionNumber)[0] ?? null
+  );
 }
 
 async function mutateDraftForAdmin({

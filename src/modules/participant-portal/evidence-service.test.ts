@@ -15,6 +15,7 @@ import {
   getParticipantPortalSelfieScreen,
   requestParticipantEvidenceUpload
 } from "./evidence-service";
+import { PARTICIPANT_REFERENCE_CODE_PATTERN } from "./review";
 
 const identity: ParticipantPortalIdentity = {
   email: "persona@example.com",
@@ -484,9 +485,9 @@ describe("participant portal evidence service", () => {
             manualMessageMarkedSentAt: null,
             manualMessageStatus: "NOT_SENT",
             referenceCodes: [
-              { code: "4821", slot: 1 },
-              { code: "7710", slot: 2 },
-              { code: "9034", slot: 3 }
+              { code: "A7K4", slot: 1 },
+              { code: "M3P9", slot: 2 },
+              { code: "T8R2", slot: 3 }
             ]
           }
         })
@@ -498,6 +499,8 @@ describe("participant portal evidence service", () => {
     expect(rejected.ok ? rejected.data.message : "").toContain("reclutador");
     expect(approved.ok ? approved.data.confirmation?.folio : null).toBe("NAV-001");
     expect(approved.ok ? approved.data.confirmation?.codes : []).toHaveLength(3);
-    expect(approved.ok ? approved.data.confirmation?.codes.every((item) => /^[1-9]\d{3}$/.test(item.code)) : false).toBe(true);
+    expect(
+      approved.ok ? approved.data.confirmation?.codes.every((item) => PARTICIPANT_REFERENCE_CODE_PATTERN.test(item.code)) : false
+    ).toBe(true);
   });
 });

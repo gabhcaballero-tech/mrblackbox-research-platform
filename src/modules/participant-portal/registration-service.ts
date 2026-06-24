@@ -25,6 +25,7 @@ export type ParticipantPortalRegistrationFieldErrors = Partial<
 >;
 
 export type ParticipantPortalRegistrationErrorCode =
+  | "DUPLICATE_PROFILE_CONFLICT"
   | "DUPLICATE_WITH_ATTEMPT"
   | "MISSING_AUTH_EMAIL"
   | "PORTAL_UNAVAILABLE"
@@ -132,10 +133,18 @@ export async function registerParticipantInPortal({
       },
       ok: true
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof PortalRegistrationConflictError) {
+      return {
+        code: "DUPLICATE_PROFILE_CONFLICT",
+        message: error.message,
+        ok: false
+      };
+    }
+
     return {
       code: "UNKNOWN_ERROR",
-      message: "No se pudo completar el registro. Intenta nuevamente.",
+      message: "No fue posible completar tu registro. Intenta de nuevo.",
       ok: false
     };
   }
@@ -164,15 +173,68 @@ async function findOrCreateParticipantProfile({
   });
 
   if (!existing) {
-    return {
-      created: true,
-      profile: await repository.createParticipantProfile({
-        email,
-        name: input.name,
-        participantAuthUserId: identity.id,
-        phone: input.phone
-      })
-    };
+    try {
+      return {
+        created: true,
+        profile: await repository.createParticipantProfile({
+          email,
+          name: input.name,
+          participantAuthUserId: identity.id,
+          phone: input.phone
+        })
+      };
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error)) {
+        const retriedMatches = await repository.findParticipantProfilesForRegistration({
+          email,
+          participantAuthUserId: identity.id,
+          phone: input.phone
+        });
+        const retriedExisting = selectBestProfileMatch(retriedMatches, {
+          email,
+          participantAuthUserId: identity.id,
+          phone: input.phone
+        });
+
+        if (retriedExisting) {
+          return reuseOrConflictExistingProfile({
+            email,
+            existing: retriedExisting,
+            identity,
+            input,
+            repository
+          });
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  return reuseOrConflictExistingProfile({
+    email,
+    existing,
+    identity,
+    input,
+    repository
+  });
+}
+
+async function reuseOrConflictExistingProfile({
+  email,
+  existing,
+  identity,
+  input,
+  repository
+}: {
+  email: string;
+  existing: PortalRegistrationParticipantProfile;
+  identity: ParticipantPortalIdentity;
+  input: ParticipantPortalRegistrationInput;
+  repository: ParticipantPortalRegistrationRepository;
+}): Promise<{ created: boolean; profile: PortalRegistrationParticipantProfile }> {
+  if (existing.participantAuthUserId && existing.participantAuthUserId !== identity.id) {
+    throw new PortalRegistrationConflictError(PARTICIPANT_PORTAL_DUPLICATE_REGISTRATION_MESSAGE);
   }
 
   const update: { email?: string; name?: string; participantAuthUserId?: string; phone?: string } = {};
@@ -200,13 +262,21 @@ async function findOrCreateParticipantProfile({
     };
   }
 
-  return {
-    created: false,
-    profile: await repository.updateParticipantProfile({
-      id: existing.id,
-      ...update
-    })
-  };
+  try {
+    return {
+      created: false,
+      profile: await repository.updateParticipantProfile({
+        id: existing.id,
+        ...update
+      })
+    };
+  } catch (error) {
+    if (isPrismaUniqueConstraintError(error)) {
+      throw new PortalRegistrationConflictError(PARTICIPANT_PORTAL_DUPLICATE_REGISTRATION_MESSAGE);
+    }
+
+    throw error;
+  }
 }
 
 async function findOrCreateStudyParticipant({
@@ -230,13 +300,31 @@ async function findOrCreateStudyParticipant({
     };
   }
 
-  return {
-    created: true,
-    studyParticipant: await repository.createStudyParticipant({
-      participantProfileId,
-      studyId
-    })
-  };
+  try {
+    return {
+      created: true,
+      studyParticipant: await repository.createStudyParticipant({
+        participantProfileId,
+        studyId
+      })
+    };
+  } catch (error) {
+    if (isPrismaUniqueConstraintError(error)) {
+      const reusable = await repository.findStudyParticipant({
+        participantProfileId,
+        studyId
+      });
+
+      if (reusable) {
+        return {
+          created: false,
+          studyParticipant: reusable
+        };
+      }
+    }
+
+    throw error;
+  }
 }
 
 async function createOrReuseConsent({
@@ -304,3 +392,5 @@ function selectBestProfileMatch(
     null
   );
 }
+
+class PortalRegistrationConflictError extends Error {}

@@ -4,6 +4,7 @@ import {
   type EvidenceReviewRepository,
   type EvidenceReviewAttemptRecord
 } from "./evidence-review-repository";
+import { PARTICIPANT_REFERENCE_CODE_PATTERN } from "./review";
 import {
   approveParticipantEvidenceReview,
   buildWhatsAppUrl,
@@ -90,9 +91,9 @@ function repository(currentAttempt = attempt()) {
         manualMessageMarkedSentAt: null,
         manualMessageStatus: "NOT_SENT" as const,
         referenceCodes: [
-          { code: "4821", slot: 1 as const },
-          { code: "7710", slot: 2 as const },
-          { code: "9034", slot: 3 as const }
+          { code: "A7K4", slot: 1 as const },
+          { code: "M3P9", slot: 2 as const },
+          { code: "T8R2", slot: 3 as const }
         ]
       },
       created: true,
@@ -123,9 +124,9 @@ function repository(currentAttempt = attempt()) {
         manualMessageMarkedSentAt: null,
         manualMessageStatus: "NOT_SENT" as const,
         referenceCodes: [
-          { code: "1001", slot: 1 as const },
-          { code: "1002", slot: 2 as const },
-          { code: "1003", slot: 3 as const }
+          { code: "B6N7", slot: 1 as const },
+          { code: "C4D8", slot: 2 as const },
+          { code: "E9F2", slot: 3 as const }
         ]
       },
       ok: true as const
@@ -238,11 +239,18 @@ describe("participant evidence review service", () => {
     expect(approved.ok).toBe(true);
     expect(rejectedWithoutReason.ok).toBe(false);
     expect(rejected.ok).toBe(true);
+    const approveInput = vi.mocked(repo.approveEvidence).mock.calls[0]?.[0];
+    expect(approveInput?.codeGenerator()).toMatch(PARTICIPANT_REFERENCE_CODE_PATTERN);
     expect(repo.rejectEvidence).toHaveBeenCalledWith(expect.objectContaining({ rejectionReason: "Selfie borrosa" }));
   });
 
-  it("generates exactly four numeric digits for new reference codes", () => {
-    expect(generateReferenceCode()).toMatch(/^[1-9]\d{3}$/);
+  it("generates exactly four safe alphanumeric characters for new reference codes", () => {
+    const codes = Array.from({ length: 100 }, () => generateReferenceCode());
+
+    expect(codes.every((code) => code.length === 4)).toBe(true);
+    expect(codes.every((code) => code === code.toUpperCase())).toBe(true);
+    expect(codes.every((code) => PARTICIPANT_REFERENCE_CODE_PATTERN.test(code))).toBe(true);
+    expect(codes.every((code) => !/[0O1IL]/.test(code))).toBe(true);
   });
 
   it("finds the first available folio sequence, including released NAV-001", () => {
@@ -267,6 +275,8 @@ describe("participant evidence review service", () => {
         regeneratedByUserId: "admin-1"
       })
     );
+    const regenerateInput = vi.mocked(repo.regenerateReferenceCodes).mock.calls[0]?.[0];
+    expect(regenerateInput?.codeGenerator()).toMatch(PARTICIPANT_REFERENCE_CODE_PATTERN);
   });
 
   it("surfaces the server-side block when regenerating after WhatsApp was marked sent", async () => {

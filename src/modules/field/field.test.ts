@@ -410,6 +410,30 @@ describe("field service", () => {
     });
   });
 
+  it("starts new attempts with the latest ACTIVE screener version provided by the study", async () => {
+    const currentStudy = {
+      ...study("ACTIVE"),
+      activeScreenerVersion: {
+        ...version(),
+        id: "version-2",
+        versionNumber: 2
+      }
+    };
+    const repository = createMemoryRepository([currentStudy]);
+
+    const result = await startFieldScreeningAttempt({
+      actor: interviewer,
+      formInput: { email: "", externalReference: "REF-2", name: "Persona", phone: "5552222222" },
+      repository,
+      studyId
+    });
+    const attempt = result.ok && result.data.kind === "started" ? await repository.getAttempt(result.data.attemptId) : null;
+
+    expect(result).toMatchObject({ ok: true });
+    expect(attempt?.questionnaireVersionId).toBe("version-2");
+    expect(attempt?.questionnaireVersion.versionNumber).toBe(2);
+  });
+
   it("does not allow starting with only name", async () => {
     const repository = createMemoryRepository();
     const result = await startFieldScreeningAttempt({

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ScreenerDefinition } from "@/modules/screener";
+import type { ScreenerDraftRecord } from "@/modules/screener/repository";
 import type { LibraryItemProjection } from "@/modules/question-library/service";
 import { ScreenerBuilder } from "./ScreenerBuilder";
 
@@ -131,6 +132,47 @@ function renderBuilder(definition: ScreenerDefinition, libraryItems: LibraryItem
   );
 }
 
+function renderActiveBuilder({
+  definition = testDefinition,
+  draft = null,
+  readOnly = true
+}: {
+  definition?: ScreenerDefinition | null;
+  draft?: ScreenerDraftRecord | null;
+  readOnly?: boolean;
+} = {}) {
+  render(
+    <ScreenerBuilder
+      definition={definition}
+      draft={draft}
+      libraryItems={[]}
+      readOnly={readOnly}
+      study={{
+        code: "TEST-1",
+        id: "study-1",
+        name: "Estudio activo",
+        status: "ACTIVE",
+        timeZoneIana: "America/Mexico_City"
+      }}
+      versions={[
+        {
+          definitionHash: "abc123",
+          definitionJson: testDefinition,
+          id: "version-1",
+          publishedAt: new Date("2026-01-03T12:00:00Z"),
+          publishedByUserId: "user-1",
+          questionnaireDraftId: "draft-published",
+          retiredAt: null,
+          retiredByUserId: null,
+          status: "ACTIVE",
+          studyId: "study-1",
+          versionNumber: 1
+        }
+      ]}
+    />
+  );
+}
+
 function definitionWithDependentQuestion(
   visibilityCondition?: ScreenerDefinition["questions"][number]["visibilityCondition"]
 ): ScreenerDefinition {
@@ -159,6 +201,40 @@ function openVisibilityPanel(index: number) {
 }
 
 describe("ScreenerBuilder", () => {
+  it("ofrece crear una nueva versión cuando el estudio activo no tiene borrador editable", () => {
+    renderActiveBuilder({ definition: null, draft: null, readOnly: true });
+
+    expect(screen.getByRole("heading", { name: "Crear nueva versión del filtro" })).toBeInTheDocument();
+    expect(
+      screen.getByText(/Se creará un borrador editable a partir de la versión publicada actual/)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Versión activa actual: v1/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Crear nueva versión del filtro" })).toBeEnabled();
+  });
+
+  it("muestra el borrador de nueva versión y el botón para publicarla", () => {
+    renderActiveBuilder({
+      draft: {
+        createdAt: new Date("2026-01-04T12:00:00Z"),
+        createdByUserId: "user-1",
+        definitionJson: testDefinition,
+        id: "draft-new-version",
+        name: "Borrador nueva versión",
+        purpose: "SCREENER",
+        status: "DRAFT",
+        studyId: "study-1",
+        updatedAt: new Date("2026-01-04T12:00:00Z"),
+        updatedByUserId: null
+      },
+      readOnly: false
+    });
+
+    expect(screen.getByText("Nueva versión editable")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Borrador de nueva versión" })).toBeInTheDocument();
+    expect(screen.getAllByText(/Los cambios solo aplicarán a nuevos intentos después de publicar/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Publicar nueva versión" })).toBeEnabled();
+  });
+
   it("ubica insertar desde biblioteca dentro de anadir contenido, no en la parte superior", () => {
     renderBuilder(testDefinition);
 
