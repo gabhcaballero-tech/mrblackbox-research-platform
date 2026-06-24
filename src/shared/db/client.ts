@@ -18,13 +18,14 @@ type PrismaClientDependencies = {
 
 type CreatePrismaClientOptions = {
   databaseUrl?: string;
+  env?: NodeJS.ProcessEnv;
   loadEnvFile?: boolean;
   dependencies?: PrismaClientDependencies;
 };
 
 type GetPrismaPoolOptions = Pick<
   CreatePrismaClientOptions,
-  "databaseUrl" | "loadEnvFile" | "dependencies"
+  "databaseUrl" | "env" | "loadEnvFile" | "dependencies"
 >;
 
 type PrismaSingletonState = {
@@ -32,11 +33,13 @@ type PrismaSingletonState = {
   client?: PrismaClientLike;
   clientPromise?: Promise<PrismaClientLike>;
   databaseUrl?: string;
+  loggedPoolInitialization?: boolean;
   pool?: Pool;
   poolMax?: number;
 };
 
-const DEFAULT_PRISMA_POOL_MAX = 3;
+const LOCAL_PRISMA_POOL_MAX = 3;
+const PRODUCTION_PRISMA_POOL_MAX = 1;
 const prismaClientModuleName = "@prisma/client";
 const globalForPrisma = globalThis as typeof globalThis & {
   __mrblackboxPrisma?: PrismaSingletonState;
@@ -57,8 +60,14 @@ export function getDatabaseUrl(env: NodeJS.ProcessEnv = process.env): string {
   return databaseUrl;
 }
 
-export function getPrismaPoolMax(): number {
-  return DEFAULT_PRISMA_POOL_MAX;
+export function getPrismaPoolMax(env: NodeJS.ProcessEnv = process.env): number {
+  const configuredMax = parseDatabasePoolMax(env.DATABASE_POOL_MAX);
+
+  if (configuredMax !== null) {
+    return configuredMax;
+  }
+
+  return isProductionRuntime(env) ? PRODUCTION_PRISMA_POOL_MAX : LOCAL_PRISMA_POOL_MAX;
 }
 
 export function getPrismaPool(options: GetPrismaPoolOptions = {}): Pool {
@@ -66,7 +75,9 @@ export function getPrismaPool(options: GetPrismaPoolOptions = {}): Pool {
     loadDotenv();
   }
 
-  const databaseUrl = options.databaseUrl ?? getDatabaseUrl();
+  const env = options.env ?? process.env;
+  const databaseUrl = options.databaseUrl ?? getDatabaseUrl(env);
+  const poolMax = getPrismaPoolMax(env);
   const state = getSingletonState();
 
   if (state.databaseUrl && state.databaseUrl !== databaseUrl) {
@@ -74,14 +85,15 @@ export function getPrismaPool(options: GetPrismaPoolOptions = {}): Pool {
   }
 
   state.databaseUrl = databaseUrl;
-  state.poolMax = DEFAULT_PRISMA_POOL_MAX;
 
   if (!state.pool) {
     const PoolConstructor = options.dependencies?.PoolConstructor ?? Pool;
+    state.poolMax = poolMax;
     state.pool = new PoolConstructor({
       connectionString: databaseUrl,
-      max: DEFAULT_PRISMA_POOL_MAX
+      max: poolMax
     });
+    logPrismaPoolInitialization({ env, poolMax, state });
   }
 
   return state.pool;
@@ -132,6 +144,45 @@ export async function createPrismaClient(
 
 export function resetPrismaClientSingletonForTests(): void {
   delete globalForPrisma.__mrblackboxPrisma;
+}
+
+function parseDatabasePoolMax(value: string | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim();
+
+  if (!/^[1-9]\d*$/.test(normalized)) {
+    return null;
+  }
+
+  const parsed = Number(normalized);
+
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+function isProductionRuntime(env: NodeJS.ProcessEnv): boolean {
+  return env.VERCEL === "1" || env.VERCEL === "true" || env.NODE_ENV === "production";
+}
+
+function logPrismaPoolInitialization({
+  env,
+  poolMax,
+  state
+}: {
+  env: NodeJS.ProcessEnv;
+  poolMax: number;
+  state: PrismaSingletonState;
+}) {
+  if (state.loggedPoolInitialization || env.NODE_ENV === "test") {
+    return;
+  }
+
+  state.loggedPoolInitialization = true;
+  const runtime = env.VERCEL ? "vercel" : env.NODE_ENV ?? "unknown";
+
+  console.info(`Prisma pg pool initialized: max=${poolMax} runtime=${runtime}`);
 }
 
 export type { PrismaClientDependencies, PrismaClientLike };
