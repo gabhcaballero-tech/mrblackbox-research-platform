@@ -776,11 +776,9 @@ function selectCurrentEvidenceAttempt(
 }
 
 function logEvidenceServiceError(step: string, evidenceType: ParticipantEvidenceKind, error: unknown) {
-  console.error("[participant-evidence]", {
-    code: readSafeErrorCode(error),
-    evidenceType,
-    step
-  });
+  console.error(
+    `participant evidence signed upload failed: step=${step} type=${evidenceType} bucket=${PARTICIPANT_EVIDENCE_BUCKET} code=${readSafeErrorCode(error)} message=${readSafeErrorMessage(error)}`
+  );
 }
 
 function readSafeErrorCode(error: unknown): string {
@@ -796,4 +794,29 @@ function readSafeErrorCode(error: unknown): string {
   }
 
   return "unknown";
+}
+
+function readSafeErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.name === "EvidenceStorageError") {
+    return sanitizeLogMessage(error.message);
+  }
+
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && looksSafeForLogs(message)) {
+      return sanitizeLogMessage(message);
+    }
+  }
+
+  return "unavailable";
+}
+
+function sanitizeLogMessage(message: string): string {
+  return message
+    .replace(/sb_(secret|publishable)_[A-Za-z0-9_\-]+/g, "[redacted]")
+    .replace(/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, "[redacted]");
+}
+
+function looksSafeForLogs(message: string): boolean {
+  return !message.includes("cookie") && !message.includes("token=");
 }

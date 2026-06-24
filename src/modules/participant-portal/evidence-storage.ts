@@ -6,7 +6,9 @@ export const F6_PERFUME_EVIDENCE_QUESTION_ID = "F6_MARCAS_UTILIZA";
 
 export type EvidenceStorageErrorCode =
   | "BUCKET_UNAVAILABLE"
+  | "INVALID_SERVER_KEY"
   | "INVALID_FILE"
+  | "MISSING_SUPABASE_URL"
   | "SIGNED_UPLOAD_UNAVAILABLE"
   | "STORAGE_NOT_CONFIGURED";
 
@@ -55,6 +57,11 @@ export class EvidenceStorageError extends Error {
 
 const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const allowedExtensions = new Set(["jpg", "jpeg", "png", "webp"]);
+
+export type EvidenceStorageConfig = {
+  secretKey: string;
+  supabaseUrl: string;
+};
 
 export function validateEvidenceUploadMetadata({
   maxImageBytes,
@@ -179,15 +186,7 @@ export function assertEvidenceStorageKeyBelongsToAttempt({
 }
 
 export function createSupabaseEvidenceStorageClient(): EvidenceStorageClient {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const secretKey = process.env.SUPABASE_SECRET_KEY;
-
-  if (!supabaseUrl || !secretKey) {
-    throw new EvidenceStorageError(
-      "STORAGE_NOT_CONFIGURED",
-      "La carga de evidencias no esta configurada. Contacta al administrador."
-    );
-  }
+  const { secretKey, supabaseUrl } = resolveEvidenceStorageConfig(process.env);
 
   const client = createClient(supabaseUrl, secretKey, {
     auth: {
@@ -233,6 +232,39 @@ export function createSupabaseEvidenceStorageClient(): EvidenceStorageClient {
   };
 }
 
+export function resolveEvidenceStorageConfig(
+  env: NodeJS.ProcessEnv
+): EvidenceStorageConfig {
+  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const secretKey = env.SUPABASE_SECRET_KEY?.trim();
+
+  if (!supabaseUrl) {
+    throw new EvidenceStorageError(
+      "MISSING_SUPABASE_URL",
+      "La carga de evidencias no esta configurada. Contacta al administrador."
+    );
+  }
+
+  if (!secretKey) {
+    throw new EvidenceStorageError(
+      "STORAGE_NOT_CONFIGURED",
+      "La carga de evidencias no esta configurada. Contacta al administrador."
+    );
+  }
+
+  if (!isServerSideSupabaseKey(secretKey)) {
+    throw new EvidenceStorageError(
+      "INVALID_SERVER_KEY",
+      "La carga de evidencias no esta configurada. Contacta al administrador."
+    );
+  }
+
+  return {
+    secretKey,
+    supabaseUrl
+  };
+}
+
 function extractExtension(filename: string): string {
   const normalized = filename.trim().toLowerCase();
   const extension = normalized.split(".").pop();
@@ -261,6 +293,24 @@ function storageErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function isServerSideSupabaseKey(secretKey: string): boolean {
+  if (secretKey.startsWith("sb_secret_")) {
+    return true;
+  }
+
+  if (secretKey.startsWith("sb_publishable_")) {
+    return false;
+  }
+
+  const jwtPayload = readJwtPayload(secretKey);
+
+  if (!jwtPayload) {
+    return false;
+  }
+
+  return jwtPayload.role === "service_role";
+}
+
 function readStorageErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -273,4 +323,23 @@ function readStorageErrorMessage(error: unknown): string {
   }
 
   return "";
+}
+
+function readJwtPayload(token: string): { role?: string } | null {
+  const parts = token.split(".");
+
+  if (parts.length !== 3) {
+    return null;
+  }
+
+  try {
+    const decoded = Buffer.from(parts[1] ?? "", "base64url").toString("utf8");
+    const parsed = JSON.parse(decoded) as { role?: unknown };
+
+    return {
+      role: typeof parsed.role === "string" ? parsed.role : undefined
+    };
+  } catch {
+    return null;
+  }
 }

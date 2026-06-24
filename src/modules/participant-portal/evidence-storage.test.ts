@@ -1,12 +1,25 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createClient } from "@supabase/supabase-js";
 import {
   PARTICIPANT_EVIDENCE_BUCKET,
   buildEvidenceStorageKey,
   createSignedEvidenceUpload,
+  createSupabaseEvidenceStorageClient,
+  resolveEvidenceStorageConfig,
   validateEvidenceUploadMetadata
 } from "./evidence-storage";
 
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: vi.fn()
+}));
+
 describe("participant evidence storage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SECRET_KEY = "sb_secret_example";
+  });
+
   it("rejects invalid MIME and files larger than maxImageBytes", () => {
     expect(() =>
       validateEvidenceUploadMetadata({
@@ -78,8 +91,71 @@ describe("participant evidence storage", () => {
     });
 
     expect(result.storageBucket).toBe(PARTICIPANT_EVIDENCE_BUCKET);
-    expect(result.signedUrl).toBe("https://storage.example/signed-upload");
+    expect(result.privateStorageKey).toContain("/selfie_identification/");
+    expect(result.token).toBe("signed-token");
     expect(Object.keys(result)).not.toContain("publicUrl");
     expect(result.privateStorageKey).not.toContain("selfie.png");
+  });
+
+  it("detects missing NEXT_PUBLIC_SUPABASE_URL", () => {
+    expect(() =>
+      resolveEvidenceStorageConfig({
+        NEXT_PUBLIC_SUPABASE_URL: "",
+        SUPABASE_SECRET_KEY: "sb_secret_example"
+      } as unknown as NodeJS.ProcessEnv)
+    ).toThrow("La carga de evidencias no esta configurada. Contacta al administrador.");
+  });
+
+  it("detects missing SUPABASE_SECRET_KEY", () => {
+    expect(() =>
+      resolveEvidenceStorageConfig({
+        NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+        SUPABASE_SECRET_KEY: ""
+      } as unknown as NodeJS.ProcessEnv)
+    ).toThrow("La carga de evidencias no esta configurada. Contacta al administrador.");
+  });
+
+  it("rejects keys that do not look server-side valid", () => {
+    expect(() =>
+      resolveEvidenceStorageConfig({
+        NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+        SUPABASE_SECRET_KEY: "sb_publishable_not_allowed"
+      } as unknown as NodeJS.ProcessEnv)
+    ).toThrow("La carga de evidencias no esta configurada. Contacta al administrador.");
+  });
+
+  it("accepts a server-side secret key and builds a storage client", async () => {
+    const createSignedUploadUrl = vi.fn(async () => ({
+      data: {
+        signedUrl: "https://signed.example/upload",
+        token: "token-1"
+      },
+      error: null
+    }));
+    vi.mocked(createClient).mockReturnValue({
+      storage: {
+        from: vi.fn(() => ({
+          createSignedUploadUrl,
+          createSignedUrl: vi.fn()
+        }))
+      }
+    } as never);
+
+    const client = createSupabaseEvidenceStorageClient();
+    const result = await client.createSignedUploadUrl({
+      bucket: PARTICIPANT_EVIDENCE_BUCKET,
+      contentType: "image/jpeg",
+      privateStorageKey: "studies/study-1/path.jpg"
+    });
+
+    expect(createClient).toHaveBeenCalledWith(
+      "https://example.supabase.co",
+      "sb_secret_example",
+      expect.any(Object)
+    );
+    expect(result).toEqual({
+      signedUrl: "https://signed.example/upload",
+      token: "token-1"
+    });
   });
 });

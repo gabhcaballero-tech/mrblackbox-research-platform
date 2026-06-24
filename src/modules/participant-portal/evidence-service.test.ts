@@ -214,6 +214,74 @@ describe("participant portal evidence service", () => {
     });
   });
 
+  it("returns a generic preparation message when Supabase Storage fails to sign", async () => {
+    const { repository } = createRepository(
+      attempt({ completedAt: null, participantEvidence: [], participantScreeningReview: null, status: "STARTED" })
+    );
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const result = await requestParticipantEvidenceUpload({
+      identity,
+      metadata: {
+        evidenceType: "SELFIE_IDENTIFICATION",
+        mimeType: "image/jpeg",
+        originalFilename: "selfie.jpg",
+        sizeBytes: 100
+      },
+      repository,
+      storage: {
+        createSignedReadUrl: vi.fn(),
+        createSignedUploadUrl: vi.fn(async () => {
+          throw new EvidenceStorageError(
+            "SIGNED_UPLOAD_UNAVAILABLE",
+            "No fue posible preparar la carga. Intenta de nuevo."
+          );
+        })
+      },
+      studyCode: "FMASCULINA-NAVIGO-2026"
+    });
+
+    expect(result).toMatchObject({
+      message: "No fue posible preparar la carga. Intenta de nuevo.",
+      ok: false
+    });
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "participant evidence signed upload failed: step=prepare-signed-upload type=SELFIE_IDENTIFICATION bucket=participant-evidence"
+      )
+    );
+    consoleError.mockRestore();
+  });
+
+  it("logs safe diagnostics without printing secrets", async () => {
+    const { repository } = createRepository(
+      attempt({ completedAt: null, participantEvidence: [], participantScreeningReview: null, status: "STARTED" })
+    );
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await requestParticipantEvidenceUpload({
+      identity,
+      metadata: {
+        evidenceType: "SELFIE_IDENTIFICATION",
+        mimeType: "image/jpeg",
+        originalFilename: "selfie.jpg",
+        sizeBytes: 100
+      },
+      repository,
+      storage: {
+        createSignedReadUrl: vi.fn(),
+        createSignedUploadUrl: vi.fn(async () => {
+          throw new Error("sb_secret_real-value-should-not-appear");
+        })
+      },
+      studyCode: "FMASCULINA-NAVIGO-2026"
+    });
+
+    const logged = String(consoleError.mock.calls[0]?.[0] ?? "");
+    expect(logged).toContain("bucket=participant-evidence");
+    expect(logged).not.toContain("sb_secret_real-value-should-not-appear");
+    consoleError.mockRestore();
+  });
+
   it("requires exactly one selfie and at least one perfume photo before final review", async () => {
     const { repository } = createRepository(attempt());
     const result = await completeParticipantEvidenceSubmission({
