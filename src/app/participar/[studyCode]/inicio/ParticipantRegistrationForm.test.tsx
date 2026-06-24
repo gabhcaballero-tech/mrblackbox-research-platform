@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ParticipantRegistrationForm } from "./ParticipantRegistrationForm";
 
@@ -39,5 +39,19 @@ describe("ParticipantRegistrationForm", () => {
     expect(
       screen.getByText(/Otorgo mi consentimiento expreso para el tratamiento de la información de salud/)
     ).toBeInTheDocument();
+  });
+
+  it("normalizes the participant name while typing", () => {
+    render(
+      <ParticipantRegistrationForm
+        privacyNoticeText="Aviso de privacidad del estudio."
+        studyCode="FMASCULINA-NAVIGO-2026"
+      />
+    );
+
+    const nameInput = screen.getByLabelText("Nombre completo");
+    fireEvent.change(nameInput, { target: { value: "  niña ámbar 😀 " } });
+
+    expect(nameInput).toHaveValue("NIÑA ÁMBAR");
   });
 });

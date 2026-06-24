@@ -139,6 +139,17 @@ function createRepository(currentAttempt: PortalEvidenceAttemptRecord | null = a
   return { evidences, pendingReviews, repository };
 }
 
+function perfumePhotoInput(index: string) {
+  return {
+    evidenceType: "PERFUME_PHOTO" as const,
+    mimeType: "image/jpeg",
+    originalFilename: `perfume-${index}.jpg`,
+    privateStorageKey: `studies/study-1/participants/profile-1/screening-attempts/attempt-1/perfume_photo/${index}.jpg`,
+    sizeBytes: 100,
+    storageBucket: "participant-evidence"
+  };
+}
+
 describe("participant portal evidence service", () => {
   it("creates an early portal attempt so the selfie can be captured before the filter", async () => {
     const { repository } = createRepository(null);
@@ -367,6 +378,47 @@ describe("participant portal evidence service", () => {
 
     expect(evidences[0]).toMatchObject({ relatedQuestionId: null, type: "SELFIE_IDENTIFICATION" });
     expect(evidences[1]).toMatchObject({ relatedQuestionId: "F6_MARCAS_UTILIZA", type: "PERFUME_PHOTO" });
+  });
+
+  it("registers each perfume photo as a separate F6 evidence and returns updated counts", async () => {
+    const current = attempt({
+      completedAt: null,
+      participantEvidence: [evidence({ type: "SELFIE_IDENTIFICATION", relatedQuestionId: null })],
+      participantScreeningReview: null,
+      status: "STARTED"
+    });
+    const { evidences, repository } = createRepository(current);
+
+    const first = await confirmParticipantEvidenceUpload({
+      identity,
+      input: perfumePhotoInput("1"),
+      repository,
+      studyCode: "FMASCULINA-NAVIGO-2026"
+    });
+    const second = await confirmParticipantEvidenceUpload({
+      identity,
+      input: perfumePhotoInput("2"),
+      repository,
+      studyCode: "FMASCULINA-NAVIGO-2026"
+    });
+    const third = await confirmParticipantEvidenceUpload({
+      identity,
+      input: perfumePhotoInput("3"),
+      repository,
+      studyCode: "FMASCULINA-NAVIGO-2026"
+    });
+
+    expect(first.ok ? first.data.counts.perfumePhotos : null).toBe(1);
+    expect(second.ok ? second.data.counts.perfumePhotos : null).toBe(2);
+    expect(third.ok ? third.data.counts.perfumePhotos : null).toBe(3);
+    expect(evidences.filter((item) => item.type === "PERFUME_PHOTO")).toHaveLength(3);
+    expect(evidences.filter((item) => item.type === "PERFUME_PHOTO")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ relatedQuestionId: "F6_MARCAS_UTILIZA" }),
+        expect.objectContaining({ relatedQuestionId: "F6_MARCAS_UTILIZA" }),
+        expect.objectContaining({ relatedQuestionId: "F6_MARCAS_UTILIZA" })
+      ])
+    );
   });
 
   it("marks complete evidence as pending review and public result shows review message", async () => {

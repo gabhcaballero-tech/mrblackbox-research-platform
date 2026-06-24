@@ -8,6 +8,11 @@ import type {
   ParticipantPortalPublicResult
 } from "@/modules/participant-portal/screener-service";
 import { saveParticipantPortalScreenerAnswerAction } from "@/modules/participant-portal/screener-actions";
+import {
+  NormalizedParticipantTextArea,
+  NormalizedParticipantTextInput
+} from "../_components/NormalizedParticipantTextField";
+import { PendingSubmitButton } from "../_components/PendingSubmitButton";
 import { PortalEvidenceCapture } from "../_components/PortalEvidenceCapture";
 
 type ParticipantScreenerFormProps = {
@@ -87,9 +92,12 @@ export function ParticipantScreenerForm({ error, screen }: ParticipantScreenerFo
             Debes registrar al menos {screen.evidence.minPerfumePhotos} foto de perfume antes de continuar.
           </p>
         ) : null}
-        <button className={primaryButtonClass} disabled={!canSubmit} type="submit">
-          Guardar y continuar
-        </button>
+        <PendingSubmitButton
+          className={primaryButtonClass}
+          disabled={!canSubmit}
+          label="Guardar y continuar"
+          pendingLabel="Guardando..."
+        />
       </form>
     </section>
   );
@@ -141,7 +149,7 @@ function QuestionControl({ answer, question }: { answer: ScreenerAnswer | undefi
       return (
         <label className={labelClass}>
           Respuesta
-          <textarea
+          <NormalizedParticipantTextArea
             className={inputClass}
             defaultValue={typeof answer === "string" ? answer : ""}
             maxLength={question.validation.maxLength}
@@ -157,9 +165,9 @@ function QuestionControl({ answer, question }: { answer: ScreenerAnswer | undefi
     return (
       <label className={labelClass}>
         Respuesta
-        <input
-          className={inputClass}
-          defaultValue={typeof answer === "string" ? answer : ""}
+          <NormalizedParticipantTextInput
+            className={inputClass}
+            defaultValue={typeof answer === "string" ? answer : ""}
           maxLength={question.validation.maxLength}
           minLength={question.validation.minLength}
           name="value"
@@ -222,7 +230,7 @@ function OtherTextInput({ defaultValue }: { defaultValue: string }) {
   return (
     <label className={labelClass}>
       Especifica
-      <input className={inputClass} defaultValue={defaultValue} name="otherText" />
+      <NormalizedParticipantTextInput className={inputClass} defaultValue={defaultValue} name="otherText" />
     </label>
   );
 }

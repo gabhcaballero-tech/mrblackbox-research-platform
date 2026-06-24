@@ -39,6 +39,7 @@ export function PortalEvidenceCapture({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isUploading, setIsUploading] = useState(false);
   const [cameraState, setCameraState] = useState<"idle" | "opening" | "ready">("idle");
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -146,7 +147,8 @@ export function PortalEvidenceCapture({
 
   const count = onCountChange ? currentCount : internalCount;
   const remaining = Math.max(0, maxCount - count);
-  const canUploadMore = remaining > 0 && !isPending;
+  const busy = isPending || isUploading;
+  const canUploadMore = remaining > 0 && !busy;
   const counterText =
     evidenceType === "SELFIE_IDENTIFICATION"
       ? `Selfie registrada: ${count}/${maxCount}`
@@ -206,11 +208,9 @@ export function PortalEvidenceCapture({
         return;
       }
 
-      const file = new File(
-        [blob],
-        `${evidenceType.toLowerCase()}-${Date.now()}.jpg`,
-        { type: "image/jpeg" }
-      );
+      const file = new File([blob], `${evidenceType.toLowerCase()}-${Date.now()}.jpg`, {
+        type: "image/jpeg"
+      });
 
       stopCamera();
       setCapturedFile(file);
@@ -224,27 +224,34 @@ export function PortalEvidenceCapture({
       return;
     }
 
+    if (busy) {
+      return;
+    }
+
     const file = capturedFile;
+    setIsUploading(true);
     startTransition(async () => {
-      const result = await uploadEvidenceFile(studyCode, evidenceType, file);
+      try {
+        const result = await uploadEvidenceFile(studyCode, evidenceType, file);
 
-      if (!result.ok) {
-        setError(result.message);
-        return;
-      }
-
-      setInternalCount((current) => {
-        const nextCount = Math.min(maxCount, current + 1);
-        if (onCountChange) {
-          onCountChange(nextCount);
-          return current;
+        if (!result.ok) {
+          setError(result.message);
+          return;
         }
 
-        return nextCount;
-      });
-      setMessage("Evidencia registrada correctamente.");
-      setError(null);
-      clearCapturedPhoto();
+        if (onCountChange) {
+          onCountChange(result.count);
+        } else {
+          setInternalCount(result.count);
+        }
+        setMessage("Evidencia registrada correctamente.");
+        setError(null);
+        clearCapturedPhoto();
+      } catch {
+        setError("No fue posible subir la foto. Revisa tu conexión e intenta nuevamente.");
+      } finally {
+        setIsUploading(false);
+      }
     });
   }
 
@@ -296,12 +303,7 @@ export function PortalEvidenceCapture({
 
       {cameraState === "idle" && !previewUrl ? (
         <div className="mt-4 flex flex-col gap-3">
-          <button
-            className={primaryButtonClass}
-            disabled={!canUploadMore}
-            onClick={openCamera}
-            type="button"
-          >
+          <button className={primaryButtonClass} disabled={!canUploadMore} onClick={openCamera} type="button">
             {buttonLabel}
           </button>
         </div>
@@ -319,7 +321,7 @@ export function PortalEvidenceCapture({
           <div className="mt-3 flex flex-col gap-3 sm:flex-row">
             <button
               className={primaryButtonClass}
-              disabled={isPending || cameraState !== "ready"}
+              disabled={busy || cameraState !== "ready"}
               onClick={captureFromCamera}
               type="button"
             >
@@ -341,11 +343,11 @@ export function PortalEvidenceCapture({
             src={previewUrl}
           />
           <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-            <button className={secondaryButtonClass} disabled={isPending} onClick={repeatPhoto} type="button">
+            <button className={secondaryButtonClass} disabled={busy} onClick={repeatPhoto} type="button">
               Repetir foto
             </button>
-            <button className={primaryButtonClass} disabled={isPending} onClick={useCapturedPhoto} type="button">
-              {isPending ? "Subiendo foto..." : "Usar esta foto"}
+            <button className={primaryButtonClass} disabled={busy} onClick={useCapturedPhoto} type="button">
+              {busy ? <LoadingLabel label="Subiendo foto..." /> : "Usar esta foto"}
             </button>
           </div>
         </div>
@@ -353,7 +355,9 @@ export function PortalEvidenceCapture({
 
       {count >= maxCount ? (
         <p className="mt-4 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
-          Ya registraste el máximo permitido para esta evidencia.
+          {evidenceType === "PERFUME_PHOTO"
+            ? `Ya registraste el máximo de ${maxCount} fotos.`
+            : "Ya registraste la selfie requerida."}
         </p>
       ) : null}
 
@@ -366,7 +370,7 @@ async function uploadEvidenceFile(
   studyCode: string,
   evidenceType: ParticipantEvidenceKind,
   file: File
-): Promise<{ ok: true } | { message: string; ok: false }> {
+): Promise<{ count: number; ok: true } | { message: string; ok: false }> {
   const metadata = {
     evidenceType,
     mimeType: file.type,
@@ -406,12 +410,32 @@ async function uploadEvidenceFile(
     storageBucket: signed.data.storageBucket
   });
 
-  return confirmed.ok
-    ? { ok: true }
-    : {
-        message: "La foto se subió, pero no fue posible registrarla. Contacta al administrador.",
-        ok: false
-      };
+  if (!confirmed.ok) {
+    return {
+      message: "La foto se subió, pero no fue posible registrarla. Contacta al administrador.",
+      ok: false
+    };
+  }
+
+  return {
+    count:
+      evidenceType === "PERFUME_PHOTO"
+        ? confirmed.data.counts.perfumePhotos
+        : confirmed.data.counts.selfie,
+    ok: true
+  };
+}
+
+function LoadingLabel({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span
+        aria-hidden="true"
+        className="h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-t-transparent"
+      />
+      {label}
+    </span>
+  );
 }
 
 const primaryButtonClass =

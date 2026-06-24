@@ -108,11 +108,23 @@ function TurnstileSubmitButton({
 
   return (
     <button
-      className="w-full rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition enabled:hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
+      className="inline-flex w-full items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition enabled:hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
       disabled={disabled || pending}
       type="submit"
     >
-      {pending ? pendingLabel ?? buttonLabel : buttonLabel}
+      {pending ? <LoadingLabel label={pendingLabel ?? buttonLabel} /> : buttonLabel}
     </button>
+  );
+}
+
+function LoadingLabel({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center justify-center gap-2">
+      <span
+        aria-hidden="true"
+        className="h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-t-transparent"
+      />
+      {label}
+    </span>
   );
 }

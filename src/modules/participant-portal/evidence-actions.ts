@@ -7,7 +7,8 @@ import { createParticipantPortalEvidenceRepository } from "./evidence-repository
 import {
   completeParticipantEvidenceSubmission,
   confirmParticipantEvidenceUpload,
-  requestParticipantEvidenceUpload
+  requestParticipantEvidenceUpload,
+  type ParticipantEvidenceUploadConfirmation
 } from "./evidence-service";
 import {
   PARTICIPANT_EVIDENCE_BUCKET,
@@ -92,7 +93,7 @@ export async function confirmParticipantEvidenceUploadAction(
     privateStorageKey: string;
     storageBucket: string;
   }
-): Promise<ParticipantEvidenceActionResult> {
+): Promise<ParticipantEvidenceActionResult<ParticipantEvidenceUploadConfirmation>> {
   try {
     const auth = await getParticipantEvidenceActionAuth();
     const studyCode = normalizeStudyCode(studyCodeInput);
@@ -121,7 +122,7 @@ export async function confirmParticipantEvidenceUploadAction(
     revalidatePath(`/participar/${studyCode}/resultado`);
 
     return {
-      data: null,
+      data: result.data,
       ok: true
     };
   } catch (error) {

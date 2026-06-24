@@ -1,5 +1,6 @@
 import { PARTICIPANT_PORTAL_UNAVAILABLE_MESSAGE } from "./access";
 import { PARTICIPANT_PORTAL_DUPLICATE_REGISTRATION_MESSAGE } from "./registration-service";
+import { normalizeParticipantTextInput } from "./text-normalization";
 import type {
   ParticipantPortalScreenerRepository,
   PortalOperationalStatus,
@@ -655,7 +656,7 @@ function normalizeAnswerForQuestion(question: ScreenerQuestion, input: Participa
 
   if (question.type === "SHORT_TEXT" || question.type === "LONG_TEXT") {
     const rawValue = Array.isArray(input.value) ? input.value[0] : input.value;
-    const value = String(rawValue ?? "").trim();
+    const value = normalizeParticipantTextInput(String(rawValue ?? ""));
 
     if (question.required && value.length === 0) {
       throw new Error("Esta respuesta es obligatoria.");
@@ -696,7 +697,7 @@ function normalizeAnswerForQuestion(question: ScreenerQuestion, input: Participa
   const selectedOther = question.options.find(
     (option) => selectedValues.includes(option.value) && option.isOther
   );
-  const otherText = input.otherText?.trim() ?? "";
+  const otherText = normalizeParticipantTextInput(input.otherText ?? "");
 
   if (selectedOther?.otherTextRequired && otherText.length === 0) {
     throw new Error("Especifica la respuesta en Otro.");

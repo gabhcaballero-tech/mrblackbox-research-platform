@@ -242,6 +242,7 @@ describe("participant portal registration service", () => {
     expect(profiles[0]).toMatchObject({
       createdByUserId: null,
       email: identity.email,
+      name: "PERSONA PARTICIPANTE",
       participantAuthUserId: identity.id,
       phone: "+525512345678"
     });
@@ -250,6 +251,21 @@ describe("participant portal registration service", () => {
       participantProfileId: profiles[0]?.id,
       studyId: "study-1"
     });
+  });
+
+  it("normalizes participant name without uppercasing the email", async () => {
+    const { profiles, repository } = createRepository();
+    const result = await registerParticipantInPortal({
+      formInput: validForm({ name: "  niña ámbar  😊 " }),
+      identity: { ...identity, email: "Persona@Example.COM" },
+      now,
+      repository,
+      study: portalStudy()
+    });
+
+    expect(result.ok).toBe(true);
+    expect(profiles[0]?.name).toBe("NIÑA ÁMBAR");
+    expect(profiles[0]?.email).toBe("persona@example.com");
   });
 
   it("reuses ParticipantProfile by participantAuthUserId", async () => {

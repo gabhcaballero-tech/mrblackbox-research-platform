@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ScreenerDefinition } from "@/modules/screener";
 import type { ParticipantPortalAttemptScreen } from "@/modules/participant-portal/screener-service";
@@ -173,6 +173,15 @@ describe("ParticipantScreenerForm", () => {
     expect(screen.getByText("Fotos de perfumes")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tomar foto del perfume" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Guardar y continuar" })).toBeDisabled();
+  });
+
+  it("normalizes participant free text while typing", () => {
+    render(<ParticipantScreenerForm screen={screenData()} />);
+
+    const input = screen.getByLabelText("Respuesta");
+    fireEvent.change(input, { target: { value: "  fragancia niña  😀 " } });
+
+    expect(input).toHaveValue("FRAGANCIA NIÑA");
   });
 
   it("does not show NSE or internal termination details in public result", () => {

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   confirmParticipantEvidenceUploadAction,
@@ -48,6 +48,9 @@ function renderCapture(overrides: Partial<ComponentProps<typeof PortalEvidenceCa
 beforeEach(() => {
   videoSize = { height: 480, width: 640 };
   vi.useRealTimers();
+  vi.mocked(requestParticipantEvidenceUploadAction).mockReset();
+  vi.mocked(confirmParticipantEvidenceUploadAction).mockReset();
+  uploadToSignedUrl.mockReset();
   vi.mocked(requestParticipantEvidenceUploadAction).mockResolvedValue({
     data: {
       metadata: {
@@ -62,7 +65,7 @@ beforeEach(() => {
     },
     ok: true
   });
-  vi.mocked(confirmParticipantEvidenceUploadAction).mockResolvedValue({ data: null, ok: true });
+  vi.mocked(confirmParticipantEvidenceUploadAction).mockResolvedValue(confirmResultWithCounts(0));
   uploadToSignedUrl.mockResolvedValue({ data: null, error: null });
   Object.defineProperty(navigator, "mediaDevices", {
     configurable: true,
@@ -154,7 +157,9 @@ describe("PortalEvidenceCapture", () => {
       vi.advanceTimersByTime(4100);
     });
 
-    expect(screen.getByText("No fue posible abrir la cámara. Permite el acceso a la cámara o intenta desde un celular.")).toBeInTheDocument();
+    expect(
+      screen.getByText("No fue posible abrir la cámara. Permite el acceso a la cámara o intenta desde un celular.")
+    ).toBeInTheDocument();
   });
 
   it("stops camera tracks when cancelling", async () => {
@@ -173,9 +178,7 @@ describe("PortalEvidenceCapture", () => {
   it("captures preview and uploads through Supabase signed upload token", async () => {
     renderCapture();
 
-    fireEvent.click(screen.getByRole("button", { name: "Abrir camara" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Tomar foto" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Usar esta foto" }));
+    await uploadPhoto("Abrir camara");
 
     await waitFor(() => expect(uploadToSignedUrl).toHaveBeenCalled());
     expect(createBrowserSupabaseClient).toHaveBeenCalled();
@@ -199,11 +202,107 @@ describe("PortalEvidenceCapture", () => {
 
     expect(await screen.findByText("No fue posible subir la foto. Revisa tu conexión e intenta nuevamente.")).toBeInTheDocument();
     expect(screen.getByAltText("Vista previa de la foto capturada")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Usar esta foto" })).toBeEnabled());
 
     uploadToSignedUrl.mockResolvedValueOnce({ data: null, error: null });
     vi.mocked(confirmParticipantEvidenceUploadAction).mockResolvedValueOnce({ message: "fallo", ok: false });
     fireEvent.click(screen.getByRole("button", { name: "Usar esta foto" }));
 
-    expect(await screen.findByText("La foto se subió, pero no fue posible registrarla. Contacta al administrador.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("La foto se subió, pero no fue posible registrarla. Contacta al administrador.")
+    ).toBeInTheDocument();
+  });
+
+  it("updates perfume counter from server counts after consecutive uploads", async () => {
+    vi.mocked(confirmParticipantEvidenceUploadAction)
+      .mockResolvedValueOnce(confirmResultWithCounts(2))
+      .mockResolvedValueOnce(confirmResultWithCounts(3));
+
+    function ControlledCapture() {
+      const [count, setCount] = useState(1);
+
+      return (
+        <PortalEvidenceCapture
+          buttonLabel="Tomar foto del perfume"
+          captureFacingMode="environment"
+          currentCount={count}
+          description="Descripcion"
+          emptyState="Sin fotos"
+          evidenceType="PERFUME_PHOTO"
+          maxCount={5}
+          minRequired={1}
+          onCountChange={setCount}
+          studyCode="FMASCULINA-NAVIGO-2026"
+          title="Perfumes"
+        />
+      );
+    }
+
+    render(<ControlledCapture />);
+
+    await uploadPhoto("Tomar foto del perfume");
+    expect(await screen.findByText("Fotos registradas: 2/5. Mínimo requerido: 1.")).toBeInTheDocument();
+
+    await uploadPhoto("Tomar foto del perfume");
+    expect(await screen.findByText("Fotos registradas: 3/5. Mínimo requerido: 1.")).toBeInTheDocument();
+  });
+
+  it("blocks additional perfume photos when the configured maximum is reached", () => {
+    renderCapture({
+      buttonLabel: "Tomar foto del perfume",
+      captureFacingMode: "environment",
+      currentCount: 5,
+      emptyState: "Sin fotos",
+      evidenceType: "PERFUME_PHOTO",
+      maxCount: 5,
+      title: "Perfumes"
+    });
+
+    expect(screen.getByText("Ya registraste el máximo de 5 fotos.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tomar foto del perfume" })).toBeDisabled();
+  });
+
+  it("prevents double click from registering the same captured photo twice", async () => {
+    let resolveConfirm: (value: Awaited<ReturnType<typeof confirmParticipantEvidenceUploadAction>>) => void =
+      () => undefined;
+    const confirmPromise = new Promise<Awaited<ReturnType<typeof confirmParticipantEvidenceUploadAction>>>((resolve) => {
+      resolveConfirm = resolve;
+    });
+    vi.mocked(confirmParticipantEvidenceUploadAction).mockReturnValueOnce(confirmPromise);
+    renderCapture();
+
+    fireEvent.click(screen.getByRole("button", { name: "Abrir camara" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Tomar foto" }));
+    const usePhotoButton = await screen.findByRole("button", { name: "Usar esta foto" });
+
+    fireEvent.click(usePhotoButton);
+    fireEvent.click(usePhotoButton);
+
+    expect(usePhotoButton).toBeDisabled();
+    await waitFor(() => expect(confirmParticipantEvidenceUploadAction).toHaveBeenCalledTimes(1));
+
+    resolveConfirm!(confirmResultWithCounts(0));
+    expect(await screen.findByText("Evidencia registrada correctamente.")).toBeInTheDocument();
   });
 });
+
+async function uploadPhoto(buttonName: string) {
+  fireEvent.click(screen.getByRole("button", { name: buttonName }));
+  fireEvent.click(await screen.findByRole("button", { name: "Tomar foto" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Usar esta foto" }));
+  await screen.findByText("Evidencia registrada correctamente.");
+}
+
+function confirmResultWithCounts(
+  perfumePhotos: number
+): Awaited<ReturnType<typeof confirmParticipantEvidenceUploadAction>> {
+  return {
+    data: {
+      counts: {
+        perfumePhotos,
+        selfie: 1
+      }
+    },
+    ok: true
+  };
+}

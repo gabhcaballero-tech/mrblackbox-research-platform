@@ -36,6 +36,10 @@ export type ParticipantEvidenceCounts = {
   selfie: number;
 };
 
+export type ParticipantEvidenceUploadConfirmation = {
+  counts: ParticipantEvidenceCounts;
+};
+
 export type ParticipantEvidenceScreen = {
   attemptId: string;
   canFinalizeReview: boolean;
@@ -232,7 +236,7 @@ export async function confirmParticipantEvidenceUpload({
   };
   repository: ParticipantPortalEvidenceRepository;
   studyCode: string;
-}): Promise<ParticipantPortalEvidenceResult<PortalEvidenceRecord>> {
+}): Promise<ParticipantPortalEvidenceResult<ParticipantEvidenceUploadConfirmation>> {
   const context = await loadCurrentEvidenceContext({ identity, repository, studyCode });
 
   if (!context.ok) {
@@ -272,7 +276,9 @@ export async function confirmParticipantEvidenceUpload({
     });
 
     return {
-      data: evidence,
+      data: {
+        counts: countEvidence(withNewEvidence(context.data.attempt.participantEvidence, evidence))
+      },
       ok: true
     };
   } catch (error) {
@@ -696,6 +702,10 @@ export function countEvidence(evidence: PortalEvidenceRecord[]): ParticipantEvid
     perfumePhotos: evidence.filter((item) => item.type === "PERFUME_PHOTO").length,
     selfie: evidence.filter((item) => item.type === "SELFIE_IDENTIFICATION").length
   };
+}
+
+function withNewEvidence(evidence: PortalEvidenceRecord[], newEvidence: PortalEvidenceRecord): PortalEvidenceRecord[] {
+  return evidence.some((item) => item.id === newEvidence.id) ? evidence : [...evidence, newEvidence];
 }
 
 export function hasExactlyOneSelfie(evidence: PortalEvidenceRecord[]): boolean {

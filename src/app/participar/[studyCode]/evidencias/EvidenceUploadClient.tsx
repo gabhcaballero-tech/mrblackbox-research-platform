@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { completeParticipantEvidenceSubmissionAction } from "@/modules/participant-portal/evidence-actions";
 import type { ParticipantEvidenceScreen } from "@/modules/participant-portal/evidence-service";
+import { LoadingLabel } from "../_components/PendingSubmitButton";
 import { PortalEvidenceCapture } from "../_components/PortalEvidenceCapture";
 
 export function EvidenceUploadClient({ screen }: { screen: ParticipantEvidenceScreen }) {
@@ -11,24 +12,35 @@ export function EvidenceUploadClient({ screen }: { screen: ParticipantEvidenceSc
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isFinalizing, setIsFinalizing] = useState(false);
+  const busy = isPending || isFinalizing;
   const evidenceComplete =
     counts.selfie === 1 &&
     counts.perfumePhotos >= screen.config.minPerfumePhotos &&
     counts.perfumePhotos <= screen.config.maxPerfumePhotos;
 
   function finalizeEvidence() {
+    if (busy) {
+      return;
+    }
+
     setError(null);
     setMessage(null);
+    setIsFinalizing(true);
 
     startTransition(async () => {
-      const result = await completeParticipantEvidenceSubmissionAction(screen.study.code);
+      try {
+        const result = await completeParticipantEvidenceSubmissionAction(screen.study.code);
 
-      if (!result.ok) {
-        setError(result.message);
-        return;
+        if (!result.ok) {
+          setError(result.message);
+          return;
+        }
+
+        window.location.href = result.data.redirectTo;
+      } finally {
+        setIsFinalizing(false);
       }
-
-      window.location.href = result.data.redirectTo;
     });
   }
 
@@ -80,11 +92,11 @@ export function EvidenceUploadClient({ screen }: { screen: ParticipantEvidenceSc
         {screen.canFinalizeReview ? (
           <button
             className={primaryButtonClass}
-            disabled={isPending || !evidenceComplete}
+            disabled={busy || !evidenceComplete}
             onClick={finalizeEvidence}
             type="button"
           >
-            {isPending ? "Guardando..." : "Finalizar evidencias"}
+            {busy ? <LoadingLabel label="Guardando..." /> : "Finalizar evidencias"}
           </button>
         ) : (
           <Link

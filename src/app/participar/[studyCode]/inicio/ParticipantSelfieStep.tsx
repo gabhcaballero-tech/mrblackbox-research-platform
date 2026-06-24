@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { ParticipantPortalSelfieScreen } from "@/modules/participant-portal/evidence-service";
+import { LoadingLabel } from "../_components/PendingSubmitButton";
 import { PortalEvidenceCapture } from "../_components/PortalEvidenceCapture";
 
 type ParticipantSelfieStepProps = {
@@ -15,6 +16,7 @@ export function ParticipantSelfieStep({
   showRegistrationSuccess
 }: ParticipantSelfieStepProps) {
   const [selfieCount, setSelfieCount] = useState(screen.counts.selfie);
+  const [isContinuing, setIsContinuing] = useState(false);
   const selfieComplete = selfieCount === 1;
 
   return (
@@ -40,11 +42,12 @@ export function ParticipantSelfieStep({
       />
 
       <Link
-        aria-disabled={!selfieComplete}
-        className={`${primaryButtonClass} ${selfieComplete ? "" : "pointer-events-none bg-zinc-300 hover:bg-zinc-300"}`}
+        aria-disabled={!selfieComplete || isContinuing}
+        className={`${primaryButtonClass} ${selfieComplete && !isContinuing ? "" : "pointer-events-none bg-zinc-300 hover:bg-zinc-300"}`}
         href={`/participar/${screen.study.code}/filtro`}
+        onClick={() => setIsContinuing(true)}
       >
-        Continuar al filtro
+        {isContinuing ? <LoadingLabel label="Continuando..." /> : "Continuar al filtro"}
       </Link>
     </div>
   );

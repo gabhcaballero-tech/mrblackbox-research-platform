@@ -1,6 +1,7 @@
 import type { ParticipantPortalIdentity } from "@/shared/auth/participant-portal";
 import {
   buildParticipantConsentSnapshot,
+  normalizePortalEmail,
   participantPortalRegistrationSchema,
   type ParticipantPortalRegistrationInput
 } from "./validation";
@@ -92,8 +93,9 @@ export async function registerParticipantInPortal({
   }
 
   try {
+    const email = normalizePortalEmail(identity.email);
     const profileResult = await findOrCreateParticipantProfile({
-      email: identity.email,
+      email,
       identity,
       input: parsed.data,
       repository

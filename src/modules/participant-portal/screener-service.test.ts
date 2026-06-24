@@ -530,17 +530,17 @@ describe("participant portal screener service", () => {
 
     await answer(repository, attemptId, "CONSENTIMIENTO", "SI");
     await answer(repository, attemptId, "F1_GENERO", "HOMBRE");
-    await answer(repository, attemptId, "F6_MARCAS_UTILIZA", "Respuesta larga de prueba.");
+    await answer(repository, attemptId, "F6_MARCAS_UTILIZA", "  respuesta larga  de prueba 😊 ");
     await answer(repository, attemptId, "F9_FRECUENCIA_SEMANAL", "MAS_DE_UNA_VEZ_DIA");
     await answer(repository, attemptId, "F9A_VECES_AL_DIA", "4");
-    await answer(repository, attemptId, "OTRO", "OTRA", "Fragancia de ejemplo");
+    await answer(repository, attemptId, "OTRO", "OTRA", "Fragancia de ejemplo 💐");
 
     const saved = answers.get(attemptId) ?? [];
     expect(saved.find((item) => item.questionId === "F1_GENERO")?.answerJson).toBe("HOMBRE");
-    expect(saved.find((item) => item.questionId === "F6_MARCAS_UTILIZA")?.answerJson).toBe("Respuesta larga de prueba.");
+    expect(saved.find((item) => item.questionId === "F6_MARCAS_UTILIZA")?.answerJson).toBe("RESPUESTA LARGA DE PRUEBA");
     expect(saved.find((item) => item.questionId === "F9A_VECES_AL_DIA")?.answerJson).toBe(4);
     expect(saved.find((item) => item.questionId === "OTRO")?.answerJson).toEqual({
-      otherText: "Fragancia de ejemplo",
+      otherText: "FRAGANCIA DE EJEMPLO",
       value: "OTRA"
     });
   });

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeParticipantTextInput } from "./text-normalization";
 
 export const participantEvidenceTypeSchema = z.enum(["SELFIE_IDENTIFICATION", "PERFUME_PHOTO"]);
 
@@ -39,6 +40,7 @@ export const participantPortalIdentitySchema = z
   .transform((input, context) => {
     const phone = normalizeMexicoPhone(input.phone);
     const confirmPhone = normalizeMexicoPhone(input.confirmPhone);
+    const name = normalizeParticipantTextInput(input.name);
 
     if (!isMexicoPhone(phone)) {
       context.addIssue({
@@ -56,9 +58,18 @@ export const participantPortalIdentitySchema = z
       });
     }
 
+    if (!name) {
+      context.addIssue({
+        code: "custom",
+        message: "Ingresa tu nombre.",
+        path: ["name"]
+      });
+    }
+
     return {
       ...input,
       confirmPhone,
+      name,
       phone
     };
   });
@@ -75,6 +86,7 @@ export const participantPortalRegistrationSchema = z
   .transform((input, context) => {
     const phone = normalizeMexicoPhone(input.phone);
     const confirmPhone = normalizeMexicoPhone(input.confirmPhone);
+    const name = normalizeParticipantTextInput(input.name);
 
     if (!isMexicoPhone(phone)) {
       context.addIssue({
@@ -100,10 +112,18 @@ export const participantPortalRegistrationSchema = z
       });
     }
 
+    if (!name) {
+      context.addIssue({
+        code: "custom",
+        message: "Ingresa tu nombre completo.",
+        path: ["name"]
+      });
+    }
+
     return {
       ...input,
       confirmPhone,
-      name: input.name.trim(),
+      name,
       phone
     };
   });

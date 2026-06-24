@@ -11,11 +11,10 @@ import {
   PARTICIPANT_PORTAL_REQUEST_NEW_CODE_MESSAGE,
   PARTICIPANT_PORTAL_SPAM_HINT_MESSAGE
 } from "@/modules/participant-portal/access";
-import {
-  verifyParticipantPortalOtpAction
-} from "@/modules/participant-portal/actions";
+import { verifyParticipantPortalOtpAction } from "@/modules/participant-portal/actions";
 import { otpEmailCookieName } from "@/modules/participant-portal/cookies";
 import { participantPortalStudyCodeSchema } from "@/modules/participant-portal/validation";
+import { PendingSubmitButton } from "../_components/PendingSubmitButton";
 
 type ParticipantPortalVerifyPageProps = {
   params: Promise<{ studyCode: string }>;
@@ -62,9 +61,7 @@ export default async function ParticipantPortalVerifyPage({
             {PARTICIPANT_PORTAL_INVALID_CODE_MESSAGE} {PARTICIPANT_PORTAL_REQUEST_NEW_CODE_MESSAGE}
           </Message>
         ) : null}
-        {error === "format" ? (
-          <Message tone="error">{PARTICIPANT_PORTAL_INVALID_FORMAT_MESSAGE}</Message>
-        ) : null}
+        {error === "format" ? <Message tone="error">{PARTICIPANT_PORTAL_INVALID_FORMAT_MESSAGE}</Message> : null}
         {error === "max" ? <Message tone="error">{PARTICIPANT_PORTAL_MAX_ATTEMPTS_MESSAGE}</Message> : null}
         {error === "internal" ? <Message tone="error">{PARTICIPANT_PORTAL_INTERNAL_USER_MESSAGE}</Message> : null}
 
@@ -81,9 +78,7 @@ export default async function ParticipantPortalVerifyPage({
               required
             />
           </label>
-          <button className={primaryButtonClass} type="submit">
-            Verificar código
-          </button>
+          <PendingSubmitButton className={primaryButtonClass} label="Entrar" pendingLabel="Verificando..." />
         </form>
 
         <p className="mt-3 text-sm text-zinc-600">{PARTICIPANT_PORTAL_SPAM_HINT_MESSAGE}</p>
@@ -114,6 +109,6 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 const inputClass =
   "mt-2 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-950 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100";
 const primaryButtonClass =
-  "w-full rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2";
+  "w-full rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition enabled:hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2";
 const secondaryButtonClass =
   "block w-full rounded-md border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50";
