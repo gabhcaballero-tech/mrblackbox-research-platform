@@ -20,6 +20,8 @@ export type PortalOperationalStatus =
 
 export type PortalScreenerConfigRecord = {
   enabled: boolean;
+  maxPerfumePhotos: number;
+  minPerfumePhotos: number;
   privacyNoticeHash: string;
   privacyNoticeText: string;
   privacyNoticeVersion: string;
@@ -73,6 +75,11 @@ export type PortalScreeningAttemptRecord = {
   nseClass: string | null;
   nseScore: number | null;
   participantConfirmation: { id: string } | null;
+  participantEvidence: Array<{
+    id: string;
+    relatedQuestionId: string | null;
+    type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION";
+  }>;
   participantScreeningReview: {
     id: string;
     rejectionReason: string | null;
@@ -233,6 +240,14 @@ const attemptSelect = {
       id: true
     }
   },
+  participantEvidence: {
+    orderBy: { uploadedAt: "asc" },
+    select: {
+      id: true,
+      relatedQuestionId: true,
+      type: true
+    }
+  },
   participantScreeningReview: {
     select: {
       id: true,
@@ -356,6 +371,8 @@ export function createParticipantPortalScreenerRepository(
           participantPortalConfig: {
             select: {
               enabled: true,
+              maxPerfumePhotos: true,
+              minPerfumePhotos: true,
               privacyNoticeHash: true,
               privacyNoticeText: true,
               privacyNoticeVersion: true

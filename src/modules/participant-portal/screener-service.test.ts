@@ -164,6 +164,8 @@ function activeStudy(overrides: Partial<PortalScreenerStudyRecord> = {}): Portal
     name: "Fragancia Masculina",
     portalConfig: {
       enabled: true,
+      maxPerfumePhotos: 5,
+      minPerfumePhotos: 1,
       privacyNoticeHash: "notice-hash",
       privacyNoticeText: "Aviso.",
       privacyNoticeVersion: "v1"
@@ -175,11 +177,13 @@ function activeStudy(overrides: Partial<PortalScreenerStudyRecord> = {}): Portal
 
 function createMemoryRepository({
   consents,
+  initialEvidence = [portalEvidence("SELFIE_IDENTIFICATION"), portalEvidence("PERFUME_PHOTO")],
   participants,
   profile,
   study
 }: {
   consents?: PortalParticipantConsentRecord[];
+  initialEvidence?: PortalScreeningAttemptRecord["participantEvidence"];
   participants?: PortalStudyParticipantRecord[];
   profile?: PortalParticipantProfileRecord | null;
   study?: PortalScreenerStudyRecord;
@@ -205,6 +209,7 @@ function createMemoryRepository({
     async createPortalScreeningAttempt(input) {
       const participant = studyParticipants.find((item) => item.id === input.studyParticipantId)!;
       const attempt = buildAttempt({
+        evidence: initialEvidence,
         id: `attempt-${attempts.length + 1}`,
         participant,
         source: "PARTICIPANT_PORTAL",
@@ -326,12 +331,14 @@ function studyParticipant(): PortalStudyParticipantRecord {
 }
 
 function buildAttempt({
+  evidence = [portalEvidence("SELFIE_IDENTIFICATION"), portalEvidence("PERFUME_PHOTO")],
   id,
   participant,
   source,
   status,
   study
 }: {
+  evidence?: PortalScreeningAttemptRecord["participantEvidence"];
   id: string;
   participant: PortalStudyParticipantRecord;
   source: "FIELD" | "PARTICIPANT_PORTAL";
@@ -346,6 +353,7 @@ function buildAttempt({
     nseClass: null,
     nseScore: null,
     participantConfirmation: null,
+    participantEvidence: evidence,
     participantScreeningReview: status === "PENDING_REVIEW"
       ? { id: "review-1", rejectionReason: null, status: "PENDING" }
       : null,
@@ -369,6 +377,14 @@ function buildAttempt({
     studyParticipantId: participant.id,
     terminationCode: null,
     terminationReason: null
+  };
+}
+
+function portalEvidence(type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION") {
+  return {
+    id: `${type.toLowerCase()}-1`,
+    relatedQuestionId: type === "PERFUME_PHOTO" ? "F6_MARCAS_UTILIZA" : null,
+    type
   };
 }
 
@@ -533,6 +549,22 @@ describe("participant portal screener service", () => {
     const { repository } = createMemoryRepository();
     const attemptId = await start(repository);
     const result = await answer(repository, attemptId, "CONSENTIMIENTO", "VALOR_INVALIDO");
+
+    expect(result).toMatchObject({
+      code: "VALIDATION_ERROR",
+      ok: false
+    });
+  });
+
+  it("blocks F6 when there are no perfume photos yet", async () => {
+    const { repository } = createMemoryRepository({
+      initialEvidence: [portalEvidence("SELFIE_IDENTIFICATION")]
+    });
+    const attemptId = await start(repository);
+
+    await answer(repository, attemptId, "CONSENTIMIENTO", "SI");
+    await answer(repository, attemptId, "F1_GENERO", "HOMBRE");
+    const result = await answer(repository, attemptId, "F6_MARCAS_UTILIZA", "Uso perfume.");
 
     expect(result).toMatchObject({
       code: "VALIDATION_ERROR",

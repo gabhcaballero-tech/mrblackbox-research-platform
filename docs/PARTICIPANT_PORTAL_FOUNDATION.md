@@ -170,6 +170,38 @@ Variables requeridas adicionales:
 
 - `SUPABASE_SECRET_KEY`
 
+## Checklist movil del portal
+
+Pruebas manuales recomendadas:
+
+### iPhone Safari
+
+- Iniciar sesion con OTP del portal.
+- Completar registro.
+- Abrir camara frontal para selfie.
+- Confirmar fallback si Safari niega permisos.
+- Entrar al filtro.
+- Llegar a F6 y abrir camara trasera.
+- Tomar al menos una foto de perfume.
+- Confirmar que no permita continuar en F6 sin foto.
+- Revisar `/resultado` y `/evidencias` sin desbordes en 360 px.
+
+### Android Chrome
+
+- Iniciar sesion con OTP del portal.
+- Completar registro y selfie.
+- Verificar `capture="user"` como respaldo si falla `getUserMedia`.
+- En F6 tomar varias fotos de perfume una por una.
+- Confirmar contador visible y limite maximo de 5.
+- Revisar mensajes de error de Storage sin exponer rutas ni tokens.
+
+### Desktop Chrome
+
+- Validar flujo con webcam para selfie.
+- Validar flujo con webcam o selector de archivo como respaldo.
+- Confirmar que `/evidencias` funciona como resumen o recuperacion y no como paso principal.
+- Confirmar que el resultado elegible solo pase a revision cuando selfie y fotos ya existan.
+
 ## Migracion
 
 Migracion creada:

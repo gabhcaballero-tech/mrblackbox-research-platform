@@ -37,32 +37,39 @@ export async function requestParticipantEvidenceUploadAction(
   studyCodeInput: string,
   metadata: EvidenceUploadMetadata
 ): Promise<ParticipantEvidenceActionResult<ParticipantSignedUploadActionResult>> {
-  const auth = await getParticipantEvidenceActionAuth();
-  const studyCode = normalizeStudyCode(studyCodeInput);
+  try {
+    const auth = await getParticipantEvidenceActionAuth();
+    const studyCode = normalizeStudyCode(studyCodeInput);
 
-  if (!auth.ok) {
-    return auth;
-  }
+    if (!auth.ok) {
+      return auth;
+    }
 
-  const result = await requestParticipantEvidenceUpload({
-    identity: auth.data.identity,
-    metadata,
-    repository: createParticipantPortalEvidenceRepository(),
-    storage: createSupabaseEvidenceStorageClient(),
-    studyCode
-  });
+    const result = await requestParticipantEvidenceUpload({
+      identity: auth.data.identity,
+      metadata,
+      repository: createParticipantPortalEvidenceRepository(),
+      storage: createSupabaseEvidenceStorageClient(),
+      studyCode
+    });
 
-  if (!result.ok) {
+    if (!result.ok) {
+      return {
+        message: result.message,
+        ok: false
+      };
+    }
+
     return {
-      message: result.message,
+      data: result.data,
+      ok: true
+    };
+  } catch (error) {
+    return {
+      message: error instanceof Error ? error.message : "No fue posible preparar la carga. Intenta de nuevo.",
       ok: false
     };
   }
-
-  return {
-    data: result.data,
-    ok: true
-  };
 }
 
 export async function confirmParticipantEvidenceUploadAction(
@@ -94,6 +101,8 @@ export async function confirmParticipantEvidenceUploadAction(
   }
 
   revalidatePath(`/participar/${studyCode}/evidencias`);
+  revalidatePath(`/participar/${studyCode}/inicio`);
+  revalidatePath(`/participar/${studyCode}/filtro`);
   revalidatePath(`/participar/${studyCode}/resultado`);
 
   return {

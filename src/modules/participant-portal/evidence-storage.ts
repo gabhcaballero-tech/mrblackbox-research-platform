@@ -4,6 +4,12 @@ import { createClient } from "@supabase/supabase-js";
 export const PARTICIPANT_EVIDENCE_BUCKET = "participant-evidence";
 export const F6_PERFUME_EVIDENCE_QUESTION_ID = "F6_MARCAS_UTILIZA";
 
+export type EvidenceStorageErrorCode =
+  | "BUCKET_UNAVAILABLE"
+  | "INVALID_FILE"
+  | "SIGNED_UPLOAD_UNAVAILABLE"
+  | "STORAGE_NOT_CONFIGURED";
+
 export type ParticipantEvidenceKind = "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION";
 
 export type EvidenceUploadMetadata = {
@@ -37,6 +43,16 @@ export type EvidenceStorageClient = {
   }) => Promise<{ signedUrl: string; token?: string }>;
 };
 
+export class EvidenceStorageError extends Error {
+  code: EvidenceStorageErrorCode;
+
+  constructor(code: EvidenceStorageErrorCode, message: string) {
+    super(message);
+    this.code = code;
+    this.name = "EvidenceStorageError";
+  }
+}
+
 const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const allowedExtensions = new Set(["jpg", "jpeg", "png", "webp"]);
 
@@ -50,19 +66,19 @@ export function validateEvidenceUploadMetadata({
   const extension = extractExtension(metadata.originalFilename);
 
   if (!allowedMimeTypes.has(metadata.mimeType)) {
-    throw new Error("Formato no permitido. Usa JPG, PNG o WebP.");
+    throw new EvidenceStorageError("INVALID_FILE", "Formato no permitido. Usa JPG, PNG o WebP.");
   }
 
   if (!allowedExtensions.has(extension)) {
-    throw new Error("Extensión no permitida. Usa jpg, jpeg, png o webp.");
+    throw new EvidenceStorageError("INVALID_FILE", "Extension no permitida. Usa jpg, jpeg, png o webp.");
   }
 
   if (!Number.isInteger(metadata.sizeBytes) || metadata.sizeBytes <= 0) {
-    throw new Error("El archivo no es válido.");
+    throw new EvidenceStorageError("INVALID_FILE", "El archivo no es valido.");
   }
 
   if (metadata.sizeBytes > maxImageBytes) {
-    throw new Error("El archivo excede el tamaño máximo permitido.");
+    throw new EvidenceStorageError("INVALID_FILE", "El archivo excede el tamano maximo permitido.");
   }
 
   return {
@@ -158,7 +174,7 @@ export function assertEvidenceStorageKeyBelongsToAttempt({
   ].join("/");
 
   if (!privateStorageKey.startsWith(expectedPrefix)) {
-    throw new Error("No fue posible validar la evidencia cargada.");
+    throw new EvidenceStorageError("INVALID_FILE", "No fue posible validar la evidencia cargada.");
   }
 }
 
@@ -167,7 +183,10 @@ export function createSupabaseEvidenceStorageClient(): EvidenceStorageClient {
   const secretKey = process.env.SUPABASE_SECRET_KEY;
 
   if (!supabaseUrl || !secretKey) {
-    throw new Error("SUPABASE_SECRET_KEY and NEXT_PUBLIC_SUPABASE_URL are required for evidence storage.");
+    throw new EvidenceStorageError(
+      "STORAGE_NOT_CONFIGURED",
+      "La carga de evidencias no esta configurada. Contacta al administrador."
+    );
   }
 
   const client = createClient(supabaseUrl, secretKey, {
@@ -184,7 +203,10 @@ export function createSupabaseEvidenceStorageClient(): EvidenceStorageClient {
         .createSignedUrl(input.privateStorageKey, input.expiresInSeconds);
 
       if (error || !data?.signedUrl) {
-        throw new Error("No fue posible generar la URL temporal de lectura.");
+        throw new EvidenceStorageError(
+          classifyStorageErrorCode(error),
+          storageErrorMessage(error, "No fue posible generar la URL temporal de lectura.")
+        );
       }
 
       return data.signedUrl;
@@ -197,7 +219,10 @@ export function createSupabaseEvidenceStorageClient(): EvidenceStorageClient {
         });
 
       if (error || !data?.signedUrl) {
-        throw new Error("No fue posible preparar la carga de evidencia.");
+        throw new EvidenceStorageError(
+          classifyStorageErrorCode(error),
+          storageErrorMessage(error, "No fue posible preparar la carga. Intenta de nuevo.")
+        );
       }
 
       return {
@@ -213,4 +238,39 @@ function extractExtension(filename: string): string {
   const extension = normalized.split(".").pop();
 
   return extension ?? "";
+}
+
+function classifyStorageErrorCode(error: unknown): EvidenceStorageErrorCode {
+  const message = readStorageErrorMessage(error).toLowerCase();
+
+  if (
+    message.includes("bucket") &&
+    (message.includes("not found") || message.includes("does not exist") || message.includes("missing"))
+  ) {
+    return "BUCKET_UNAVAILABLE";
+  }
+
+  return "SIGNED_UPLOAD_UNAVAILABLE";
+}
+
+function storageErrorMessage(error: unknown, fallback: string): string {
+  if (classifyStorageErrorCode(error) === "BUCKET_UNAVAILABLE") {
+    return "La carga de evidencias no esta disponible. Contacta al administrador.";
+  }
+
+  return fallback;
+}
+
+function readStorageErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+
+    return typeof message === "string" ? message : "";
+  }
+
+  return "";
 }

@@ -1,10 +1,14 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import type { ScreenerAnswer, ScreenerQuestion } from "@/modules/screener";
 import type {
   ParticipantPortalAttemptScreen,
   ParticipantPortalPublicResult
 } from "@/modules/participant-portal/screener-service";
 import { saveParticipantPortalScreenerAnswerAction } from "@/modules/participant-portal/screener-actions";
+import { PortalEvidenceCapture } from "../_components/PortalEvidenceCapture";
 
 type ParticipantScreenerFormProps = {
   error?: string;
@@ -13,12 +17,13 @@ type ParticipantScreenerFormProps = {
 
 export function ParticipantScreenerForm({ error, screen }: ParticipantScreenerFormProps) {
   const question = screen.currentQuestion;
+  const [perfumePhotoCount, setPerfumePhotoCount] = useState(screen.evidence.perfumePhotos);
 
   if (!question) {
     return (
       <section className="rounded-lg border border-zinc-200 bg-white p-5 text-center shadow-sm">
         <h2 className="text-xl font-semibold text-zinc-950">Ya registramos tus respuestas.</h2>
-        <p className="mt-2 text-sm leading-6 text-zinc-600">Consulta el estado de tu participación.</p>
+        <p className="mt-2 text-sm leading-6 text-zinc-600">Consulta el estado de tu participacion.</p>
         <Link className={`${primaryButtonClass} mt-5`} href={`/participar/${screen.study.code}/resultado`}>
           Ver resultado
         </Link>
@@ -27,6 +32,9 @@ export function ParticipantScreenerForm({ error, screen }: ParticipantScreenerFo
   }
 
   const answer = screen.answers[question.id];
+  const isPerfumeQuestion = question.id === "F6_MARCAS_UTILIZA";
+  const hasMinimumPerfumePhotos = perfumePhotoCount >= screen.evidence.minPerfumePhotos;
+  const canSubmit = !isPerfumeQuestion || hasMinimumPerfumePhotos;
 
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
@@ -59,7 +67,27 @@ export function ParticipantScreenerForm({ error, screen }: ParticipantScreenerFo
             {screen.photoNotice}
           </p>
         ) : null}
-        <button className={primaryButtonClass} type="submit">
+        {isPerfumeQuestion ? (
+          <PortalEvidenceCapture
+            buttonLabel="Tomar foto del perfume"
+            captureFacingMode="environment"
+            currentCount={perfumePhotoCount}
+            description="Despues de indicar las marcas que utilizas, toma de una a cinco fotos de tus perfumes. Debe verse la marca o el envase cuando sea posible."
+            emptyState="Todavia no hay fotos de perfumes registradas."
+            evidenceType="PERFUME_PHOTO"
+            maxCount={screen.evidence.maxPerfumePhotos}
+            minRequired={screen.evidence.minPerfumePhotos}
+            onCountChange={setPerfumePhotoCount}
+            studyCode={screen.study.code}
+            title="Fotos de perfumes"
+          />
+        ) : null}
+        {!canSubmit ? (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Debes registrar al menos {screen.evidence.minPerfumePhotos} foto de perfume antes de continuar.
+          </p>
+        ) : null}
+        <button className={primaryButtonClass} disabled={!canSubmit} type="submit">
           Guardar y continuar
         </button>
       </form>
@@ -70,7 +98,7 @@ export function ParticipantScreenerForm({ error, screen }: ParticipantScreenerFo
 export function ParticipantPortalResultCard({ result }: { result: ParticipantPortalPublicResult }) {
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-6 text-center shadow-sm">
-      <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Estado de participación</p>
+      <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Estado de participacion</p>
       <h1 className="mt-2 text-2xl font-semibold text-zinc-950">{result.study.name}</h1>
       <p className="mt-4 text-sm leading-6 text-zinc-700">{result.message}</p>
 
@@ -81,9 +109,9 @@ export function ParticipantPortalResultCard({ result }: { result: ParticipantPor
       ) : null}
 
       {result.showEvidencePlaceholder ? (
-        <button className={`${disabledButtonClass} mt-6`} disabled type="button">
-          Continuar con evidencias
-        </button>
+        <Link className={`${primaryButtonClass} mt-6`} href={`/participar/${result.study.code}/evidencias`}>
+          Revisar evidencias
+        </Link>
       ) : null}
     </section>
   );
@@ -93,7 +121,7 @@ function QuestionControl({ answer, question }: { answer: ScreenerAnswer | undefi
   if (question.type === "INTEGER") {
     return (
       <label className={labelClass}>
-        Respuesta numérica
+        Respuesta numerica
         <input
           className={inputClass}
           defaultValue={typeof answer === "number" ? answer : ""}
@@ -155,7 +183,7 @@ function QuestionControl({ answer, question }: { answer: ScreenerAnswer | undefi
         <legend className="text-sm font-medium text-zinc-700">Selecciona las opciones aplicables</legend>
         {question.options.map((option) => (
           <label
-            className="flex items-center gap-3 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800"
+            className="flex items-center gap-3 rounded-md border border-zinc-200 bg-white px-3 py-3 text-sm text-zinc-800"
             key={option.value}
           >
             <input defaultChecked={selectedValues.includes(option.value)} name="value" type="checkbox" value={option.value} />
@@ -172,7 +200,7 @@ function QuestionControl({ answer, question }: { answer: ScreenerAnswer | undefi
       <legend className="text-sm font-medium text-zinc-700">Selecciona una respuesta</legend>
       {question.options.map((option) => (
         <label
-          className="flex items-center gap-3 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800"
+          className="flex items-center gap-3 rounded-md border border-zinc-200 bg-white px-3 py-3 text-sm text-zinc-800"
           key={option.value}
         >
           <input
@@ -229,8 +257,6 @@ function selectedOtherTextFromAnswer(answer: ScreenerAnswer | undefined): string
 
 const labelClass = "flex flex-col gap-1 text-sm font-medium text-zinc-700";
 const inputClass =
-  "min-h-10 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-950 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100";
+  "min-h-12 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-950 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100";
 const primaryButtonClass =
-  "inline-flex w-fit justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800";
-const disabledButtonClass =
-  "inline-flex w-fit cursor-not-allowed justify-center rounded-md bg-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-500";
+  "inline-flex w-full justify-center rounded-md bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300";

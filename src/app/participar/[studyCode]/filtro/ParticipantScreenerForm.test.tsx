@@ -12,17 +12,35 @@ vi.mock("@/modules/participant-portal/screener-actions", () => ({
   saveParticipantPortalScreenerAnswerAction: vi.fn()
 }));
 
+vi.mock("../_components/PortalEvidenceCapture", () => ({
+  PortalEvidenceCapture: ({ buttonLabel, title }: { buttonLabel: string; title: string }) => (
+    <div>
+      <p>{title}</p>
+      <button type="button">{buttonLabel}</button>
+    </div>
+  )
+}));
+
 function definition(): ScreenerDefinition {
   return {
     nse: {
       code: "NSE",
       inputs: [],
-      label: "Nivel socioeconómico",
-      ranges: [{ code: "C", eligible: true, label: "C típico", max: 167, min: 141 }],
+      label: "Nivel socioeconomico",
+      ranges: [{ code: "C", eligible: true, label: "C tipico", max: 167, min: 141 }],
       type: "score_table"
     },
     purpose: "SCREENER",
     questions: [
+      {
+        dataDestination: "SCREENING",
+        id: "F6_MARCAS_UTILIZA",
+        order: 1,
+        required: true,
+        text: "Que marcas utilizas?",
+        type: "LONG_TEXT",
+        validation: {}
+      },
       {
         dataDestination: "SCREENING",
         id: "F9_FRECUENCIA_SEMANAL",
@@ -30,40 +48,26 @@ function definition(): ScreenerDefinition {
           {
             actions: [],
             isOther: false,
-            label: "Más de una vez al día",
+            label: "Mas de una vez al dia",
             order: 1,
             otherTextRequired: false,
             value: "MAS_DE_UNA_VEZ_DIA"
           }
         ],
-        order: 1,
-        required: true,
-        text: "¿Con qué frecuencia usas fragancia?",
-        type: "SINGLE_CHOICE",
-        validation: {}
-      },
-      {
-        dataDestination: "SCREENING",
-        id: "F9A_VECES_AL_DIA",
         order: 2,
         required: true,
-        text: "¿Cuántas veces al día?",
-        type: "INTEGER",
-        validation: { max: 20, min: 2 },
-        visibilityCondition: {
-          questionId: "F9_FRECUENCIA_SEMANAL",
-          type: "ANSWER_EQUALS",
-          value: "MAS_DE_UNA_VEZ_DIA"
-        }
+        text: "Con que frecuencia usas fragancia?",
+        type: "SINGLE_CHOICE",
+        validation: {}
       }
     ],
     rules: [],
     schemaVersion: "screening.v1",
-    title: "Filtro público"
+    title: "Filtro publico"
   };
 }
 
-function screenData(): ParticipantPortalAttemptScreen {
+function screenData(overrides: Partial<ParticipantPortalAttemptScreen> = {}): ParticipantPortalAttemptScreen {
   const currentDefinition = definition();
 
   return {
@@ -76,6 +80,7 @@ function screenData(): ParticipantPortalAttemptScreen {
       nseClass: null,
       nseScore: null,
       participantConfirmation: null,
+      participantEvidence: [],
       participantScreeningReview: null,
       questionnaireVersion: {
         definitionHash: "hash",
@@ -114,11 +119,17 @@ function screenData(): ParticipantPortalAttemptScreen {
     },
     currentQuestion: currentDefinition.questions[0] ?? null,
     definition: currentDefinition,
+    evidence: {
+      maxPerfumePhotos: 5,
+      minPerfumePhotos: 1,
+      perfumePhotos: 0,
+      selfieComplete: true
+    },
     photoNotice: null,
     progress: {
       answeredVisibleQuestions: 0,
       currentIndex: 1,
-      totalVisibleQuestions: 1
+      totalVisibleQuestions: 2
     },
     result: {
       evaluationJson: {
@@ -142,7 +153,8 @@ function screenData(): ParticipantPortalAttemptScreen {
       id: "study-1",
       name: "Fragancia Masculina"
     },
-    visibleQuestions: [currentDefinition.questions[0]!]
+    visibleQuestions: currentDefinition.questions,
+    ...overrides
   };
 }
 
@@ -150,9 +162,17 @@ describe("ParticipantScreenerForm", () => {
   it("renders one visible question at a time", () => {
     render(<ParticipantScreenerForm screen={screenData()} />);
 
-    expect(screen.getByText("¿Con qué frecuencia usas fragancia?")).toBeInTheDocument();
-    expect(screen.queryByText("¿Cuántas veces al día?")).not.toBeInTheDocument();
+    expect(screen.getByText("Que marcas utilizas?")).toBeInTheDocument();
+    expect(screen.queryByText("Con que frecuencia usas fragancia?")).not.toBeInTheDocument();
     expect(screen.queryByText("F9_FRECUENCIA_SEMANAL")).not.toBeInTheDocument();
+  });
+
+  it("requires perfume photos during F6 before continuing", () => {
+    render(<ParticipantScreenerForm screen={screenData()} />);
+
+    expect(screen.getByText("Fotos de perfumes")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tomar foto del perfume" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Guardar y continuar" })).toBeDisabled();
   });
 
   it("does not show NSE or internal termination details in public result", () => {
@@ -178,7 +198,7 @@ describe("ParticipantScreenerForm", () => {
     expect(screen.queryByText(/Producto Secreto/i)).not.toBeInTheDocument();
   });
 
-  it("shows evidence placeholder only for pending review", () => {
+  it("shows evidence link only for pending review", () => {
     render(
       <ParticipantPortalResultCard
         result={{
@@ -196,6 +216,6 @@ describe("ParticipantScreenerForm", () => {
     );
 
     expect(screen.getByText(PARTICIPANT_PORTAL_PUBLIC_PENDING_REVIEW_MESSAGE)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Continuar con evidencias" })).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Revisar evidencias" })).toBeInTheDocument();
   });
 });

@@ -55,7 +55,7 @@ export default async function ParticipantPortalResultPage({ params }: Participan
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-10">
+    <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-6 sm:py-10">
       <div className="w-full max-w-md">
         <ParticipantResultCard result={result.data} />
       </div>

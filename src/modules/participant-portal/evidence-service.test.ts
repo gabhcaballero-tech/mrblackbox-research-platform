@@ -5,12 +5,14 @@ import type {
   PortalEvidenceAttemptRecord,
   PortalEvidenceRecord
 } from "./evidence-repository";
+import { EvidenceStorageError } from "./evidence-storage";
 import {
   PARTICIPANT_PORTAL_EVIDENCE_REVIEW_MESSAGE,
   completeParticipantEvidenceSubmission,
   confirmParticipantEvidenceUpload,
   getParticipantPortalEvidenceResult,
   getParticipantPortalEvidenceScreen,
+  getParticipantPortalSelfieScreen,
   requestParticipantEvidenceUpload
 } from "./evidence-service";
 
@@ -68,6 +70,14 @@ function createRepository(currentAttempt: PortalEvidenceAttemptRecord | null = a
   const evidences = currentAttempt?.participantEvidence ?? [];
   const pendingReviews: Array<{ screeningAttemptId: string; studyParticipantId: string }> = [];
   const repository: ParticipantPortalEvidenceRepository = {
+    createPortalScreeningAttempt: vi.fn(async () =>
+      attempt({
+        completedAt: null,
+        participantEvidence: evidences,
+        participantScreeningReview: null,
+        status: "STARTED"
+      })
+    ),
     createEvidence: vi.fn(async (input) => {
       const record = evidence({
         extension: input.extension,
@@ -103,6 +113,7 @@ function createRepository(currentAttempt: PortalEvidenceAttemptRecord | null = a
     })),
     getAttempt: vi.fn(async () => currentAttempt),
     getStudyByCode: vi.fn(async () => ({
+      activeScreenerVersionId: "version-1",
       code: "FMASCULINA-NAVIGO-2026",
       id: "study-1",
       name: "Fragancia Masculina",
@@ -119,6 +130,7 @@ function createRepository(currentAttempt: PortalEvidenceAttemptRecord | null = a
       status: "ACTIVE" as const
     })),
     listPortalAttemptsForStudyParticipant: vi.fn(async () => (currentAttempt ? [currentAttempt] : [])),
+    updateStudyParticipantScreening: vi.fn(async () => undefined),
     upsertPendingReview: vi.fn(async (input) => {
       pendingReviews.push(input);
     })
@@ -128,18 +140,81 @@ function createRepository(currentAttempt: PortalEvidenceAttemptRecord | null = a
 }
 
 describe("participant portal evidence service", () => {
-  it("does not allow evidence without a preliminary attempt", async () => {
+  it("creates an early portal attempt so the selfie can be captured before the filter", async () => {
     const { repository } = createRepository(null);
-    const result = await getParticipantPortalEvidenceScreen({
+    const result = await getParticipantPortalSelfieScreen({
       identity,
       repository,
       studyCode: "FMASCULINA-NAVIGO-2026"
     });
 
-    expect(result).toMatchObject({ code: "ATTEMPT_NOT_READY", ok: false });
+    expect(result.ok).toBe(true);
+    expect(repository.createPortalScreeningAttempt).toHaveBeenCalled();
   });
 
-  it("requires exactly one selfie and at least one perfume photo", async () => {
+  it("returns a clear message when storage is not configured", async () => {
+    const { repository } = createRepository(
+      attempt({ completedAt: null, participantEvidence: [], participantScreeningReview: null, status: "STARTED" })
+    );
+    const result = await requestParticipantEvidenceUpload({
+      identity,
+      metadata: {
+        evidenceType: "SELFIE_IDENTIFICATION",
+        mimeType: "image/jpeg",
+        originalFilename: "selfie.jpg",
+        sizeBytes: 100
+      },
+      repository,
+      storage: {
+        createSignedReadUrl: vi.fn(),
+        createSignedUploadUrl: vi.fn(async () => {
+          throw new EvidenceStorageError(
+            "STORAGE_NOT_CONFIGURED",
+            "La carga de evidencias no esta configurada. Contacta al administrador."
+          );
+        })
+      },
+      studyCode: "FMASCULINA-NAVIGO-2026"
+    });
+
+    expect(result).toMatchObject({
+      message: "La carga de evidencias no esta configurada. Contacta al administrador.",
+      ok: false
+    });
+  });
+
+  it("returns a clear message when the evidence bucket is unavailable", async () => {
+    const { repository } = createRepository(
+      attempt({ completedAt: null, participantEvidence: [], participantScreeningReview: null, status: "STARTED" })
+    );
+    const result = await requestParticipantEvidenceUpload({
+      identity,
+      metadata: {
+        evidenceType: "SELFIE_IDENTIFICATION",
+        mimeType: "image/jpeg",
+        originalFilename: "selfie.jpg",
+        sizeBytes: 100
+      },
+      repository,
+      storage: {
+        createSignedReadUrl: vi.fn(),
+        createSignedUploadUrl: vi.fn(async () => {
+          throw new EvidenceStorageError(
+            "BUCKET_UNAVAILABLE",
+            "La carga de evidencias no esta disponible. Contacta al administrador."
+          );
+        })
+      },
+      studyCode: "FMASCULINA-NAVIGO-2026"
+    });
+
+    expect(result).toMatchObject({
+      message: "La carga de evidencias no esta disponible. Contacta al administrador.",
+      ok: false
+    });
+  });
+
+  it("requires exactly one selfie and at least one perfume photo before final review", async () => {
     const { repository } = createRepository(attempt());
     const result = await completeParticipantEvidenceSubmission({
       identity,
@@ -155,10 +230,13 @@ describe("participant portal evidence service", () => {
 
   it("allows maximum five perfume photos and rejects the sixth", async () => {
     const current = attempt({
+      completedAt: null,
       participantEvidence: [
         evidence({ type: "SELFIE_IDENTIFICATION", relatedQuestionId: null }),
         ...Array.from({ length: 5 }, (_, index) => evidence({ id: `perfume-${index}` }))
-      ]
+      ],
+      participantScreeningReview: null,
+      status: "STARTED"
     });
     const { repository } = createRepository(current);
     const result = await requestParticipantEvidenceUpload({
@@ -184,7 +262,13 @@ describe("participant portal evidence service", () => {
   });
 
   it("creates ParticipantEvidence for selfie and perfume with F6 related question", async () => {
-    const { evidences, repository } = createRepository(attempt());
+    const current = attempt({
+      completedAt: null,
+      participantEvidence: [],
+      participantScreeningReview: null,
+      status: "STARTED"
+    });
+    const { evidences, repository } = createRepository(current);
 
     await confirmParticipantEvidenceUpload({
       identity,
@@ -242,6 +326,25 @@ describe("participant portal evidence service", () => {
     expect(pendingReviews).toEqual([{ screeningAttemptId: "attempt-1", studyParticipantId: "study-participant-1" }]);
     expect(result.ok ? result.data.message : "").toBe(PARTICIPANT_PORTAL_EVIDENCE_REVIEW_MESSAGE);
     expect(result.ok ? result.data.showEvidenceLink : true).toBe(false);
+  });
+
+  it("lets /evidencias act as recovery without forcing a repeated final upload step", async () => {
+    const { repository } = createRepository(
+      attempt({
+        completedAt: null,
+        participantEvidence: [evidence({ type: "SELFIE_IDENTIFICATION", relatedQuestionId: null })],
+        participantScreeningReview: null,
+        status: "INCOMPLETE"
+      })
+    );
+    const result = await getParticipantPortalEvidenceScreen({
+      identity,
+      repository,
+      studyCode: "FMASCULINA-NAVIGO-2026"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.canFinalizeReview : true).toBe(false);
   });
 
   it("keeps rejected public result generic and approved result shows folio and codes", async () => {

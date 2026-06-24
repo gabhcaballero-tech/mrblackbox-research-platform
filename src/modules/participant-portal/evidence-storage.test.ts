@@ -30,7 +30,7 @@ describe("participant evidence storage", () => {
           sizeBytes: 1001
         }
       })
-    ).toThrow("tamaño máximo");
+    ).toThrow("tamano maximo");
   });
 
   it("generates non-guessable private storage keys without using the original filename", () => {

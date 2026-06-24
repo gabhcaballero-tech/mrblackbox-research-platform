@@ -23,6 +23,7 @@ export type PortalEvidenceConfigRecord = {
 };
 
 export type PortalEvidenceStudyRecord = {
+  activeScreenerVersionId: string | null;
   code: string;
   id: string;
   name: string;
@@ -112,6 +113,10 @@ export type CreatePortalEvidenceInput = {
 };
 
 export type ParticipantPortalEvidenceRepository = {
+  createPortalScreeningAttempt: (input: {
+    questionnaireVersionId: string;
+    studyParticipantId: string;
+  }) => Promise<PortalEvidenceAttemptRecord>;
   createEvidence: (input: CreatePortalEvidenceInput) => Promise<PortalEvidenceRecord>;
   findCurrentParticipantConsent: (input: {
     noticeVersion: string;
@@ -130,6 +135,11 @@ export type ParticipantPortalEvidenceRepository = {
   listPortalAttemptsForStudyParticipant: (
     studyParticipantId: string
   ) => Promise<PortalEvidenceAttemptRecord[]>;
+  updateStudyParticipantScreening: (input: {
+    operationalStatus: "SCREENING_STARTED";
+    screeningStatus: "STARTED";
+    studyParticipantId: string;
+  }) => Promise<void>;
   upsertPendingReview: (input: {
     screeningAttemptId: string;
     studyParticipantId: string;
@@ -150,6 +160,7 @@ type ParticipantPortalEvidencePrismaClient = PrismaClientLike & {
     create: (args: unknown) => Promise<PortalEvidenceRecord>;
   };
   screeningAttempt: {
+    create: (args: unknown) => Promise<PortalEvidenceAttemptRecord>;
     findMany: (args: unknown) => Promise<PortalEvidenceAttemptRecord[]>;
     findUnique: (args: unknown) => Promise<PortalEvidenceAttemptRecord | null>;
   };
@@ -158,11 +169,18 @@ type ParticipantPortalEvidencePrismaClient = PrismaClientLike & {
   };
   studyParticipant: {
     findUnique: (args: unknown) => Promise<PortalEvidenceStudyParticipantRecord | null>;
+    update: (args: unknown) => Promise<PortalEvidenceStudyParticipantRecord>;
   };
 };
 
 type StudyWithPortalConfig = Omit<PortalEvidenceStudyRecord, "portalConfig"> & {
   participantPortalConfig: PortalEvidenceConfigRecord | null;
+  questionnaireVersions: Array<{
+    definitionJson: unknown;
+    id: string;
+    status: "ACTIVE" | "RETIRED";
+    versionNumber: number;
+  }>;
 };
 
 const portalConfigSelect = {
@@ -254,6 +272,20 @@ export function createParticipantPortalEvidenceRepository(
   }
 
   return {
+    async createPortalScreeningAttempt(input) {
+      const prisma = await getPrisma();
+
+      return prisma.screeningAttempt.create({
+        data: {
+          fieldUserId: null,
+          questionnaireVersionId: input.questionnaireVersionId,
+          source: "PARTICIPANT_PORTAL",
+          status: "STARTED",
+          studyParticipantId: input.studyParticipantId
+        },
+        select: attemptSelect
+      });
+    },
     async createEvidence(input) {
       const prisma = await getPrisma();
 
@@ -326,6 +358,19 @@ export function createParticipantPortalEvidenceRepository(
       const prisma = await getPrisma();
       const study = await prisma.study.findUnique({
         select: {
+          questionnaireVersions: {
+            orderBy: { versionNumber: "desc" },
+            select: {
+              definitionJson: true,
+              id: true,
+              status: true,
+              versionNumber: true
+            },
+            take: 10,
+            where: {
+              status: "ACTIVE"
+            }
+          },
           code: true,
           id: true,
           name: true,
@@ -342,6 +387,8 @@ export function createParticipantPortalEvidenceRepository(
       }
 
       return {
+        activeScreenerVersionId:
+          study.questionnaireVersions.find((version) => isScreenerDefinition(version.definitionJson))?.id ?? null,
         code: study.code,
         id: study.id,
         name: study.name,
@@ -359,6 +406,18 @@ export function createParticipantPortalEvidenceRepository(
           source: "PARTICIPANT_PORTAL",
           studyParticipantId
         }
+      });
+    },
+    async updateStudyParticipantScreening(input) {
+      const prisma = await getPrisma();
+
+      await prisma.studyParticipant.update({
+        data: {
+          operationalStatus: input.operationalStatus,
+          screeningStatus: input.screeningStatus
+        },
+        select: studyParticipantSelect,
+        where: { id: input.studyParticipantId }
       });
     },
     async upsertPendingReview(input) {
@@ -382,4 +441,15 @@ export function createParticipantPortalEvidenceRepository(
       });
     }
   };
+}
+
+function isScreenerDefinition(input: unknown): boolean {
+  return (
+    typeof input === "object" &&
+    input !== null &&
+    "purpose" in input &&
+    (input as { purpose?: unknown }).purpose === "SCREENER" &&
+    "schemaVersion" in input &&
+    (input as { schemaVersion?: unknown }).schemaVersion === "screening.v1"
+  );
 }

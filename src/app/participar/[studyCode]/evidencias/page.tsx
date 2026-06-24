@@ -1,9 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { getParticipantPortalAuth } from "@/shared/auth/participant-portal";
-import { createParticipantPortalRepository } from "@/modules/participant-portal/repository";
 import { createParticipantPortalEvidenceRepository } from "@/modules/participant-portal/evidence-repository";
 import { getParticipantPortalEvidenceScreen } from "@/modules/participant-portal/evidence-service";
+import { createParticipantPortalRepository } from "@/modules/participant-portal/repository";
 import { participantPortalStudyCodeSchema } from "@/modules/participant-portal/validation";
 import { EvidenceUploadClient } from "./EvidenceUploadClient";
 
@@ -18,14 +18,14 @@ export default async function ParticipantEvidencePage({ params }: ParticipantEvi
   const parsedStudyCode = participantPortalStudyCodeSchema.safeParse(rawStudyCode);
 
   if (!parsedStudyCode.success) {
-    return <PortalMessage title="El portal de participación no está disponible en este momento." />;
+    return <PortalMessage title="El portal de participacion no esta disponible en este momento." />;
   }
 
   const studyCode = parsedStudyCode.data;
   const auth = await getParticipantPortalAuth({ repository: createParticipantPortalRepository() });
 
   if (auth.status === "no_session") {
-    return <PortalMessage title="Inicia sesión con el código enviado a tu correo para continuar." />;
+    return <PortalMessage title="Inicia sesion con el codigo enviado a tu correo para continuar." />;
   }
 
   if (auth.status === "internal_user_blocked") {
@@ -46,7 +46,7 @@ export default async function ParticipantEvidencePage({ params }: ParticipantEvi
             <Link className={primaryButtonClass} href={`/participar/${studyCode}/resultado`}>
               Ver resultado
             </Link>
-          ) : null
+          ) : undefined
         }
         title={result.message}
       />
@@ -54,13 +54,13 @@ export default async function ParticipantEvidencePage({ params }: ParticipantEvi
   }
 
   return (
-    <main className="min-h-screen bg-zinc-50 px-4 py-10">
+    <main className="min-h-screen bg-zinc-50 px-4 py-6 sm:py-10">
       <section className="mx-auto w-full max-w-2xl">
         <div className="mb-6">
-          <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Portal de participación</p>
+          <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Portal de participacion</p>
           <h1 className="mt-2 text-2xl font-semibold text-zinc-950">{result.data.study.name}</h1>
           <p className="mt-2 text-sm leading-6 text-zinc-600">
-            Sube tus evidencias para que el equipo interno pueda confirmar tu participación.
+            Esta pantalla queda como resumen y recuperacion de evidencias. Normalmente la selfie se captura al inicio y las fotos de perfumes durante F6.
           </p>
         </div>
 
@@ -80,7 +80,7 @@ function PortalMessage({
   return (
     <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-10">
       <section className="w-full max-w-md rounded-lg border border-zinc-200 bg-white p-6 text-center shadow-sm">
-        <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Portal de participación</p>
+        <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Portal de participacion</p>
         <h1 className="mt-2 text-2xl font-semibold text-zinc-950">{title}</h1>
         {action ? <div className="mt-5">{action}</div> : null}
       </section>

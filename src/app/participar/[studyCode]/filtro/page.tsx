@@ -51,9 +51,11 @@ export default async function ParticipantPortalFilterPage({
     return (
       <PortalMessage
         action={
-          result.code === "REGISTRATION_REQUIRED" || result.code === "CONSENT_REQUIRED" ? (
+          result.code === "REGISTRATION_REQUIRED" ||
+          result.code === "CONSENT_REQUIRED" ||
+          result.code === "SELFIE_REQUIRED" ? (
             <a className={primaryButtonClass} href={`/participar/${studyCode}/inicio`}>
-              Completar registro
+              {result.code === "SELFIE_REQUIRED" ? "Capturar selfie" : "Completar registro"}
             </a>
           ) : null
         }
@@ -69,7 +71,7 @@ export default async function ParticipantPortalFilterPage({
       : 0;
 
   return (
-    <main className="min-h-screen bg-zinc-50 px-4 py-10">
+    <main className="min-h-screen bg-zinc-50 px-4 py-6 sm:py-10">
       <section className="mx-auto w-full max-w-2xl">
         <div className="mb-6">
           <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Portal de participación</p>

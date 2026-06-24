@@ -1,4 +1,5 @@
 import { PARTICIPANT_PORTAL_UNAVAILABLE_MESSAGE } from "./access";
+import { PARTICIPANT_PORTAL_DUPLICATE_REGISTRATION_MESSAGE } from "./registration-service";
 import {
   PARTICIPANT_PORTAL_PUBLIC_TERMINATED_MESSAGE,
   PARTICIPANT_PORTAL_REGISTRATION_REQUIRED_MESSAGE
@@ -37,6 +38,7 @@ export type ParticipantEvidenceCounts = {
 
 export type ParticipantEvidenceScreen = {
   attemptId: string;
+  canFinalizeReview: boolean;
   config: {
     maxImageBytes: number;
     maxPerfumePhotos: number;
@@ -44,6 +46,18 @@ export type ParticipantEvidenceScreen = {
   };
   counts: ParticipantEvidenceCounts;
   evidenceComplete: boolean;
+  status: PortalEvidenceAttemptRecord["status"];
+  study: {
+    code: string;
+    id: string;
+    name: string;
+  };
+};
+
+export type ParticipantPortalSelfieScreen = {
+  attemptId: string;
+  counts: ParticipantEvidenceCounts;
+  selfieComplete: boolean;
   study: {
     code: string;
     id: string;
@@ -104,7 +118,7 @@ export async function getParticipantPortalEvidenceScreen({
   repository: ParticipantPortalEvidenceRepository;
   studyCode: string;
 }): Promise<ParticipantPortalEvidenceResult<ParticipantEvidenceScreen>> {
-  const context = await loadEvidenceContext({ identity, repository, studyCode });
+  const context = await loadCurrentEvidenceContext({ identity, repository, studyCode });
 
   if (!context.ok) {
     return context;
@@ -124,6 +138,43 @@ export async function getParticipantPortalEvidenceScreen({
   };
 }
 
+export async function getParticipantPortalSelfieScreen({
+  identity,
+  repository,
+  studyCode
+}: {
+  identity: ParticipantPortalIdentity;
+  repository: ParticipantPortalEvidenceRepository;
+  studyCode: string;
+}): Promise<ParticipantPortalEvidenceResult<ParticipantPortalSelfieScreen>> {
+  const base = await loadBaseContext({ identity, repository, studyCode });
+
+  if (!base.ok) {
+    return base;
+  }
+
+  const attemptResult = await ensurePortalAttemptForEvidence({
+    attempts: base.data.attempts,
+    repository,
+    study: base.data.study,
+    studyParticipant: base.data.studyParticipant
+  });
+
+  if (!attemptResult.ok) {
+    return attemptResult;
+  }
+
+  return {
+    data: {
+      attemptId: attemptResult.data.id,
+      counts: countEvidence(attemptResult.data.participantEvidence),
+      selfieComplete: hasExactlyOneSelfie(attemptResult.data.participantEvidence),
+      study: publicStudy(base.data.study)
+    },
+    ok: true
+  };
+}
+
 export async function requestParticipantEvidenceUpload({
   identity,
   metadata,
@@ -137,7 +188,7 @@ export async function requestParticipantEvidenceUpload({
   storage: EvidenceStorageClient;
   studyCode: string;
 }): Promise<ParticipantPortalEvidenceResult<SignedEvidenceUpload & { metadata: EvidenceUploadMetadata }>> {
-  const context = await loadEvidenceContext({ identity, repository, studyCode });
+  const context = await loadCurrentEvidenceContext({ identity, repository, studyCode });
 
   if (!context.ok) {
     return context;
@@ -181,7 +232,7 @@ export async function confirmParticipantEvidenceUpload({
   repository: ParticipantPortalEvidenceRepository;
   studyCode: string;
 }): Promise<ParticipantPortalEvidenceResult<PortalEvidenceRecord>> {
-  const context = await loadEvidenceContext({ identity, repository, studyCode });
+  const context = await loadCurrentEvidenceContext({ identity, repository, studyCode });
 
   if (!context.ok) {
     return context;
@@ -256,6 +307,14 @@ export async function completeParticipantEvidenceSubmission({
     return {
       code: "EVIDENCE_INCOMPLETE",
       message: validation.message,
+      ok: false
+    };
+  }
+
+  if (context.data.attempt.status !== "PENDING_REVIEW" && context.data.attempt.status !== "PASSED") {
+    return {
+      code: "ATTEMPT_NOT_READY",
+      message: "Completa el filtro antes de finalizar las evidencias.",
       ok: false
     };
   }
@@ -362,15 +421,14 @@ async function loadEvidenceContext({
     return context;
   }
 
-  const attempt = context.data.attempts.find((candidate) =>
-    candidate.source === "PARTICIPANT_PORTAL" &&
-    candidate.status === "PENDING_REVIEW"
+  const attempt = context.data.attempts.find(
+    (candidate) => candidate.source === "PARTICIPANT_PORTAL" && candidate.status === "PENDING_REVIEW"
   );
 
   if (!attempt) {
     return {
       code: "ATTEMPT_NOT_READY",
-      message: "El filtro aún no está listo para cargar evidencias.",
+      message: "El filtro aun no esta listo para cargar evidencias.",
       ok: false
     };
   }
@@ -378,6 +436,57 @@ async function loadEvidenceContext({
   return {
     data: {
       attempt,
+      participantProfile: context.data.participantProfile,
+      study: context.data.study,
+      studyParticipant: context.data.studyParticipant
+    },
+    ok: true
+  };
+}
+
+async function loadCurrentEvidenceContext({
+  identity,
+  repository,
+  studyCode
+}: {
+  identity: ParticipantPortalIdentity;
+  repository: ParticipantPortalEvidenceRepository;
+  studyCode: string;
+}): Promise<ParticipantPortalEvidenceResult<EvidenceContext>> {
+  const context = await loadBaseContext({ identity, repository, studyCode });
+
+  if (!context.ok) {
+    return context;
+  }
+
+  const attempt = selectCurrentEvidenceAttempt(context.data.attempts);
+
+  if (attempt) {
+    return {
+      data: {
+        attempt,
+        participantProfile: context.data.participantProfile,
+        study: context.data.study,
+        studyParticipant: context.data.studyParticipant
+      },
+      ok: true
+    };
+  }
+
+  const created = await ensurePortalAttemptForEvidence({
+    attempts: context.data.attempts,
+    repository,
+    study: context.data.study,
+    studyParticipant: context.data.studyParticipant
+  });
+
+  if (!created.ok) {
+    return created;
+  }
+
+  return {
+    data: {
+      attempt: created.data,
       participantProfile: context.data.participantProfile,
       study: context.data.study,
       studyParticipant: context.data.studyParticipant
@@ -406,7 +515,7 @@ async function loadResultContext({
   if (!attempt) {
     return {
       code: "ATTEMPT_NOT_READY",
-      message: "Aún no hay un filtro registrado.",
+      message: "Aun no hay un filtro registrado.",
       ok: false
     };
   }
@@ -499,6 +608,57 @@ async function loadBaseContext({
   };
 }
 
+async function ensurePortalAttemptForEvidence({
+  attempts,
+  repository,
+  study,
+  studyParticipant
+}: {
+  attempts: PortalEvidenceAttemptRecord[];
+  repository: ParticipantPortalEvidenceRepository;
+  study: PortalEvidenceStudyRecord & { portalConfig: PortalEvidenceConfigRecord };
+  studyParticipant: PortalEvidenceStudyParticipantRecord;
+}): Promise<ParticipantPortalEvidenceResult<PortalEvidenceAttemptRecord>> {
+  const current = selectCurrentEvidenceAttempt(attempts);
+
+  if (current) {
+    return {
+      data: current,
+      ok: true
+    };
+  }
+
+  if (!study.activeScreenerVersionId) {
+    return {
+      code: "ATTEMPT_NOT_READY",
+      message: "El filtro aun no esta listo para capturar evidencias.",
+      ok: false
+    };
+  }
+
+  if (attempts.length > 0) {
+    return {
+      code: "ATTEMPT_NOT_READY",
+      message: PARTICIPANT_PORTAL_DUPLICATE_REGISTRATION_MESSAGE,
+      ok: false
+    };
+  }
+
+  await repository.updateStudyParticipantScreening({
+    operationalStatus: "SCREENING_STARTED",
+    screeningStatus: "STARTED",
+    studyParticipantId: studyParticipant.id
+  });
+
+  return {
+    data: await repository.createPortalScreeningAttempt({
+      questionnaireVersionId: study.activeScreenerVersionId,
+      studyParticipantId: studyParticipant.id
+    }),
+    ok: true
+  };
+}
+
 function toEvidenceScreen(context: EvidenceContext): ParticipantEvidenceScreen {
   const counts = countEvidence(context.attempt.participantEvidence);
   const complete = validateEvidenceCounts({
@@ -508,6 +668,7 @@ function toEvidenceScreen(context: EvidenceContext): ParticipantEvidenceScreen {
 
   return {
     attemptId: context.attempt.id,
+    canFinalizeReview: context.attempt.status === "PENDING_REVIEW" || context.attempt.status === "PASSED",
     config: {
       maxImageBytes: context.study.portalConfig.maxImageBytes,
       maxPerfumePhotos: context.study.portalConfig.maxPerfumePhotos,
@@ -515,6 +676,7 @@ function toEvidenceScreen(context: EvidenceContext): ParticipantEvidenceScreen {
     },
     counts,
     evidenceComplete: complete,
+    status: context.attempt.status,
     study: publicStudy(context.study)
   };
 }
@@ -532,6 +694,10 @@ export function countEvidence(evidence: PortalEvidenceRecord[]): ParticipantEvid
     perfumePhotos: evidence.filter((item) => item.type === "PERFUME_PHOTO").length,
     selfie: evidence.filter((item) => item.type === "SELFIE_IDENTIFICATION").length
   };
+}
+
+export function hasExactlyOneSelfie(evidence: PortalEvidenceRecord[]): boolean {
+  return countEvidence(evidence).selfie === 1;
 }
 
 export function validateEvidenceCounts({
@@ -588,4 +754,21 @@ function assertCanAddEvidence(
   if (evidenceType === "PERFUME_PHOTO" && counts.perfumePhotos >= config.maxPerfumePhotos) {
     throw new Error(`Puedes subir máximo ${config.maxPerfumePhotos} fotos de perfumes.`);
   }
+}
+
+function selectCurrentEvidenceAttempt(
+  attempts: PortalEvidenceAttemptRecord[]
+): PortalEvidenceAttemptRecord | null {
+  return (
+    attempts.find(
+      (attempt) =>
+        attempt.source === "PARTICIPANT_PORTAL" &&
+        (attempt.status === "STARTED" || attempt.status === "INCOMPLETE")
+    ) ??
+    attempts.find(
+      (attempt) =>
+        attempt.source === "PARTICIPANT_PORTAL" &&
+        (attempt.status === "PENDING_REVIEW" || attempt.status === "PASSED")
+    ) ?? null
+  );
 }

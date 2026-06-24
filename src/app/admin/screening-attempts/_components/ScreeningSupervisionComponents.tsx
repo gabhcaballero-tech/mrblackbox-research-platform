@@ -339,7 +339,7 @@ export function EvidenceReviewPanel({
           <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Revisión de evidencias</p>
           <h2 className="mt-2 text-xl font-semibold text-zinc-950">{detail.participant.name}</h2>
           <p className="mt-2 text-sm text-zinc-600">
-            Revisa selfie, fotos de perfumes y marcas declaradas antes de aprobar.
+            Revisa la selfie capturada al inicio, las fotos de perfumes capturadas en F6 y las marcas declaradas antes de aprobar.
           </p>
         </div>
         <StatusBadge status={detail.review?.status === "APPROVED" ? "ready" : detail.review?.status === "REJECTED" ? "blocked" : "planned"}>

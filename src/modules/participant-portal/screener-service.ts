@@ -54,6 +54,12 @@ export type ParticipantPortalAttemptScreen = {
   attempt: PortalScreeningAttemptRecord;
   currentQuestion: ScreenerQuestion | null;
   definition: ScreenerDefinition;
+  evidence: {
+    maxPerfumePhotos: number;
+    minPerfumePhotos: number;
+    perfumePhotos: number;
+    selfieComplete: boolean;
+  };
   photoNotice: string | null;
   progress: ParticipantPortalScreenProgress;
   result: ScreenerEvaluationResult;
@@ -101,6 +107,7 @@ export type ParticipantPortalScreenerErrorCode =
   | "QUESTION_HIDDEN"
   | "QUESTION_NOT_FOUND"
   | "REGISTRATION_REQUIRED"
+  | "SELFIE_REQUIRED"
   | "UNAUTHORIZED"
   | "VALIDATION_ERROR";
 
@@ -152,6 +159,14 @@ export async function getParticipantPortalScreenerScreen({
 
   if (!attemptResult.ok) {
     return attemptResult;
+  }
+
+  if (!hasExactlyOneSelfie(attemptResult.data)) {
+    return {
+      code: "SELFIE_REQUIRED",
+      message: "Debes capturar una selfie antes de continuar con el filtro.",
+      ok: false
+    };
   }
 
   const answers = recordsToAnswers(await repository.listAnswers(attemptResult.data.id));
@@ -279,6 +294,18 @@ export async function saveParticipantPortalScreenerAnswer({
   }
 
   const evaluation = evaluateScreener(definition, answers);
+
+  if (questionId === "F6_MARCAS_UTILIZA") {
+    const perfumePhotoCount = countPerfumePhotos(attempt.participantEvidence);
+
+    if (perfumePhotoCount < context.data.study.portalConfig.minPerfumePhotos) {
+      return {
+        code: "VALIDATION_ERROR",
+        message: `Debes registrar al menos ${context.data.study.portalConfig.minPerfumePhotos} foto de perfume antes de continuar.`,
+        ok: false
+      };
+    }
+  }
 
   if (evaluation.status === "TERMINATED") {
     await closePortalAttempt({ attempt, evaluation, repository });
@@ -565,6 +592,12 @@ function buildAttemptScreen({
     attempt,
     currentQuestion: closedStatuses.has(attempt.status) ? null : currentQuestion,
     definition,
+    evidence: {
+      maxPerfumePhotos: study.portalConfig.maxPerfumePhotos,
+      minPerfumePhotos: study.portalConfig.minPerfumePhotos,
+      perfumePhotos: countPerfumePhotos(attempt.participantEvidence),
+      selfieComplete: hasExactlyOneSelfie(attempt)
+    },
     photoNotice: currentQuestion?.id === "F6_MARCAS_UTILIZA" ? PARTICIPANT_PORTAL_F6_PHOTOS_NOTE : null,
     progress: {
       answeredVisibleQuestions: visibleQuestions.filter((question) => hasAnswer(answers[question.id])).length,
@@ -859,4 +892,12 @@ function hasAnswer(answer: ScreenerAnswer | undefined): boolean {
   }
 
   return String(answer).trim().length > 0;
+}
+
+function hasExactlyOneSelfie(attempt: PortalScreeningAttemptRecord): boolean {
+  return attempt.participantEvidence.filter((item) => item.type === "SELFIE_IDENTIFICATION").length === 1;
+}
+
+function countPerfumePhotos(evidence: PortalScreeningAttemptRecord["participantEvidence"]): number {
+  return evidence.filter((item) => item.type === "PERFUME_PHOTO").length;
 }
