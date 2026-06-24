@@ -1,0 +1,60 @@
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { ParticipantResultCard } from "./ParticipantResultCard";
+
+describe("ParticipantResultCard", () => {
+  it("shows approved folio and three codes without raw JSON or internal reasons", () => {
+    render(
+      <ParticipantResultCard
+        result={{
+          confirmation: {
+            codes: [
+              { code: "ABC12345", slot: 1 },
+              { code: "DEF12345", slot: 2 },
+              { code: "GHI12345", slot: 3 }
+            ],
+            folio: "NAV-001",
+            participantName: "Gabriela"
+          },
+          kind: "APPROVED",
+          message: "Conserva estos códigos. Te serán solicitados durante tu evaluación.",
+          showEvidenceLink: false,
+          study: {
+            code: "FMASCULINA-NAVIGO-2026",
+            id: "study-1",
+            name: "Fragancia Masculina"
+          }
+        }}
+      />
+    );
+
+    expect(screen.getByText("NAV-001")).toBeInTheDocument();
+    expect(screen.getByText("ABC12345")).toBeInTheDocument();
+    expect(screen.getByText("DEF12345")).toBeInTheDocument();
+    expect(screen.getByText("GHI12345")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copiar datos" })).toBeInTheDocument();
+    expect(screen.queryByText(/answerJson|rejectionReason|NO_USUARIO_NAVIGO/)).not.toBeInTheDocument();
+  });
+
+  it("shows evidence link when evidence is pending", () => {
+    render(
+      <ParticipantResultCard
+        result={{
+          kind: "PENDING_EVIDENCE",
+          message: "Completa tus evidencias para continuar con la revisión.",
+          showEvidenceLink: true,
+          study: {
+            code: "FMASCULINA-NAVIGO-2026",
+            id: "study-1",
+            name: "Fragancia Masculina"
+          }
+        }}
+      />
+    );
+
+    expect(screen.getByRole("link", { name: "Continuar con evidencias" })).toHaveAttribute(
+      "href",
+      "/participar/FMASCULINA-NAVIGO-2026/evidencias"
+    );
+  });
+});

@@ -33,8 +33,8 @@ export type SupervisionQuestionnaireVersionRecord = {
 export type SupervisionAttemptRecord = {
   completedAt: Date | null;
   evaluationJson: unknown;
-  fieldUser: SupervisionFieldUserRecord;
-  fieldUserId: string;
+  fieldUser: SupervisionFieldUserRecord | null;
+  fieldUserId: string | null;
   id: string;
   nseClass: string | null;
   nseScore: number | null;

@@ -3,17 +3,17 @@ import type { ReactNode } from "react";
 import { getParticipantPortalAuth } from "@/shared/auth/participant-portal";
 import { createParticipantPortalRepository } from "@/modules/participant-portal/repository";
 import { createParticipantPortalEvidenceRepository } from "@/modules/participant-portal/evidence-repository";
-import { getParticipantPortalEvidenceResult } from "@/modules/participant-portal/evidence-service";
+import { getParticipantPortalEvidenceScreen } from "@/modules/participant-portal/evidence-service";
 import { participantPortalStudyCodeSchema } from "@/modules/participant-portal/validation";
-import { ParticipantResultCard } from "./ParticipantResultCard";
+import { EvidenceUploadClient } from "./EvidenceUploadClient";
 
-type ParticipantPortalResultPageProps = {
+type ParticipantEvidencePageProps = {
   params: Promise<{ studyCode: string }>;
 };
 
 export const dynamic = "force-dynamic";
 
-export default async function ParticipantPortalResultPage({ params }: ParticipantPortalResultPageProps) {
+export default async function ParticipantEvidencePage({ params }: ParticipantEvidencePageProps) {
   const { studyCode: rawStudyCode } = await params;
   const parsedStudyCode = participantPortalStudyCodeSchema.safeParse(rawStudyCode);
 
@@ -22,8 +22,7 @@ export default async function ParticipantPortalResultPage({ params }: Participan
   }
 
   const studyCode = parsedStudyCode.data;
-  const portalRepository = createParticipantPortalRepository();
-  const auth = await getParticipantPortalAuth({ repository: portalRepository });
+  const auth = await getParticipantPortalAuth({ repository: createParticipantPortalRepository() });
 
   if (auth.status === "no_session") {
     return <PortalMessage title="Inicia sesión con el código enviado a tu correo para continuar." />;
@@ -33,7 +32,7 @@ export default async function ParticipantPortalResultPage({ params }: Participan
     return <PortalMessage title={auth.message} />;
   }
 
-  const result = await getParticipantPortalEvidenceResult({
+  const result = await getParticipantPortalEvidenceScreen({
     identity: auth.identity,
     repository: createParticipantPortalEvidenceRepository(),
     studyCode
@@ -43,9 +42,9 @@ export default async function ParticipantPortalResultPage({ params }: Participan
     return (
       <PortalMessage
         action={
-          result.code === "REGISTRATION_REQUIRED" || result.code === "CONSENT_REQUIRED" ? (
-            <Link className={primaryButtonClass} href={`/participar/${studyCode}/inicio`}>
-              Completar registro
+          result.code === "ATTEMPT_NOT_READY" ? (
+            <Link className={primaryButtonClass} href={`/participar/${studyCode}/resultado`}>
+              Ver resultado
             </Link>
           ) : null
         }
@@ -55,10 +54,18 @@ export default async function ParticipantPortalResultPage({ params }: Participan
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-10">
-      <div className="w-full max-w-md">
-        <ParticipantResultCard result={result.data} />
-      </div>
+    <main className="min-h-screen bg-zinc-50 px-4 py-10">
+      <section className="mx-auto w-full max-w-2xl">
+        <div className="mb-6">
+          <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Portal de participación</p>
+          <h1 className="mt-2 text-2xl font-semibold text-zinc-950">{result.data.study.name}</h1>
+          <p className="mt-2 text-sm leading-6 text-zinc-600">
+            Sube tus evidencias para que el equipo interno pueda confirmar tu participación.
+          </p>
+        </div>
+
+        <EvidenceUploadClient screen={result.data} />
+      </section>
     </main>
   );
 }

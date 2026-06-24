@@ -72,12 +72,11 @@ export function rejectParticipantReview({
   rejectionReason
 }: {
   rejectionReason: string;
-}):
-  | {
-      canCreateConfirmation: false;
-      rejectionReason: string;
-      status: "REJECTED";
-    } {
+}): {
+  canCreateConfirmation: false;
+  rejectionReason: string;
+  status: "REJECTED";
+} {
   return {
     canCreateConfirmation: false,
     rejectionReason,
@@ -146,7 +145,7 @@ export function generateReferenceCodes({
     attempts += 1;
 
     if (attempts > 50) {
-      throw new Error("No fue posible generar tres codigos de referencia unicos.");
+      throw new Error("No fue posible generar tres códigos de referencia únicos.");
     }
 
     const code = codeGenerator().trim().toUpperCase();
@@ -169,19 +168,22 @@ export function buildManualWhatsAppMessage({
   codes,
   folio,
   participantName,
-  studyName
+  studyName: _studyName
 }: {
   codes: ParticipantReferenceCodeDraft[];
   folio: string;
   participantName: string;
   studyName: string;
 }): string {
+  void _studyName;
   const orderedCodes = [...codes].sort((a, b) => a.slot - b.slot);
 
   return [
-    `Hola ${participantName}.`,
-    `Tu participacion en ${studyName} fue aprobada.`,
+    `Hola, ${participantName}. Tu participación ha sido confirmada para continuar en el estudio.`,
+    "",
     `Folio: ${folio}.`,
-    `Codigos de referencia: ${orderedCodes.map((item) => item.code).join(", ")}.`
+    ...orderedCodes.map((item) => `Código ${item.slot}: ${item.code}`),
+    "",
+    "Conserva este mensaje y tus códigos, ya que te serán solicitados durante tu evaluación."
   ].join("\n");
 }

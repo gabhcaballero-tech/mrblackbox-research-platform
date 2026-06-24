@@ -88,19 +88,87 @@ Reglas preparadas:
 
 La migracion agrega un indice unico parcial para impedir mas de una selfie por intento.
 
-## Storage futuro
+## Bloque 5: evidencias, revision interna y confirmacion
 
-No se implemento Storage en este bloque.
+Se implemento el flujo publico de evidencias posterior al pase preliminar del screener:
 
-Arquitectura prevista:
+- Ruta publica: `/participar/[studyCode]/evidencias`.
+- Requiere sesion de participante, portal habilitado, consentimiento vigente, `StudyParticipant` y un intento de portal en `PENDING_REVIEW`.
+- Solicita exactamente una selfie y entre una y cinco fotos de perfumes, segun configuracion del estudio.
+- Las fotos de perfumes se registran con `relatedQuestionId = F6_MARCAS_UTILIZA`.
+- Al completar evidencias, se asegura una `ParticipantScreeningReview` en estado `PENDING`.
+- El resultado publico no expone razones internas, NSE, codigos de terminacion ni notas de revision.
 
-- Usar variable server-only `SUPABASE_SECRET_KEY` con clave `sb_secret_...`.
-- Nunca exponer esa clave al navegador.
-- Crear URL firmada de carga en servidor.
-- Subir archivos directamente desde el navegador a Supabase Storage privado.
-- No enviar imagenes a traves de Vercel Functions.
-- Usar bucket privado `participant-evidence`.
-- Usar URLs firmadas temporales para revision interna.
+La pantalla publica de resultado ahora distingue:
+
+- Filtro terminado o evidencia rechazada: mensaje generico sin razon interna.
+- Evidencia pendiente: enlace para continuar con evidencias.
+- Revision pendiente: mensaje de seguimiento.
+- Confirmacion aprobada: nombre, folio, tres codigos y boton para copiar datos.
+
+## Storage privado
+
+Se implemento la preparacion de Storage privado con URLs firmadas:
+
+- Bucket esperado: `participant-evidence`.
+- El servidor valida tipo, extension, tamano y cantidad antes de generar URL firmada.
+- El navegador sube directamente al bucket privado con la URL firmada.
+- Despues de subir, el cliente confirma la carga y el servidor crea `ParticipantEvidence`.
+- La base guarda `storageBucket` y `privateStorageKey`; nunca guarda URL publica persistente.
+- La revision interna usa URLs firmadas temporales de lectura.
+- La clave `SUPABASE_SECRET_KEY` es server-only y no debe exponerse al navegador.
+
+Configuracion manual requerida en Supabase Storage:
+
+1. Crear bucket privado `participant-evidence`.
+2. Mantener desactivado el acceso publico.
+3. Verificar que el proyecto permita URLs firmadas de carga y lectura.
+4. Configurar en Vercel la variable server-only `SUPABASE_SECRET_KEY`.
+5. No usar service role ni secret key en componentes cliente.
+
+## Revision interna
+
+La revision de evidencias se integra al detalle de intento de supervision para ADMIN y SUPERVISOR:
+
+- Muestra participante, telefono, correo, intento y marcas declaradas en F6.
+- Muestra selfie y fotos de perfumes mediante URLs firmadas temporales.
+- Permite aprobar o rechazar solo si la revision esta pendiente.
+- INTERVIEWER no tiene permiso para revisar evidencias.
+
+Al aprobar:
+
+- La operacion corre en una transaccion.
+- Es idempotente si ya existe `ParticipantConfirmation`.
+- Exige evidencia completa y revision `PENDING`.
+- Genera folio con `folioPrefix` y `nextFolioSequence`.
+- Respeta `folioMaxSequence`; si se agota, bloquea con el mensaje configurado.
+- Genera exactamente tres codigos globalmente unicos, sin PII.
+- Marca revision y evidencias como `APPROVED`.
+- Crea `ParticipantConfirmation` y tres `ParticipantReferenceCode` en slots 1, 2 y 3.
+
+Al rechazar:
+
+- Requiere motivo interno.
+- Marca revision y evidencias como `REJECTED`.
+- No crea folio, codigos ni confirmacion.
+- El participante solo ve mensaje publico generico.
+
+## WhatsApp manual
+
+No se implemento API de WhatsApp ni envio automatico.
+
+Despues de aprobar, supervision muestra:
+
+- Mensaje listo para copiar.
+- Boton `Copiar mensaje`.
+- Boton `Abrir en WhatsApp` con `https://wa.me/<telefono_sin_+>?text=<mensaje_codificado>`.
+- Boton `Marcar mensaje como enviado`.
+
+El estado manual se guarda en `ParticipantConfirmation.manualMessageStatus`, con usuario y fecha de marcado.
+
+Variables requeridas adicionales:
+
+- `SUPABASE_SECRET_KEY`
 
 ## Migracion
 
@@ -127,11 +195,10 @@ Resumen SQL:
 
 ## Fuera de alcance
 
-- UI del portal participante.
-- OTP real con Supabase Auth.
-- Supabase Storage y URLs firmadas reales.
 - API de WhatsApp.
-- Revision visual de evidencias.
 - Aplicacion de migraciones.
 - Cambios a versiones publicadas o respuestas reales.
 - Conexiones a Supabase.
+- Envio automatico de WhatsApp.
+- Edicion de evidencias despues de revision.
+- Exposicion publica de URLs de Storage.

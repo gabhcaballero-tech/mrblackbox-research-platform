@@ -50,7 +50,7 @@ export type SupervisionStatusLabel = {
 
 export type ScreeningAttemptListItem = {
   closedAt: Date | null;
-  fieldUser: SupervisionFieldUserRecord;
+  fieldUser: SupervisionFieldUserRecord | null;
   id: string;
   nseClassCode: string | null;
   nseClassLabel: string | null;
@@ -96,7 +96,7 @@ export type ScreeningAttemptDetail = {
     missingQuestionIds: string[];
     reasons: Array<{ code: string; questionId?: string; reason: string }>;
   };
-  fieldUser: SupervisionFieldUserRecord;
+  fieldUser: SupervisionFieldUserRecord | null;
   id: string;
   nseClassCode: string | null;
   nseClassLabel: string | null;

@@ -347,7 +347,10 @@ describe("participant portal foundation", () => {
     });
 
     expect(message).toContain("Folio: NAV-001.");
-    expect(message).toContain("Codigos de referencia: COD-1, COD-2, COD-3.");
+    expect(message).toContain("Código 1: COD-1");
+    expect(message).toContain("Código 2: COD-2");
+    expect(message).toContain("Código 3: COD-3");
+    expect(message).toContain("Conserva este mensaje y tus códigos");
   });
 
   it("prepares OTP, CAPTCHA and E.164 contracts without calling external services", () => {

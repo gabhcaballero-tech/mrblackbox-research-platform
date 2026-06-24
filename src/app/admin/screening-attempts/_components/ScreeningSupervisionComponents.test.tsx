@@ -49,7 +49,7 @@ const listItem: ScreeningAttemptListItem = {
 
 const listData: ScreeningAttemptListData = {
   attempts: [listItem],
-  fieldUsers: [listItem.fieldUser],
+  fieldUsers: [listItem.fieldUser!],
   filters: {
     code: undefined,
     dateFrom: undefined,

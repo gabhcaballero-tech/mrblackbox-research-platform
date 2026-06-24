@@ -6,7 +6,13 @@ import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { createScreeningSupervisionRepository } from "@/modules/screening-supervision/repository";
 import { getScreeningAttemptSupervisionDetail } from "@/modules/screening-supervision/service";
-import { ScreeningAttemptDetailView } from "../_components/ScreeningSupervisionComponents";
+import { createEvidenceReviewRepository } from "@/modules/participant-portal/evidence-review-repository";
+import { getParticipantEvidenceReviewDetail } from "@/modules/participant-portal/evidence-review-service";
+import { createSupabaseEvidenceStorageClient } from "@/modules/participant-portal/evidence-storage";
+import {
+  EvidenceReviewPanel,
+  ScreeningAttemptDetailView
+} from "../_components/ScreeningSupervisionComponents";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +20,12 @@ type ScreeningAttemptDetailPageProps = {
   params: Promise<{
     attemptId: string;
   }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function ScreeningAttemptDetailPage({ params }: ScreeningAttemptDetailPageProps) {
+export default async function ScreeningAttemptDetailPage({ params, searchParams }: ScreeningAttemptDetailPageProps) {
   const { attemptId } = await params;
+  const search = (await searchParams) ?? {};
   const actor = await requireCapability("screening:review");
   const result = await getScreeningAttemptSupervisionDetail({
     actor,
@@ -34,6 +42,12 @@ export default async function ScreeningAttemptDetailPage({ params }: ScreeningAt
   }
 
   const detail = result.data;
+  const evidenceResult = await getParticipantEvidenceReviewDetail({
+    actor,
+    attemptId,
+    repository: createEvidenceReviewRepository(),
+    storage: createSupabaseEvidenceStorageClient()
+  });
 
   return (
     <AppShell>
@@ -60,6 +74,19 @@ export default async function ScreeningAttemptDetailPage({ params }: ScreeningAt
       </div>
 
       <ScreeningAttemptDetailView detail={detail} />
+      {evidenceResult.ok ? (
+        <div className="mt-6">
+          <EvidenceReviewPanel
+            detail={evidenceResult.data}
+            message={firstParam(search.evidenceMessage)}
+            error={firstParam(search.evidenceError)}
+          />
+        </div>
+      ) : null}
     </AppShell>
   );
+}
+
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
 }

@@ -6,6 +6,12 @@ import type {
   ScreeningAttemptListData,
   ScreeningAttemptListItem
 } from "@/modules/screening-supervision";
+import type { ParticipantEvidenceReviewDetail } from "@/modules/participant-portal/evidence-review-service";
+import {
+  approveParticipantEvidenceAction,
+  rejectParticipantEvidenceAction
+} from "@/modules/participant-portal/evidence-review-actions";
+import { WhatsAppManualBlock } from "./WhatsAppManualBlock";
 
 const dateFormatter = new Intl.DateTimeFormat("es-MX", {
   dateStyle: "medium",
@@ -41,7 +47,7 @@ function compactNse(attempt: ScreeningAttemptListItem): string {
 }
 
 function interviewerLabel(attempt: ScreeningAttemptListItem): string {
-  return attempt.fieldUser.name.trim() || attempt.fieldUser.email;
+  return attempt.fieldUser?.name.trim() || attempt.fieldUser?.email || "Portal participante";
 }
 
 function referenceLabel(reference: string | null): string {
@@ -211,7 +217,7 @@ export function ScreeningAttemptDetailView({ detail }: { detail: ScreeningAttemp
           <SummaryItem label="Referencia externa" value={detail.participant.externalReference ?? "Sin referencia"} />
           <SummaryItem label="Teléfono" value={detail.participant.phone ?? "Sin teléfono"} />
           <SummaryItem label="Correo" value={detail.participant.email ?? "Sin correo"} />
-          <SummaryItem label="Entrevistador" value={detail.fieldUser.name} />
+          <SummaryItem label="Entrevistador" value={detail.fieldUser?.name ?? "Portal participante"} />
           <SummaryItem label="Código" value={detail.terminationCode ?? "No aplica"} />
           <SummaryItem label="Inicio" value={formatDate(detail.startedAt)} />
           <SummaryItem label="Cierre" value={formatDate(detail.closedAt)} />
@@ -315,6 +321,136 @@ function SummaryItem({ label, mono, value }: { label: string; mono?: boolean; va
       <dd className={`mt-1 break-words text-zinc-900 ${mono ? "font-mono text-xs" : ""}`}>{value}</dd>
     </div>
   );
+}
+
+export function EvidenceReviewPanel({
+  detail,
+  error,
+  message
+}: {
+  detail: ParticipantEvidenceReviewDetail;
+  error?: string;
+  message?: string;
+}) {
+  return (
+    <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Revisión de evidencias</p>
+          <h2 className="mt-2 text-xl font-semibold text-zinc-950">{detail.participant.name}</h2>
+          <p className="mt-2 text-sm text-zinc-600">
+            Revisa selfie, fotos de perfumes y marcas declaradas antes de aprobar.
+          </p>
+        </div>
+        <StatusBadge status={detail.review?.status === "APPROVED" ? "ready" : detail.review?.status === "REJECTED" ? "blocked" : "planned"}>
+          {reviewStatusLabel(detail.review?.status)}
+        </StatusBadge>
+      </div>
+
+      {message ? (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {message}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+          {error}
+        </p>
+      ) : null}
+
+      <dl className="mt-5 grid gap-4 text-sm md:grid-cols-3">
+        <SummaryItem label="Celular" value={detail.participant.phone ?? "Sin celular"} />
+        <SummaryItem label="Correo" value={detail.participant.email ?? "Sin correo"} />
+        <SummaryItem label="Intento" value={detail.attemptId} mono />
+      </dl>
+
+      <div className="mt-5 rounded-md border border-zinc-200 bg-zinc-50 p-4">
+        <h3 className="text-sm font-semibold text-zinc-800">Marcas declaradas en F6</h3>
+        <p className="mt-2 text-sm leading-6 text-zinc-700">{detail.f6DeclaredBrands}</p>
+      </div>
+
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        {detail.evidence.map((item) => (
+          <article className="rounded-md border border-zinc-200 p-4" key={item.id}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-zinc-950">{item.type === "SELFIE_IDENTIFICATION" ? "Selfie" : "Foto de perfume"}</h3>
+                <p className="mt-1 text-xs text-zinc-500">{item.filename}</p>
+              </div>
+              <StatusBadge status={item.reviewStatus === "APPROVED" ? "ready" : item.reviewStatus === "REJECTED" ? "blocked" : "planned"}>
+                {reviewStatusLabel(item.reviewStatus)}
+              </StatusBadge>
+            </div>
+            {item.signedUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                alt={item.type === "SELFIE_IDENTIFICATION" ? "Selfie de identificación" : "Foto de perfume"}
+                className="mt-3 h-56 w-full rounded-md border border-zinc-200 object-cover"
+                src={item.signedUrl}
+              />
+            ) : (
+              <p className="mt-3 text-sm text-zinc-600">No fue posible generar vista temporal.</p>
+            )}
+            <p className="mt-2 text-xs text-zinc-500">
+              {item.mimeType} · {Math.round(item.sizeBytes / 1024)} KB
+            </p>
+          </article>
+        ))}
+      </div>
+
+      {detail.review?.status === "PENDING" ? (
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <form action={approveParticipantEvidenceAction.bind(null, detail.attemptId)} className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
+            <h3 className="font-semibold text-emerald-950">Aprobar evidencia</h3>
+            <p className="mt-2 text-sm leading-6 text-emerald-900">
+              Al aprobar se generará folio y exactamente tres códigos únicos.
+            </p>
+            <button className={`${primaryButtonClass} mt-4`} type="submit">
+              Aprobar evidencia
+            </button>
+          </form>
+          <form action={rejectParticipantEvidenceAction.bind(null, detail.attemptId)} className="rounded-md border border-rose-200 bg-rose-50 p-4">
+            <h3 className="font-semibold text-rose-950">Rechazar evidencia</h3>
+            <label className={labelClass}>
+              Motivo interno obligatorio
+              <textarea className={inputClass} name="rejectionReason" required rows={3} />
+            </label>
+            <label className={labelClass}>
+              Nota interna opcional
+              <textarea className={inputClass} name="internalNote" rows={2} />
+            </label>
+            <button className={`${secondaryButtonClass} mt-4`} type="submit">
+              Rechazar evidencia
+            </button>
+          </form>
+        </div>
+      ) : null}
+
+      {detail.confirmation ? (
+        <div className="mt-5">
+          <WhatsAppManualBlock
+            attemptId={detail.attemptId}
+            manualMessageStatus={detail.confirmation.manualMessageStatus}
+            message={detail.confirmation.whatsappMessage}
+            whatsappUrl={detail.confirmation.whatsappUrl}
+          />
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function reviewStatusLabel(status: string | undefined): string {
+  switch (status) {
+    case "APPROVED":
+      return "Aprobado";
+    case "REJECTED":
+      return "Rechazado";
+    case "PENDING":
+      return "Pendiente";
+    default:
+      return "Sin revisión";
+  }
 }
 
 const labelClass = "flex flex-col gap-1 text-sm font-medium text-zinc-700";

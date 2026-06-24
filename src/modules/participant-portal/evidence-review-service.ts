@@ -1,0 +1,318 @@
+import { randomInt } from "node:crypto";
+import { hasCapability, type InternalUserRole, type InternalUserStatus } from "@/shared/auth/permissions";
+import {
+  F6_PERFUME_EVIDENCE_QUESTION_ID,
+  type EvidenceStorageClient
+} from "./evidence-storage";
+import type {
+  EvidenceReviewAttemptRecord,
+  EvidenceReviewRepository
+} from "./evidence-review-repository";
+import { buildManualWhatsAppMessage } from "./review";
+
+export type EvidenceReviewActor = {
+  id: string;
+  role: InternalUserRole;
+  status: InternalUserStatus;
+};
+
+export type EvidenceReviewImage = {
+  id: string;
+  filename: string;
+  mimeType: string;
+  reviewStatus: string;
+  signedUrl: string | null;
+  sizeBytes: number;
+  type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION";
+};
+
+export type ParticipantEvidenceReviewDetail = {
+  attemptId: string;
+  confirmation: {
+    folio: string;
+    manualMessageStatus: "MARKED_SENT" | "NOT_SENT";
+    referenceCodes: Array<{ code: string; slot: number }>;
+    whatsappMessage: string;
+    whatsappUrl: string | null;
+  } | null;
+  evidence: EvidenceReviewImage[];
+  f6DeclaredBrands: string;
+  participant: {
+    email: string | null;
+    id: string;
+    name: string;
+    phone: string | null;
+  };
+  review: {
+    internalNote: string | null;
+    rejectionReason: string | null;
+    status: "APPROVED" | "PENDING" | "REJECTED";
+  } | null;
+  study: {
+    code: string;
+    id: string;
+    name: string;
+  };
+};
+
+export type EvidenceReviewResult<T> =
+  | {
+      data: T;
+      ok: true;
+    }
+  | {
+      message: string;
+      ok: false;
+    };
+
+export function canReviewParticipantEvidence(actor: EvidenceReviewActor | null): actor is EvidenceReviewActor {
+  return Boolean(actor && actor.status === "ACTIVE" && hasCapability(actor.role, "screening:review"));
+}
+
+export async function getParticipantEvidenceReviewDetail({
+  actor,
+  attemptId,
+  repository,
+  storage
+}: {
+  actor: EvidenceReviewActor | null;
+  attemptId: string;
+  repository: EvidenceReviewRepository;
+  storage: EvidenceStorageClient;
+}): Promise<EvidenceReviewResult<ParticipantEvidenceReviewDetail>> {
+  if (!canReviewParticipantEvidence(actor)) {
+    return {
+      message: "No tienes permiso para revisar evidencias.",
+      ok: false
+    };
+  }
+
+  const attempt = await repository.getAttemptReview(attemptId);
+
+  if (!attempt) {
+    return {
+      message: "El intento no existe.",
+      ok: false
+    };
+  }
+
+  return {
+    data: await toReviewDetail(attempt, storage),
+    ok: true
+  };
+}
+
+export async function approveParticipantEvidenceReview({
+  actor,
+  attemptId,
+  repository
+}: {
+  actor: EvidenceReviewActor | null;
+  attemptId: string;
+  repository: EvidenceReviewRepository;
+}): Promise<EvidenceReviewResult<{ created: boolean }>> {
+  if (!canReviewParticipantEvidence(actor)) {
+    return {
+      message: "No tienes permiso para aprobar evidencias.",
+      ok: false
+    };
+  }
+
+  const result = await repository.approveEvidence({
+    approvedByUserId: actor.id,
+    attemptId,
+    codeGenerator: generateReferenceCode
+  });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  return {
+    data: {
+      created: result.created
+    },
+    ok: true
+  };
+}
+
+export async function rejectParticipantEvidenceReview({
+  actor,
+  attemptId,
+  internalNote,
+  rejectionReason,
+  repository
+}: {
+  actor: EvidenceReviewActor | null;
+  attemptId: string;
+  internalNote?: string | null;
+  rejectionReason: string;
+  repository: EvidenceReviewRepository;
+}): Promise<EvidenceReviewResult<null>> {
+  if (!canReviewParticipantEvidence(actor)) {
+    return {
+      message: "No tienes permiso para rechazar evidencias.",
+      ok: false
+    };
+  }
+
+  if (!rejectionReason.trim()) {
+    return {
+      message: "Captura el motivo interno de rechazo.",
+      ok: false
+    };
+  }
+
+  await repository.rejectEvidence({
+    attemptId,
+    internalNote,
+    rejectionReason: rejectionReason.trim(),
+    reviewedByUserId: actor.id
+  });
+
+  return {
+    data: null,
+    ok: true
+  };
+}
+
+export async function markParticipantManualMessageSent({
+  actor,
+  attemptId,
+  repository
+}: {
+  actor: EvidenceReviewActor | null;
+  attemptId: string;
+  repository: EvidenceReviewRepository;
+}): Promise<EvidenceReviewResult<null>> {
+  if (!canReviewParticipantEvidence(actor)) {
+    return {
+      message: "No tienes permiso para marcar el mensaje como enviado.",
+      ok: false
+    };
+  }
+
+  await repository.markManualMessageSent({
+    attemptId,
+    markedByUserId: actor.id
+  });
+
+  return {
+    data: null,
+    ok: true
+  };
+}
+
+async function toReviewDetail(
+  attempt: EvidenceReviewAttemptRecord,
+  storage: EvidenceStorageClient
+): Promise<ParticipantEvidenceReviewDetail> {
+  const participant = attempt.studyParticipant.participantProfile;
+  const study = attempt.questionnaireVersion.study;
+  const confirmation = attempt.participantConfirmation
+    ? {
+        folio: attempt.participantConfirmation.folio,
+        manualMessageStatus: attempt.participantConfirmation.manualMessageStatus,
+        referenceCodes: attempt.participantConfirmation.referenceCodes,
+        whatsappMessage: buildManualWhatsAppMessage({
+          codes: attempt.participantConfirmation.referenceCodes,
+          folio: attempt.participantConfirmation.folio,
+          participantName: participant.name,
+          studyName: study.name
+        }),
+        whatsappUrl: buildWhatsAppUrl({
+          message: buildManualWhatsAppMessage({
+            codes: attempt.participantConfirmation.referenceCodes,
+            folio: attempt.participantConfirmation.folio,
+            participantName: participant.name,
+            studyName: study.name
+          }),
+          phone: participant.phone
+        })
+      }
+    : null;
+
+  return {
+    attemptId: attempt.id,
+    confirmation,
+    evidence: await Promise.all(
+      attempt.participantEvidence.map(async (item) => ({
+        filename: item.originalFilename ?? "Evidencia",
+        id: item.id,
+        mimeType: item.mimeType,
+        reviewStatus: item.reviewStatus,
+        signedUrl: await storage.createSignedReadUrl({
+          bucket: item.storageBucket,
+          expiresInSeconds: 300,
+          privateStorageKey: item.privateStorageKey
+        }),
+        sizeBytes: item.sizeBytes,
+        type: item.type
+      }))
+    ),
+    f6DeclaredBrands: formatF6Answer(attempt.answers.find((answer) => answer.questionId === F6_PERFUME_EVIDENCE_QUESTION_ID)?.answerJson),
+    participant: {
+      email: participant.email,
+      id: participant.id,
+      name: participant.name,
+      phone: participant.phone
+    },
+    review: attempt.participantScreeningReview,
+    study: {
+      code: study.code,
+      id: study.id,
+      name: study.name
+    }
+  };
+}
+
+export function buildWhatsAppUrl({
+  message,
+  phone
+}: {
+  message: string;
+  phone: string | null;
+}): string | null {
+  if (!phone) {
+    return null;
+  }
+
+  const digits = phone.replace(/\D/g, "");
+
+  if (!digits) {
+    return null;
+  }
+
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+}
+
+export function generateReferenceCode(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+
+  for (let index = 0; index < 8; index += 1) {
+    code += alphabet[randomInt(0, alphabet.length)];
+  }
+
+  return code;
+}
+
+function formatF6Answer(answer: unknown): string {
+  if (typeof answer === "string") {
+    return answer;
+  }
+
+  if (Array.isArray(answer)) {
+    return answer.map(String).join(", ");
+  }
+
+  if (answer && typeof answer === "object") {
+    const value = answer as { otherText?: unknown; value?: unknown; values?: unknown };
+    const values = Array.isArray(value.values) ? value.values.map(String).join(", ") : String(value.value ?? "");
+    const otherText = typeof value.otherText === "string" ? value.otherText : "";
+
+    return [values, otherText].filter(Boolean).join(". ");
+  }
+
+  return "Sin respuesta registrada.";
+}
