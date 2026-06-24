@@ -12,7 +12,6 @@ import type {
   PortalStudyParticipantRecord
 } from "./screener-repository";
 import {
-  PARTICIPANT_PORTAL_PUBLIC_PENDING_REVIEW_MESSAGE,
   PARTICIPANT_PORTAL_PUBLIC_TERMINATED_MESSAGE,
   getParticipantPortalPublicResult,
   getParticipantPortalScreenerScreen,
@@ -186,7 +185,7 @@ function activeStudy(overrides: Partial<PortalScreenerStudyRecord> = {}): Portal
 
 function createMemoryRepository({
   consents,
-  initialEvidence = [portalEvidence("SELFIE_IDENTIFICATION"), portalEvidence("PERFUME_PHOTO")],
+  initialEvidence = [portalEvidence("PERFUME_PHOTO")],
   participants,
   profile,
   study
@@ -340,7 +339,7 @@ function studyParticipant(): PortalStudyParticipantRecord {
 }
 
 function buildAttempt({
-  evidence = [portalEvidence("SELFIE_IDENTIFICATION"), portalEvidence("PERFUME_PHOTO")],
+  evidence = [portalEvidence("PERFUME_PHOTO")],
   id,
   participant,
   source,
@@ -625,7 +624,7 @@ describe("participant portal screener service", () => {
     expect(result.ok ? result.data.message : "").not.toContain("Frecuencia insuficiente");
   });
 
-  it("creates PENDING_REVIEW for preliminary eligible results", async () => {
+  it("keeps a preliminary eligible result in PASSED until the final selfie is completed", async () => {
     const { attempts, repository, reviews } = createMemoryRepository();
     const attemptId = await start(repository);
 
@@ -634,16 +633,12 @@ describe("participant portal screener service", () => {
     expect(attempts[0]).toMatchObject({
       nseClass: "C",
       nseScore: 150,
-      status: "PENDING_REVIEW",
+      status: "PASSED",
+      participantScreeningReview: null,
       terminationCode: null,
       terminationReason: null
     });
-    expect(reviews).toEqual([
-      {
-        screeningAttemptId: attemptId,
-        studyParticipantId: "study-participant-1"
-      }
-    ]);
+    expect(reviews).toEqual([]);
 
     const result = await getParticipantPortalPublicResult({
       identity,
@@ -651,7 +646,8 @@ describe("participant portal screener service", () => {
       studyCode: "FMASCULINA-NAVIGO-2026"
     });
 
-    expect(result.ok ? result.data.message : "").toBe(PARTICIPANT_PORTAL_PUBLIC_PENDING_REVIEW_MESSAGE);
+    expect(result.ok ? result.data.kind : "").toBe("PENDING_EVIDENCE");
+    expect(result.ok ? result.data.message : "").toContain("Falta tu selfie");
   });
 
   it("does not use QuestionnaireDraft to discover the active public screener", async () => {

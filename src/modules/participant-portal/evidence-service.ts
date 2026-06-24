@@ -1,5 +1,4 @@
 import { PARTICIPANT_PORTAL_UNAVAILABLE_MESSAGE } from "./access";
-import { PARTICIPANT_PORTAL_DUPLICATE_REGISTRATION_MESSAGE } from "./registration-service";
 import {
   PARTICIPANT_PORTAL_PUBLIC_REJECTED_MESSAGE,
   PARTICIPANT_PORTAL_PUBLIC_TERMINATED_MESSAGE,
@@ -30,7 +29,7 @@ import type { ParticipantPortalIdentity } from "@/shared/auth/participant-portal
 export const PARTICIPANT_PORTAL_EVIDENCE_REVIEW_MESSAGE =
   "Gracias. Tus respuestas y evidencias están en revisión. Recibirás seguimiento de tu reclutador.";
 export const PARTICIPANT_PORTAL_EVIDENCE_REQUIRED_MESSAGE =
-  "Completa tus evidencias para continuar con la revisión.";
+  "Toma tu selfie final para enviar tu participación a revisión.";
 
 export type ParticipantEvidenceCounts = {
   perfumePhotos: number;
@@ -159,10 +158,7 @@ export async function getParticipantPortalSelfieScreen({
   }
 
   const attemptResult = await ensurePortalAttemptForEvidence({
-    attempts: base.data.attempts,
-    repository,
-    study: base.data.study,
-    studyParticipant: base.data.studyParticipant
+    attempts: base.data.attempts
   });
 
   if (!attemptResult.ok) {
@@ -433,7 +429,9 @@ async function loadEvidenceContext({
   }
 
   const attempt = context.data.attempts.find(
-    (candidate) => candidate.source === "PARTICIPANT_PORTAL" && candidate.status === "PENDING_REVIEW"
+    (candidate) =>
+      candidate.source === "PARTICIPANT_PORTAL" &&
+      (candidate.status === "PENDING_REVIEW" || candidate.status === "PASSED")
   );
 
   if (!attempt) {
@@ -485,10 +483,7 @@ async function loadCurrentEvidenceContext({
   }
 
   const created = await ensurePortalAttemptForEvidence({
-    attempts: context.data.attempts,
-    repository,
-    study: context.data.study,
-    studyParticipant: context.data.studyParticipant
+    attempts: context.data.attempts
   });
 
   if (!created.ok) {
@@ -620,17 +615,15 @@ async function loadBaseContext({
 }
 
 async function ensurePortalAttemptForEvidence({
-  attempts,
-  repository,
-  study,
-  studyParticipant
+  attempts
 }: {
   attempts: PortalEvidenceAttemptRecord[];
-  repository: ParticipantPortalEvidenceRepository;
-  study: PortalEvidenceStudyRecord & { portalConfig: PortalEvidenceConfigRecord };
-  studyParticipant: PortalEvidenceStudyParticipantRecord;
 }): Promise<ParticipantPortalEvidenceResult<PortalEvidenceAttemptRecord>> {
-  const current = selectCurrentEvidenceAttempt(attempts);
+  const current = attempts.find(
+    (attempt) =>
+      attempt.source === "PARTICIPANT_PORTAL" &&
+      (attempt.status === "PASSED" || attempt.status === "PENDING_REVIEW")
+  );
 
   if (current) {
     return {
@@ -639,34 +632,18 @@ async function ensurePortalAttemptForEvidence({
     };
   }
 
-  if (!study.activeScreenerVersionId) {
-    return {
-      code: "ATTEMPT_NOT_READY",
-      message: "El filtro aun no esta listo para capturar evidencias.",
-      ok: false
-    };
-  }
-
   if (attempts.length > 0) {
     return {
       code: "ATTEMPT_NOT_READY",
-      message: PARTICIPANT_PORTAL_DUPLICATE_REGISTRATION_MESSAGE,
+      message: "Completa y aprueba preliminarmente el filtro antes de capturar tu selfie.",
       ok: false
     };
   }
 
-  await repository.updateStudyParticipantScreening({
-    operationalStatus: "SCREENING_STARTED",
-    screeningStatus: "STARTED",
-    studyParticipantId: studyParticipant.id
-  });
-
   return {
-    data: await repository.createPortalScreeningAttempt({
-      questionnaireVersionId: study.activeScreenerVersionId,
-      studyParticipantId: studyParticipant.id
-    }),
-    ok: true
+    code: "ATTEMPT_NOT_READY",
+    message: "Completa el filtro antes de capturar tu selfie.",
+    ok: false
   };
 }
 

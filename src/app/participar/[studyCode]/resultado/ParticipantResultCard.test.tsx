@@ -36,12 +36,12 @@ describe("ParticipantResultCard", () => {
     expect(screen.queryByText(/answerJson|rejectionReason|NO_USUARIO_NAVIGO/)).not.toBeInTheDocument();
   });
 
-  it("shows evidence link when evidence is pending", () => {
+  it("shows selfie link when preliminary eligible evidence is still pending", () => {
     render(
       <ParticipantResultCard
         result={{
           kind: "PENDING_EVIDENCE",
-          message: "Completa tus evidencias para continuar con la revisión.",
+          message: "Toma tu selfie final para enviar tu participación a revisión.",
           showEvidenceLink: true,
           study: {
             code: "FMASCULINA-NAVIGO-2026",
@@ -52,9 +52,9 @@ describe("ParticipantResultCard", () => {
       />
     );
 
-    expect(screen.getByRole("link", { name: "Continuar con evidencias" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Continuar con selfie" })).toHaveAttribute(
       "href",
-      "/participar/FMASCULINA-NAVIGO-2026/evidencias"
+      "/participar/FMASCULINA-NAVIGO-2026/selfie"
     );
   });
 });

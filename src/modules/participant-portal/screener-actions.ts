@@ -56,9 +56,14 @@ export async function saveParticipantPortalScreenerAnswerAction(
 
   revalidatePath(`/participar/${studyCode}/filtro`);
   revalidatePath(`/participar/${studyCode}/resultado`);
+  revalidatePath(`/participar/${studyCode}/selfie`);
 
   if (result.data.closed) {
-    redirect(`/participar/${encodeURIComponent(studyCode)}/resultado`);
+    redirect(
+      result.data.status === "PASSED"
+        ? `/participar/${encodeURIComponent(studyCode)}/selfie`
+        : `/participar/${encodeURIComponent(studyCode)}/resultado`
+    );
   }
 
   redirect(portalFilterPath(studyCode, result.data.nextQuestionId));

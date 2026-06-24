@@ -209,13 +209,13 @@ describe("ParticipantScreenerForm", () => {
     expect(screen.queryByText(/Producto Secreto/i)).not.toBeInTheDocument();
   });
 
-  it("shows evidence link only for pending review", () => {
+  it("shows continue with selfie for preliminary eligible result", () => {
     render(
       <ParticipantPortalResultCard
         result={{
           attemptId: "attempt-1",
-          kind: "PENDING_REVIEW",
-          message: PARTICIPANT_PORTAL_PUBLIC_PENDING_REVIEW_MESSAGE,
+          kind: "PENDING_EVIDENCE",
+          message: "Tu filtro fue registrado de forma preliminar. Falta tu selfie para enviar tu participación a revisión.",
           showEvidencePlaceholder: true,
           study: {
             code: "FMASCULINA-NAVIGO-2026",
@@ -226,7 +226,31 @@ describe("ParticipantScreenerForm", () => {
       />
     );
 
+    expect(screen.getByText(/Falta tu selfie/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Continuar con selfie" })).toHaveAttribute(
+      "href",
+      "/participar/FMASCULINA-NAVIGO-2026/selfie"
+    );
+  });
+
+  it("keeps the review message only after evidence is complete", () => {
+    render(
+      <ParticipantPortalResultCard
+        result={{
+          attemptId: "attempt-1",
+          kind: "PENDING_REVIEW",
+          message: PARTICIPANT_PORTAL_PUBLIC_PENDING_REVIEW_MESSAGE,
+          showEvidencePlaceholder: false,
+          study: {
+            code: "FMASCULINA-NAVIGO-2026",
+            id: "study-1",
+            name: "Fragancia Masculina"
+          }
+        }}
+      />
+    );
+
     expect(screen.getByText(PARTICIPANT_PORTAL_PUBLIC_PENDING_REVIEW_MESSAGE)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Revisar evidencias" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Continuar con selfie" })).not.toBeInTheDocument();
   });
 });

@@ -51,11 +51,9 @@ export default async function ParticipantPortalFilterPage({
     return (
       <PortalMessage
         action={
-          result.code === "REGISTRATION_REQUIRED" ||
-          result.code === "CONSENT_REQUIRED" ||
-          result.code === "SELFIE_REQUIRED" ? (
+          result.code === "REGISTRATION_REQUIRED" || result.code === "CONSENT_REQUIRED" ? (
             <a className={primaryButtonClass} href={`/participar/${studyCode}/inicio`}>
-              {result.code === "SELFIE_REQUIRED" ? "Capturar selfie" : "Completar registro"}
+              Completar registro
             </a>
           ) : null
         }

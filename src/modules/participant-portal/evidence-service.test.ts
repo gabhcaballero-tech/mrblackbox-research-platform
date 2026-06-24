@@ -152,7 +152,7 @@ function perfumePhotoInput(index: string) {
 }
 
 describe("participant portal evidence service", () => {
-  it("creates an early portal attempt so the selfie can be captured before the filter", async () => {
+  it("does not create an early portal attempt before the filter passes preliminarily", async () => {
     const { repository } = createRepository(null);
     const result = await getParticipantPortalSelfieScreen({
       identity,
@@ -160,8 +160,11 @@ describe("participant portal evidence service", () => {
       studyCode: "FMASCULINA-NAVIGO-2026"
     });
 
-    expect(result.ok).toBe(true);
-    expect(repository.createPortalScreeningAttempt).toHaveBeenCalled();
+    expect(result).toMatchObject({
+      code: "ATTEMPT_NOT_READY",
+      ok: false
+    });
+    expect(repository.createPortalScreeningAttempt).not.toHaveBeenCalled();
   });
 
   it("returns a clear message when storage is not configured", async () => {
@@ -447,6 +450,26 @@ describe("participant portal evidence service", () => {
     expect(pendingReviews).toEqual([{ screeningAttemptId: "attempt-1", studyParticipantId: "study-participant-1" }]);
     expect(result.ok ? result.data.message : "").toBe(PARTICIPANT_PORTAL_EVIDENCE_REVIEW_MESSAGE);
     expect(result.ok ? result.data.showEvidenceLink : true).toBe(false);
+  });
+
+  it("returns a continue-with-selfie result when the participant passed preliminarily without selfie", async () => {
+    const { repository } = createRepository(
+      attempt({
+        participantEvidence: [evidence({ type: "PERFUME_PHOTO" })],
+        participantScreeningReview: null,
+        status: "PASSED"
+      })
+    );
+
+    const result = await getParticipantPortalEvidenceResult({
+      identity,
+      repository,
+      studyCode: "FMASCULINA-NAVIGO-2026"
+    });
+
+    expect(result.ok ? result.data.kind : null).toBe("PENDING_EVIDENCE");
+    expect(result.ok ? result.data.message : "").toBe("Toma tu selfie final para enviar tu participación a revisión.");
+    expect(result.ok ? result.data.showEvidenceLink : false).toBe(true);
   });
 
   it("lets /evidencias act as recovery without forcing a repeated final upload step", async () => {

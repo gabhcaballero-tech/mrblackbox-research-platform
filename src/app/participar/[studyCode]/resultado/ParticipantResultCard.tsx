@@ -66,8 +66,8 @@ export function ParticipantResultCard({ result }: { result: ParticipantPortalEvi
       ) : null}
 
       {result.showEvidenceLink ? (
-        <Link className={`${primaryButtonClass} mt-6`} href={`/participar/${result.study.code}/evidencias`}>
-          Continuar con evidencias
+        <Link className={`${primaryButtonClass} mt-6`} href={`/participar/${result.study.code}/selfie`}>
+          Continuar con selfie
         </Link>
       ) : null}
 

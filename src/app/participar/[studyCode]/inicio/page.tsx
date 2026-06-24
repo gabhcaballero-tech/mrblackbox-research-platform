@@ -5,14 +5,16 @@ import {
   PARTICIPANT_PORTAL_UNAVAILABLE_MESSAGE
 } from "@/modules/participant-portal/access";
 import { allowsDirectParticipantAccess } from "@/modules/participant-portal/access-mode";
-import { createParticipantPortalEvidenceRepository } from "@/modules/participant-portal/evidence-repository";
-import { getParticipantPortalSelfieScreen } from "@/modules/participant-portal/evidence-service";
 import { createParticipantPortalRepository } from "@/modules/participant-portal/repository";
 import { PARTICIPANT_PORTAL_REGISTRATION_SUCCESS_MESSAGE } from "@/modules/participant-portal/registration-service";
+import {
+  getParticipantPortalPublicResult,
+  PARTICIPANT_PORTAL_REGISTRATION_REQUIRED_MESSAGE
+} from "@/modules/participant-portal/screener-service";
+import { createParticipantPortalScreenerRepository } from "@/modules/participant-portal/screener-repository";
 import { participantPortalStudyCodeSchema } from "@/modules/participant-portal/validation";
 import { getParticipantPortalAuth } from "@/shared/auth/participant-portal";
 import { ParticipantRegistrationForm } from "./ParticipantRegistrationForm";
-import { ParticipantSelfieStep } from "./ParticipantSelfieStep";
 
 type ParticipantPortalHomePageProps = {
   params: Promise<{ studyCode: string }>;
@@ -77,50 +79,54 @@ export default async function ParticipantPortalHomePage({
 
   const search = (await searchParams) ?? {};
   const registered = firstParam(search.registered) === "1";
-  const selfie = await getParticipantPortalSelfieScreen({
+  const portalResult = await getParticipantPortalPublicResult({
     identity: auth.identity,
-    repository: createParticipantPortalEvidenceRepository(),
+    repository: createParticipantPortalScreenerRepository(),
     studyCode
   });
 
-  if (selfie.ok) {
-    const showContinue = selfie.data.selfieComplete;
-
+  if (portalResult.ok) {
     return (
       <main className="min-h-screen bg-zinc-50 px-4 py-6 sm:py-10">
         <section className="mx-auto w-full max-w-2xl rounded-lg border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
-          <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Portal de participacion</p>
+          <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Portal de participación</p>
           <h1 className="mt-2 text-2xl font-semibold text-zinc-950">
-            {showContinue
-              ? "Registro completo"
-              : registered
-                ? PARTICIPANT_PORTAL_REGISTRATION_SUCCESS_MESSAGE
-                : "Verifica tu selfie"}
+            {registered ? PARTICIPANT_PORTAL_REGISTRATION_SUCCESS_MESSAGE : "Registro listo"}
           </h1>
           <p className="mt-2 text-sm leading-6 text-zinc-600">
-            {showContinue
-              ? "Tu registro ya fue validado. Si tu selfie ya aparece registrada, puedes continuar al filtro."
-              : "Toma una selfie clara de identificacion. Se usara unicamente para validar que la misma persona continue durante el estudio."}
+            {portalResult.data.kind === "IN_PROGRESS"
+              ? "Tu registro quedó listo. Continúa al filtro para responder el cuestionario."
+              : "Ya existe un avance para este estudio. Puedes continuar desde tu estado actual."}
           </p>
-          <div className="mt-6">
-            <ParticipantSelfieStep screen={selfie.data} showRegistrationSuccess={registered} />
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            {portalResult.data.kind === "IN_PROGRESS" ? (
+              <Link className={primaryButtonClass} href={`/participar/${studyCode}/filtro`}>
+                Continuar al filtro
+              </Link>
+            ) : (
+              <Link className={primaryButtonClass} href={`/participar/${studyCode}/resultado`}>
+                Ver estado de participación
+              </Link>
+            )}
           </div>
         </section>
       </main>
     );
   }
 
-  if (selfie.code !== "REGISTRATION_REQUIRED" && selfie.code !== "CONSENT_REQUIRED") {
+  if (
+    portalResult.code !== "REGISTRATION_REQUIRED" &&
+    portalResult.code !== "CONSENT_REQUIRED" &&
+    portalResult.message !== PARTICIPANT_PORTAL_REGISTRATION_REQUIRED_MESSAGE
+  ) {
     return (
       <PortalMessage
         action={
-          selfie.code === "ATTEMPT_NOT_READY" ? (
-            <Link className={primaryButtonClass} href={`/participar/${studyCode}/resultado`}>
-              Ver resultado
-            </Link>
-          ) : undefined
+          <Link className={primaryButtonClass} href={`/participar/${studyCode}/resultado`}>
+            Ver estado de participación
+          </Link>
         }
-        title={selfie.message}
+        title={portalResult.message}
       />
     );
   }
@@ -131,7 +137,7 @@ export default async function ParticipantPortalHomePage({
         <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Portal de participación</p>
         <h1 className="mt-2 text-2xl font-semibold text-zinc-950">Completa tu registro</h1>
         <p className="mt-2 text-sm leading-6 text-zinc-600">
-          Captura tus datos de contacto, acepta el aviso y luego toma tu selfie para continuar.
+          Captura tus datos de contacto y acepta el aviso para continuar al filtro.
         </p>
         <div className="mt-6">
           <ParticipantRegistrationForm

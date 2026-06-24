@@ -117,8 +117,8 @@ export function ParticipantPortalResultCard({ result }: { result: ParticipantPor
       ) : null}
 
       {result.showEvidencePlaceholder ? (
-        <Link className={`${primaryButtonClass} mt-6`} href={`/participar/${result.study.code}/evidencias`}>
-          Revisar evidencias
+        <Link className={`${primaryButtonClass} mt-6`} href={`/participar/${result.study.code}/selfie`}>
+          Continuar con selfie
         </Link>
       ) : null}
     </section>

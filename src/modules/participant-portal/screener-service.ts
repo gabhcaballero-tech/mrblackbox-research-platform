@@ -32,6 +32,8 @@ export const PARTICIPANT_PORTAL_PUBLIC_TERMINATED_MESSAGE =
   "Gracias por participar. En este momento no es posible continuar con el estudio. Por favor, comunícate con tu reclutador.";
 export const PARTICIPANT_PORTAL_PUBLIC_PENDING_REVIEW_MESSAGE =
   "Gracias. Tus respuestas están registradas. En el siguiente paso se revisará tu evidencia para confirmar tu participación.";
+export const PARTICIPANT_PORTAL_PUBLIC_SELFIE_REQUIRED_MESSAGE =
+  "Tu filtro fue registrado de forma preliminar. Falta tu selfie para enviar tu participación a revisión.";
 export const PARTICIPANT_PORTAL_PUBLIC_APPROVED_PLACEHOLDER_MESSAGE =
   "Tu participación fue aprobada. En una etapa posterior se mostrarán tus folios y códigos.";
 export const PARTICIPANT_PORTAL_PUBLIC_REJECTED_MESSAGE =
@@ -83,6 +85,7 @@ export type ParticipantPortalPublicResultKind =
   | "APPROVED_PLACEHOLDER"
   | "BLOCKED_CLOSED_ATTEMPT"
   | "IN_PROGRESS"
+  | "PENDING_EVIDENCE"
   | "PENDING_REVIEW"
   | "REJECTED"
   | "TERMINATED";
@@ -108,7 +111,6 @@ export type ParticipantPortalScreenerErrorCode =
   | "QUESTION_HIDDEN"
   | "QUESTION_NOT_FOUND"
   | "REGISTRATION_REQUIRED"
-  | "SELFIE_REQUIRED"
   | "UNAUTHORIZED"
   | "VALIDATION_ERROR";
 
@@ -160,14 +162,6 @@ export async function getParticipantPortalScreenerScreen({
 
   if (!attemptResult.ok) {
     return attemptResult;
-  }
-
-  if (!hasExactlyOneSelfie(attemptResult.data)) {
-    return {
-      code: "SELFIE_REQUIRED",
-      message: "Debes capturar una selfie antes de continuar con el filtro.",
-      ok: false
-    };
   }
 
   const answers = recordsToAnswers(await repository.listAnswers(attemptResult.data.id));
@@ -325,12 +319,8 @@ export async function saveParticipantPortalScreenerAnswer({
   if (evaluation.status === "PASSED" || evaluation.status === "PENDING_REVIEW") {
     await closePortalAttempt({
       attempt,
-      evaluation: evaluation.status === "PASSED" ? toPendingReviewEvaluation(evaluation) : evaluation,
+      evaluation: toPreliminaryPassedEvaluation(evaluation),
       repository
-    });
-    await repository.upsertPendingScreeningReview({
-      screeningAttemptId: attempt.id,
-      studyParticipantId: attempt.studyParticipantId
     });
 
     return {
@@ -338,7 +328,7 @@ export async function saveParticipantPortalScreenerAnswer({
         attemptId,
         closed: true,
         nextQuestionId: null,
-        status: "PENDING_REVIEW"
+        status: "PASSED"
       },
       ok: true
     };
@@ -426,12 +416,25 @@ export async function getParticipantPortalPublicResult({
     };
   }
 
-  if (latest.status === "PENDING_REVIEW" || latest.status === "PASSED") {
+  if (latest.status === "PENDING_REVIEW") {
     return {
       data: {
         attemptId: latest.id,
         kind: "PENDING_REVIEW",
         message: PARTICIPANT_PORTAL_PUBLIC_PENDING_REVIEW_MESSAGE,
+        showEvidencePlaceholder: true,
+        study: publicStudy(context.data.study)
+      },
+      ok: true
+    };
+  }
+
+  if (latest.status === "PASSED") {
+    return {
+      data: {
+        attemptId: latest.id,
+        kind: "PENDING_EVIDENCE",
+        message: PARTICIPANT_PORTAL_PUBLIC_SELFIE_REQUIRED_MESSAGE,
         showEvidencePlaceholder: true,
         study: publicStudy(context.data.study)
       },
@@ -789,18 +792,17 @@ function buildImmediateTerminationEvaluation(
   };
 }
 
-function toPendingReviewEvaluation(evaluation: ScreenerEvaluationResult): ScreenerEvaluationResult {
+function toPreliminaryPassedEvaluation(evaluation: ScreenerEvaluationResult): ScreenerEvaluationResult {
   return {
     ...evaluation,
     evaluationJson: {
       ...evaluation.evaluationJson,
-      reasons: [],
-      result: "PENDING_REVIEW",
-      safeExplanation: "El filtro requiere revisión de evidencia.",
-      status: "PENDING_REVIEW"
+      result: "ELIGIBLE",
+      safeExplanation: "El filtro fue aprobado preliminarmente y falta la selfie final.",
+      status: "PASSED"
     },
-    result: "PENDING_REVIEW",
-    status: "PENDING_REVIEW",
+    result: "ELIGIBLE",
+    status: "PASSED",
     termination: undefined
   };
 }

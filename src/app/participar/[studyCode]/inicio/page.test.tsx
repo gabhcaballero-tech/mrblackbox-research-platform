@@ -32,31 +32,18 @@ vi.mock("@/modules/participant-portal/repository", () => ({
   createParticipantPortalRepository: vi.fn(() => ({}))
 }));
 
-vi.mock("@/modules/participant-portal/evidence-repository", () => ({
-  createParticipantPortalEvidenceRepository: vi.fn(() => ({}))
+vi.mock("@/modules/participant-portal/screener-repository", () => ({
+  createParticipantPortalScreenerRepository: vi.fn(() => ({}))
 }));
 
-vi.mock("@/modules/participant-portal/evidence-service", () => ({
-  getParticipantPortalSelfieScreen: vi.fn()
+vi.mock("@/modules/participant-portal/screener-service", () => ({
+  PARTICIPANT_PORTAL_REGISTRATION_REQUIRED_MESSAGE: "Completa tu registro y consentimiento para continuar.",
+  getParticipantPortalPublicResult: vi.fn()
 }));
 
 vi.mock("./ParticipantRegistrationForm", () => ({
   ParticipantRegistrationForm: ({ studyCode }: { studyCode: string }) => (
     <div data-testid="registration-form">Formulario {studyCode}</div>
-  )
-}));
-
-vi.mock("./ParticipantSelfieStep", () => ({
-  ParticipantSelfieStep: ({
-    screen,
-    showRegistrationSuccess
-  }: {
-    screen: { selfieComplete: boolean; study: { code: string } };
-    showRegistrationSuccess: boolean;
-  }) => (
-    <div data-testid="selfie-step">
-      selfie:{String(screen.selfieComplete)} success:{String(showRegistrationSuccess)} study:{screen.study.code}
-    </div>
   )
 }));
 
@@ -77,13 +64,13 @@ describe("ParticipantPortalHomePage", () => {
     expect(screen.queryByText(/código enviado/i)).not.toBeInTheDocument();
   });
 
-  it("shows the selfie step after a successful 303 redirect instead of returning to an empty form", async () => {
-    const { getParticipantPortalSelfieScreen } = await import("@/modules/participant-portal/evidence-service");
-    vi.mocked(getParticipantPortalSelfieScreen).mockResolvedValueOnce({
+  it("shows continue-to-filter after a successful 303 redirect instead of returning to an empty form", async () => {
+    const { getParticipantPortalPublicResult } = await import("@/modules/participant-portal/screener-service");
+    vi.mocked(getParticipantPortalPublicResult).mockResolvedValueOnce({
       data: {
-        attemptId: "attempt-1",
-        counts: { perfumePhotos: 0, selfie: 0 },
-        selfieComplete: false,
+        kind: "IN_PROGRESS",
+        message: "Continúa el filtro para completar tus respuestas.",
+        showEvidencePlaceholder: false,
         study: {
           code: "FMASCULINA-NAVIGO-2026",
           id: "study-1",
@@ -102,12 +89,15 @@ describe("ParticipantPortalHomePage", () => {
 
     expect(screen.queryByTestId("registration-form")).not.toBeInTheDocument();
     expect(screen.getByText(PARTICIPANT_PORTAL_REGISTRATION_SUCCESS_MESSAGE)).toBeInTheDocument();
-    expect(screen.getByTestId("selfie-step")).toHaveTextContent("selfie:false success:true");
+    expect(screen.getByRole("link", { name: "Continuar al filtro" })).toHaveAttribute(
+      "href",
+      "/participar/FMASCULINA-NAVIGO-2026/filtro"
+    );
   });
 
   it("does not use registered=1 as the source of truth when there is no real registration data", async () => {
-    const { getParticipantPortalSelfieScreen } = await import("@/modules/participant-portal/evidence-service");
-    vi.mocked(getParticipantPortalSelfieScreen).mockResolvedValueOnce({
+    const { getParticipantPortalPublicResult } = await import("@/modules/participant-portal/screener-service");
+    vi.mocked(getParticipantPortalPublicResult).mockResolvedValueOnce({
       code: "REGISTRATION_REQUIRED",
       message: "Registro requerido.",
       ok: false
@@ -121,16 +111,16 @@ describe("ParticipantPortalHomePage", () => {
     );
 
     expect(screen.getByTestId("registration-form")).toBeInTheDocument();
-    expect(screen.queryByTestId("selfie-step")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Continuar al filtro" })).not.toBeInTheDocument();
   });
 
-  it("shows the continue state when the participant already has a registered selfie", async () => {
-    const { getParticipantPortalSelfieScreen } = await import("@/modules/participant-portal/evidence-service");
-    vi.mocked(getParticipantPortalSelfieScreen).mockResolvedValueOnce({
+  it("shows the current state when the participant already has an existing result", async () => {
+    const { getParticipantPortalPublicResult } = await import("@/modules/participant-portal/screener-service");
+    vi.mocked(getParticipantPortalPublicResult).mockResolvedValueOnce({
       data: {
-        attemptId: "attempt-1",
-        counts: { perfumePhotos: 0, selfie: 1 },
-        selfieComplete: true,
+        kind: "PENDING_REVIEW",
+        message: "Gracias. Tus respuestas están registradas.",
+        showEvidencePlaceholder: true,
         study: {
           code: "FMASCULINA-NAVIGO-2026",
           id: "study-1",
@@ -147,7 +137,10 @@ describe("ParticipantPortalHomePage", () => {
       })
     );
 
-    expect(screen.getByText("Registro completo")).toBeInTheDocument();
-    expect(screen.getByTestId("selfie-step")).toHaveTextContent("selfie:true success:false");
+    expect(screen.getByText("Registro listo")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ver estado de participación" })).toHaveAttribute(
+      "href",
+      "/participar/FMASCULINA-NAVIGO-2026/resultado"
+    );
   });
 });
