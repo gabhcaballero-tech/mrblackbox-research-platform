@@ -46,6 +46,7 @@ export type EvidenceReplacementSignedUpload = {
 
 export type ParticipantEvidenceReviewDetail = {
   attemptId: string;
+  attemptStatus: EvidenceReviewAttemptRecord["status"];
   confirmation: {
     folio: string;
     manualMessageStatus: "MARKED_SENT" | "NOT_SENT";
@@ -259,9 +260,9 @@ export async function deleteParticipantEvidenceTestRecord({
     };
   }
 
-  if (confirmationText.trim() !== "ELIMINAR") {
+  if (confirmationText.trim() !== "ELIMINAR PRUEBA") {
     return {
-      message: "Escribe ELIMINAR para confirmar esta acciÃ³n.",
+      message: "Escribe ELIMINAR PRUEBA para confirmar esta acciÃ³n.",
       ok: false
     };
   }
@@ -305,7 +306,7 @@ export async function deleteParticipantEvidenceTestRecord({
       );
     } catch (error) {
       logEvidenceReviewError("delete-test-record-storage", "PERFUME_PHOTO", error);
-      storageWarning = "El registro se eliminÃ³, pero no fue posible borrar evidencias en Storage.";
+      storageWarning = "El registro se eliminÃ³, pero algunas evidencias no pudieron borrarse de Storage. RevÃ­salas manualmente.";
     }
   }
 
@@ -607,6 +608,7 @@ async function toReviewDetail(
 
   return {
     attemptId: attempt.id,
+    attemptStatus: attempt.status,
     confirmation,
     evidence: await Promise.all(
       attempt.participantEvidence.map(async (item) => ({

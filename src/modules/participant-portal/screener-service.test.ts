@@ -81,8 +81,17 @@ function screenerDefinition(): ScreenerDefinition {
           value: "MAS_DE_UNA_VEZ_DIA"
         }
       },
+      {
+        dataDestination: "SCREENING",
+        id: "F10_ULTIMA_COMPRA",
+        order: 6,
+        required: false,
+        text: "Cuando fue la ultima vez que compro perfume?",
+        type: "SHORT_TEXT",
+        validation: { maxLength: 120, minLength: 2 }
+      },
       ...["D1", "D2", "D3", "D4", "D5", "D6"].map((id, index) =>
-        choiceQuestion(id, 6 + index, `Pregunta NSE ${index + 1}`, [
+        choiceQuestion(id, 7 + index, `Pregunta NSE ${index + 1}`, [
           option("HIGH", "Alto"),
           option("LOW", "Bajo")
         ])
@@ -100,7 +109,7 @@ function screenerDefinition(): ScreenerDefinition {
             value: "OTRA"
           }
         ],
-        order: 12,
+        order: 13,
         required: false,
         text: "Otra fragancia",
         type: "SINGLE_CHOICE",
@@ -524,23 +533,25 @@ describe("participant portal screener service", () => {
     expect(screen.ok ? screen.data.currentQuestion?.id : null).toBe("F9A_VECES_AL_DIA");
   });
 
-  it("saves single choice, long text, integer and Other text", async () => {
+  it("saves single choice, short text, long text, integer and Other text with preserved spaces", async () => {
     const { answers, repository } = createMemoryRepository();
     const attemptId = await start(repository);
 
     await answer(repository, attemptId, "CONSENTIMIENTO", "SI");
     await answer(repository, attemptId, "F1_GENERO", "HOMBRE");
-    await answer(repository, attemptId, "F6_MARCAS_UTILIZA", "  respuesta larga  de prueba 😊 ");
+    await answer(repository, attemptId, "F6_MARCAS_UTILIZA", "  navigo   homme azul  ");
     await answer(repository, attemptId, "F9_FRECUENCIA_SEMANAL", "MAS_DE_UNA_VEZ_DIA");
     await answer(repository, attemptId, "F9A_VECES_AL_DIA", "4");
-    await answer(repository, attemptId, "OTRO", "OTRA", "Fragancia de ejemplo 💐");
+    await answer(repository, attemptId, "F10_ULTIMA_COMPRA", "  2   meses  ");
+    await answer(repository, attemptId, "OTRO", "OTRA", "Fragancia  de ejemplo azul 💐");
 
     const saved = answers.get(attemptId) ?? [];
     expect(saved.find((item) => item.questionId === "F1_GENERO")?.answerJson).toBe("HOMBRE");
-    expect(saved.find((item) => item.questionId === "F6_MARCAS_UTILIZA")?.answerJson).toBe("RESPUESTA LARGA DE PRUEBA");
+    expect(saved.find((item) => item.questionId === "F6_MARCAS_UTILIZA")?.answerJson).toBe("NAVIGO HOMME AZUL");
     expect(saved.find((item) => item.questionId === "F9A_VECES_AL_DIA")?.answerJson).toBe(4);
+    expect(saved.find((item) => item.questionId === "F10_ULTIMA_COMPRA")?.answerJson).toBe("2 MESES");
     expect(saved.find((item) => item.questionId === "OTRO")?.answerJson).toEqual({
-      otherText: "FRAGANCIA DE EJEMPLO",
+      otherText: "FRAGANCIA DE EJEMPLO AZUL",
       value: "OTRA"
     });
   });

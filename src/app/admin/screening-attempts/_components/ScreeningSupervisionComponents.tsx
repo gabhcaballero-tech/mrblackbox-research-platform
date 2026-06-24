@@ -477,10 +477,7 @@ export function EvidenceReviewPanel({
       ) : null}
 
       {canDeleteTestRecord ? (
-        <DeleteTestRecordForm
-          attemptId={detail.attemptId}
-          blocked={Boolean(detail.confirmation || detail.review?.status === "APPROVED")}
-        />
+        <DeleteTestRecordForm detail={detail} />
       ) : null}
     </section>
   );
@@ -564,36 +561,51 @@ function ConfirmationSummary({ detail }: { detail: ParticipantEvidenceReviewDeta
   );
 }
 
-function DeleteTestRecordForm({ attemptId, blocked }: { attemptId: string; blocked: boolean }) {
+function DeleteTestRecordForm({ detail }: { detail: ParticipantEvidenceReviewDetail }) {
+  const codes = detail.confirmation
+    ? [...detail.confirmation.referenceCodes].sort((left, right) => left.slot - right.slot)
+    : [];
+
   return (
     <form
-      action={deleteParticipantEvidenceTestRecordAction.bind(null, attemptId)}
+      action={deleteParticipantEvidenceTestRecordAction.bind(null, detail.attemptId)}
       className="mt-6 rounded-md border border-rose-200 bg-rose-50 p-4"
     >
-      <h3 className="font-semibold text-rose-950">Eliminar registro de prueba</h3>
+      <h3 className="font-semibold text-rose-950">Eliminar registro de prueba y liberar folio</h3>
       <p className="mt-2 text-sm leading-6 text-rose-900">
-        Accion exclusiva para limpiar pruebas o registros creados por error. No debe usarse como gestion legal de
-        derechos ARCO.
+        Esta accion elimina un registro de prueba y puede liberar folios usados. Usala solo antes de iniciar operacion
+        real.
       </p>
-      {blocked ? (
-        <p className="mt-3 rounded-md border border-rose-300 bg-white px-3 py-2 text-sm text-rose-800">
-          No se puede eliminar este registro porque ya tiene informacion final o relaciones activas.
-        </p>
-      ) : (
-        <div className="mt-4 space-y-3">
-          <label className={labelClass}>
-            Escribe ELIMINAR para confirmar
-            <input className={inputClass} name="confirmationText" />
-          </label>
-          <label className={labelClass}>
-            Motivo obligatorio
-            <textarea className={inputClass} name="deleteReason" required rows={3} />
-          </label>
-          <button className={secondaryButtonClass} type="submit">
-            Eliminar registro de prueba
-          </button>
-        </div>
-      )}
+      <p className="mt-2 text-sm leading-6 text-rose-900">
+        No uses esta accion para participantes reales. Para datos reales se debera implementar un flujo formal de
+        cancelacion/ARCO o anulacion auditada.
+      </p>
+      <dl className="mt-4 grid gap-3 rounded-md border border-rose-200 bg-white p-3 text-sm md:grid-cols-2">
+        <SummaryItem label="Participante" value={detail.participant.name} />
+        <SummaryItem label="Intento" value={detail.attemptId} mono />
+        <SummaryItem label="Estado" value={detail.attemptStatus} />
+        <SummaryItem label="Revision" value={reviewStatusLabel(detail.review?.status)} />
+        <SummaryItem label="Folio" value={detail.confirmation?.folio ?? "Sin folio"} mono />
+        <SummaryItem
+          label="Codigos"
+          value={codes.length > 0 ? codes.map((item) => `${item.slot}: ${item.code}`).join(", ") : "Sin codigos"}
+          mono={codes.length > 0}
+        />
+        <SummaryItem label="Evidencias" value={String(detail.evidence.length)} />
+      </dl>
+      <div className="mt-4 space-y-3">
+        <label className={labelClass}>
+          Escribe ELIMINAR PRUEBA para confirmar
+          <input className={inputClass} name="confirmationText" />
+        </label>
+        <label className={labelClass}>
+          Motivo obligatorio
+          <textarea className={inputClass} name="deleteReason" required rows={3} />
+        </label>
+        <button className={secondaryButtonClass} type="submit">
+          Eliminar registro de prueba y liberar folio
+        </button>
+      </div>
     </form>
   );
 }

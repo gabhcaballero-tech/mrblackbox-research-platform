@@ -219,6 +219,7 @@ describe("ScreeningSupervisionComponents", () => {
         canDeleteTestRecord
         detail={{
           attemptId: "attempt-1",
+          attemptStatus: "PASSED",
           confirmation: {
             folio: "NAV-001",
             manualMessageStatus: "NOT_SENT",
@@ -256,7 +257,8 @@ describe("ScreeningSupervisionComponents", () => {
     expect(screen.getByText("Datos del participante")).toBeInTheDocument();
     expect(screen.getByText("Confirmacion final")).toBeInTheDocument();
     expect(screen.getByText("4821")).toBeInTheDocument();
-    expect(screen.getByText("Eliminar registro de prueba")).toBeInTheDocument();
-    expect(screen.getByText("No se puede eliminar este registro porque ya tiene informacion final o relaciones activas.")).toBeInTheDocument();
+    expect(screen.getAllByText("Eliminar registro de prueba y liberar folio").length).toBeGreaterThan(0);
+    expect(screen.getByText("Escribe ELIMINAR PRUEBA para confirmar")).toBeInTheDocument();
+    expect(screen.getByText("1: 4821, 2: 7710, 3: 9034")).toBeInTheDocument();
   });
 });

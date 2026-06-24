@@ -197,7 +197,13 @@ ADMIN y SUPERVISOR pueden regenerar codigos de cuatro digitos para confirmacione
 
 ADMIN y SUPERVISOR pueden corregir datos operativos del participante desde supervision: nombre, celular, correo operativo y referencia externa. Esta pantalla no cambia `participantAuthUserId` ni la cuenta Auth usada para OTP. En V1 no existe una bitacora dedicada para estas correcciones; queda documentada esta limitacion.
 
-ADMIN puede usar `Eliminar registro de prueba` solo para limpiar pruebas o registros capturados por error antes de una aprobacion final. Requiere escribir `ELIMINAR` y capturar motivo. Se bloquea si ya existe confirmacion, WhatsApp marcado como enviado, aprobacion final o relaciones activas. Esta accion es hard delete operativo de pruebas, no gestion legal de derechos ARCO.
+ADMIN puede usar `Eliminar registro de prueba y liberar folio` solo antes de iniciar operacion real. Requiere escribir `ELIMINAR PRUEBA` y capturar motivo. Puede borrar registros de prueba aprobados, rechazados, con folio, codigos y WhatsApp marcado como enviado durante pruebas. Esta accion elimina `ParticipantReferenceCode`, `ParticipantConfirmation`, `ParticipantScreeningReview`, `ParticipantEvidence`, `ScreeningAnswer`, `ScreeningAttempt`, `ParticipantConsent` del estudio y `StudyParticipant`; tambien elimina `ParticipantProfile` solo si no participa en otro estudio y no esta ligado a un usuario Auth de participante. No elimina usuarios de Supabase Auth.
+
+Despues de eliminar una confirmacion de prueba, se recalcula `ParticipantPortalStudyConfig.nextFolioSequence` al primer hueco disponible entre 1 y `folioMaxSequence`. Por ejemplo, si no quedan confirmaciones vuelve a 1; si queda `NAV-002` pero se libero `NAV-001`, vuelve a 1. La aprobacion tambien busca el primer hueco disponible y conserva los indices unicos como proteccion final.
+
+Si hay evidencias privadas, el servidor intenta borrar los objetos de Storage por `privateStorageKey` solo cuando la ruta pertenece al estudio, participante e intento eliminados. El bucket permanece privado. Si falla Storage despues de borrar DB, se muestra advertencia para revision manual.
+
+No uses esta accion para participantes reales. Para datos reales se debera implementar un flujo formal de cancelacion/ARCO o anulacion auditada.
 
 ## Checklist movil del portal
 

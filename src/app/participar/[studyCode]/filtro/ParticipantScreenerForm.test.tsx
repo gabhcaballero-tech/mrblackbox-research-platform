@@ -175,13 +175,15 @@ describe("ParticipantScreenerForm", () => {
     expect(screen.getByRole("button", { name: "Guardar y continuar" })).toBeDisabled();
   });
 
-  it("normalizes participant free text while typing", () => {
+  it("normalizes participant free text while typing without removing word spaces", () => {
     render(<ParticipantScreenerForm screen={screenData()} />);
 
     const input = screen.getByLabelText("Respuesta");
-    fireEvent.change(input, { target: { value: "  fragancia niña  😀 " } });
+    fireEvent.change(input, { target: { value: "  hace   2 meses  \ud83d\ude0a " } });
 
-    expect(input).toHaveValue("FRAGANCIA NIÑA");
+    expect(input).toHaveValue("HACE 2 MESES ");
+    fireEvent.blur(input);
+    expect(input).toHaveValue("HACE 2 MESES");
   });
 
   it("does not show NSE or internal termination details in public result", () => {

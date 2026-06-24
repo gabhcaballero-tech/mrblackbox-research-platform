@@ -10,6 +10,8 @@ import {
   participantPortalIdentitySchema,
   participantPortalOtpRequestSchema,
   participantPortalVerifyOtpSchema,
+  normalizeMexicoPhone,
+  normalizePortalEmail,
   publicPortalResultMessage,
   rejectParticipantReview,
   validateParticipantEvidenceSet,
@@ -392,5 +394,10 @@ describe("participant portal foundation", () => {
         phone: "5512345678"
       })
     ).toThrow();
+  });
+
+  it("does not apply participant free-text normalization to email or phone", () => {
+    expect(normalizePortalEmail("Persona+Panel@Example.com")).toBe("persona+panel@example.com");
+    expect(normalizeMexicoPhone("55 1234 5678")).toBe("+525512345678");
   });
 });

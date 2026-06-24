@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import type { EvidenceReviewRepository, EvidenceReviewAttemptRecord } from "./evidence-review-repository";
+import {
+  findFirstAvailableFolioSequence,
+  type EvidenceReviewRepository,
+  type EvidenceReviewAttemptRecord
+} from "./evidence-review-repository";
 import {
   approveParticipantEvidenceReview,
   buildWhatsAppUrl,
@@ -185,6 +189,13 @@ describe("participant evidence review service", () => {
     expect(generateReferenceCode()).toMatch(/^[1-9]\d{3}$/);
   });
 
+  it("finds the first available folio sequence, including released NAV-001", () => {
+    expect(findFirstAvailableFolioSequence([], 999)).toBe(1);
+    expect(findFirstAvailableFolioSequence([1, 2], 999)).toBe(3);
+    expect(findFirstAvailableFolioSequence([2], 999)).toBe(1);
+    expect(findFirstAvailableFolioSequence([1, 2, 3], 3)).toBe(4);
+  });
+
   it("regenerates codes through repository and keeps message-sent blocks in service response", async () => {
     const repo = repository();
     const regenerated = await regenerateParticipantReferenceCodes({
@@ -271,7 +282,7 @@ describe("participant evidence review service", () => {
     const deniedByRole = await deleteParticipantEvidenceTestRecord({
       actor: { id: "super-1", role: "SUPERVISOR", status: "ACTIVE" },
       attemptId: "attempt-1",
-      confirmationText: "ELIMINAR",
+      confirmationText: "ELIMINAR PRUEBA",
       reason: "Prueba",
       repository: repository(),
       storage: {
@@ -305,7 +316,7 @@ describe("participant evidence review service", () => {
     const result = await deleteParticipantEvidenceTestRecord({
       actor: admin,
       attemptId: "attempt-1",
-      confirmationText: "ELIMINAR",
+      confirmationText: "ELIMINAR PRUEBA",
       reason: "Registro de prueba",
       repository: repo,
       storage
@@ -319,6 +330,46 @@ describe("participant evidence review service", () => {
     });
   });
 
+  it("allows ADMIN cleanup for an approved test record with confirmation", async () => {
+    const repo = repository(
+      attempt({
+        participantConfirmation: {
+          folio: "NAV-001",
+          folioSequence: 1,
+          manualMessageMarkedSentAt: new Date("2026-06-24T12:00:00Z"),
+          manualMessageStatus: "MARKED_SENT",
+          referenceCodes: [
+            { code: "4821", slot: 1 },
+            { code: "7710", slot: 2 },
+            { code: "9034", slot: 3 }
+          ]
+        },
+        participantScreeningReview: {
+          id: "review-1",
+          internalNote: null,
+          rejectionReason: null,
+          status: "APPROVED"
+        },
+        status: "PASSED"
+      })
+    );
+    const result = await deleteParticipantEvidenceTestRecord({
+      actor: admin,
+      attemptId: "attempt-1",
+      confirmationText: "ELIMINAR PRUEBA",
+      reason: "Registro aprobado de prueba",
+      repository: repo,
+      storage: {
+        createSignedReadUrl: vi.fn(),
+        createSignedUploadUrl: vi.fn(),
+        deleteObjects: vi.fn(async () => undefined)
+      }
+    });
+
+    expect(result.ok).toBe(true);
+    expect(repo.deleteTestRecord).toHaveBeenCalled();
+  });
+
   it("blocks test-record deletion when the repository detects final information", async () => {
     const repo = repository();
     vi.mocked(repo.deleteTestRecord).mockResolvedValueOnce({
@@ -329,7 +380,7 @@ describe("participant evidence review service", () => {
     const result = await deleteParticipantEvidenceTestRecord({
       actor: admin,
       attemptId: "attempt-1",
-      confirmationText: "ELIMINAR",
+      confirmationText: "ELIMINAR PRUEBA",
       reason: "Registro confirmado",
       repository: repo,
       storage: {

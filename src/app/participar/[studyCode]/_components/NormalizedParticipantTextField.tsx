@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { normalizeParticipantTextInput } from "@/modules/participant-portal/text-normalization";
+import {
+  normalizeParticipantTextInput,
+  normalizeParticipantTextInputDraft
+} from "@/modules/participant-portal/text-normalization";
 
 type CommonProps = {
   className: string;
@@ -26,7 +29,8 @@ export function NormalizedParticipantTextInput({
     <input
       {...props}
       value={value}
-      onChange={(event) => setValue(normalizeParticipantTextInput(event.target.value))}
+      onBlur={(event) => setValue(normalizeParticipantTextInput(event.target.value))}
+      onChange={(event) => setValue(normalizeParticipantTextInputDraft(event.target.value))}
     />
   );
 }
@@ -45,7 +49,8 @@ export function NormalizedParticipantTextArea({
       {...props}
       rows={rows}
       value={value}
-      onChange={(event) => setValue(normalizeParticipantTextInput(event.target.value))}
+      onBlur={(event) => setValue(normalizeParticipantTextInput(event.target.value))}
+      onChange={(event) => setValue(normalizeParticipantTextInputDraft(event.target.value))}
     />
   );
 }

@@ -186,6 +186,8 @@ type EvidenceReviewTransactionClient = {
   };
   participantConfirmation: {
     create: (args: unknown) => Promise<EvidenceReviewConfirmationRecord>;
+    delete: (args: unknown) => Promise<unknown>;
+    findMany: (args: unknown) => Promise<Array<{ folioSequence: number }>>;
     findUnique: (args: unknown) => Promise<EvidenceReviewConfirmationRecord | null>;
     update: (args: unknown) => Promise<EvidenceReviewConfirmationRecord>;
   };
@@ -426,7 +428,10 @@ export function createEvidenceReviewRepository(
           return evidenceValidation;
         }
 
-        if (config.nextFolioSequence > config.folioMaxSequence) {
+        const usedFolioSequences = await listUsedFolioSequences(tx, attempt.questionnaireVersion.study.id);
+        const folioSequence = findFirstAvailableFolioSequence(usedFolioSequences, config.folioMaxSequence);
+
+        if (folioSequence > config.folioMaxSequence) {
           return {
             message: "Se agotó la secuencia de folios configurada para este estudio.",
             ok: false
@@ -434,13 +439,16 @@ export function createEvidenceReviewRepository(
         }
 
         const codes = await generateUniqueCodes(tx, input.codeGenerator);
-        const folioSequence = config.nextFolioSequence;
         const folio = `${config.folioPrefix}-${String(folioSequence).padStart(3, "0")}`;
+        const nextFolioSequence = findFirstAvailableFolioSequence(
+          [...usedFolioSequences, folioSequence],
+          config.folioMaxSequence
+        );
         const now = input.now ?? new Date();
 
         await tx.participantPortalStudyConfig.update({
           data: {
-            nextFolioSequence: folioSequence + 1
+            nextFolioSequence
           },
           where: {
             studyId: attempt.questionnaireVersion.study.id
@@ -539,99 +547,129 @@ export function createEvidenceReviewRepository(
 
       try {
         return await prisma.$transaction(async (tx) => {
-        const attempt = await getAttemptReviewWithClient(tx, input.attemptId);
+          const attempt = await getAttemptReviewWithClient(tx, input.attemptId);
 
-        if (!attempt) {
-          return { message: "El intento no existe.", ok: false };
-        }
+          if (!attempt) {
+            return { message: "El intento no existe.", ok: false };
+          }
 
-        if (attempt.participantConfirmation || attempt.participantScreeningReview?.status === "APPROVED") {
-          return {
-            message: "No se puede eliminar este registro porque ya tiene informacion final o relaciones activas.",
-            ok: false
-          };
-        }
+          if (attempt.source !== "PARTICIPANT_PORTAL") {
+            return {
+              message: "No se puede eliminar este registro porque ya tiene informacion final o relaciones activas.",
+              ok: false
+            };
+          }
 
-        if (attempt.source !== "PARTICIPANT_PORTAL") {
-          return {
-            message: "No se puede eliminar este registro porque ya tiene informacion final o relaciones activas.",
-            ok: false
-          };
-        }
+          const participantProfileId = attempt.studyParticipant.participantProfile.id;
+          const studyParticipantId = attempt.studyParticipantId;
+          const studyId = attempt.questionnaireVersion.study.id;
+          const evidenceToDelete = attempt.participantEvidence
+            .filter((item) =>
+              storageKeyBelongsToAttempt({
+                attemptId: attempt.id,
+                participantProfileId,
+                privateStorageKey: item.privateStorageKey,
+                studyId
+              })
+            )
+            .map((item) => ({
+              bucket: item.storageBucket,
+              privateStorageKey: item.privateStorageKey
+            }));
 
-        const participantProfileId = attempt.studyParticipant.participantProfile.id;
-        const studyParticipantId = attempt.studyParticipantId;
-        const evidenceToDelete = attempt.participantEvidence.map((item) => ({
-          bucket: item.storageBucket,
-          privateStorageKey: item.privateStorageKey
-        }));
-
-        await tx.participantEvidence.deleteMany({
-          where: {
-            screeningAttemptId: attempt.id
-          }
-        });
-        await tx.participantScreeningReview.deleteMany({
-          where: {
-            screeningAttemptId: attempt.id
-          }
-        });
-        await tx.screeningAnswer.deleteMany({
-          where: {
-            screeningAttemptId: attempt.id
-          }
-        });
-        await tx.screeningAttempt.delete({
-          where: {
-            id: attempt.id
-          }
-        });
-        await tx.participantConsent.deleteMany({
-          where: {
-            studyParticipantId
-          }
-        });
-        await tx.participantAccessToken.deleteMany({
-          where: {
-            studyParticipantId
-          }
-        });
-        await tx.studyParticipant.delete({
-          where: {
-            id: studyParticipantId
-          }
-        });
-
-        const profile = await tx.participantProfile.findUnique({
-          select: {
-            id: true,
-            participantAuthUserId: true,
-            participations: {
-              select: {
-                id: true
+          if (attempt.participantConfirmation?.id) {
+            await tx.participantReferenceCode.deleteMany({
+              where: {
+                confirmationId: attempt.participantConfirmation.id
               }
-            }
-          },
-          where: {
-            id: participantProfileId
+            });
+            await tx.participantConfirmation.delete({
+              where: {
+                screeningAttemptId: attempt.id
+              }
+            });
           }
-        });
 
-        if (profile && !profile.participantAuthUserId && profile.participations.length === 0) {
-          await tx.participantProfile.delete({
+          await tx.participantEvidence.deleteMany({
+            where: {
+              screeningAttemptId: attempt.id
+            }
+          });
+          await tx.participantScreeningReview.deleteMany({
+            where: {
+              screeningAttemptId: attempt.id
+            }
+          });
+          await tx.screeningAnswer.deleteMany({
+            where: {
+              screeningAttemptId: attempt.id
+            }
+          });
+          await tx.screeningAttempt.delete({
+            where: {
+              id: attempt.id
+            }
+          });
+          await tx.participantConsent.deleteMany({
+            where: {
+              studyParticipantId
+            }
+          });
+          await tx.participantAccessToken.deleteMany({
+            where: {
+              studyParticipantId
+            }
+          });
+          await tx.studyParticipant.delete({
+            where: {
+              id: studyParticipantId
+            }
+          });
+
+          const profile = await tx.participantProfile.findUnique({
+            select: {
+              id: true,
+              participantAuthUserId: true,
+              participations: {
+                select: {
+                  id: true
+                }
+              }
+            },
             where: {
               id: participantProfileId
             }
           });
-        }
 
-        void input.deletedByUserId;
-        void input.reason;
+          if (profile && !profile.participantAuthUserId && profile.participations.length === 0) {
+            await tx.participantProfile.delete({
+              where: {
+                id: participantProfileId
+              }
+            });
+          }
+
+          const config = attempt.questionnaireVersion.study.participantPortalConfig;
+
+          if (config) {
+            const usedFolioSequences = await listUsedFolioSequences(tx, studyId);
+            await tx.participantPortalStudyConfig.update({
+              data: {
+                nextFolioSequence: findFirstAvailableFolioSequence(usedFolioSequences, config.folioMaxSequence)
+              },
+              where: {
+                studyId
+              }
+            });
+          }
+
+          void input.deletedByUserId;
+          void input.reason;
 
           return {
             evidenceToDelete,
             ok: true,
-            studyId: attempt.questionnaireVersion.study.id
+            studyId
           };
         });
       } catch {
@@ -866,6 +904,58 @@ async function getAttemptReviewWithClient(
     select: attemptReviewSelect,
     where: { id: attemptId }
   });
+}
+
+async function listUsedFolioSequences(
+  tx: EvidenceReviewTransactionClient,
+  studyId: string
+): Promise<number[]> {
+  const confirmations = await tx.participantConfirmation.findMany({
+    select: {
+      folioSequence: true
+    },
+    where: {
+      studyId
+    }
+  });
+
+  return confirmations.map((item) => item.folioSequence);
+}
+
+export function findFirstAvailableFolioSequence(usedSequences: number[], folioMaxSequence: number): number {
+  const used = new Set(usedSequences.filter((value) => Number.isInteger(value) && value >= 1));
+
+  for (let sequence = 1; sequence <= folioMaxSequence; sequence += 1) {
+    if (!used.has(sequence)) {
+      return sequence;
+    }
+  }
+
+  return folioMaxSequence + 1;
+}
+
+function storageKeyBelongsToAttempt({
+  attemptId,
+  participantProfileId,
+  privateStorageKey,
+  studyId
+}: {
+  attemptId: string;
+  participantProfileId: string;
+  privateStorageKey: string;
+  studyId: string;
+}): boolean {
+  const expectedPrefix = [
+    "studies",
+    studyId,
+    "participants",
+    participantProfileId,
+    "screening-attempts",
+    attemptId,
+    ""
+  ].join("/");
+
+  return privateStorageKey.startsWith(expectedPrefix);
 }
 
 async function generateUniqueCodes(
