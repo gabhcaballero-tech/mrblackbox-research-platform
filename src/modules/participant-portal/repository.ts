@@ -4,6 +4,22 @@ export type ParticipantPortalStudyStatus = "ACTIVE" | "ARCHIVED" | "DRAFT" | "PA
 
 export type ParticipantPortalConfigRecord = {
   enabled: boolean;
+  evidenceRetentionDays: number;
+  folioMaxSequence: number;
+  folioPrefix: string;
+  maxImageBytes: number;
+  maxOtpAttempts: number;
+  maxPerfumePhotos: number;
+  minPerfumePhotos: number;
+  nextFolioSequence: number;
+  otpCooldownSeconds: number;
+  privacyNoticeHash: string;
+  privacyNoticeText: string;
+  privacyNoticeVersion: string;
+};
+
+export type ParticipantPortalOtpConfigRecord = {
+  enabled: boolean;
   maxOtpAttempts: number;
   otpCooldownSeconds: number;
 };
@@ -81,8 +97,18 @@ type PrismaWithParticipantPortal = PrismaClientLike & {
         participantPortalConfig: {
           select: {
             enabled: true;
+            evidenceRetentionDays: true;
+            folioMaxSequence: true;
+            folioPrefix: true;
+            maxImageBytes: true;
             maxOtpAttempts: true;
+            maxPerfumePhotos: true;
+            minPerfumePhotos: true;
+            nextFolioSequence: true;
             otpCooldownSeconds: true;
+            privacyNoticeHash: true;
+            privacyNoticeText: true;
+            privacyNoticeVersion: true;
           };
         };
         questionnaireVersions: {
@@ -159,8 +185,18 @@ export function createParticipantPortalRepository(): ParticipantPortalRepository
           participantPortalConfig: {
             select: {
               enabled: true,
+              evidenceRetentionDays: true,
+              folioMaxSequence: true,
+              folioPrefix: true,
+              maxImageBytes: true,
               maxOtpAttempts: true,
-              otpCooldownSeconds: true
+              maxPerfumePhotos: true,
+              minPerfumePhotos: true,
+              nextFolioSequence: true,
+              otpCooldownSeconds: true,
+              privacyNoticeHash: true,
+              privacyNoticeText: true,
+              privacyNoticeVersion: true
             }
           },
           questionnaireVersions: {

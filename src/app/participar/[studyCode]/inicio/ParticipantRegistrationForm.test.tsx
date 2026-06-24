@@ -1,0 +1,31 @@
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { ParticipantRegistrationForm } from "./ParticipantRegistrationForm";
+
+vi.mock("@/modules/participant-portal/registration-actions", () => ({
+  registerParticipantPortalAction: vi.fn()
+}));
+
+describe("ParticipantRegistrationForm", () => {
+  it("renders required registration and consent fields", () => {
+    render(
+      <ParticipantRegistrationForm
+        privacyNoticeText="Aviso de privacidad del estudio."
+        studyCode="FMASCULINA-NAVIGO-2026"
+      />
+    );
+
+    expect(screen.getByLabelText("Nombre completo")).toBeRequired();
+    expect(screen.getByLabelText("Celular")).toBeRequired();
+    expect(screen.getByLabelText("Confirmar celular")).toBeRequired();
+    expect(screen.getByText("Aviso de privacidad del estudio.")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "He leído el aviso de privacidad y acepto el tratamiento de mis datos personales para participar en este estudio."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Otorgo mi consentimiento expreso para el tratamiento de la información de salud/)
+    ).toBeInTheDocument();
+  });
+});

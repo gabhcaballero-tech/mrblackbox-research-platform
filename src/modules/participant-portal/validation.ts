@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const participantEvidenceTypeSchema = z.enum(["SELFIE_IDENTIFICATION", "PERFUME_PHOTO"]);
 
+const checkboxSchema = z.preprocess((value) => value === "on" || value === true, z.boolean());
+
 export const participantPortalOtpRequestSchema = z
   .object({
     captchaToken: z.string().trim().min(1, "Confirma la verificación antes de solicitar el código."),
@@ -35,13 +37,13 @@ export const participantPortalIdentitySchema = z
   })
   .strict()
   .transform((input, context) => {
-    const phone = normalizeE164Phone(input.phone);
-    const confirmPhone = normalizeE164Phone(input.confirmPhone);
+    const phone = normalizeMexicoPhone(input.phone);
+    const confirmPhone = normalizeMexicoPhone(input.confirmPhone);
 
-    if (!isE164Phone(phone)) {
+    if (!isMexicoPhone(phone)) {
       context.addIssue({
         code: "custom",
-        message: "Ingresa el celular en formato internacional E.164, por ejemplo +525512345678.",
+        message: "Captura un celular válido a 10 dígitos o con clave +52.",
         path: ["phone"]
       });
     }
@@ -49,7 +51,7 @@ export const participantPortalIdentitySchema = z
     if (phone !== confirmPhone) {
       context.addIssue({
         code: "custom",
-        message: "El celular y la confirmación deben coincidir.",
+        message: "El celular y la confirmación no coinciden.",
         path: ["confirmPhone"]
       });
     }
@@ -59,6 +61,76 @@ export const participantPortalIdentitySchema = z
       confirmPhone,
       phone
     };
+  });
+
+export const participantPortalRegistrationSchema = z
+  .object({
+    consentPrivacy: checkboxSchema.refine((value) => value, "Debes aceptar el aviso de privacidad."),
+    consentSensitive: checkboxSchema.refine((value) => value, "Debes otorgar el consentimiento expreso para continuar."),
+    confirmPhone: z.string().trim().min(1, "Confirma el celular."),
+    name: z.string().trim().min(1, "Ingresa tu nombre completo."),
+    phone: z.string().trim().min(1, "Ingresa tu celular.")
+  })
+  .strict()
+  .transform((input, context) => {
+    const phone = normalizeMexicoPhone(input.phone);
+    const confirmPhone = normalizeMexicoPhone(input.confirmPhone);
+
+    if (!isMexicoPhone(phone)) {
+      context.addIssue({
+        code: "custom",
+        message: "Captura un celular válido a 10 dígitos o con clave +52.",
+        path: ["phone"]
+      });
+    }
+
+    if (!isMexicoPhone(confirmPhone)) {
+      context.addIssue({
+        code: "custom",
+        message: "Captura un celular válido a 10 dígitos o con clave +52.",
+        path: ["confirmPhone"]
+      });
+    }
+
+    if (phone !== confirmPhone) {
+      context.addIssue({
+        code: "custom",
+        message: "El celular y la confirmación no coinciden.",
+        path: ["confirmPhone"]
+      });
+    }
+
+    return {
+      ...input,
+      confirmPhone,
+      name: input.name.trim(),
+      phone
+    };
+  });
+
+export const participantPortalAdminConfigSchema = z
+  .object({
+    enabled: checkboxSchema.default(false),
+    evidenceRetentionDays: z.coerce.number().int().positive(),
+    folioMaxSequence: z.coerce.number().int().min(1),
+    folioPrefix: z.string().trim(),
+    maxImageBytes: z.coerce.number().int().positive(),
+    maxOtpAttempts: z.coerce.number().int().positive(),
+    maxPerfumePhotos: z.coerce.number().int().min(1),
+    minPerfumePhotos: z.coerce.number().int().min(1),
+    nextFolioSequence: z.coerce.number().int().min(1),
+    otpCooldownSeconds: z.coerce.number().int().min(0),
+    privacyNoticeText: z.string().trim(),
+    privacyNoticeVersion: z.string().trim().min(1, "Captura la versión del aviso.")
+  })
+  .strict()
+  .refine((input) => input.maxPerfumePhotos >= input.minPerfumePhotos, {
+    message: "El máximo de fotos de perfume no puede ser menor al mínimo.",
+    path: ["maxPerfumePhotos"]
+  })
+  .refine((input) => input.nextFolioSequence <= input.folioMaxSequence + 1, {
+    message: "La siguiente secuencia de folio no puede exceder el límite configurado más uno.",
+    path: ["nextFolioSequence"]
   });
 
 export const participantConsentInputSchema = z
@@ -99,8 +171,10 @@ export const participantPortalConfigSchema = z
 
 export type ParticipantEvidenceType = z.infer<typeof participantEvidenceTypeSchema>;
 export type ParticipantPortalConfigInput = z.infer<typeof participantPortalConfigSchema>;
+export type ParticipantPortalAdminConfigInput = z.infer<typeof participantPortalAdminConfigSchema>;
 export type ParticipantPortalIdentityInput = z.infer<typeof participantPortalIdentitySchema>;
 export type ParticipantPortalOtpRequestInput = z.infer<typeof participantPortalOtpRequestSchema>;
+export type ParticipantPortalRegistrationInput = z.infer<typeof participantPortalRegistrationSchema>;
 export type ParticipantPortalVerifyOtpInput = z.infer<typeof participantPortalVerifyOtpSchema>;
 
 export type ParticipantEvidenceDraft = {
@@ -136,12 +210,26 @@ export function normalizeE164Phone(value: string): string {
   return value.replace(/[\s().-]/g, "");
 }
 
+export function normalizeMexicoPhone(value: string): string {
+  const compact = value.replace(/[\s().-]/g, "");
+
+  if (/^\d{10}$/.test(compact)) {
+    return `+52${compact}`;
+  }
+
+  return compact;
+}
+
 export function normalizePortalEmail(value: string): string {
   return value.trim().toLowerCase();
 }
 
 export function isE164Phone(value: string): boolean {
   return /^\+[1-9]\d{7,14}$/.test(value);
+}
+
+export function isMexicoPhone(value: string): boolean {
+  return /^\+52\d{10}$/.test(value);
 }
 
 export function buildParticipantConsentSnapshot({

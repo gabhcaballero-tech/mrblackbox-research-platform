@@ -10,12 +10,15 @@ import {
   buildComparativeChecklist,
   getComparativeConfigurationForAdmin
 } from "@/modules/comparative-rotation/admin-service";
+import { createParticipantPortalAdminRepository } from "@/modules/participant-portal/admin-repository";
+import { getParticipantPortalConfigForAdmin } from "@/modules/participant-portal/admin-service";
 import { createScreenerRepository } from "@/modules/screener/repository";
 import { getScreenerBuilderForAdmin } from "@/modules/screener/service";
 import { ActivateStudyPanel } from "./_components/ActivateStudyPanel";
 import { ArmSection } from "./_components/ArmSection";
 import { ConfigurationChecklist } from "./_components/ConfigurationChecklist";
 import { ConfigurationSummary } from "./_components/ConfigurationSummary";
+import { ParticipantPortalSection } from "./_components/ParticipantPortalSection";
 import { ProductSection } from "./_components/ProductSection";
 import { RotationSection } from "./_components/RotationSection";
 import { SafePreviewSection } from "./_components/SafePreviewSection";
@@ -51,6 +54,16 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
     repository: createScreenerRepository(),
     studyId
   });
+  const participantPortalResult = await getParticipantPortalConfigForAdmin({
+    actor: admin,
+    repository: createParticipantPortalAdminRepository(),
+    studyId
+  });
+
+  if (!participantPortalResult.ok) {
+    throw new Error(participantPortalResult.message);
+  }
+
   const checklist = buildComparativeChecklist(config);
   const readOnly = config.study.status !== "DRAFT";
   const hasActiveScreener =
@@ -96,6 +109,7 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
         <ConfigurationSummary config={config} readOnly={readOnly} />
         <ActivateStudyPanel canActivate={!readOnly && hasActiveScreener} studyId={studyId} />
         <ConfigurationChecklist checklist={checklist} />
+        <ParticipantPortalSection data={participantPortalResult.data} studyId={studyId} />
         <ProductSection products={config.products} readOnly={readOnly} studyId={studyId} />
         <ArmSection arms={config.arms} readOnly={readOnly} studyId={studyId} />
         <RotationSection

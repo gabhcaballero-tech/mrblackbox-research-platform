@@ -1,0 +1,12 @@
+import type { ParticipantPortalAdminFieldErrors } from "./admin-service";
+import type { ParticipantPortalRegistrationFieldErrors } from "./registration-service";
+
+export type ParticipantPortalActionState = {
+  fieldErrors?: ParticipantPortalAdminFieldErrors | ParticipantPortalRegistrationFieldErrors;
+  message?: string;
+  status: "error" | "idle" | "success";
+};
+
+export const initialParticipantPortalActionState: ParticipantPortalActionState = {
+  status: "idle"
+};

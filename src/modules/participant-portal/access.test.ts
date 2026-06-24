@@ -26,7 +26,17 @@ function activePortalStudy(overrides: Partial<ParticipantPortalStudyRecord> = {}
     name: "Fragancia Masculina",
     portalConfig: {
       enabled: true,
+      evidenceRetentionDays: 30,
+      folioMaxSequence: 999,
+      folioPrefix: "NAV",
+      maxImageBytes: 8388608,
       maxOtpAttempts: 5,
+      maxPerfumePhotos: 5,
+      minPerfumePhotos: 1,
+      nextFolioSequence: 1,
+      privacyNoticeHash: "notice-hash",
+      privacyNoticeText: "Aviso de privacidad.",
+      privacyNoticeVersion: "v1",
       otpCooldownSeconds: 60
     },
     status: "ACTIVE",
@@ -86,7 +96,7 @@ function supabaseMock({
 describe("participant portal access", () => {
   it("blocks disabled portal, inactive study and missing active screener generically", async () => {
     for (const study of [
-      activePortalStudy({ portalConfig: { enabled: false, maxOtpAttempts: 5, otpCooldownSeconds: 60 } }),
+      activePortalStudy({ portalConfig: { ...activePortalStudy().portalConfig!, enabled: false } }),
       activePortalStudy({ status: "DRAFT" }),
       activePortalStudy({ activeScreenerVersionId: null })
     ]) {
