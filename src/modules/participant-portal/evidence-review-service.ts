@@ -252,7 +252,13 @@ export async function deleteParticipantEvidenceTestRecord({
   reason: string;
   repository: EvidenceReviewRepository;
   storage: EvidenceStorageClient;
-}): Promise<EvidenceReviewResult<{ storageWarning: string | null; studyId: string }>> {
+}): Promise<
+  EvidenceReviewResult<{
+    successMessage: string;
+    storageWarning: string | null;
+    studyId: string;
+  }>
+> {
   if (!actor || actor.status !== "ACTIVE" || actor.role !== "ADMIN") {
     return {
       message: "Solo ADMIN puede eliminar registros de prueba.",
@@ -312,6 +318,9 @@ export async function deleteParticipantEvidenceTestRecord({
 
   return {
     data: {
+      successMessage: result.preservedInternalProfile
+        ? "Registro de prueba eliminado. El perfil interno se conservó por seguridad."
+        : "Registro de prueba eliminado correctamente.",
       storageWarning,
       studyId: result.studyId
     },

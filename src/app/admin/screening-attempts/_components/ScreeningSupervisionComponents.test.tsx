@@ -260,5 +260,10 @@ describe("ScreeningSupervisionComponents", () => {
     expect(screen.getAllByText("Eliminar registro de prueba y liberar folio").length).toBeGreaterThan(0);
     expect(screen.getByText("Escribe ELIMINAR PRUEBA para confirmar")).toBeInTheDocument();
     expect(screen.getByText("1: 4821, 2: 7710, 3: 9034")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Si este registro fue creado con un usuario interno, se eliminara el intento de prueba, pero se conservara el perfil interno y la cuenta de acceso."
+      )
+    ).toBeInTheDocument();
   });
 });

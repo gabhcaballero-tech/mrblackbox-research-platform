@@ -100,6 +100,7 @@ function repository(currentAttempt = attempt()) {
     deleteTestRecord: vi.fn(async () => ({
       evidenceToDelete: [{ bucket: "participant-evidence", privateStorageKey: "private/selfie.jpg" }],
       ok: true as const,
+      preservedInternalProfile: false,
       studyId: "study-1"
     })),
     getAttemptReview: vi.fn(async () => currentAttempt),
@@ -328,6 +329,7 @@ describe("participant evidence review service", () => {
       bucket: "participant-evidence",
       privateStorageKeys: ["private/selfie.jpg"]
     });
+    expect(result.ok ? result.data.successMessage : "").toBe("Registro de prueba eliminado correctamente.");
   });
 
   it("allows ADMIN cleanup for an approved test record with confirmation", async () => {
@@ -370,10 +372,39 @@ describe("participant evidence review service", () => {
     expect(repo.deleteTestRecord).toHaveBeenCalled();
   });
 
-  it("blocks test-record deletion when the repository detects final information", async () => {
+  it("returns a preservation message when the cleaned test record used an internal profile", async () => {
     const repo = repository();
     vi.mocked(repo.deleteTestRecord).mockResolvedValueOnce({
-      message: "No se puede eliminar este registro porque ya tiene informacion final o relaciones activas.",
+      evidenceToDelete: [],
+      ok: true,
+      preservedInternalProfile: true,
+      studyId: "study-1"
+    });
+
+    const result = await deleteParticipantEvidenceTestRecord({
+      actor: admin,
+      attemptId: "attempt-1",
+      confirmationText: "ELIMINAR PRUEBA",
+      reason: "Registro de prueba con perfil interno",
+      repository: repo,
+      storage: {
+        createSignedReadUrl: vi.fn(),
+        createSignedUploadUrl: vi.fn()
+      }
+    });
+
+    expect(result).toMatchObject({
+      data: {
+        successMessage: "Registro de prueba eliminado. El perfil interno se conservó por seguridad."
+      },
+      ok: true
+    });
+  });
+
+  it("shows the specific repository blocker when test-record deletion is not safe", async () => {
+    const repo = repository();
+    vi.mocked(repo.deleteTestRecord).mockResolvedValueOnce({
+      message: "No se puede eliminar porque el participante está asociado a otro estudio.",
       ok: false
     });
 
@@ -390,7 +421,7 @@ describe("participant evidence review service", () => {
     });
 
     expect(result).toMatchObject({
-      message: "No se puede eliminar este registro porque ya tiene informacion final o relaciones activas.",
+      message: "No se puede eliminar porque el participante está asociado a otro estudio.",
       ok: false
     });
   });

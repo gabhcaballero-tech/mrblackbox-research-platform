@@ -111,7 +111,7 @@ export async function deleteParticipantEvidenceTestRecordAction(
 
   redirect(
     `/admin/studies/${result.data.studyId}/screening-attempts?evidenceMessage=${encodeURIComponent(
-      result.data.storageWarning ?? "Registro de prueba eliminado correctamente."
+      result.data.storageWarning ?? result.data.successMessage
     )}`
   );
 }

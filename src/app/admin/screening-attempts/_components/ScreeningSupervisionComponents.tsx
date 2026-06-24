@@ -580,6 +580,10 @@ function DeleteTestRecordForm({ detail }: { detail: ParticipantEvidenceReviewDet
         No uses esta accion para participantes reales. Para datos reales se debera implementar un flujo formal de
         cancelacion/ARCO o anulacion auditada.
       </p>
+      <p className="mt-2 text-sm leading-6 text-rose-900">
+        Si este registro fue creado con un usuario interno, se eliminara el intento de prueba, pero se conservara el
+        perfil interno y la cuenta de acceso.
+      </p>
       <dl className="mt-4 grid gap-3 rounded-md border border-rose-200 bg-white p-3 text-sm md:grid-cols-2">
         <SummaryItem label="Participante" value={detail.participant.name} />
         <SummaryItem label="Intento" value={detail.attemptId} mono />

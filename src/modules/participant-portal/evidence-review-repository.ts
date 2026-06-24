@@ -165,6 +165,7 @@ export type EvidenceReviewUpdateParticipantResult =
 export type EvidenceReviewDeleteResult =
   | {
       evidenceToDelete: Array<{ bucket: string; privateStorageKey: string }>;
+      preservedInternalProfile: boolean;
       ok: true;
       studyId: string;
     }
@@ -194,6 +195,7 @@ type EvidenceReviewTransactionClient = {
   participantEvidence: {
     create: (args: unknown) => Promise<PortalEvidenceRecord>;
     deleteMany: (args: unknown) => Promise<unknown>;
+    findMany: (args: unknown) => Promise<Array<{ id: string }>>;
     update: (args: unknown) => Promise<PortalEvidenceRecord>;
     updateMany: (args: unknown) => Promise<unknown>;
   };
@@ -208,6 +210,9 @@ type EvidenceReviewTransactionClient = {
       participations: Array<{ id: string }>;
     } | null>;
     update: (args: unknown) => Promise<unknown>;
+  };
+  internalUser: {
+    findFirst: (args: unknown) => Promise<{ id: string } | null>;
   };
   participantPortalStudyConfig: {
     update: (args: unknown) => Promise<unknown>;
@@ -227,11 +232,30 @@ type EvidenceReviewTransactionClient = {
   screeningAttempt: {
     delete: (args: unknown) => Promise<unknown>;
     findUnique: (args: unknown) => Promise<EvidenceReviewAttemptRecord | null>;
+    findMany: (args: unknown) => Promise<Array<{ id: string }>>;
     update: (args: unknown) => Promise<unknown>;
   };
   studyParticipant: {
     delete: (args: unknown) => Promise<unknown>;
     update: (args: unknown) => Promise<unknown>;
+  };
+  applicationTimeEvent: {
+    findMany: (args: unknown) => Promise<Array<{ id: string }>>;
+  };
+  participantActivity: {
+    findMany: (args: unknown) => Promise<Array<{ id: string }>>;
+  };
+  participantArmAssignment: {
+    findMany: (args: unknown) => Promise<Array<{ id: string }>>;
+  };
+  participantAttributeOrder: {
+    findMany: (args: unknown) => Promise<Array<{ id: string }>>;
+  };
+  participantRotationAssignment: {
+    findMany: (args: unknown) => Promise<Array<{ id: string }>>;
+  };
+  quotaEvaluation: {
+    findMany: (args: unknown) => Promise<Array<{ id: string }>>;
   };
 };
 
@@ -339,8 +363,8 @@ export function createEvidenceReviewRepository(
     async approveEvidence(input) {
       const prisma = await getPrisma();
 
-      return prisma.$transaction(async (tx) => {
-        const attempt = await getAttemptReviewWithClient(tx, input.attemptId);
+        return prisma.$transaction(async (tx) => {
+          const attempt = await getAttemptReviewWithClient(tx, input.attemptId);
 
         if (!attempt) {
           return { message: "El intento no existe.", ok: false };
@@ -555,7 +579,7 @@ export function createEvidenceReviewRepository(
 
           if (attempt.source !== "PARTICIPANT_PORTAL") {
             return {
-              message: "No se puede eliminar este registro porque ya tiene informacion final o relaciones activas.",
+              message: "No se puede eliminar porque el intento no pertenece al portal de participantes.",
               ok: false
             };
           }
@@ -563,6 +587,20 @@ export function createEvidenceReviewRepository(
           const participantProfileId = attempt.studyParticipant.participantProfile.id;
           const studyParticipantId = attempt.studyParticipantId;
           const studyId = attempt.questionnaireVersion.study.id;
+          const blockers = await diagnoseDeleteTestRecordBlockers(tx, {
+            attemptId: attempt.id,
+            participantProfileId,
+            studyParticipantId
+          });
+
+          if (blockers.length > 0) {
+            logDeleteTestRecordIssue("blocked", input.attemptId, blockers[0]);
+            return {
+              message: blockers[0],
+              ok: false
+            };
+          }
+
           const evidenceToDelete = attempt.participantEvidence
             .filter((item) =>
               storageKeyBelongsToAttempt({
@@ -641,6 +679,8 @@ export function createEvidenceReviewRepository(
             }
           });
 
+          const preservedInternalProfile = Boolean(profile?.participantAuthUserId);
+
           if (profile && !profile.participantAuthUserId && profile.participations.length === 0) {
             await tx.participantProfile.delete({
               where: {
@@ -668,13 +708,15 @@ export function createEvidenceReviewRepository(
 
           return {
             evidenceToDelete,
+            preservedInternalProfile,
             ok: true,
             studyId
           };
         });
-      } catch {
+      } catch (error) {
+        logDeleteTestRecordIssue("failed", input.attemptId, buildDeleteTestRecordFailureMessage(error), error);
         return {
-          message: "No se puede eliminar este registro porque ya tiene informacion final o relaciones activas.",
+          message: buildDeleteTestRecordFailureMessage(error),
           ok: false
         };
       }
@@ -922,6 +964,172 @@ async function listUsedFolioSequences(
   return confirmations.map((item) => item.folioSequence);
 }
 
+async function diagnoseDeleteTestRecordBlockers(
+  tx: EvidenceReviewTransactionClient,
+  input: {
+    attemptId: string;
+    participantProfileId: string;
+    studyParticipantId: string;
+  }
+): Promise<string[]> {
+  const blockers: string[] = [];
+
+  const profile = await tx.participantProfile.findUnique({
+    select: {
+      id: true,
+      participantAuthUserId: true,
+      participations: {
+        select: {
+          id: true
+        }
+      }
+    },
+    where: {
+      id: input.participantProfileId
+    }
+  });
+
+  if (profile && profile.participations.length > 1) {
+    blockers.push("No se puede eliminar porque el participante está asociado a otro estudio.");
+  }
+
+  const unsupportedRelations = await findUnsupportedDeleteRelations(tx, input);
+
+  if (unsupportedRelations.length > 0) {
+    blockers.push(
+      `No se puede eliminar porque existen relaciones no soportadas: ${unsupportedRelations.join(", ")}.`
+    );
+  }
+
+  return blockers;
+}
+
+async function findUnsupportedDeleteRelations(
+  tx: EvidenceReviewTransactionClient,
+  input: {
+    attemptId: string;
+    studyParticipantId: string;
+  }
+): Promise<string[]> {
+  const [
+    additionalAttempts,
+    additionalEvidence,
+    applicationTimeEvents,
+    quotaEvaluations,
+    rotationAssignments,
+    armAssignments,
+    activities,
+    attributeOrders
+  ] = await Promise.all([
+    tx.screeningAttempt.findMany({
+      select: {
+        id: true
+      },
+      where: {
+        id: {
+          not: input.attemptId
+        },
+        studyParticipantId: input.studyParticipantId
+      }
+    }),
+    tx.participantEvidence.findMany({
+      select: {
+        id: true
+      },
+      where: {
+        screeningAttemptId: {
+          not: input.attemptId
+        },
+        studyParticipantId: input.studyParticipantId
+      }
+    }),
+    tx.applicationTimeEvent.findMany({
+      select: {
+        id: true
+      },
+      where: {
+        studyParticipantId: input.studyParticipantId
+      }
+    }),
+    tx.quotaEvaluation.findMany({
+      select: {
+        id: true
+      },
+      where: {
+        studyParticipantId: input.studyParticipantId
+      }
+    }),
+    tx.participantRotationAssignment.findMany({
+      select: {
+        id: true
+      },
+      where: {
+        studyParticipantId: input.studyParticipantId
+      }
+    }),
+    tx.participantArmAssignment.findMany({
+      select: {
+        id: true
+      },
+      where: {
+        studyParticipantId: input.studyParticipantId
+      }
+    }),
+    tx.participantActivity.findMany({
+      select: {
+        id: true
+      },
+      where: {
+        studyParticipantId: input.studyParticipantId
+      }
+    }),
+    tx.participantAttributeOrder.findMany({
+      select: {
+        id: true
+      },
+      where: {
+        studyParticipantId: input.studyParticipantId
+      }
+    })
+  ]);
+
+  const relations: string[] = [];
+
+  if (additionalAttempts.length > 0) {
+    relations.push("screening_attempts adicionales");
+  }
+
+  if (additionalEvidence.length > 0) {
+    relations.push("participant_evidence adicional");
+  }
+
+  if (applicationTimeEvents.length > 0) {
+    relations.push("application_time_events");
+  }
+
+  if (quotaEvaluations.length > 0) {
+    relations.push("quota_evaluations");
+  }
+
+  if (rotationAssignments.length > 0) {
+    relations.push("participant_rotation_assignments");
+  }
+
+  if (armAssignments.length > 0) {
+    relations.push("participant_arm_assignments");
+  }
+
+  if (activities.length > 0) {
+    relations.push("participant_activities");
+  }
+
+  if (attributeOrders.length > 0) {
+    relations.push("participant_attribute_orders");
+  }
+
+  return relations;
+}
+
 export function findFirstAvailableFolioSequence(usedSequences: number[], folioMaxSequence: number): number {
   const used = new Set(usedSequences.filter((value) => Number.isInteger(value) && value >= 1));
 
@@ -956,6 +1164,16 @@ function storageKeyBelongsToAttempt({
   ].join("/");
 
   return privateStorageKey.startsWith(expectedPrefix);
+}
+
+function buildDeleteTestRecordFailureMessage(error: unknown): string {
+  const fieldName = readSafeMetaFieldName(error);
+
+  if (fieldName) {
+    return `No se puede eliminar porque existen relaciones no soportadas: ${fieldName}.`;
+  }
+
+  return "No se puede eliminar porque existen relaciones no soportadas que impiden limpiar este registro de prueba.";
 }
 
 async function generateUniqueCodes(
@@ -1044,4 +1262,48 @@ function buildEvidenceReplacementNote({
 
 function appendInternalNote(current: string | null | undefined, next: string): string {
   return [current?.trim(), next].filter(Boolean).join("\n");
+}
+
+function readSafeMetaFieldName(error: unknown): string | null {
+  if (typeof error !== "object" || error === null || !("meta" in error)) {
+    return null;
+  }
+
+  const meta = (error as { meta?: unknown }).meta;
+
+  if (typeof meta !== "object" || meta === null || !("field_name" in meta)) {
+    return null;
+  }
+
+  const fieldName = (meta as { field_name?: unknown }).field_name;
+  return typeof fieldName === "string" && fieldName.trim().length > 0 ? fieldName.trim() : null;
+}
+
+function logDeleteTestRecordIssue(
+  step: "blocked" | "failed",
+  attemptId: string,
+  message: string,
+  error?: unknown
+): void {
+  console.warn("[participant-test-record-delete]", {
+    attemptId,
+    code: readSafeErrorCode(error),
+    message,
+    step
+  });
+}
+
+function readSafeErrorCode(error: unknown): string {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "string") {
+      return code;
+    }
+  }
+
+  if (error instanceof Error) {
+    return error.name;
+  }
+
+  return "none";
 }
