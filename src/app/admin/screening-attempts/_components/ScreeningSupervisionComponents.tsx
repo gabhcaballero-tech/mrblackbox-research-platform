@@ -190,7 +190,7 @@ export function ScreeningAttemptFilters({ data }: { data: ScreeningAttemptListDa
       <p className="mt-3 text-xs leading-5 text-zinc-500">
         {data.attempts.length === 0
           ? "No hay intentos con los filtros actuales para exportar."
-          : "La exportación descarga un CSV compatible con Excel y respeta los filtros actuales."}
+          : "La exportacion descarga un archivo tabulado compatible con Excel y respeta los filtros actuales."}
       </p>
     </form>
   );

@@ -14,14 +14,14 @@ export function ExportCsvButton({
   if (disabled) {
     return (
       <span aria-disabled="true" className={className}>
-        Exportar Excel
+        Exportar Excel (TSV)
       </span>
     );
   }
 
   return (
     <a className={className} href={href}>
-      Exportar Excel
+      Exportar Excel (TSV)
     </a>
   );
 }

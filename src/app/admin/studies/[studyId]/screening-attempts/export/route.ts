@@ -31,7 +31,7 @@ export async function GET(request: Request, { params }: ExportRouteContext) {
     return NextResponse.json({ message: result.message }, { status: result.code === "UNAUTHORIZED" ? 403 : 400 });
   }
 
-  return new Response(result.data.csv, {
+  return new Response(result.data.fileContent, {
     headers: {
       "Cache-Control": "no-store",
       "Content-Disposition": `attachment; filename="${result.data.filename}"`,

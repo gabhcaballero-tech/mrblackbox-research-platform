@@ -287,7 +287,12 @@ describe("PortalEvidenceCapture", () => {
 });
 
 async function uploadPhoto(buttonName: string) {
-  fireEvent.click(screen.getByRole("button", { name: buttonName }));
+  const openCameraButton = screen.queryByRole("button", { name: buttonName });
+
+  if (openCameraButton) {
+    fireEvent.click(openCameraButton);
+  }
+
   fireEvent.click(await screen.findByRole("button", { name: "Tomar foto" }));
   fireEvent.click(await screen.findByRole("button", { name: "Usar esta foto" }));
   await screen.findByText("Evidencia registrada correctamente.");

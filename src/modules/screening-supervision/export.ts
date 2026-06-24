@@ -16,8 +16,8 @@ import {
 } from "./service";
 import { parseScreeningAttemptFilters } from "./validation";
 
-const CSV_SEPARATOR = ";";
-const CSV_CONTENT_TYPE = "text/csv; charset=utf-8";
+const TSV_SEPARATOR = "\t";
+const TSV_CONTENT_TYPE = "text/tab-separated-values; charset=utf-8";
 const DEFAULT_STUDY_TIME_ZONE = "America/Mexico_City";
 
 type ExportColumn = {
@@ -35,9 +35,9 @@ type KeyAnswerColumn = {
   questionIds: string[];
 };
 
-export type ScreeningAttemptCsvExport = {
+export type ScreeningAttemptTabularExport = {
   contentType: string;
-  csv: string;
+  fileContent: string;
   filename: string;
   rowCount: number;
 };
@@ -125,7 +125,7 @@ export async function exportScreeningAttemptsCsvForStudy({
   now?: Date;
   repository: ScreeningSupervisionRepository;
   studyId: string;
-}): Promise<ScreeningSupervisionResult<ScreeningAttemptCsvExport>> {
+}): Promise<ScreeningSupervisionResult<ScreeningAttemptTabularExport>> {
   if (!canReviewScreeningAttempts(actor)) {
     return {
       code: "UNAUTHORIZED",
@@ -160,16 +160,16 @@ export async function exportScreeningAttemptsCsvForStudy({
 
   return {
     data: {
-      contentType: CSV_CONTENT_TYPE,
-      csv: buildScreeningAttemptsCsv(attempts, study.timeZoneIana),
-      filename: `${sanitizeFilenamePart(study.code)}_intentos_screener_${formatDateForFilename(now, study.timeZoneIana)}.csv`,
+      contentType: TSV_CONTENT_TYPE,
+      fileContent: buildScreeningAttemptsTsv(attempts, study.timeZoneIana),
+      filename: `${sanitizeFilenamePart(study.code)}_intentos_screener_${formatDateForFilename(now, study.timeZoneIana)}.tsv`,
       rowCount: attempts.length
     },
     ok: true
   };
 }
 
-export function buildScreeningAttemptsCsv(attempts: SupervisionAttemptExportRecord[], timeZoneIana: string): string {
+export function buildScreeningAttemptsTsv(attempts: SupervisionAttemptExportRecord[], timeZoneIana: string): string {
   const columns = [
     ...baseColumns,
     ...keyAnswerColumns.map<ExportColumn>((column) => ({
@@ -181,11 +181,11 @@ export function buildScreeningAttemptsCsv(attempts: SupervisionAttemptExportReco
     const definition = parseScreenerDefinition(attempt.questionnaireVersion.definitionJson);
     const context = { definition, timeZoneIana };
 
-    return columns.map((column) => csvCell(column.value(attempt, context)));
+    return columns.map((column) => tsvCell(column.value(attempt, context)));
   });
-  const header = columns.map((column) => csvCell(column.header));
+  const header = columns.map((column) => tsvCell(column.header));
 
-  return `\uFEFF${[header, ...rows].map((row) => row.join(CSV_SEPARATOR)).join("\r\n")}\r\n`;
+  return `\uFEFF${[header, ...rows].map((row) => row.join(TSV_SEPARATOR)).join("\r\n")}\r\n`;
 }
 
 function keyAnswerText(attempt: SupervisionAttemptExportRecord, definition: ScreenerDefinition, questionIds: string[]): string {
@@ -396,17 +396,20 @@ function yesNo(value: boolean): string {
   return value ? "Sí" : "No";
 }
 
-function csvCell(value: string | number | null | undefined): string {
-  const text = neutralizeFormula(String(value ?? ""));
-  const escaped = text.replace(/"/g, "\"\"");
-
-  return escaped.includes(CSV_SEPARATOR) || escaped.includes("\"") || escaped.includes("\n") || escaped.includes("\r")
-    ? `"${escaped}"`
-    : escaped;
+function tsvCell(value: string | number | null | undefined): string {
+  return neutralizeFormula(sanitizeTabularValue(value));
 }
 
 function neutralizeFormula(value: string): string {
   return /^[=+\-@]/.test(value.trimStart()) ? `'${value}` : value;
+}
+
+function sanitizeTabularValue(value: string | number | null | undefined): string {
+  return String(value ?? "")
+    .replace(/\t+/g, " ")
+    .replace(/\r\n|\r|\n/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function formatDateTime(value: Date | null, timeZoneIana: string): string {

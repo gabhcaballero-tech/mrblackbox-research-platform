@@ -480,7 +480,7 @@ describe("screening supervision service", () => {
     expect(result.ok ? result.data.answers.find((answer) => answer.questionId === "F9A_VECES_AL_DIA")?.missing : null).toBe(true);
   });
 
-  it("exports CSV compatible with Excel using filters and readable answers", async () => {
+  it("exports TSV compatible with Excel using filters and cleaned cell values", async () => {
     const record = exportAttempt({
       participantConfirmation: {
         folio: "NAV-001",
@@ -512,8 +512,8 @@ describe("screening supervision service", () => {
         }
       ],
       participantScreeningReview: {
-        internalNote: "Evidencia clara.",
-        rejectionReason: null,
+        internalNote: "Evidencia\tclara.\nLista",
+        rejectionReason: "Motivo; interno, con separadores",
         reviewedAt: new Date("2026-06-24T17:10:00Z"),
         reviewedBy: { email: "sup@example.com", id: "supervisor-1", name: "Supervisor Uno" },
         status: "APPROVED"
@@ -545,25 +545,37 @@ describe("screening supervision service", () => {
       studyId: study.id
     });
 
-    expect(result.ok ? result.data.filename : null).toBe("FMASCULINA-NAVIGO-2026_intentos_screener_2026-06-24.csv");
-    expect(result.ok ? result.data.contentType : null).toBe("text/csv; charset=utf-8");
+    expect(result.ok ? result.data.filename : null).toBe("FMASCULINA-NAVIGO-2026_intentos_screener_2026-06-24.tsv");
+    expect(result.ok ? result.data.contentType : null).toBe("text/tab-separated-values; charset=utf-8");
     expect(result.ok ? result.data.rowCount : null).toBe(1);
-    expect(result.ok ? result.data.csv.startsWith("\uFEFF") : false).toBe(true);
-    expect(result.ok ? result.data.csv : "").toContain("Código del estudio;Nombre del estudio");
-    expect(result.ok ? result.data.csv : "").toContain("FMASCULINA-NAVIGO-2026");
-    expect(result.ok ? result.data.csv : "").toContain("Portal participante");
-    expect(result.ok ? result.data.csv : "").toContain("Elegible confirmado");
-    expect(result.ok ? result.data.csv : "").toContain("23 jun 2026, 8:30 a.m.");
-    expect(result.ok ? result.data.csv : "").toContain("23 jun 2026, 9:00 a.m.");
-    expect(result.ok ? result.data.csv : "").toContain("23 jun 2026, 10:00 a.m.");
-    expect(result.ok ? result.data.csv : "").toContain("24 jun 2026, 11:10 a.m.");
-    expect(result.ok ? result.data.csv : "").toContain("24 jun 2026, 12:00 p.m.");
-    expect(result.ok ? result.data.csv : "").toContain("144;C típico;RANGO-3");
-    expect(result.ok ? result.data.csv : "").toContain("Sí;1;Sí;NAV-001;A7K4;M3P9;T8R2");
-    expect(result.ok ? result.data.csv : "").toContain("Navigo|Otra - Especificación: Marca local");
-    expect(result.ok ? result.data.csv : "").not.toContain("other-attempt");
-    expect(result.ok ? result.data.csv : "").not.toContain("privateStorageKey");
-    expect(result.ok ? result.data.csv : "").not.toContain("signedUrl");
+    expect(result.ok ? result.data.fileContent.startsWith("\uFEFF") : false).toBe(true);
+    expect(result.ok ? result.data.fileContent : "").toContain("Código del estudio\tNombre del estudio");
+    expect(result.ok ? result.data.fileContent : "").toContain("FMASCULINA-NAVIGO-2026");
+    expect(result.ok ? result.data.fileContent : "").toContain("Portal participante");
+    expect(result.ok ? result.data.fileContent : "").toContain("Elegible confirmado");
+    expect(result.ok ? result.data.fileContent : "").toContain("23 jun 2026, 8:30 a.m.");
+    expect(result.ok ? result.data.fileContent : "").toContain("23 jun 2026, 9:00 a.m.");
+    expect(result.ok ? result.data.fileContent : "").toContain("23 jun 2026, 10:00 a.m.");
+    expect(result.ok ? result.data.fileContent : "").toContain("24 jun 2026, 11:10 a.m.");
+    expect(result.ok ? result.data.fileContent : "").toContain("24 jun 2026, 12:00 p.m.");
+    expect(result.ok ? result.data.fileContent : "").toContain("144\tC típico\tRANGO-3");
+    expect(result.ok ? result.data.fileContent : "").toContain("Sí\t1\tSí\tNAV-001\tA7K4\tM3P9\tT8R2");
+    expect(result.ok ? result.data.fileContent : "").toContain("Navigo|Otra - Especificación: Marca local");
+    expect(result.ok ? result.data.fileContent : "").toContain("Evidencia clara. Lista");
+    expect(result.ok ? result.data.fileContent : "").toContain("Motivo; interno, con separadores");
+    expect(result.ok ? result.data.fileContent : "").not.toContain("Evidencia\tclara.");
+    expect(result.ok ? result.data.fileContent : "").not.toContain("other-attempt");
+    expect(result.ok ? result.data.fileContent : "").not.toContain("privateStorageKey");
+    expect(result.ok ? result.data.fileContent : "").not.toContain("signedUrl");
+
+    if (result.ok) {
+      const lines = result.data.fileContent.trimEnd().split("\r\n");
+      const headerTabCount = (lines[0]?.match(/\t/g) ?? []).length;
+
+      expect(headerTabCount).toBeGreaterThan(10);
+      expect(lines[1]).toContain("\t");
+      expect(lines[0]).not.toContain("Código del estudio;Nombre del estudio");
+    }
   });
 
   it("allows SUPERVISOR to export CSV", async () => {
@@ -576,7 +588,7 @@ describe("screening supervision service", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.ok ? result.data.filename : null).toBe("FMASCULINA-NAVIGO-2026_intentos_screener_2026-06-24.csv");
+    expect(result.ok ? result.data.filename : null).toBe("FMASCULINA-NAVIGO-2026_intentos_screener_2026-06-24.tsv");
   });
 
   it("falls back to America/Mexico_City when the study time zone is missing or invalid during export", async () => {
@@ -620,10 +632,10 @@ describe("screening supervision service", () => {
       studyId: invalidTimeZoneStudy.id
     });
 
-    expect(result.ok ? result.data.csv : "").toContain("23 jun 2026, 8:30 a.m.");
-    expect(result.ok ? result.data.csv : "").toContain("23 jun 2026, 9:00 a.m.");
-    expect(result.ok ? result.data.csv : "").toContain("23 jun 2026, 10:00 a.m.");
-    expect(result.ok ? result.data.filename : null).toBe("FMASCULINA-NAVIGO-2026_intentos_screener_2026-06-24.csv");
+    expect(result.ok ? result.data.fileContent : "").toContain("23 jun 2026, 8:30 a.m.");
+    expect(result.ok ? result.data.fileContent : "").toContain("23 jun 2026, 9:00 a.m.");
+    expect(result.ok ? result.data.fileContent : "").toContain("23 jun 2026, 10:00 a.m.");
+    expect(result.ok ? result.data.filename : null).toBe("FMASCULINA-NAVIGO-2026_intentos_screener_2026-06-24.tsv");
   });
 
   it("exports headers only when there are no matching attempts", async () => {
@@ -636,8 +648,8 @@ describe("screening supervision service", () => {
     });
 
     expect(result.ok ? result.data.rowCount : null).toBe(0);
-    expect(result.ok ? result.data.csv.split("\r\n").filter(Boolean).length : null).toBe(1);
-    expect(result.ok ? result.data.csv : "").toContain("Código del estudio");
+    expect(result.ok ? result.data.fileContent.split("\r\n").filter(Boolean).length : null).toBe(1);
+    expect(result.ok ? result.data.fileContent : "").toContain("Código del estudio");
   });
 
   it("denies CSV export to roles without screening review permission", async () => {

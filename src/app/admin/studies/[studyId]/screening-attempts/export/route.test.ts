@@ -26,14 +26,14 @@ describe("screening attempts export route", () => {
     vi.clearAllMocks();
   });
 
-  it("returns a downloadable CSV attachment with the current filters", async () => {
+  it("returns a downloadable TSV attachment with the current filters", async () => {
     requireCapability.mockResolvedValue({ id: "admin-1", role: "ADMIN", status: "ACTIVE" });
     createScreeningSupervisionRepository.mockReturnValue({ kind: "repo" });
     exportScreeningAttemptsCsvForStudy.mockResolvedValue({
       data: {
-        contentType: "text/csv; charset=utf-8",
-        csv: "\uFEFFColumna A;Columna B\r\nÁRBOL;C TÍPICO\r\n",
-        filename: "FMASCULINA-NAVIGO-2026_intentos_screener_2026-06-24.csv",
+        contentType: "text/tab-separated-values; charset=utf-8",
+        fileContent: "\uFEFFColumna A\tColumna B\r\nARBOL\tC TIPICO\r\n",
+        filename: "FMASCULINA-NAVIGO-2026_intentos_screener_2026-06-24.tsv",
         rowCount: 1
       },
       ok: true
@@ -61,17 +61,18 @@ describe("screening attempts export route", () => {
       studyId: "study-1"
     });
     expect(response.status).toBe(200);
-    expect(response.headers.get("Content-Type")).toBe("text/csv; charset=utf-8");
+    expect(response.headers.get("Content-Type")).toBe("text/tab-separated-values; charset=utf-8");
     expect(response.headers.get("Content-Disposition")).toBe(
-      'attachment; filename="FMASCULINA-NAVIGO-2026_intentos_screener_2026-06-24.csv"'
+      'attachment; filename="FMASCULINA-NAVIGO-2026_intentos_screener_2026-06-24.tsv"'
     );
 
     const bytes = new Uint8Array(await response.clone().arrayBuffer());
     const body = await response.text();
 
     expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
-    expect(body).toContain(";");
-    expect(body).toContain("ÁRBOL");
+    expect(body).toContain("\t");
+    expect(body).not.toContain("Columna A;Columna B");
+    expect(body).toContain("ARBOL");
   });
 
   it("returns 403 when the actor cannot export", async () => {

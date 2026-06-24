@@ -145,25 +145,27 @@ describe("ScreeningSupervisionComponents", () => {
   it("shows an Excel export action that preserves current filters", () => {
     render(<ScreeningAttemptFilters data={{ ...listData, filters: { ...listData.filters, code: "PASSED" } }} />);
 
-    expect(screen.getByRole("link", { name: "Exportar Excel" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Exportar Excel (TSV)" })).toHaveAttribute(
       "href",
       "/admin/studies/study-1/screening-attempts/export?participantQuery=Gabriela&code=PASSED"
     );
-    expect(screen.getByText("La exportación descarga un CSV compatible con Excel y respeta los filtros actuales.")).toBeInTheDocument();
+    expect(
+      screen.getByText("La exportacion descarga un archivo tabulado compatible con Excel y respeta los filtros actuales.")
+    ).toBeInTheDocument();
   });
 
   it("disables the export action when there are no attempts to export", () => {
     render(<ScreeningAttemptFilters data={{ ...listData, attempts: [] }} />);
 
-    expect(screen.queryByRole("link", { name: "Exportar Excel" })).not.toBeInTheDocument();
-    expect(screen.getByText("Exportar Excel")).toHaveAttribute("aria-disabled", "true");
+    expect(screen.queryByRole("link", { name: "Exportar Excel (TSV)" })).not.toBeInTheDocument();
+    expect(screen.getByText("Exportar Excel (TSV)")).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByText("No hay intentos con los filtros actuales para exportar.")).toBeInTheDocument();
   });
 
   it("renders the export control without client event handlers", () => {
     render(<ScreeningAttemptFilters data={listData} />);
 
-    const exportLink = screen.getByRole("link", { name: "Exportar Excel" });
+    const exportLink = screen.getByRole("link", { name: "Exportar Excel (TSV)" });
 
     expect(exportLink.getAttribute("href")).toBe("/admin/studies/study-1/screening-attempts/export?participantQuery=Gabriela");
     expect(exportLink.getAttribute("onClick")).toBeNull();
