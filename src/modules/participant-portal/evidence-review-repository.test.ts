@@ -81,6 +81,7 @@ function createDeleteContext(options?: {
   evidence?: Array<{ id: string }>;
   folioSequences?: Array<{ folioSequence: number }>;
   internalUser?: { id: string } | null;
+  participantActivityEvidence?: Array<{ id: string }>;
   participantActivities?: Array<{ id: string }>;
   participantArmAssignments?: Array<{ id: string }>;
   participantAttributeOrders?: Array<{ id: string }>;
@@ -100,6 +101,9 @@ function createDeleteContext(options?: {
     },
     participantActivity: {
       findMany: vi.fn(async () => options?.participantActivities ?? [])
+    },
+    participantActivityEvidence: {
+      findMany: vi.fn(async () => options?.participantActivityEvidence ?? [])
     },
     participantArmAssignment: {
       findMany: vi.fn(async () => options?.participantArmAssignments ?? [])

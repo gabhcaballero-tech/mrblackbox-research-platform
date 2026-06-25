@@ -214,6 +214,9 @@ type EvidenceReviewTransactionClient = {
     update: (args: unknown) => Promise<PortalEvidenceRecord>;
     updateMany: (args: unknown) => Promise<unknown>;
   };
+  participantActivityEvidence: {
+    findMany: (args: unknown) => Promise<Array<{ id: string }>>;
+  };
   participantConsent: {
     deleteMany: (args: unknown) => Promise<unknown>;
   };
@@ -1274,6 +1277,14 @@ async function findUnsupportedDeleteRelations(
       studyParticipantId: input.studyParticipantId
     }
   });
+  const activityEvidence = await tx.participantActivityEvidence.findMany({
+    select: {
+      id: true
+    },
+    where: {
+      studyParticipantId: input.studyParticipantId
+    }
+  });
   const attributeOrders = await tx.participantAttributeOrder.findMany({
     select: {
       id: true
@@ -1311,6 +1322,10 @@ async function findUnsupportedDeleteRelations(
 
   if (activities.length > 0) {
     relations.push("participant_activities");
+  }
+
+  if (activityEvidence.length > 0) {
+    relations.push("participant_activity_evidence");
   }
 
   if (attributeOrders.length > 0) {

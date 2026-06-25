@@ -330,6 +330,7 @@ model InternalUser {
   insertedLibraryUses         QuestionnaireDraftLibraryUse[]    @relation("QuestionnaireDraftLibraryUseInsertedBy")
   screeningAttempts           ScreeningAttempt[]               @relation("ScreeningAttemptFieldUser")
   reviewedParticipantEvidence ParticipantEvidence[]             @relation("ParticipantEvidenceReviewedBy")
+  reviewedParticipantActivityEvidence ParticipantActivityEvidence[] @relation("ParticipantActivityEvidenceReviewedBy")
   reviewedParticipantScreeningReviews ParticipantScreeningReview[] @relation("ParticipantScreeningReviewReviewedBy")
   approvedParticipantConfirmations ParticipantConfirmation[]     @relation("ParticipantConfirmationApprovedBy")
   manualParticipantMessagesMarkedSent ParticipantConfirmation[]  @relation("ParticipantConfirmationManualMessageMarkedSentBy")
@@ -522,6 +523,7 @@ model StudyParticipant {
   screeningAttempts              ScreeningAttempt[]
   participantConsents            ParticipantConsent[]
   participantEvidence            ParticipantEvidence[]
+  participantActivityEvidence    ParticipantActivityEvidence[]
   participantScreeningReviews    ParticipantScreeningReview[]
   participantConfirmation        ParticipantConfirmation?
   quotaEvaluations               QuotaEvaluation[]
@@ -810,6 +812,35 @@ model ParticipantEvidence {
   @@map("participant_evidence")
 }
 
+model ParticipantActivityEvidence {
+  id                    String                          @id @default(uuid()) @db.Uuid
+  participantActivityId String                          @db.Uuid
+  studyParticipantId    String                          @db.Uuid
+  type                  ParticipantEvidenceType
+  storageBucket         String
+  privateStorageKey     String                          @unique
+  originalFilename      String?
+  mimeType              String
+  extension             String
+  sizeBytes             Int
+  reviewStatus          ParticipantEvidenceReviewStatus @default(PENDING)
+  reviewedByUserId      String?                         @db.Uuid
+  reviewedAt            DateTime?
+  rejectionReason       String?
+  internalNote          String?
+  uploadedAt            DateTime                        @default(now())
+
+  participantActivity ParticipantActivity @relation(fields: [participantActivityId], references: [id])
+  studyParticipant    StudyParticipant    @relation(fields: [studyParticipantId], references: [id])
+  reviewedBy          InternalUser?       @relation("ParticipantActivityEvidenceReviewedBy", fields: [reviewedByUserId], references: [id])
+
+  @@unique([participantActivityId, type])
+  @@index([studyParticipantId, uploadedAt])
+  @@index([reviewStatus])
+  @@index([reviewedByUserId])
+  @@map("participant_activity_evidence")
+}
+
 model ParticipantScreeningReview {
   id                 String                           @id @default(uuid()) @db.Uuid
   screeningAttemptId String                           @unique @db.Uuid
@@ -970,6 +1001,7 @@ model ActivitySchedule {
   studyId                String                 @db.Uuid
   type                   ActivityType
   name                   String
+  code                   String?
   anchorEvent            ActivityAnchorEvent    @default(APPLICATION_STARTED)
   offsetMinutes          Int
   windowStartsMinutes    Int
@@ -983,6 +1015,7 @@ model ActivitySchedule {
   questionnaireVersion QuestionnaireVersion? @relation(fields: [questionnaireVersionId], references: [id])
   participantActivities ParticipantActivity[]
 
+  @@unique([studyId, code])
   @@unique([studyId, type, sortOrder])
   @@index([studyId, status])
   @@index([questionnaireVersionId])
@@ -1010,6 +1043,7 @@ model ParticipantActivity {
   reopenedBy       InternalUser?    @relation("ParticipantActivityReopenedBy", fields: [reopenedByUserId], references: [id])
   reminders        ReminderLog[]
   responses        ResearchResponse[]
+  participantActivityEvidence ParticipantActivityEvidence[]
   mediaEvidence    MediaEvidencePlaceholder?
 
   @@unique([studyParticipantId, activityScheduleId, occurrenceKey], map: "participant_activity_occurrence_unique")

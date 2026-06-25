@@ -23,6 +23,7 @@ export const activityScheduleSchema = z
     id: z.string().trim().min(1),
     type: activityTypeSchema,
     name: z.string().trim().min(1),
+    code: z.string().trim().min(1).optional(),
     anchorEvent: activityAnchorEventSchema,
     offsetMinutes: z.number().int().min(0),
     windowStartsMinutes: z.number().int(),

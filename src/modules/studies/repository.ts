@@ -149,6 +149,7 @@ type StudyPrismaClient = PrismaClientLike & {
   mediaEvidencePlaceholder: CountDelegate;
   participantAccessToken: CountDelegate;
   participantActivity: CountDelegate;
+  participantActivityEvidence: CountDelegate;
   participantArmAssignment: CountDelegate;
   participantAttributeOrder: CountDelegate;
   participantConfirmation: CountDelegate;
@@ -432,6 +433,15 @@ async function getDeletionBlockers(
     countBlocker(prisma.participantActivity, studyId, "participantActivities", "actividades de participante", {
       where: { studyParticipant: { studyId } }
     }),
+    countBlocker(
+      prisma.participantActivityEvidence,
+      studyId,
+      "participantActivityEvidence",
+      "evidencias de actividad",
+      {
+        where: { studyParticipant: { studyId } }
+      }
+    ),
     countBlocker(prisma.applicationTimeEvent, studyId, "applicationTimeEvents", "eventos de hora de aplicacion", {
       where: { studyParticipant: { studyId } }
     }),

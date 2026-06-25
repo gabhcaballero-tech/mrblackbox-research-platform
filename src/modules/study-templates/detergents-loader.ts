@@ -162,6 +162,7 @@ type DetergentsTemplatePrismaClient = PrismaClientLike & {
 
 type DetergentsTemplateTransaction = {
   participantActivity: CountDelegate;
+  participantActivityEvidence: CountDelegate;
   participantConfirmation: CountDelegate;
   participantConsent: CountDelegate;
   participantEvidence: CountDelegate;
@@ -422,6 +423,9 @@ async function countOperationalStudyRecords(
   const participantActivities = await transaction.participantActivity.count({
     where: { studyParticipant: { studyId } }
   });
+  const participantActivityEvidence = await transaction.participantActivityEvidence.count({
+    where: { studyParticipant: { studyId } }
+  });
   const researchResponses = await transaction.researchResponse.count({
     where: { participantActivity: { studyParticipant: { studyId } } }
   });
@@ -435,6 +439,7 @@ async function countOperationalStudyRecords(
     participantConfirmations +
     participantReferenceCodes +
     participantActivities +
+    participantActivityEvidence +
     researchResponses
   );
 }

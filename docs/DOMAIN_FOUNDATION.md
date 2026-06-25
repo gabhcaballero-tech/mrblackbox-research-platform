@@ -9,6 +9,7 @@
 - `quotas`: definicion y evaluacion de cuotas por criterios y etapa de conteo.
 - `comparative-rotation`: validacion y configuracion administrativa de productos, brazos y rotaciones manuales de dos brazos para V1.
 - `activities`: calculo de actividades programadas desde `applicationStartedAt` y reglas de correccion de hora.
+- `navigo-app`: fundacion tecnica para mediciones T0, 2 h, 4 h y 8 h de Navigo.
 - `randomization`: aleatorizacion determinista de atributos por semilla, contexto y configuracion de orden compartido o independiente.
 - `questionnaire-engine`: esquema minimo de snapshot publicado e inmutable.
 - `responses`: construccion determinista de `responseKey` para guardados parciales o autosave sin duplicados.
@@ -33,6 +34,8 @@
 - La configuracion comparativa V1 usa productos sensibles, brazos canonicos `left`/`right` y planes manuales `MANUAL`.
 - Las actividades usan offsets y ventanas configurables; los offsets de prueba cubren 15, 120, 240 y 480 minutos.
 - Las actividades recurrentes usan `occurrenceKey` para permitir varias instancias del mismo schedule.
+- Navigo Fase 1 usa codigos estables de schedule `T0_SALON`, `T2_HORAS`, `T4_HORAS` y `T8_HORAS`.
+- Las selfies de medicion futura no se mezclan con `ParticipantEvidence`; se reservan para `ParticipantActivityEvidence`.
 - La correccion de hora siempre devuelve una decision explicita e indica si requiere auditoria.
 - La aleatorizacion de atributos usa semilla inyectable y permite reutilizar ordenes guardadas al retomar.
 - La pregunta final de atributos queda fija y fuera de los grupos aleatorizados.

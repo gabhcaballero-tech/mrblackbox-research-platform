@@ -26,6 +26,7 @@ Instaladas posteriormente para la fundacion de autenticacion interna:
 - `prisma/migrations/20260623003740_add_screener_pending_review_evaluation/migration.sql`
 - `prisma/migrations/20260623082108_add_screener_question_library/migration.sql`
 - `prisma/migrations/migration_lock.toml`
+- `prisma/migrations/20260625144216_add_navigo_app_foundation/migration.sql`
 - `src/shared/db/client.ts`
 - `src/shared/db/index.ts`
 - `.env.example`
@@ -51,6 +52,7 @@ El esquema prepara PostgreSQL con Prisma para:
 - Cuotas: `QuotaDefinition` guarda criterios flexibles y etapa; `QuotaEvaluation` registra match, conteo, cuota llena y aviso sin bloqueo.
 - Hora de aplicacion: `ApplicationTimeEvent` registra alta y correccion de `applicationStartedAt` con usuario, motivo y estado de actividades.
 - Actividades: `ActivitySchedule` define mediciones, video futuro y seguimiento; `ParticipantActivity` instancia horarios, ventanas, ocurrencia y estados por participacion.
+- Evidencia por actividad: `ParticipantActivityEvidence` guarda selfies u otras evidencias ligadas a una medicion concreta, sin mezclarla con el screener.
 - Respuestas: `ResearchResponse` guarda respuestas por actividad, `responseKey`, version de cuestionario, pregunta, bloque y contexto de producto o brazo.
 - Aleatorizacion: `AttributeRandomizationConfig` y `ParticipantAttributeOrder` guardan configuracion y orden persistente por participacion, version, bloque y contexto.
 - Seguimientos: `ReminderLog` registra seguimiento interno sin integrar correo, SMS o WhatsApp.
@@ -70,6 +72,7 @@ El esquema prepara PostgreSQL con Prisma para:
 - `QuotaEvaluation.blocksInterview` existe y queda por defecto en `false`, reflejando la regla V1 de aviso no bloqueante.
 - El orden de atributos tiene `orderKey` para evitar duplicados por participacion, version, bloque y contexto, incluyendo orden compartido.
 - `ActivitySchedule.recurrenceJson` puede describir recurrencia futura, pero cada instancia generada debe persistirse como `ParticipantActivity` con `occurrenceKey` propio.
+- `ActivitySchedule.code` queda nullable para no forzar backfill peligroso, pero la fundacion de Navigo exige `code` en servicio para `T0_SALON`, `T2_HORAS`, `T4_HORAS` y `T8_HORAS`.
 - Las mediciones no recurrentes deben usar una ocurrencia estandar, como `DEFAULT`.
 - `ResearchResponse.responseKey` debe construirse deterministamente con pregunta, bloque y contexto; no debe contener PII.
 - La consistencia de estudio para rotacion manual queda como regla obligatoria de aplicacion antes de persistir, no como trigger ni SQL manual.
@@ -92,6 +95,8 @@ El esquema prepara PostgreSQL con Prisma para:
 - `ScreeningAnswer` evita duplicar respuesta por intento y pregunta.
 - `QuotaDefinition` evita nombres duplicados por estudio.
 - `ParticipantActivity` evita duplicar schedule y ocurrencia por participacion mediante `@@unique([studyParticipantId, activityScheduleId, occurrenceKey])`.
+- `ActivitySchedule` agrega `@@unique([studyId, code])`, permitiendo multiples `NULL` en PostgreSQL.
+- `ParticipantActivityEvidence` evita duplicar el mismo tipo de evidencia en una actividad con `@@unique([participantActivityId, type])`.
 - `ResearchResponse` evita duplicar respuesta por actividad mediante `@@unique([participantActivityId, responseKey])`.
 - `ParticipantAttributeOrder` evita duplicados por participacion, version, bloque y `orderKey`.
 - `ParticipantAccessToken.tokenHash` es unico.
@@ -215,6 +220,22 @@ Resumen:
 - agrega unicidad para `ParticipantEvidence.privateStorageKey`.
 
 No se aplico a Supabase ni a ninguna base de datos. El detalle de decisiones queda en `docs/PARTICIPANT_PORTAL_FOUNDATION.md`.
+
+## Fundacion tecnica App Navigo - Fase 1
+
+Migracion creada y no aplicada:
+
+- `20260625144216_add_navigo_app_foundation`
+
+Resumen:
+
+- agrega `activity_schedules.code` nullable para codigos estables de slot;
+- crea `participant_activity_evidence` para evidencias por medicion;
+- reutiliza enums existentes `ParticipantEvidenceType` y `ParticipantEvidenceReviewStatus`;
+- mantiene intacto `participant_evidence` para el screener/portal ya operativo;
+- prepara la base de `T0_SALON`, `T2_HORAS`, `T4_HORAS` y `T8_HORAS` sin abrir todavia una experiencia productiva al participante.
+
+No se aplico a Supabase ni a ninguna base de datos.
 
 ## Validaciones ejecutadas
 
