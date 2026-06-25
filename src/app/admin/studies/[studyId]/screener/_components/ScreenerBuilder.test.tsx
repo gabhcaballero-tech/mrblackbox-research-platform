@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { ScreenerDefinition } from "@/modules/screener";
 import type { ScreenerDraftRecord } from "@/modules/screener/repository";
 import type { LibraryItemProjection } from "@/modules/question-library/service";
-import { ScreenerBuilder } from "./ScreenerBuilder";
+import { DETERGENTS_STUDY_CODE, NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
+import { formatScreenerDate, ScreenerBuilder } from "./ScreenerBuilder";
 
 vi.mock("@/modules/screener/actions", () => ({
   addConsentDefaultOptionsAction: vi.fn(),
@@ -35,6 +36,7 @@ vi.mock("@/modules/screener/actions", () => ({
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
+    push: vi.fn(),
     refresh: vi.fn()
   })
 }));
@@ -88,7 +90,28 @@ const testDefinition: ScreenerDefinition = {
   title: "Filtro de prueba"
 };
 
-function renderBuilder(definition: ScreenerDefinition, libraryItems: LibraryItemProjection[] = []) {
+const emptyDefinition: ScreenerDefinition = {
+  purpose: "SCREENER",
+  questions: [],
+  rules: [],
+  schemaVersion: "screening.v1",
+  title: "Filtro vacío"
+};
+
+function renderBuilder(
+  definition: ScreenerDefinition,
+  libraryItems: LibraryItemProjection[] = [],
+  overrides: {
+    draftUpdatedAt?: Date;
+    study?: Partial<{
+      code: string;
+      id: string;
+      name: string;
+      status: "ACTIVE" | "ARCHIVED" | "DRAFT" | "PAUSED";
+      timeZoneIana: string;
+    }>;
+  } = {}
+) {
   render(
     <ScreenerBuilder
       definition={definition}
@@ -101,7 +124,7 @@ function renderBuilder(definition: ScreenerDefinition, libraryItems: LibraryItem
         purpose: "SCREENER",
         status: "DRAFT",
         studyId: "study-1",
-        updatedAt: new Date("2026-01-02T12:00:00Z"),
+        updatedAt: overrides.draftUpdatedAt ?? new Date("2026-01-02T12:00:00Z"),
         updatedByUserId: null
       }}
       libraryItems={libraryItems}
@@ -111,7 +134,8 @@ function renderBuilder(definition: ScreenerDefinition, libraryItems: LibraryItem
         id: "study-1",
         name: "Estudio de prueba",
         status: "DRAFT",
-        timeZoneIana: "America/Mexico_City"
+        timeZoneIana: "America/Mexico_City",
+        ...overrides.study
       }}
       versions={[
         {
@@ -201,6 +225,52 @@ function openVisibilityPanel(index: number) {
 }
 
 describe("ScreenerBuilder", () => {
+  it("muestra guia y boton de plantilla cuando detergentes no tiene preguntas", () => {
+    renderBuilder(emptyDefinition, [], {
+      study: {
+        code: DETERGENTS_STUDY_CODE
+      }
+    });
+
+    expect(
+      screen.getByText(
+        "Este estudio no tiene preguntas todavía. Puedes cargar una plantilla disponible o editar el cuestionario manualmente."
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cargar plantilla de detergentes" })).toBeInTheDocument();
+  });
+
+  it("no muestra el boton de detergentes para Navigo", () => {
+    renderBuilder(emptyDefinition, [], {
+      study: {
+        code: NAVIGO_STUDY_CODE
+      }
+    });
+
+    expect(
+      screen.getByText(
+        "Este estudio no tiene preguntas todavía. Puedes cargar una plantilla disponible o editar el cuestionario manualmente."
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cargar plantilla de detergentes" })).not.toBeInTheDocument();
+  });
+
+  it("formatea actualizado en la zona horaria del estudio", () => {
+    renderBuilder(testDefinition, [], {
+      draftUpdatedAt: new Date("2026-06-25T00:15:00Z"),
+      study: {
+        timeZoneIana: "America/Mexico_City"
+      }
+    });
+
+    expect(formatScreenerDate(new Date("2026-06-25T00:15:00Z"), "America/Mexico_City")).toContain("24 jun 2026");
+    expect(screen.getByText(/24 jun 2026/)).toBeInTheDocument();
+  });
+
+  it("usa America/Mexico_City como fallback de zona horaria", () => {
+    expect(formatScreenerDate(new Date("2026-06-25T00:15:00Z"), "Zona/Invalida")).toContain("24 jun 2026");
+  });
+
   it("ofrece crear una nueva versión cuando el estudio activo no tiene borrador editable", () => {
     renderActiveBuilder({ definition: null, draft: null, readOnly: true });
 

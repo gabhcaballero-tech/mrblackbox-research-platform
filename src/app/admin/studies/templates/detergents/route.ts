@@ -14,7 +14,7 @@ export async function POST() {
         message: result.message,
         ok: false
       },
-      { status: result.code === "UNAUTHORIZED" ? 403 : 500 }
+      { status: result.code === "UNAUTHORIZED" ? 403 : result.code === "PARTIAL_STUDY_HAS_DATA" ? 409 : 500 }
     );
   }
 

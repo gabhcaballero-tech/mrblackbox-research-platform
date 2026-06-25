@@ -16,11 +16,12 @@ import { createScreenerRepository } from "@/modules/screener/repository";
 import { getScreenerBuilderForAdmin } from "@/modules/screener/service";
 import { createStudiesRepository } from "@/modules/studies/repository";
 import { getStudyRiskForAdmin } from "@/modules/studies/service";
-import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
+import { DETERGENTS_STUDY_CODE, getStudyBehavior } from "@/modules/study-templates/study-behavior";
 import { ActivateStudyPanel } from "./_components/ActivateStudyPanel";
 import { ArmSection } from "./_components/ArmSection";
 import { ConfigurationChecklist } from "./_components/ConfigurationChecklist";
 import { ConfigurationSummary } from "./_components/ConfigurationSummary";
+import { DetergentsTemplateButton } from "./_components/DetergentsTemplateButton";
 import { ParticipantPortalSection } from "./_components/ParticipantPortalSection";
 import { ProductSection } from "./_components/ProductSection";
 import { RotationSection } from "./_components/RotationSection";
@@ -132,6 +133,21 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
 
       <div className="space-y-8">
         <ConfigurationSummary config={config} readOnly={readOnly} />
+        {config.study.code === DETERGENTS_STUDY_CODE ? (
+          <section className="rounded-lg border border-teal-200 bg-teal-50 p-5">
+            <p className="text-sm font-semibold uppercase tracking-wide text-teal-800">
+              Plantillas disponibles
+            </p>
+            <h2 className="mt-2 text-xl font-semibold text-zinc-950">Filtro de detergentes</h2>
+            <p className="mt-2 text-sm leading-6 text-zinc-700">
+              Carga o actualiza la plantilla autoaplicable de detergentes sin crear estudios duplicados.
+              Si este estudio fue creado manualmente, se completara de forma idempotente.
+            </p>
+            <div className="mt-4">
+              <DetergentsTemplateButton studyId={studyId} />
+            </div>
+          </section>
+        ) : null}
         <ActivateStudyPanel canActivate={!readOnly && hasActiveScreener} studyId={studyId} />
         <ConfigurationChecklist checklist={checklist} />
         <ParticipantPortalSection data={participantPortalResult.data} studyId={studyId} />

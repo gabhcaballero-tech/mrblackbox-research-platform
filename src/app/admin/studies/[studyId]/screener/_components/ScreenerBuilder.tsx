@@ -29,6 +29,7 @@ import {
   STUDY_STATUS_LABELS,
   UI_LABELS
 } from "@/shared/ui/labels";
+import { DETERGENTS_STUDY_CODE } from "@/modules/study-templates/study-behavior";
 import { AddContentTabs } from "./AddContentTabs";
 import { ConsentDefaultOptionsButton } from "./ConsentDefaultOptionsButton";
 import {
@@ -42,6 +43,7 @@ import { OptionEditForm } from "./OptionEditForm";
 import { QuestionMoveControls } from "./QuestionMoveControls";
 import { QuestionVisibilityForm } from "./QuestionVisibilityForm";
 import { RuleGuidedForm } from "./RuleGuidedForm";
+import { DetergentsTemplateButton } from "../../_components/DetergentsTemplateButton";
 
 type ScreenerBuilderProps = {
   definition: ScreenerDefinition | null;
@@ -86,10 +88,25 @@ const optionActionTypes = [
   "PENDING_REVIEW"
 ] satisfies Array<ScreenerOption["actions"][number]["type"]>;
 
-const dateFormatter = new Intl.DateTimeFormat("es-MX", {
-  dateStyle: "medium",
-  timeStyle: "short"
-});
+const DEFAULT_STUDY_TIME_ZONE = "America/Mexico_City";
+
+export function formatScreenerDate(value: Date, timeZoneIana?: string | null): string {
+  const timeZone = timeZoneIana || DEFAULT_STUDY_TIME_ZONE;
+
+  try {
+    return new Intl.DateTimeFormat("es-MX", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone
+    }).format(value);
+  } catch {
+    return new Intl.DateTimeFormat("es-MX", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: DEFAULT_STUDY_TIME_ZONE
+    }).format(value);
+  }
+}
 
 export function ScreenerBuilder({
   definition,
@@ -115,12 +132,14 @@ export function ScreenerBuilder({
             draft={draft}
             definition={definition}
             isPreparingNewVersion={isPreparingNewVersion}
+            timeZoneIana={study.timeZoneIana}
           />
           <MetadataPanel definition={definition} readOnly={readOnly} studyId={study.id} />
           <QuestionPanel
             definition={definition}
             libraryItems={libraryItems}
             readOnly={readOnly}
+            study={study}
             studyId={study.id}
           />
           <RulePanel definition={definition} readOnly={readOnly} studyId={study.id} />
@@ -134,7 +153,12 @@ export function ScreenerBuilder({
         </>
       )}
 
-      <VersionHistory canRetire={study.status === "DRAFT"} studyId={study.id} versions={versions} />
+      <VersionHistory
+        canRetire={study.status === "DRAFT"}
+        studyId={study.id}
+        timeZoneIana={study.timeZoneIana}
+        versions={versions}
+      />
     </div>
   );
 }
@@ -222,12 +246,14 @@ function DraftStatusPanel({
   activeVersion,
   definition,
   draft,
-  isPreparingNewVersion
+  isPreparingNewVersion,
+  timeZoneIana
 }: {
   activeVersion: ScreenerVersionRecord | null;
   definition: ScreenerDefinition;
   draft: ScreenerDraftRecord;
   isPreparingNewVersion: boolean;
+  timeZoneIana?: string | null;
 }) {
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
@@ -255,7 +281,7 @@ function DraftStatusPanel({
         </div>
         <div>
           <dt className="font-medium text-zinc-500">{UI_LABELS.common.updated}</dt>
-          <dd className="mt-1 text-zinc-900">{dateFormatter.format(draft.updatedAt)}</dd>
+          <dd className="mt-1 text-zinc-900">{formatScreenerDate(draft.updatedAt, timeZoneIana)}</dd>
         </div>
       </dl>
     </section>
@@ -305,11 +331,13 @@ function QuestionPanel({
   definition,
   libraryItems,
   readOnly,
+  study,
   studyId
 }: {
   definition: ScreenerDefinition;
   libraryItems: LibraryItemProjection[];
   readOnly: boolean;
+  study: ScreenerStudySummary;
   studyId: string;
 }) {
   const questions = [...definition.questions].sort((left, right) => left.order - right.order);
@@ -322,9 +350,7 @@ function QuestionPanel({
       />
       <div className="space-y-4">
         {questions.length === 0 ? (
-          <p className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
-            {UI_LABELS.screener.noDraftQuestions}
-          </p>
+          <EmptyQuestionsGuide readOnly={readOnly} study={study} />
         ) : (
           questions.map((question) => (
             <QuestionCard
@@ -361,6 +387,26 @@ function QuestionPanel({
         />
       </div>
     </section>
+  );
+}
+
+function EmptyQuestionsGuide({
+  readOnly,
+  study
+}: {
+  readOnly: boolean;
+  study: ScreenerStudySummary;
+}) {
+  const canLoadDetergents = !readOnly && study.code === DETERGENTS_STUDY_CODE;
+
+  return (
+    <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      <p>
+        Este estudio no tiene preguntas todavía. Puedes cargar una plantilla disponible o editar el
+        cuestionario manualmente.
+      </p>
+      {canLoadDetergents ? <DetergentsTemplateButton compact studyId={study.id} /> : null}
+    </div>
   );
 }
 
@@ -681,10 +727,12 @@ function PublishPanel({
 function VersionHistory({
   canRetire,
   studyId,
+  timeZoneIana,
   versions
 }: {
   canRetire: boolean;
   studyId: string;
+  timeZoneIana?: string | null;
   versions: ScreenerVersionRecord[];
 }) {
   return (
@@ -708,7 +756,7 @@ function VersionHistory({
                   </h3>
                   <p className="mt-1 text-sm text-zinc-600">
                     {QUESTIONNAIRE_VERSION_STATUS_LABELS[version.status]} · {UI_LABELS.screener.publishedOn}{" "}
-                    {dateFormatter.format(version.publishedAt)}
+                    {formatScreenerDate(version.publishedAt, timeZoneIana)}
                   </p>
                   <p className="mt-1 break-all font-mono text-xs text-zinc-500">
                     {UI_LABELS.screener.definitionHash}: {version.definitionHash}
