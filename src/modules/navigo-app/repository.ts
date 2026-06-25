@@ -18,10 +18,14 @@ import {
 } from "./definition";
 import {
   buildNavigoActivityTimeline,
+  buildNavigoRotationChecklist,
+  buildNavigoStartT0PendingMessage,
+  normalizeNavigoRotationCode,
   prepareNavigoParticipantActivities,
   validateNavigoMeasurementAnswers,
   type NavigoActivityRecord,
   type NavigoAnswerInput,
+  type NavigoRotationChecklist,
   type NavigoScheduleRecord
 } from "./service";
 
@@ -54,6 +58,14 @@ export type NavigoParticipantListItem = {
     name: string;
     phone: string | null;
   };
+  rotation: {
+    applicationKitCode: string | null;
+    checklist: NavigoRotationChecklist;
+    leftCode: string | null;
+    ready: boolean;
+    rightCode: string | null;
+    startPendingMessage: string | null;
+  };
   rotationReady: boolean;
   status: "APPROVED" | "CONFIRMED" | "PENDING" | "REJECTED" | "TERMINATED";
 };
@@ -80,6 +92,16 @@ export type NavigoStartT0Result =
       message: string;
       ok: false;
     };
+
+export type NavigoConfigureRotationInput = {
+  actorUserId: string;
+  applicationKitCode: string;
+  leftFragranceCode: string;
+  rightFragranceCode: string;
+  studyParticipantId: string;
+  triangularCode1?: string | null;
+  triangularCode2?: string | null;
+};
 
 export type NavigoParticipantActivitiesView =
   | {
@@ -142,6 +164,11 @@ export type NavigoActionResult<T = unknown> =
     };
 
 export type NavigoAppRepository = {
+  configureParticipantRotation: (input: NavigoConfigureRotationInput) => Promise<NavigoActionResult<{
+    applicationKitCode: string;
+    leftFragranceCode: string;
+    rightFragranceCode: string;
+  }>>;
   confirmActivitySelfieUpload: (input: {
     activityId: string;
     metadata: EvidenceUploadMetadata & {
@@ -179,6 +206,8 @@ export type NavigoAppRepository = {
 
 type Delegate = {
   create?: (args: unknown) => Promise<unknown>;
+  createMany?: (args: unknown) => Promise<unknown>;
+  deleteMany?: (args: unknown) => Promise<unknown>;
   findFirst?: (args: unknown) => Promise<unknown>;
   findMany?: (args: unknown) => Promise<unknown[]>;
   findUnique?: (args: unknown) => Promise<unknown>;
@@ -193,9 +222,15 @@ type NavigoPrismaClient = PrismaClientLike & {
   participantAccessToken: Delegate;
   participantActivity: Delegate;
   participantActivityEvidence: Delegate;
+  participantArmAssignment: Delegate;
+  participantRotationAssignment: Delegate;
   researchResponse: Delegate;
+  rotationPlan: Delegate;
+  rotationPlanArm: Delegate;
+  studyArm: Delegate;
   study: Delegate;
   studyParticipant: Delegate;
+  studyProduct: Delegate;
 };
 
 type NavigoTransactionClient = Omit<NavigoPrismaClient, "$connect" | "$disconnect" | "$transaction"> & {
@@ -279,6 +314,7 @@ const participantSelect = {
   },
   rotationAssignment: {
     select: {
+      rotationCode: true,
       arms: {
         orderBy: { applicationOrder: "asc" },
         select: {
@@ -289,6 +325,13 @@ const participantSelect = {
               code: true,
               label: true,
               sortOrder: true
+            }
+          },
+          studyProduct: {
+            select: {
+              displayLabel: true,
+              id: true,
+              internalCode: true
             }
           }
         }
@@ -339,10 +382,12 @@ type ParticipantRecord = {
   participantProfile: { email: string | null; id: string; name: string; phone: string | null };
   participantScreeningReviews: Array<{ status: "APPROVED" | "PENDING" | "REJECTED" }>;
   rotationAssignment: {
+    rotationCode: string;
     arms: Array<{
       applicationOrder: number;
       participantVisibleLabel: string;
       studyArm: { code: string; label: string; sortOrder: number };
+      studyProduct: { displayLabel: string; id: string; internalCode: string };
     }>;
   } | null;
   screeningStatus: "INCOMPLETE" | "NOT_STARTED" | "PASSED" | "PENDING_REVIEW" | "STARTED" | "TERMINATED";
@@ -399,6 +444,241 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
   }
 
   return {
+    async configureParticipantRotation(input) {
+      const leftFragranceCode = normalizeNavigoRotationCode(input.leftFragranceCode);
+      const rightFragranceCode = normalizeNavigoRotationCode(input.rightFragranceCode);
+      const applicationKitCode = normalizeNavigoRotationCode(input.applicationKitCode);
+
+      if (!leftFragranceCode || !rightFragranceCode || !applicationKitCode) {
+        return {
+          message: "Captura los codigos de brazo izquierdo, brazo derecho y aplicacion/kit.",
+          ok: false
+        };
+      }
+
+      if (leftFragranceCode === rightFragranceCode) {
+        return {
+          message: "Los codigos de brazo izquierdo y derecho deben ser distintos.",
+          ok: false
+        };
+      }
+
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = (await tx.studyParticipant.findUnique?.({
+          select: participantWithActivitiesSelect,
+          where: { id: input.studyParticipantId }
+        })) as ParticipantRecord | null;
+
+        if (!participant) {
+          return { message: "No encontramos el participante.", ok: false };
+        }
+
+        if (participant.study.code !== NAVIGO_STUDY_CODE) {
+          return { message: "Solo el estudio Navigo permite configurar rotacion de App Navigo.", ok: false };
+        }
+
+        if (!participant.participantConfirmation || participantStatus(participant) !== "APPROVED") {
+          return { message: "Solo participantes confirmados con folio pueden recibir rotacion.", ok: false };
+        }
+
+        const studyId = participant.study.id;
+        const leftArm = (await tx.studyArm.upsert?.({
+          create: {
+            code: "LEFT",
+            label: "Brazo izquierdo",
+            sortOrder: 1,
+            studyId
+          },
+          update: {
+            label: "Brazo izquierdo",
+            sortOrder: 1
+          },
+          where: {
+            studyId_code: {
+              code: "LEFT",
+              studyId
+            }
+          }
+        })) as { id: string };
+        const rightArm = (await tx.studyArm.upsert?.({
+          create: {
+            code: "RIGHT",
+            label: "Brazo derecho",
+            sortOrder: 2,
+            studyId
+          },
+          update: {
+            label: "Brazo derecho",
+            sortOrder: 2
+          },
+          where: {
+            studyId_code: {
+              code: "RIGHT",
+              studyId
+            }
+          }
+        })) as { id: string };
+        const leftProduct = (await tx.studyProduct.upsert?.({
+          create: {
+            displayLabel: "Primera fragancia",
+            internalCode: leftFragranceCode,
+            isSensitive: true,
+            realName: leftFragranceCode,
+            studyId
+          },
+          update: {
+            displayLabel: "Primera fragancia",
+            isSensitive: true
+          },
+          where: {
+            studyId_internalCode: {
+              internalCode: leftFragranceCode,
+              studyId
+            }
+          }
+        })) as { id: string };
+        const rightProduct = (await tx.studyProduct.upsert?.({
+          create: {
+            displayLabel: "Segunda fragancia",
+            internalCode: rightFragranceCode,
+            isSensitive: true,
+            realName: rightFragranceCode,
+            studyId
+          },
+          update: {
+            displayLabel: "Segunda fragancia",
+            isSensitive: true
+          },
+          where: {
+            studyId_internalCode: {
+              internalCode: rightFragranceCode,
+              studyId
+            }
+          }
+        })) as { id: string };
+        const rotationPlan = (await tx.rotationPlan.upsert?.({
+          create: {
+            assignmentModeAllowed: "MANUAL",
+            name: applicationKitCode,
+            rotationCode: applicationKitCode,
+            status: "ACTIVE",
+            studyId
+          },
+          select: {
+            id: true
+          },
+          update: {
+            assignmentModeAllowed: "MANUAL",
+            name: applicationKitCode,
+            status: "ACTIVE"
+          },
+          where: {
+            studyId_rotationCode: {
+              rotationCode: applicationKitCode,
+              studyId
+            }
+          }
+        })) as { id: string };
+
+        await tx.rotationPlanArm.deleteMany?.({
+          where: { rotationPlanId: rotationPlan.id }
+        });
+        await tx.rotationPlanArm.createMany?.({
+          data: [
+            {
+              applicationOrder: 1,
+              participantVisibleLabel: "Primera fragancia",
+              rotationPlanId: rotationPlan.id,
+              studyArmId: leftArm.id,
+              studyProductId: leftProduct.id
+            },
+            {
+              applicationOrder: 2,
+              participantVisibleLabel: "Segunda fragancia",
+              rotationPlanId: rotationPlan.id,
+              studyArmId: rightArm.id,
+              studyProductId: rightProduct.id
+            }
+          ]
+        });
+
+        const rotationAssignment = (await tx.participantRotationAssignment.upsert?.({
+          create: {
+            assignedByUserId: input.actorUserId,
+            assignmentMode: "MANUAL_COVER_CODE",
+            rotationCode: applicationKitCode,
+            rotationPlanId: rotationPlan.id,
+            studyParticipantId: participant.id
+          },
+          select: { id: true },
+          update: {
+            changedAt: new Date(),
+            rotationCode: applicationKitCode,
+            rotationPlanId: rotationPlan.id
+          },
+          where: {
+            studyParticipantId: participant.id
+          }
+        })) as { id: string };
+
+        await tx.participantArmAssignment.upsert?.({
+          create: {
+            applicationOrder: 1,
+            participantRotationAssignmentId: rotationAssignment.id,
+            participantVisibleLabel: "Primera fragancia",
+            studyArmId: leftArm.id,
+            studyParticipantId: participant.id,
+            studyProductId: leftProduct.id
+          },
+          update: {
+            applicationOrder: 1,
+            participantRotationAssignmentId: rotationAssignment.id,
+            participantVisibleLabel: "Primera fragancia",
+            studyProductId: leftProduct.id
+          },
+          where: {
+            studyParticipantId_studyArmId: {
+              studyArmId: leftArm.id,
+              studyParticipantId: participant.id
+            }
+          }
+        });
+        await tx.participantArmAssignment.upsert?.({
+          create: {
+            applicationOrder: 2,
+            participantRotationAssignmentId: rotationAssignment.id,
+            participantVisibleLabel: "Segunda fragancia",
+            studyArmId: rightArm.id,
+            studyParticipantId: participant.id,
+            studyProductId: rightProduct.id
+          },
+          update: {
+            applicationOrder: 2,
+            participantRotationAssignmentId: rotationAssignment.id,
+            participantVisibleLabel: "Segunda fragancia",
+            studyProductId: rightProduct.id
+          },
+          where: {
+            studyParticipantId_studyArmId: {
+              studyArmId: rightArm.id,
+              studyParticipantId: participant.id
+            }
+          }
+        });
+
+        return {
+          data: {
+            applicationKitCode,
+            leftFragranceCode,
+            rightFragranceCode
+          },
+          ok: true
+        };
+      });
+    },
+
     async getAdminDashboard(studyId, now = new Date()) {
       const prisma = await getPrisma();
       const study = (await prisma.study.findUnique?.({
@@ -862,6 +1142,7 @@ export function hashToken(token: string): string {
 function toDashboardParticipant(participant: ParticipantRecord, now: Date): NavigoParticipantListItem {
   const activities = (participant.activities ?? []).map(toActivityListItem);
   const timeline = buildNavigoActivityTimeline({ activities, now });
+  const rotation = buildParticipantRotationSummary(participant);
   const alert =
     timeline.find((activity) => activity.availability.reason === "AFTER_WINDOW")
       ? "Requiere contacto"
@@ -883,8 +1164,33 @@ function toDashboardParticipant(participant: ParticipantRecord, now: Date): Navi
       name: participant.participantProfile.name,
       phone: participant.participantProfile.phone
     },
-    rotationReady: Boolean(participant.rotationAssignment && participant.rotationAssignment.arms.length === 2),
+    rotation,
+    rotationReady: rotation.ready,
     status: participantStatus(participant)
+  };
+}
+
+function buildParticipantRotationSummary(participant: ParticipantRecord): NavigoParticipantListItem["rotation"] {
+  const leftArm = getAssignedArm(participant, "LEFT", 1);
+  const rightArm = getAssignedArm(participant, "RIGHT", 2);
+  const approvalComplete = participantStatus(participant) === "APPROVED";
+  const folioComplete = Boolean(participant.participantConfirmation);
+  const applicationKitCode = participant.rotationAssignment?.rotationCode ?? null;
+  const readiness = {
+    applicationKitCode,
+    approvalComplete,
+    folioComplete,
+    leftArmComplete: Boolean(leftArm),
+    rightArmComplete: Boolean(rightArm)
+  };
+
+  return {
+    applicationKitCode,
+    checklist: buildNavigoRotationChecklist(readiness),
+    leftCode: leftArm?.studyProduct.internalCode ?? null,
+    ready: Boolean(approvalComplete && folioComplete && leftArm && rightArm),
+    rightCode: rightArm?.studyProduct.internalCode ?? null,
+    startPendingMessage: buildNavigoStartT0PendingMessage(readiness)
   };
 }
 
@@ -927,11 +1233,13 @@ function validateParticipantForT0(participant: ParticipantRecord | null): Navigo
   }
 
   if (participantStatus(participant) !== "APPROVED" && participantStatus(participant) !== "CONFIRMED") {
-    return { message: "El participante no esta confirmado para iniciar App Navigo.", ok: false };
+    return { message: "Pendiente para iniciar T0: aprobacion del participante.", ok: false };
   }
 
-  if (!participant.rotationAssignment || participant.rotationAssignment.arms.length !== 2) {
-    return { message: "Falta asignacion de brazos para iniciar T0.", ok: false };
+  const rotation = buildParticipantRotationSummary(participant);
+
+  if (!rotation.ready) {
+    return { message: rotation.startPendingMessage ?? "Pendiente para iniciar T0: configuracion de rotacion.", ok: false };
   }
 
   return { linkToken: "", message: "ok", ok: true };
@@ -1043,14 +1351,23 @@ function getFirstIncompleteMeasurement(timeline: ReturnType<typeof buildNavigoAc
 }
 
 function resolveBlindLabels(participant: ParticipantRecord) {
-  const arms = participant.rotationAssignment?.arms ?? [];
-  const leftArm = arms.find((arm) => arm.studyArm.code.toUpperCase() === "LEFT") ?? arms[0];
-  const rightArm = arms.find((arm) => arm.studyArm.code.toUpperCase() === "RIGHT") ?? arms[1];
+  const leftArm = getAssignedArm(participant, "LEFT", 1);
+  const rightArm = getAssignedArm(participant, "RIGHT", 2);
 
   return {
     left: leftArm?.participantVisibleLabel || "Primera fragancia",
     right: rightArm?.participantVisibleLabel || "Segunda fragancia"
   };
+}
+
+function getAssignedArm(participant: ParticipantRecord, code: "LEFT" | "RIGHT", order: number) {
+  const arms = participant.rotationAssignment?.arms ?? [];
+
+  return (
+    arms.find((arm) => arm.studyArm.code.toUpperCase() === code) ??
+    arms.find((arm) => arm.applicationOrder === order) ??
+    null
+  );
 }
 
 function availabilityMessage(reason: string): string {

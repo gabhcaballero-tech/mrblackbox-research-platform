@@ -6,11 +6,13 @@ import {
   createNavigoMeasurementDefinition,
   createNavigoScheduleSeeds,
   buildNavigoActivityTimeline,
+  buildNavigoStartT0PendingMessage,
   hashNavigoMeasurementDefinition,
   hashToken,
   NAVIGO_ACTIVITY_CODES,
   NAVIGO_APP_DEFAULT_TIME_ZONE,
   navigoActivityLabel,
+  normalizeNavigoRotationCode,
   prepareNavigoParticipantActivities,
   resolveNavigoTimeZone,
   validateNavigoMeasurementAnswers
@@ -366,6 +368,42 @@ describe("navigo app MVP rules", () => {
     expect(hashToken("token-123")).toBe(hashToken("token-123"));
     expect(hashToken("token-123")).not.toBe("token-123");
     expect(JSON.stringify(createNavigoMeasurementDefinition())).not.toContain("realName");
+  });
+
+  it("normalizes rotation codes and reports missing arms without blaming folio", () => {
+    expect(normalizeNavigoRotationCode("  ab 12 \n")).toBe("AB12");
+    expect(
+      buildNavigoStartT0PendingMessage({
+        applicationKitCode: "KIT-1",
+        approvalComplete: true,
+        folioComplete: true,
+        leftArmComplete: false,
+        rightArmComplete: false
+      })
+    ).toBe("Pendiente para iniciar T0: asignar brazo izquierdo, asignar brazo derecho.");
+  });
+
+  it("does not block T0 on optional triangular codes when folio, approval and arms are ready", () => {
+    expect(
+      buildNavigoStartT0PendingMessage({
+        applicationKitCode: null,
+        approvalComplete: true,
+        folioComplete: true,
+        leftArmComplete: true,
+        rightArmComplete: true
+      })
+    ).toBeNull();
+  });
+
+  it("adds visible rotation preparation UI without exposing real product names to participants", () => {
+    const adminPage = readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "page.tsx");
+    const participantPage = readWorkspaceFile("src", "app", "p", "[token]", "activities", "page.tsx");
+
+    expect(adminPage).toContain("Preparacion de rotacion");
+    expect(adminPage).toContain("Codigo primera fragancia / brazo izquierdo");
+    expect(adminPage).toContain("Codigo aplicacion / kit ambos brazos");
+    expect(participantPage).toContain("Primera fragancia");
+    expect(participantPage).not.toContain("realName");
   });
 
   it("adds operable participant routes for token activities", () => {

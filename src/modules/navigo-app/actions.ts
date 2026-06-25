@@ -39,6 +39,29 @@ export async function startNavigoT0Action(studyId: string, studyParticipantId: s
   });
 }
 
+export async function configureNavigoRotationAction(studyId: string, studyParticipantId: string, formData: FormData) {
+  const actor = await requireCapability("rotation:register");
+  const result = await createNavigoAppRepository().configureParticipantRotation({
+    actorUserId: actor.id,
+    applicationKitCode: String(formData.get("applicationKitCode") ?? ""),
+    leftFragranceCode: String(formData.get("leftFragranceCode") ?? ""),
+    rightFragranceCode: String(formData.get("rightFragranceCode") ?? ""),
+    studyParticipantId,
+    triangularCode1: String(formData.get("triangularCode1") ?? ""),
+    triangularCode2: String(formData.get("triangularCode2") ?? "")
+  });
+
+  if (!result.ok) {
+    redirectWithNavigoMessage(studyId, { error: result.message, participant: studyParticipantId });
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+  redirectWithNavigoMessage(studyId, {
+    message: "Rotacion configurada correctamente.",
+    participant: studyParticipantId
+  });
+}
+
 export async function requestNavigoActivitySelfieUploadAction(
   tokenInput: string,
   activityId: string,

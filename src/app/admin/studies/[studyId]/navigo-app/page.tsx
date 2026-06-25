@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { startNavigoT0Action } from "@/modules/navigo-app/actions";
+import { configureNavigoRotationAction, startNavigoT0Action } from "@/modules/navigo-app/actions";
 import {
   createNavigoAppRepository,
   navigoActivityLabel,
@@ -135,9 +135,10 @@ function ParticipantRow({
   timeZoneIana: string;
 }) {
   const canStart = participant.status === "APPROVED" && participant.confirmation && participant.rotationReady;
+  const pendingMessage = participant.rotation.startPendingMessage;
 
   return (
-    <article className="grid gap-5 p-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)_minmax(260px,0.8fr)]">
+    <article className="grid gap-5 p-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)_minmax(300px,0.95fr)]">
       <div>
         <p className="text-sm font-semibold text-zinc-950">{participant.participant.name}</p>
         <p className="mt-1 font-mono text-xs text-zinc-500">{participant.confirmation?.folio ?? "Sin folio"}</p>
@@ -157,15 +158,18 @@ function ParticipantRow({
         </dl>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
-        {["T0_SALON", "T2_HORAS", "T4_HORAS", "T8_HORAS"].map((code) => (
-          <ActivitySummary
-            activity={participant.activities.find((item) => item.code === code)}
-            code={code as NavigoActivityListItem["code"]}
-            key={code}
-            timeZoneIana={timeZoneIana}
-          />
-        ))}
+      <div className="space-y-4">
+        <RotationPreparation participant={participant} studyId={studyId} />
+        <div className="grid gap-3 md:grid-cols-4">
+          {["T0_SALON", "T2_HORAS", "T4_HORAS", "T8_HORAS"].map((code) => (
+            <ActivitySummary
+              activity={participant.activities.find((item) => item.code === code)}
+              code={code as NavigoActivityListItem["code"]}
+              key={code}
+              timeZoneIana={timeZoneIana}
+            />
+          ))}
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -189,7 +193,7 @@ function ParticipantRow({
         </form>
         {!canStart ? (
           <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            Requiere folio, aprobacion y asignacion de dos brazos.
+            {pendingMessage ?? "Pendiente para iniciar T0: configuracion de rotacion."}
           </p>
         ) : null}
         {selectedToken ? (
@@ -201,6 +205,131 @@ function ParticipantRow({
         ) : null}
       </div>
     </article>
+  );
+}
+
+function RotationPreparation({
+  participant,
+  studyId
+}: {
+  participant: NavigoParticipantListItem;
+  studyId: string;
+}) {
+  const codes = participant.confirmation?.referenceCodes ?? [];
+
+  return (
+    <section className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-950">Preparacion de rotacion</h3>
+          <p className="mt-1 text-xs leading-5 text-zinc-600">
+            Los codigos de fragancia son internos. El participante solo vera Primera fragancia y Segunda fragancia.
+          </p>
+        </div>
+        <StatusBadge status={participant.rotation.ready ? "ready" : "planned"}>
+          {participant.rotation.ready ? "Completa" : "Pendiente"}
+        </StatusBadge>
+      </div>
+
+      <dl className="mt-4 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-5">
+        <ChecklistItem label="Folio" status={participant.rotation.checklist.folio} />
+        <ChecklistItem label="Aprobacion" status={participant.rotation.checklist.approval} />
+        <ChecklistItem label="Brazo izquierdo" status={participant.rotation.checklist.leftArm} value={participant.rotation.leftCode} />
+        <ChecklistItem label="Brazo derecho" status={participant.rotation.checklist.rightArm} value={participant.rotation.rightCode} />
+        <ChecklistItem label="Codigo aplicacion/kit" status={participant.rotation.checklist.applicationKit} value={participant.rotation.applicationKitCode} />
+      </dl>
+
+      {!participant.rotation.ready ? (
+        <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          {participant.rotation.startPendingMessage}
+        </p>
+      ) : null}
+
+      {codes.length > 0 ? (
+        <p className="mt-3 text-xs text-zinc-500">
+          Codigos de confirmacion disponibles como referencia manual: {codes.map((code) => code.code).join(", ")}. No se usan automaticamente como codigos de fragancia.
+        </p>
+      ) : null}
+
+      <details className="mt-4 rounded-md border border-zinc-200 bg-white p-3">
+        <summary className="cursor-pointer text-sm font-semibold text-teal-700">
+          {participant.rotation.ready ? "Actualizar rotacion" : "Configurar rotacion"}
+        </summary>
+        <form action={configureNavigoRotationAction.bind(null, studyId, participant.id)} className="mt-4 grid gap-4 md:grid-cols-3">
+          <label className={labelClass}>
+            Codigo primera fragancia / brazo izquierdo
+            <input
+              className={inputClass}
+              defaultValue={participant.rotation.leftCode ?? ""}
+              name="leftFragranceCode"
+              required
+            />
+            <span className="text-xs font-normal leading-5 text-zinc-500">
+              Este codigo se usara para identificar la fragancia aplicada en el antebrazo izquierdo.
+            </span>
+          </label>
+          <label className={labelClass}>
+            Codigo segunda fragancia / brazo derecho
+            <input
+              className={inputClass}
+              defaultValue={participant.rotation.rightCode ?? ""}
+              name="rightFragranceCode"
+              required
+            />
+            <span className="text-xs font-normal leading-5 text-zinc-500">
+              Este codigo se usara para identificar la fragancia aplicada en el antebrazo derecho.
+            </span>
+          </label>
+          <label className={labelClass}>
+            Codigo aplicacion / kit ambos brazos
+            <input
+              className={inputClass}
+              defaultValue={participant.rotation.applicationKitCode ?? ""}
+              name="applicationKitCode"
+              required
+            />
+            <span className="text-xs font-normal leading-5 text-zinc-500">
+              Codigo de control del kit o aplicacion comparativa en ambos brazos.
+            </span>
+          </label>
+          <label className={labelClass}>
+            Codigo triangular 1
+            <input className={inputClass} name="triangularCode1" />
+            <span className="text-xs font-normal leading-5 text-zinc-500">Opcional. No bloquea T0 en esta fase.</span>
+          </label>
+          <label className={labelClass}>
+            Codigo triangular 2
+            <input className={inputClass} name="triangularCode2" />
+            <span className="text-xs font-normal leading-5 text-zinc-500">Opcional. No bloquea T0 en esta fase.</span>
+          </label>
+          <div className="flex items-end">
+            <button className="inline-flex w-full justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800" type="submit">
+              Guardar rotacion
+            </button>
+          </div>
+        </form>
+      </details>
+    </section>
+  );
+}
+
+function ChecklistItem({
+  label,
+  status,
+  value
+}: {
+  label: string;
+  status: "complete" | "pending";
+  value?: string | null;
+}) {
+  return (
+    <div className="rounded-md border border-zinc-200 bg-white p-2">
+      <dt className="font-medium text-zinc-500">{label}</dt>
+      <dd className={status === "complete" ? "mt-1 font-semibold text-emerald-700" : "mt-1 font-semibold text-amber-700"}>
+        {status === "complete" ? "Completo" : "Pendiente"}
+      </dd>
+      {value ? <p className="mt-1 break-all font-mono text-xs text-zinc-700">{value}</p> : null}
+    </div>
   );
 }
 
@@ -268,3 +397,7 @@ function formatDateTimeLocal(value: Date, timeZoneIana: string): string {
 
   return `${read("year")}-${read("month")}-${read("day")}T${read("hour")}:${read("minute")}`;
 }
+
+const labelClass = "flex flex-col gap-1 text-sm font-medium text-zinc-700";
+const inputClass =
+  "min-h-10 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-950 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100";

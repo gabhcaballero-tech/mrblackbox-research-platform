@@ -104,6 +104,22 @@ export type NavigoActivityTimelineItem = NavigoActivityRecord & {
 
 export type NavigoAnswerInput = Record<string, FormDataEntryValue | FormDataEntryValue[] | null | undefined>;
 
+export type NavigoRotationReadinessInput = {
+  applicationKitCode?: string | null;
+  approvalComplete: boolean;
+  folioComplete: boolean;
+  leftArmComplete: boolean;
+  rightArmComplete: boolean;
+};
+
+export type NavigoRotationChecklist = {
+  applicationKit: "complete" | "pending";
+  approval: "complete" | "pending";
+  folio: "complete" | "pending";
+  leftArm: "complete" | "pending";
+  rightArm: "complete" | "pending";
+};
+
 export type NavigoAnswerValidationResult =
   | {
       answers: Array<{
@@ -318,6 +334,44 @@ export function navigoActivityLabel(code: NavigoActivityCode): string {
     case "T8_HORAS":
       return "Evaluacion 8 horas";
   }
+}
+
+export function normalizeNavigoRotationCode(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFC")
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
+    .trim()
+    .replace(/\s+/g, "")
+    .toUpperCase();
+}
+
+export function buildNavigoRotationChecklist(input: NavigoRotationReadinessInput): NavigoRotationChecklist {
+  return {
+    applicationKit: input.applicationKitCode?.trim() ? "complete" : "pending",
+    approval: input.approvalComplete ? "complete" : "pending",
+    folio: input.folioComplete ? "complete" : "pending",
+    leftArm: input.leftArmComplete ? "complete" : "pending",
+    rightArm: input.rightArmComplete ? "complete" : "pending"
+  };
+}
+
+export function buildNavigoStartT0PendingMessage(input: NavigoRotationReadinessInput): string | null {
+  const pending: string[] = [];
+
+  if (!input.approvalComplete) {
+    pending.push("aprobacion del participante");
+  }
+  if (!input.folioComplete) {
+    pending.push("folio");
+  }
+  if (!input.leftArmComplete) {
+    pending.push("asignar brazo izquierdo");
+  }
+  if (!input.rightArmComplete) {
+    pending.push("asignar brazo derecho");
+  }
+
+  return pending.length > 0 ? `Pendiente para iniciar T0: ${pending.join(", ")}.` : null;
 }
 
 function getNavigoActivityAvailability({
