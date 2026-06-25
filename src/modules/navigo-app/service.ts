@@ -105,7 +105,6 @@ export type NavigoActivityTimelineItem = NavigoActivityRecord & {
 export type NavigoAnswerInput = Record<string, FormDataEntryValue | FormDataEntryValue[] | null | undefined>;
 
 export type NavigoRotationReadinessInput = {
-  applicationKitCode?: string | null;
   approvalComplete: boolean;
   folioComplete: boolean;
   leftArmComplete: boolean;
@@ -113,12 +112,27 @@ export type NavigoRotationReadinessInput = {
 };
 
 export type NavigoRotationChecklist = {
-  applicationKit: "complete" | "pending";
   approval: "complete" | "pending";
   folio: "complete" | "pending";
   leftArm: "complete" | "pending";
   rightArm: "complete" | "pending";
 };
+
+export type NavigoRotationImportRowInput = {
+  folio: string;
+  primeraFragancia: string;
+  segundaFragancia: string;
+};
+
+export type NavigoRotationImportParseResult =
+  | {
+      ok: true;
+      rows: NavigoRotationImportRowInput[];
+    }
+  | {
+      message: string;
+      ok: false;
+    };
 
 export type NavigoAnswerValidationResult =
   | {
@@ -345,9 +359,22 @@ export function normalizeNavigoRotationCode(value: unknown): string {
     .toUpperCase();
 }
 
+export function createNavigoRotationPlanCode({
+  folio,
+  leftFragranceCode,
+  rightFragranceCode
+}: {
+  folio: string;
+  leftFragranceCode: string;
+  rightFragranceCode: string;
+}): string {
+  return [normalizeNavigoRotationCode(folio), leftFragranceCode, rightFragranceCode]
+    .filter(Boolean)
+    .join("__");
+}
+
 export function buildNavigoRotationChecklist(input: NavigoRotationReadinessInput): NavigoRotationChecklist {
   return {
-    applicationKit: input.applicationKitCode?.trim() ? "complete" : "pending",
     approval: input.approvalComplete ? "complete" : "pending",
     folio: input.folioComplete ? "complete" : "pending",
     leftArm: input.leftArmComplete ? "complete" : "pending",
@@ -365,13 +392,162 @@ export function buildNavigoStartT0PendingMessage(input: NavigoRotationReadinessI
     pending.push("folio");
   }
   if (!input.leftArmComplete) {
-    pending.push("asignar brazo izquierdo");
+    pending.push("asignar primera fragancia");
   }
   if (!input.rightArmComplete) {
-    pending.push("asignar brazo derecho");
+    pending.push("asignar segunda fragancia");
   }
 
   return pending.length > 0 ? `Pendiente para iniciar T0: ${pending.join(", ")}.` : null;
+}
+
+export function parseNavigoRotationImportText({
+  filename,
+  text
+}: {
+  filename: string;
+  text: string;
+}): NavigoRotationImportParseResult {
+  if (!isSupportedRotationImportFilename(filename)) {
+    return {
+      message: "En esta etapa se acepta CSV o TSV compatible con Excel. Exporta tu archivo como .csv o .tsv.",
+      ok: false
+    };
+  }
+
+  const rows = text
+    .replace(/^\uFEFF/, "")
+    .split(/\r\n|\n|\r/)
+    .filter((line) => line.trim().length > 0);
+
+  if (rows.length < 2) {
+    return {
+      message: "El archivo debe incluir encabezados y al menos una fila.",
+      ok: false
+    };
+  }
+
+  const delimiter = detectDelimiter(rows[0] ?? "");
+  const headers = splitDelimitedLine(rows[0] ?? "", delimiter).map(normalizeRotationHeader);
+  const indexes = {
+    folio: headers.findIndex((header) => header === "folio"),
+    primeraFragancia: headers.findIndex((header) => header === "primera_fragancia"),
+    segundaFragancia: headers.findIndex((header) => header === "segunda_fragancia")
+  };
+
+  if (indexes.folio < 0 || indexes.primeraFragancia < 0 || indexes.segundaFragancia < 0) {
+    return {
+      message: "El archivo debe incluir columnas folio, primera_fragancia y segunda_fragancia.",
+      ok: false
+    };
+  }
+
+  return {
+    ok: true,
+    rows: rows.slice(1).map((line) => {
+      const cells = splitDelimitedLine(line, delimiter);
+
+      return {
+        folio: normalizeImportedFolio(cells[indexes.folio] ?? ""),
+        primeraFragancia: normalizeNavigoRotationCode(cells[indexes.primeraFragancia] ?? ""),
+        segundaFragancia: normalizeNavigoRotationCode(cells[indexes.segundaFragancia] ?? "")
+      };
+    })
+  };
+}
+
+export function createNavigoRotationTemplateTsv(): string {
+  return [
+    ["folio", "primera_fragancia", "segunda_fragancia"].join("\t"),
+    ["NAV-001", "CODIGO-A", "CODIGO-B"].join("\t")
+  ].join("\n");
+}
+
+export function isSupportedRotationImportFilename(filename: string): boolean {
+  const normalized = filename.trim().toLowerCase();
+
+  return normalized.endsWith(".csv") || normalized.endsWith(".tsv");
+}
+
+function normalizeImportedFolio(value: string): string {
+  return value.trim().replace(/\s+/g, "").toUpperCase();
+}
+
+function detectDelimiter(header: string): "\t" | "," | ";" {
+  if (header.includes("\t")) {
+    return "\t";
+  }
+
+  return header.includes(";") && !header.includes(",") ? ";" : ",";
+}
+
+function splitDelimitedLine(line: string, delimiter: "\t" | "," | ";"): string[] {
+  if (delimiter === "\t") {
+    return line.split("\t").map((cell) => cell.trim());
+  }
+
+  const cells: string[] = [];
+  let current = "";
+  let quoted = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+
+    if (char === '"' && quoted && next === '"') {
+      current += '"';
+      index += 1;
+      continue;
+    }
+
+    if (char === '"') {
+      quoted = !quoted;
+      continue;
+    }
+
+    if (char === delimiter && !quoted) {
+      cells.push(current.trim());
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  cells.push(current.trim());
+  return cells;
+}
+
+function normalizeRotationHeader(value: string): string {
+  const normalized = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+
+  if (normalized === "folio") {
+    return "folio";
+  }
+
+  if (
+    normalized === "1a_fragancia" ||
+    normalized === "primera_fragancia" ||
+    normalized === "brazo_izquierdo"
+  ) {
+    return "primera_fragancia";
+  }
+
+  if (
+    normalized === "2a_fragancia" ||
+    normalized === "segunda_fragancia" ||
+    normalized === "brazo_derecho"
+  ) {
+    return "segunda_fragancia";
+  }
+
+  return normalized;
 }
 
 function getNavigoActivityAvailability({

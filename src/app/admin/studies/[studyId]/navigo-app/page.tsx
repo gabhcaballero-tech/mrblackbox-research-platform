@@ -13,6 +13,7 @@ import { AppShell } from "@/shared/ui/AppShell";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { NavigoRotationImportPanel } from "./_components/NavigoRotationImportPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,8 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
             </p>
           ) : null}
           {query?.token ? <ParticipantLinkPanel token={query.token} participantId={query.participant} /> : null}
+
+          <NavigoRotationImportPanel studyId={studyId} />
 
           {result.participants.length === 0 ? (
             <EmptyState
@@ -231,12 +234,11 @@ function RotationPreparation({
         </StatusBadge>
       </div>
 
-      <dl className="mt-4 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-5">
+      <dl className="mt-4 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
         <ChecklistItem label="Folio" status={participant.rotation.checklist.folio} />
         <ChecklistItem label="Aprobacion" status={participant.rotation.checklist.approval} />
-        <ChecklistItem label="Brazo izquierdo" status={participant.rotation.checklist.leftArm} value={participant.rotation.leftCode} />
-        <ChecklistItem label="Brazo derecho" status={participant.rotation.checklist.rightArm} value={participant.rotation.rightCode} />
-        <ChecklistItem label="Codigo aplicacion/kit" status={participant.rotation.checklist.applicationKit} value={participant.rotation.applicationKitCode} />
+        <ChecklistItem label="Brazo izquierdo / primera fragancia" status={participant.rotation.checklist.leftArm} value={participant.rotation.leftCode} />
+        <ChecklistItem label="Brazo derecho / segunda fragancia" status={participant.rotation.checklist.rightArm} value={participant.rotation.rightCode} />
       </dl>
 
       {!participant.rotation.ready ? (
@@ -255,7 +257,10 @@ function RotationPreparation({
         <summary className="cursor-pointer text-sm font-semibold text-teal-700">
           {participant.rotation.ready ? "Actualizar rotacion" : "Configurar rotacion"}
         </summary>
-        <form action={configureNavigoRotationAction.bind(null, studyId, participant.id)} className="mt-4 grid gap-4 md:grid-cols-3">
+        <p className="mt-2 text-xs leading-5 text-zinc-600">
+          Usa esta correccion puntual solo si necesitas ajustar un participante. El flujo recomendado es importar la rotacion masiva por folio.
+        </p>
+        <form action={configureNavigoRotationAction.bind(null, studyId, participant.id)} className="mt-4 grid gap-4 md:grid-cols-2">
           <label className={labelClass}>
             Codigo primera fragancia / brazo izquierdo
             <input
@@ -278,18 +283,6 @@ function RotationPreparation({
             />
             <span className="text-xs font-normal leading-5 text-zinc-500">
               Este codigo se usara para identificar la fragancia aplicada en el antebrazo derecho.
-            </span>
-          </label>
-          <label className={labelClass}>
-            Codigo aplicacion / kit ambos brazos
-            <input
-              className={inputClass}
-              defaultValue={participant.rotation.applicationKitCode ?? ""}
-              name="applicationKitCode"
-              required
-            />
-            <span className="text-xs font-normal leading-5 text-zinc-500">
-              Codigo de control del kit o aplicacion comparativa en ambos brazos.
             </span>
           </label>
           <label className={labelClass}>

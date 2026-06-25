@@ -20,12 +20,14 @@ import {
   buildNavigoActivityTimeline,
   buildNavigoRotationChecklist,
   buildNavigoStartT0PendingMessage,
+  createNavigoRotationPlanCode,
   normalizeNavigoRotationCode,
   prepareNavigoParticipantActivities,
   validateNavigoMeasurementAnswers,
   type NavigoActivityRecord,
   type NavigoAnswerInput,
   type NavigoRotationChecklist,
+  type NavigoRotationImportRowInput,
   type NavigoScheduleRecord
 } from "./service";
 
@@ -59,7 +61,6 @@ export type NavigoParticipantListItem = {
     phone: string | null;
   };
   rotation: {
-    applicationKitCode: string | null;
     checklist: NavigoRotationChecklist;
     leftCode: string | null;
     ready: boolean;
@@ -95,12 +96,33 @@ export type NavigoStartT0Result =
 
 export type NavigoConfigureRotationInput = {
   actorUserId: string;
-  applicationKitCode: string;
   leftFragranceCode: string;
   rightFragranceCode: string;
   studyParticipantId: string;
   triangularCode1?: string | null;
   triangularCode2?: string | null;
+};
+
+export type NavigoRotationImportPreviewRow = NavigoRotationImportRowInput & {
+  errors: string[];
+  existingRotation: boolean;
+  rowNumber: number;
+  t0Started: boolean;
+  updatable: boolean;
+};
+
+export type NavigoRotationImportPreview = {
+  rows: NavigoRotationImportPreviewRow[];
+  summary: {
+    duplicateFolios: number;
+    foundFolios: number;
+    rowsWithError: number;
+    t0Started: number;
+    totalRows: number;
+    updatable: number;
+    validRows: number;
+    missingFolios: number;
+  };
 };
 
 export type NavigoParticipantActivitiesView =
@@ -165,7 +187,7 @@ export type NavigoActionResult<T = unknown> =
 
 export type NavigoAppRepository = {
   configureParticipantRotation: (input: NavigoConfigureRotationInput) => Promise<NavigoActionResult<{
-    applicationKitCode: string;
+    rotationCode: string;
     leftFragranceCode: string;
     rightFragranceCode: string;
   }>>;
@@ -184,6 +206,15 @@ export type NavigoAppRepository = {
   }) => Promise<NavigoActivityCaptureView>;
   getAdminDashboard: (studyId: string, now?: Date) => Promise<NavigoAdminDashboard | null>;
   getParticipantActivitiesView: (input: { now?: Date; token: string }) => Promise<NavigoParticipantActivitiesView>;
+  previewRotationImport: (input: {
+    rows: NavigoRotationImportRowInput[];
+    studyId: string;
+  }) => Promise<NavigoActionResult<NavigoRotationImportPreview>>;
+  applyRotationImport: (input: {
+    actorUserId: string;
+    rows: NavigoRotationImportRowInput[];
+    studyId: string;
+  }) => Promise<NavigoActionResult<NavigoRotationImportPreview>>;
   requestActivitySelfieUpload: (input: {
     activityId: string;
     metadata: EvidenceUploadMetadata;
@@ -223,6 +254,7 @@ type NavigoPrismaClient = PrismaClientLike & {
   participantActivity: Delegate;
   participantActivityEvidence: Delegate;
   participantArmAssignment: Delegate;
+  participantConfirmation: Delegate;
   participantRotationAssignment: Delegate;
   researchResponse: Delegate;
   rotationPlan: Delegate;
@@ -399,6 +431,10 @@ type ActivityRecord = NavigoActivityRecord & {
   participantActivityEvidence: Array<{ id: string; type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION" }>;
   responses: Array<{ answerJson: unknown; questionId: string }>;
 };
+type ConfirmationWithParticipant = {
+  folio: string;
+  studyParticipant: ParticipantRecord;
+};
 
 export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): NavigoAppRepository {
   async function getPrisma() {
@@ -447,11 +483,10 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
     async configureParticipantRotation(input) {
       const leftFragranceCode = normalizeNavigoRotationCode(input.leftFragranceCode);
       const rightFragranceCode = normalizeNavigoRotationCode(input.rightFragranceCode);
-      const applicationKitCode = normalizeNavigoRotationCode(input.applicationKitCode);
 
-      if (!leftFragranceCode || !rightFragranceCode || !applicationKitCode) {
+      if (!leftFragranceCode || !rightFragranceCode) {
         return {
-          message: "Captura los codigos de brazo izquierdo, brazo derecho y aplicacion/kit.",
+          message: "Captura los codigos de primera y segunda fragancia.",
           ok: false
         };
       }
@@ -483,7 +518,16 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           return { message: "Solo participantes confirmados con folio pueden recibir rotacion.", ok: false };
         }
 
+        if (hasT0Started(participant)) {
+          return { message: "No se puede modificar rotacion porque T0 ya fue iniciado.", ok: false };
+        }
+
         const studyId = participant.study.id;
+        const rotationCode = createNavigoRotationPlanCode({
+          folio: participant.participantConfirmation.folio,
+          leftFragranceCode,
+          rightFragranceCode
+        });
         const leftArm = (await tx.studyArm.upsert?.({
           create: {
             code: "LEFT",
@@ -561,8 +605,8 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         const rotationPlan = (await tx.rotationPlan.upsert?.({
           create: {
             assignmentModeAllowed: "MANUAL",
-            name: applicationKitCode,
-            rotationCode: applicationKitCode,
+            name: rotationCode,
+            rotationCode,
             status: "ACTIVE",
             studyId
           },
@@ -571,12 +615,12 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           },
           update: {
             assignmentModeAllowed: "MANUAL",
-            name: applicationKitCode,
+            name: rotationCode,
             status: "ACTIVE"
           },
           where: {
             studyId_rotationCode: {
-              rotationCode: applicationKitCode,
+              rotationCode,
               studyId
             }
           }
@@ -608,14 +652,14 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           create: {
             assignedByUserId: input.actorUserId,
             assignmentMode: "MANUAL_COVER_CODE",
-            rotationCode: applicationKitCode,
+            rotationCode,
             rotationPlanId: rotationPlan.id,
             studyParticipantId: participant.id
           },
           select: { id: true },
           update: {
             changedAt: new Date(),
-            rotationCode: applicationKitCode,
+            rotationCode,
             rotationPlanId: rotationPlan.id
           },
           where: {
@@ -670,8 +714,8 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
 
         return {
           data: {
-            applicationKitCode,
             leftFragranceCode,
+            rotationCode,
             rightFragranceCode
           },
           ok: true
@@ -710,6 +754,87 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         study,
         timeZoneIana: resolveNavigoTimeZone(study.timeZoneIana)
       };
+    },
+
+    async previewRotationImport(input) {
+      const prisma = await getPrisma();
+      const study = (await prisma.study.findUnique?.({
+        select: studySelect,
+        where: { id: input.studyId }
+      })) as StudyRecord | null;
+
+      if (!study || study.code !== NAVIGO_STUDY_CODE) {
+        return { message: "Solo el estudio Navigo permite importar rotacion.", ok: false };
+      }
+
+      const preview = await buildRotationImportPreview({
+        prisma,
+        rows: input.rows,
+        studyId: input.studyId
+      });
+
+      return { data: preview, ok: true };
+    },
+
+    async applyRotationImport(input) {
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const study = (await tx.study.findUnique?.({
+          select: studySelect,
+          where: { id: input.studyId }
+        })) as StudyRecord | null;
+
+        if (!study || study.code !== NAVIGO_STUDY_CODE) {
+          return { message: "Solo el estudio Navigo permite importar rotacion.", ok: false };
+        }
+
+        const preview = await buildRotationImportPreview({
+          prisma: tx,
+          rows: input.rows,
+          studyId: input.studyId
+        });
+
+        if (preview.summary.rowsWithError > 0) {
+          return {
+            message: "Corrige los errores de la previsualizacion antes de aplicar la importacion.",
+            ok: false
+          };
+        }
+
+        const confirmations = await findConfirmationsByFolio({
+          prisma: tx,
+          rows: input.rows,
+          studyId: input.studyId
+        });
+
+        for (const row of preview.rows) {
+          const confirmation = confirmations.get(row.folio);
+
+          if (!confirmation) {
+            continue;
+          }
+
+          await upsertParticipantRotationForCodes({
+            actorUserId: input.actorUserId,
+            leftFragranceCode: row.primeraFragancia,
+            participant: confirmation.studyParticipant,
+            prisma: tx,
+            rightFragranceCode: row.segundaFragancia
+          });
+        }
+
+        const appliedPreview = await buildRotationImportPreview({
+          prisma: tx,
+          rows: input.rows,
+          studyId: input.studyId
+        });
+
+        return {
+          data: appliedPreview,
+          ok: true
+        };
+      });
     },
 
     async startT0(input) {
@@ -1170,14 +1295,336 @@ function toDashboardParticipant(participant: ParticipantRecord, now: Date): Navi
   };
 }
 
+async function buildRotationImportPreview({
+  prisma,
+  rows,
+  studyId
+}: {
+  prisma: NavigoPrismaClient | NavigoTransactionClient;
+  rows: NavigoRotationImportRowInput[];
+  studyId: string;
+}): Promise<NavigoRotationImportPreview> {
+  const confirmations = await findConfirmationsByFolio({ prisma, rows, studyId });
+  const seenFolios = new Set<string>();
+  const duplicateFolios = new Set<string>();
+
+  for (const row of rows) {
+    if (!row.folio) {
+      continue;
+    }
+    if (seenFolios.has(row.folio)) {
+      duplicateFolios.add(row.folio);
+    }
+    seenFolios.add(row.folio);
+  }
+
+  const previewRows = rows.map((row, index): NavigoRotationImportPreviewRow => {
+    const errors: string[] = [];
+    const confirmation = row.folio ? confirmations.get(row.folio) : null;
+
+    if (!row.folio) {
+      errors.push("folio vacio");
+    } else if (duplicateFolios.has(row.folio)) {
+      errors.push("folio duplicado dentro del archivo");
+    } else if (!confirmation) {
+      errors.push("folio no encontrado");
+    }
+
+    if (!row.primeraFragancia) {
+      errors.push("primera fragancia vacia");
+    }
+    if (!row.segundaFragancia) {
+      errors.push("segunda fragancia vacia");
+    }
+
+    const participant = confirmation?.studyParticipant ?? null;
+    const t0Started = participant ? hasT0Started(participant) : false;
+    const existingRotation = Boolean(participant?.rotationAssignment?.arms.length);
+
+    if (participant && participantStatus(participant) !== "APPROVED") {
+      errors.push("participante no confirmado");
+    }
+
+    if (t0Started) {
+      errors.push("No se puede modificar rotacion porque T0 ya fue iniciado.");
+    }
+
+    return {
+      ...row,
+      errors,
+      existingRotation,
+      rowNumber: index + 2,
+      t0Started,
+      updatable: errors.length === 0
+    };
+  });
+
+  return {
+    rows: previewRows,
+    summary: {
+      duplicateFolios: duplicateFolios.size,
+      foundFolios: previewRows.filter((row) => row.folio && confirmations.has(row.folio)).length,
+      missingFolios: previewRows.filter((row) => row.errors.includes("folio no encontrado")).length,
+      rowsWithError: previewRows.filter((row) => row.errors.length > 0).length,
+      t0Started: previewRows.filter((row) => row.t0Started).length,
+      totalRows: previewRows.length,
+      updatable: previewRows.filter((row) => row.updatable).length,
+      validRows: previewRows.filter((row) => row.errors.length === 0).length
+    }
+  };
+}
+
+async function findConfirmationsByFolio({
+  prisma,
+  rows,
+  studyId
+}: {
+  prisma: NavigoPrismaClient | NavigoTransactionClient;
+  rows: NavigoRotationImportRowInput[];
+  studyId: string;
+}): Promise<Map<string, ConfirmationWithParticipant>> {
+  const folios = [...new Set(rows.map((row) => row.folio).filter(Boolean))];
+
+  if (folios.length === 0) {
+    return new Map();
+  }
+
+  const confirmations = (await prisma.participantConfirmation.findMany?.({
+    select: {
+      folio: true,
+      studyParticipant: {
+        select: participantWithActivitiesSelect
+      }
+    },
+    where: {
+      folio: {
+        in: folios
+      },
+      studyId
+    }
+  })) as ConfirmationWithParticipant[];
+
+  return new Map(confirmations.map((confirmation) => [confirmation.folio, confirmation]));
+}
+
+async function upsertParticipantRotationForCodes({
+  actorUserId,
+  leftFragranceCode,
+  participant,
+  prisma,
+  rightFragranceCode
+}: {
+  actorUserId: string;
+  leftFragranceCode: string;
+  participant: ParticipantRecord;
+  prisma: NavigoTransactionClient;
+  rightFragranceCode: string;
+}) {
+  if (!participant.participantConfirmation) {
+    throw new Error("Participant confirmation is required for Navigo rotation.");
+  }
+
+  const studyId = participant.study.id;
+  const rotationCode = createNavigoRotationPlanCode({
+    folio: participant.participantConfirmation.folio,
+    leftFragranceCode,
+    rightFragranceCode
+  });
+  const leftArm = (await prisma.studyArm.upsert?.({
+    create: {
+      code: "LEFT",
+      label: "Brazo izquierdo",
+      sortOrder: 1,
+      studyId
+    },
+    update: {
+      label: "Brazo izquierdo",
+      sortOrder: 1
+    },
+    where: {
+      studyId_code: {
+        code: "LEFT",
+        studyId
+      }
+    }
+  })) as { id: string };
+  const rightArm = (await prisma.studyArm.upsert?.({
+    create: {
+      code: "RIGHT",
+      label: "Brazo derecho",
+      sortOrder: 2,
+      studyId
+    },
+    update: {
+      label: "Brazo derecho",
+      sortOrder: 2
+    },
+    where: {
+      studyId_code: {
+        code: "RIGHT",
+        studyId
+      }
+    }
+  })) as { id: string };
+  const leftProduct = (await prisma.studyProduct.upsert?.({
+    create: {
+      displayLabel: "Primera fragancia",
+      internalCode: leftFragranceCode,
+      isSensitive: true,
+      realName: leftFragranceCode,
+      studyId
+    },
+    update: {
+      displayLabel: "Primera fragancia",
+      isSensitive: true
+    },
+    where: {
+      studyId_internalCode: {
+        internalCode: leftFragranceCode,
+        studyId
+      }
+    }
+  })) as { id: string };
+  const rightProduct = (await prisma.studyProduct.upsert?.({
+    create: {
+      displayLabel: "Segunda fragancia",
+      internalCode: rightFragranceCode,
+      isSensitive: true,
+      realName: rightFragranceCode,
+      studyId
+    },
+    update: {
+      displayLabel: "Segunda fragancia",
+      isSensitive: true
+    },
+    where: {
+      studyId_internalCode: {
+        internalCode: rightFragranceCode,
+        studyId
+      }
+    }
+  })) as { id: string };
+  const rotationPlan = (await prisma.rotationPlan.upsert?.({
+    create: {
+      assignmentModeAllowed: "MANUAL",
+      name: rotationCode,
+      rotationCode,
+      status: "ACTIVE",
+      studyId
+    },
+    select: {
+      id: true
+    },
+    update: {
+      assignmentModeAllowed: "MANUAL",
+      name: rotationCode,
+      status: "ACTIVE"
+    },
+    where: {
+      studyId_rotationCode: {
+        rotationCode,
+        studyId
+      }
+    }
+  })) as { id: string };
+
+  await prisma.rotationPlanArm.deleteMany?.({
+    where: { rotationPlanId: rotationPlan.id }
+  });
+  await prisma.rotationPlanArm.createMany?.({
+    data: [
+      {
+        applicationOrder: 1,
+        participantVisibleLabel: "Primera fragancia",
+        rotationPlanId: rotationPlan.id,
+        studyArmId: leftArm.id,
+        studyProductId: leftProduct.id
+      },
+      {
+        applicationOrder: 2,
+        participantVisibleLabel: "Segunda fragancia",
+        rotationPlanId: rotationPlan.id,
+        studyArmId: rightArm.id,
+        studyProductId: rightProduct.id
+      }
+    ]
+  });
+
+  const rotationAssignment = (await prisma.participantRotationAssignment.upsert?.({
+    create: {
+      assignedByUserId: actorUserId,
+      assignmentMode: "MANUAL_COVER_CODE",
+      rotationCode,
+      rotationPlanId: rotationPlan.id,
+      studyParticipantId: participant.id
+    },
+    select: { id: true },
+    update: {
+      changedAt: new Date(),
+      rotationCode,
+      rotationPlanId: rotationPlan.id
+    },
+    where: {
+      studyParticipantId: participant.id
+    }
+  })) as { id: string };
+
+  await prisma.participantArmAssignment.upsert?.({
+    create: {
+      applicationOrder: 1,
+      participantRotationAssignmentId: rotationAssignment.id,
+      participantVisibleLabel: "Primera fragancia",
+      studyArmId: leftArm.id,
+      studyParticipantId: participant.id,
+      studyProductId: leftProduct.id
+    },
+    update: {
+      applicationOrder: 1,
+      participantRotationAssignmentId: rotationAssignment.id,
+      participantVisibleLabel: "Primera fragancia",
+      studyProductId: leftProduct.id
+    },
+    where: {
+      studyParticipantId_studyArmId: {
+        studyArmId: leftArm.id,
+        studyParticipantId: participant.id
+      }
+    }
+  });
+  await prisma.participantArmAssignment.upsert?.({
+    create: {
+      applicationOrder: 2,
+      participantRotationAssignmentId: rotationAssignment.id,
+      participantVisibleLabel: "Segunda fragancia",
+      studyArmId: rightArm.id,
+      studyParticipantId: participant.id,
+      studyProductId: rightProduct.id
+    },
+    update: {
+      applicationOrder: 2,
+      participantRotationAssignmentId: rotationAssignment.id,
+      participantVisibleLabel: "Segunda fragancia",
+      studyProductId: rightProduct.id
+    },
+    where: {
+      studyParticipantId_studyArmId: {
+        studyArmId: rightArm.id,
+        studyParticipantId: participant.id
+      }
+    }
+  });
+
+  return {
+    rotationCode
+  };
+}
+
 function buildParticipantRotationSummary(participant: ParticipantRecord): NavigoParticipantListItem["rotation"] {
   const leftArm = getAssignedArm(participant, "LEFT", 1);
   const rightArm = getAssignedArm(participant, "RIGHT", 2);
   const approvalComplete = participantStatus(participant) === "APPROVED";
   const folioComplete = Boolean(participant.participantConfirmation);
-  const applicationKitCode = participant.rotationAssignment?.rotationCode ?? null;
   const readiness = {
-    applicationKitCode,
     approvalComplete,
     folioComplete,
     leftArmComplete: Boolean(leftArm),
@@ -1185,7 +1632,6 @@ function buildParticipantRotationSummary(participant: ParticipantRecord): Navigo
   };
 
   return {
-    applicationKitCode,
     checklist: buildNavigoRotationChecklist(readiness),
     leftCode: leftArm?.studyProduct.internalCode ?? null,
     ready: Boolean(approvalComplete && folioComplete && leftArm && rightArm),
@@ -1296,6 +1742,21 @@ function activityStateAtEvent(activities: NavigoActivityRecord[]): "COMPLETED_EX
   }
 
   return "NONE_STARTED";
+}
+
+function hasT0Started(participant: ParticipantRecord): boolean {
+  if (participant.applicationStartedAt) {
+    return true;
+  }
+
+  return (participant.activities ?? []).some(
+    (activity) =>
+      activity.actualStartedAt ||
+      activity.actualCompletedAt ||
+      activity.status === "COMPLETED" ||
+      activity.status === "STARTED" ||
+      activity.status === "INCOMPLETE"
+  );
 }
 
 async function ensureParticipantAccessToken({

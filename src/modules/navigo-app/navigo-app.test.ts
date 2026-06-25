@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   createNavigoFoundationRepository,
   createNavigoMeasurementDefinition,
+  createNavigoRotationTemplateTsv,
   createNavigoScheduleSeeds,
   buildNavigoActivityTimeline,
   buildNavigoStartT0PendingMessage,
@@ -13,6 +14,7 @@ import {
   NAVIGO_APP_DEFAULT_TIME_ZONE,
   navigoActivityLabel,
   normalizeNavigoRotationCode,
+  parseNavigoRotationImportText,
   prepareNavigoParticipantActivities,
   resolveNavigoTimeZone,
   validateNavigoMeasurementAnswers
@@ -374,19 +376,17 @@ describe("navigo app MVP rules", () => {
     expect(normalizeNavigoRotationCode("  ab 12 \n")).toBe("AB12");
     expect(
       buildNavigoStartT0PendingMessage({
-        applicationKitCode: "KIT-1",
         approvalComplete: true,
         folioComplete: true,
         leftArmComplete: false,
         rightArmComplete: false
       })
-    ).toBe("Pendiente para iniciar T0: asignar brazo izquierdo, asignar brazo derecho.");
+    ).toBe("Pendiente para iniciar T0: asignar primera fragancia, asignar segunda fragancia.");
   });
 
   it("does not block T0 on optional triangular codes when folio, approval and arms are ready", () => {
     expect(
       buildNavigoStartT0PendingMessage({
-        applicationKitCode: null,
         approvalComplete: true,
         folioComplete: true,
         leftArmComplete: true,
@@ -399,11 +399,37 @@ describe("navigo app MVP rules", () => {
     const adminPage = readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "page.tsx");
     const participantPage = readWorkspaceFile("src", "app", "p", "[token]", "activities", "page.tsx");
 
+    expect(readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "_components", "NavigoRotationImportPanel.tsx")).toContain("Importar rotacion");
     expect(adminPage).toContain("Preparacion de rotacion");
     expect(adminPage).toContain("Codigo primera fragancia / brazo izquierdo");
-    expect(adminPage).toContain("Codigo aplicacion / kit ambos brazos");
+    expect(adminPage).not.toContain("Codigo aplicacion / kit ambos brazos");
     expect(participantPage).toContain("Primera fragancia");
     expect(participantPage).not.toContain("realName");
+  });
+
+  it("creates and parses the rotation import template for CSV or TSV", () => {
+    expect(createNavigoRotationTemplateTsv()).toContain("folio\tprimera_fragancia\tsegunda_fragancia");
+
+    const tsv = parseNavigoRotationImportText({
+      filename: "rotacion.tsv",
+      text: "Folio\t1a fragancia\t2a fragancia\nNAV-001\t codigo-a \tcodigo-b"
+    });
+    const csv = parseNavigoRotationImportText({
+      filename: "rotacion.csv",
+      text: "Folio,Primera fragancia,Segunda fragancia\nNAV-002,CODIGO-C,CODIGO-D"
+    });
+    const xlsx = parseNavigoRotationImportText({
+      filename: "rotacion.xlsx",
+      text: "irrelevant"
+    });
+
+    expect(tsv.ok ? tsv.rows[0] : null).toEqual({
+      folio: "NAV-001",
+      primeraFragancia: "CODIGO-A",
+      segundaFragancia: "CODIGO-B"
+    });
+    expect(csv.ok ? csv.rows[0]?.folio : null).toBe("NAV-002");
+    expect(xlsx.ok).toBe(false);
   });
 
   it("adds operable participant routes for token activities", () => {

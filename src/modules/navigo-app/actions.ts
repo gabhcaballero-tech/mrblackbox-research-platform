@@ -10,6 +10,8 @@ import {
   type NavigoActionResult,
   type NavigoSignedActivityUpload
 } from "./repository";
+import { parseNavigoRotationImportText, type NavigoRotationImportRowInput } from "./service";
+import type { NavigoRotationImportActionState } from "./rotation-import-state";
 import type { EvidenceUploadMetadata } from "@/modules/participant-portal/evidence-storage";
 
 export async function startNavigoT0Action(studyId: string, studyParticipantId: string, formData: FormData) {
@@ -43,7 +45,6 @@ export async function configureNavigoRotationAction(studyId: string, studyPartic
   const actor = await requireCapability("rotation:register");
   const result = await createNavigoAppRepository().configureParticipantRotation({
     actorUserId: actor.id,
-    applicationKitCode: String(formData.get("applicationKitCode") ?? ""),
     leftFragranceCode: String(formData.get("leftFragranceCode") ?? ""),
     rightFragranceCode: String(formData.get("rightFragranceCode") ?? ""),
     studyParticipantId,
@@ -60,6 +61,101 @@ export async function configureNavigoRotationAction(studyId: string, studyPartic
     message: "Rotacion configurada correctamente.",
     participant: studyParticipantId
   });
+}
+
+export async function previewNavigoRotationImportAction(
+  studyId: string,
+  _previousState: NavigoRotationImportActionState,
+  formData: FormData
+): Promise<NavigoRotationImportActionState> {
+  await requireCapability("rotation:register");
+  const file = formData.get("rotationFile");
+
+  if (!(file instanceof File) || file.size === 0) {
+    return {
+      message: "Selecciona un archivo CSV o TSV compatible con Excel.",
+      preview: null,
+      rows: [],
+      status: "error"
+    };
+  }
+
+  const parsed = parseNavigoRotationImportText({
+    filename: file.name,
+    text: await file.text()
+  });
+
+  if (!parsed.ok) {
+    return {
+      message: parsed.message,
+      preview: null,
+      rows: [],
+      status: "error"
+    };
+  }
+
+  const result = await createNavigoAppRepository().previewRotationImport({
+    rows: parsed.rows,
+    studyId
+  });
+
+  if (!result.ok) {
+    return {
+      message: result.message,
+      preview: null,
+      rows: parsed.rows,
+      status: "error"
+    };
+  }
+
+  return {
+    message: "Previsualizacion lista. Revisa los errores antes de aplicar.",
+    preview: result.data,
+    rows: parsed.rows,
+    status: result.data.summary.rowsWithError > 0 ? "error" : "success"
+  };
+}
+
+export async function applyNavigoRotationImportAction(
+  studyId: string,
+  _previousState: NavigoRotationImportActionState,
+  formData: FormData
+): Promise<NavigoRotationImportActionState> {
+  const actor = await requireCapability("rotation:register");
+  const rows = parseRowsJson(String(formData.get("rowsJson") ?? "[]"));
+
+  if (rows.length === 0) {
+    return {
+      message: "Primero previsualiza un archivo valido.",
+      preview: null,
+      rows: [],
+      status: "error"
+    };
+  }
+
+  const result = await createNavigoAppRepository().applyRotationImport({
+    actorUserId: actor.id,
+    rows,
+    studyId
+  });
+
+  if (!result.ok) {
+    return {
+      message: result.message,
+      preview: null,
+      rows,
+      status: "error"
+    };
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+
+  return {
+    message: "Rotacion importada correctamente.",
+    preview: result.data,
+    rows,
+    status: "success"
+  };
 }
 
 export async function requestNavigoActivitySelfieUploadAction(
@@ -147,6 +243,32 @@ function parseToken(tokenInput: string): string {
   }
 
   return parsed.data;
+}
+
+function parseRowsJson(value: string): NavigoRotationImportRowInput[] {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .map((row) => {
+        if (typeof row !== "object" || row === null) {
+          return null;
+        }
+
+        const input = row as Record<string, unknown>;
+        return {
+          folio: String(input.folio ?? ""),
+          primeraFragancia: String(input.primeraFragancia ?? ""),
+          segundaFragancia: String(input.segundaFragancia ?? "")
+        };
+      })
+      .filter((row): row is NavigoRotationImportRowInput => row !== null);
+  } catch {
+    return [];
+  }
 }
 
 function redirectWithNavigoMessage(
