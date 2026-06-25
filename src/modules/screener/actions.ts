@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireCapability } from "@/shared/auth/session";
+import { initialScreenerDraftActionState, type ScreenerDraftActionState } from "./action-state";
 import { createScreenerRepository } from "./repository";
 import {
   addConsentDefaultOptionsForAdmin,
@@ -45,10 +46,48 @@ export type ScreenerNseActionState = ScreenerOptionActionState;
 export type ScreenerVisibilityActionState = ScreenerOptionActionState;
 export type ScreenerQuestionMoveActionState = ScreenerOptionActionState;
 
+function actionStateFromResult(
+  result: {
+    fieldErrors?: ScreenerAdminFieldErrors;
+    ok: boolean;
+    message?: string;
+  },
+  successMessage: string
+): ScreenerDraftActionState {
+  if (result.ok) {
+    return {
+      message: successMessage,
+      status: "success"
+    };
+  }
+
+  return {
+    fieldErrors: result.fieldErrors,
+    message: sanitizeScreenerActionMessage(result.message ?? "No fue posible completar la acción."),
+    status: "error"
+  };
+}
+
 function revalidateScreener(studyId: string) {
   revalidatePath("/admin");
   revalidatePath(`/admin/studies/${studyId}`);
   revalidatePath(`/admin/studies/${studyId}/screener`);
+}
+
+function sanitizeScreenerActionMessage(message: string) {
+  if (message.includes("al menos una pregunta")) {
+    return "No puedes publicar una versión sin preguntas.";
+  }
+
+  return message;
+}
+
+function logScreenerActionFailure(step: "publish" | "saveDraft", studyId: string, error: unknown) {
+  if (error && typeof error === "object" && "digest" in error) {
+    throw error;
+  }
+
+  console.error(`screener builder action failed: step=${step} studyId=${studyId}`);
 }
 
 export async function createScreenerDraftAction(
@@ -71,18 +110,33 @@ export async function createScreenerDraftAction(
 
 export async function saveScreenerMetadataAction(
   studyId: string,
+  _previousState: ScreenerDraftActionState,
   formData: FormData
-): Promise<void> {
-  const actor = await requireCapability("admin:access");
-  const result = await saveScreenerMetadataForAdmin({
-    actor,
-    formInput: getMetadataInputFromFormData(formData),
-    repository: createScreenerRepository(),
-    studyId
-  });
+): Promise<ScreenerDraftActionState> {
+  void _previousState;
 
-  if (result.ok) {
-    revalidateScreener(studyId);
+  try {
+    const actor = await requireCapability("admin:access");
+    const result = await saveScreenerMetadataForAdmin({
+      actor,
+      formInput: getMetadataInputFromFormData(formData),
+      repository: createScreenerRepository(),
+      studyId
+    });
+
+    if (result.ok) {
+      revalidateScreener(studyId);
+    }
+
+    return actionStateFromResult(result, "Borrador guardado correctamente.");
+  } catch (error) {
+    logScreenerActionFailure("saveDraft", studyId, error);
+
+    return {
+      ...initialScreenerDraftActionState,
+      message: "No fue posible guardar el borrador. Intenta de nuevo.",
+      status: "error"
+    };
   }
 }
 
@@ -548,19 +602,36 @@ export async function clearScreenerNseAction(
 
 export async function publishScreenerAction(
   studyId: string,
+  _previousState: ScreenerDraftActionState,
   _formData: FormData
-): Promise<void> {
+): Promise<ScreenerDraftActionState> {
+  void _previousState;
   void _formData;
 
-  const actor = await requireCapability("admin:access");
-  const result = await publishScreenerForAdmin({
-    actor,
-    repository: createScreenerRepository(),
-    studyId
-  });
+  try {
+    const actor = await requireCapability("admin:access");
+    const result = await publishScreenerForAdmin({
+      actor,
+      repository: createScreenerRepository(),
+      studyId
+    });
 
-  if (result.ok) {
-    revalidateScreener(studyId);
+    if (result.ok) {
+      revalidateScreener(studyId);
+    }
+
+    return actionStateFromResult(result, "Versión publicada correctamente.");
+  } catch (error) {
+    if (error && typeof error === "object" && "digest" in error) {
+      throw error;
+    }
+
+    logScreenerActionFailure("publish", studyId, error);
+    return {
+      ...initialScreenerDraftActionState,
+      message: "No fue posible publicar la versión. Intenta de nuevo.",
+      status: "error"
+    };
   }
 }
 

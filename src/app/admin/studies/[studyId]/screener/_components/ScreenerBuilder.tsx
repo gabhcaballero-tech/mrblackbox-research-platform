@@ -2,9 +2,7 @@ import {
   addScreenerQuestionAction,
   createScreenerDraftAction,
   deleteScreenerQuestionAction,
-  publishScreenerAction,
   retireScreenerVersionAction,
-  saveScreenerMetadataAction,
   updateScreenerQuestionAction
 } from "@/modules/screener/actions";
 import type {
@@ -43,6 +41,7 @@ import { OptionEditForm } from "./OptionEditForm";
 import { QuestionMoveControls } from "./QuestionMoveControls";
 import { QuestionVisibilityForm } from "./QuestionVisibilityForm";
 import { RuleGuidedForm } from "./RuleGuidedForm";
+import { PublishVersionForm, ScreenerMetadataForm } from "./ScreenerActionForms";
 import { DetergentsTemplateButton } from "../../_components/DetergentsTemplateButton";
 
 type ScreenerBuilderProps = {
@@ -303,26 +302,7 @@ function MetadataPanel({
         description="Estos datos forman parte del snapshot publicado."
         title={UI_LABELS.screener.questionnaireSummary}
       />
-      <form action={saveScreenerMetadataAction.bind(null, studyId)} className="grid gap-4 md:grid-cols-2">
-        <label className={labelClass}>
-          {UI_LABELS.screener.title}
-          <input className={inputClass} defaultValue={definition.title} disabled={readOnly} name="title" />
-        </label>
-        <label className={labelClass}>
-          {UI_LABELS.screener.optionalDescription}
-          <input
-            className={inputClass}
-            defaultValue={definition.description ?? ""}
-            disabled={readOnly}
-            name="description"
-          />
-        </label>
-        <div className="md:col-span-2">
-          <button className={primaryButtonClass} disabled={readOnly} type="submit">
-            {UI_LABELS.actions.saveDraft}
-          </button>
-        </div>
-      </form>
+      <ScreenerMetadataForm definition={definition} readOnly={readOnly} studyId={studyId} />
     </section>
   );
 }
@@ -715,11 +695,13 @@ function PublishPanel({
           la que fueron creados.
         </p>
       ) : null}
-      <form action={publishScreenerAction.bind(null, studyId)}>
-        <button className={primaryButtonClass} disabled={readOnly || !canPublish} type="submit">
-          {isPreparingNewVersion ? "Publicar nueva versión" : UI_LABELS.actions.publishVersion}
-        </button>
-      </form>
+      <PublishVersionForm
+        canPublish={canPublish}
+        definition={definition}
+        isPreparingNewVersion={isPreparingNewVersion}
+        readOnly={readOnly}
+        studyId={studyId}
+      />
     </section>
   );
 }
