@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { getParticipantPortalAuth } from "@/shared/auth/participant-portal";
 import { createParticipantPortalEvidenceRepository } from "@/modules/participant-portal/evidence-repository";
 import { getParticipantPortalSelfieScreen } from "@/modules/participant-portal/evidence-service";
 import { createParticipantPortalRepository } from "@/modules/participant-portal/repository";
+import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
 import { participantPortalStudyCodeSchema } from "@/modules/participant-portal/validation";
 import { ParticipantFinalSelfieStep } from "./ParticipantFinalSelfieStep";
 
@@ -22,6 +24,11 @@ export default async function ParticipantPortalSelfiePage({ params }: Participan
   }
 
   const studyCode = parsedStudyCode.data;
+
+  if (!getStudyBehavior(studyCode).requiresFinalSelfie) {
+    redirect(`/participar/${encodeURIComponent(studyCode)}/resultado`);
+  }
+
   const auth = await getParticipantPortalAuth({ repository: createParticipantPortalRepository(), studyCode });
 
   if (auth.status === "no_session") {

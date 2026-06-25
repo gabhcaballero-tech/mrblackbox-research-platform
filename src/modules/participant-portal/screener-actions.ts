@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getParticipantPortalAuth } from "@/shared/auth/participant-portal";
+import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
 import { createParticipantPortalRepository } from "./repository";
 import { createParticipantPortalScreenerRepository } from "./screener-repository";
 import { saveParticipantPortalScreenerAnswer } from "./screener-service";
@@ -59,8 +60,10 @@ export async function saveParticipantPortalScreenerAnswerAction(
   revalidatePath(`/participar/${studyCode}/selfie`);
 
   if (result.data.closed) {
+    const behavior = getStudyBehavior(studyCode);
+
     redirect(
-      result.data.status === "PASSED"
+      result.data.status === "PASSED" && behavior.requiresFinalSelfie
         ? `/participar/${encodeURIComponent(studyCode)}/selfie`
         : `/participar/${encodeURIComponent(studyCode)}/resultado`
     );
