@@ -2,6 +2,7 @@ import { PARTICIPANT_PORTAL_UNAVAILABLE_MESSAGE } from "./access";
 import {
   PARTICIPANT_PORTAL_PUBLIC_REJECTED_MESSAGE,
   PARTICIPANT_PORTAL_PUBLIC_TERMINATED_MESSAGE,
+  PARTICIPANT_PORTAL_PUBLIC_FILTER_ONLY_PASSED_MESSAGE,
   PARTICIPANT_PORTAL_REGISTRATION_REQUIRED_MESSAGE
 } from "./screener-service";
 import {
@@ -25,6 +26,7 @@ import type {
   PortalEvidenceStudyParticipantRecord
 } from "./evidence-repository";
 import type { ParticipantPortalIdentity } from "@/shared/auth/participant-portal";
+import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
 
 export const PARTICIPANT_PORTAL_EVIDENCE_REVIEW_MESSAGE =
   "Gracias. Tus respuestas y evidencias están en revisión. Recibirás seguimiento de tu reclutador.";
@@ -75,7 +77,14 @@ export type ParticipantPortalEvidencePublicResult = {
     folio: string;
     participantName: string;
   };
-  kind: "APPROVED" | "IN_PROGRESS" | "PENDING_EVIDENCE" | "PENDING_REVIEW" | "REJECTED" | "TERMINATED";
+  kind:
+    | "APPROVED"
+    | "COMPLETED"
+    | "IN_PROGRESS"
+    | "PENDING_EVIDENCE"
+    | "PENDING_REVIEW"
+    | "REJECTED"
+    | "TERMINATED";
   message: string;
   showEvidenceLink: boolean;
   study: {
@@ -128,6 +137,14 @@ export async function getParticipantPortalEvidenceScreen({
     return context;
   }
 
+  if (!requiresParticipantEvidence(context.data.study.code)) {
+    return {
+      code: "ATTEMPT_NOT_READY",
+      message: "Este estudio no requiere evidencias.",
+      ok: false
+    };
+  }
+
   if (context.data.attempt.participantConfirmation) {
     return {
       code: "ATTEMPT_NOT_READY",
@@ -155,6 +172,14 @@ export async function getParticipantPortalSelfieScreen({
 
   if (!base.ok) {
     return base;
+  }
+
+  if (!requiresParticipantEvidence(base.data.study.code)) {
+    return {
+      code: "ATTEMPT_NOT_READY",
+      message: "Este estudio no requiere selfie.",
+      ok: false
+    };
   }
 
   const attemptResult = await ensurePortalAttemptForEvidence({
@@ -193,6 +218,14 @@ export async function requestParticipantEvidenceUpload({
 
   if (!context.ok) {
     return context;
+  }
+
+  if (!requiresParticipantEvidence(context.data.study.code)) {
+    return {
+      code: "ATTEMPT_NOT_READY",
+      message: "Este estudio no requiere evidencias.",
+      ok: false
+    };
   }
 
   try {
@@ -238,6 +271,14 @@ export async function confirmParticipantEvidenceUpload({
 
   if (!context.ok) {
     return context;
+  }
+
+  if (!requiresParticipantEvidence(context.data.study.code)) {
+    return {
+      code: "ATTEMPT_NOT_READY",
+      message: "Este estudio no requiere evidencias.",
+      ok: false
+    };
   }
 
   try {
@@ -301,6 +342,14 @@ export async function completeParticipantEvidenceSubmission({
 
   if (!context.ok) {
     return context;
+  }
+
+  if (!requiresParticipantEvidence(context.data.study.code)) {
+    return {
+      code: "ATTEMPT_NOT_READY",
+      message: "Este estudio no requiere evidencias.",
+      ok: false
+    };
   }
 
   const validation = validateEvidenceCounts({
@@ -388,6 +437,18 @@ export async function getParticipantPortalEvidenceResult({
       data: {
         kind: "IN_PROGRESS",
         message: "Continúa el filtro para completar tus respuestas.",
+        showEvidenceLink: false,
+        study: publicStudy(study)
+      },
+      ok: true
+    };
+  }
+
+  if (!requiresParticipantEvidence(study.code)) {
+    return {
+      data: {
+        kind: "COMPLETED",
+        message: PARTICIPANT_PORTAL_PUBLIC_FILTER_ONLY_PASSED_MESSAGE,
         showEvidenceLink: false,
         study: publicStudy(study)
       },
@@ -675,6 +736,12 @@ function publicStudy(study: PortalEvidenceStudyRecord) {
     id: study.id,
     name: study.name
   };
+}
+
+function requiresParticipantEvidence(studyCode: string): boolean {
+  const behavior = getStudyBehavior(studyCode);
+
+  return behavior.requiresFinalSelfie || behavior.requiresPerfumeEvidence;
 }
 
 export function countEvidence(evidence: PortalEvidenceRecord[]): ParticipantEvidenceCounts {

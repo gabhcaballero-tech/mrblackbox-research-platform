@@ -6,11 +6,15 @@ import type {
   StudyActivationState,
   StudyEditState,
   StudyListItem,
+  StudyRiskState,
   UpdateDraftStudyRecordInput
 } from "./repository";
 import {
   activateStudyForAdmin,
+  archiveStudyForAdmin,
   createStudyForAdmin,
+  deleteEmptyStudyForAdmin,
+  getStudyRiskForAdmin,
   listStudiesForAdmin,
   type StudiesActor,
   updateDraftStudyForAdmin
@@ -46,13 +50,32 @@ function study(overrides: Partial<StudyListItem> = {}): StudyListItem {
 
 function fakeRepository(options: {
   studies?: StudyListItem[];
+  risks?: Record<string, StudyRiskState>;
+  onArchive?: (id: string) => Promise<{ code: string; id: string; portalDisabled: boolean; status: "ARCHIVED" } | null> | { code: string; id: string; portalDisabled: boolean; status: "ARCHIVED" } | null;
   onCreate?: (input: CreateStudyRecordInput) => Promise<StudyListItem> | StudyListItem;
+  onDelete?: (id: string) => Promise<{ code: string; id: string } | null> | { code: string; id: string } | null;
   onUpdate?: (input: UpdateDraftStudyRecordInput) => Promise<number> | number;
   onActivate?: (id: string) => Promise<number> | number;
   onFindActivationState?: (id: string) => Promise<StudyActivationState> | StudyActivationState;
   onFindEditState?: (id: string) => Promise<StudyEditState> | StudyEditState;
 } = {}): StudiesRepository {
   return {
+    async archiveStudy(id) {
+      if (options.onArchive) {
+        return options.onArchive(id);
+      }
+
+      const found = options.studies?.find((item) => item.id === id);
+
+      return found
+        ? {
+            code: found.code,
+            id: found.id,
+            portalDisabled: true,
+            status: "ARCHIVED"
+          }
+        : null;
+    },
     async activateStudy(id) {
       if (options.onActivate) {
         return options.onActivate(id);
@@ -61,6 +84,15 @@ function fakeRepository(options: {
       return options.studies?.some((item) => item.id === id && item.status === "DRAFT")
         ? 1
         : 0;
+    },
+    async deleteEmptyStudy(id) {
+      if (options.onDelete) {
+        return options.onDelete(id);
+      }
+
+      const found = options.studies?.find((item) => item.id === id);
+
+      return found ? { code: found.code, id: found.id } : null;
     },
     async createStudy(input) {
       if (options.onCreate) {
@@ -81,6 +113,15 @@ function fakeRepository(options: {
 
       return options.studies?.find((item) => item.id === id) ?? null;
     },
+    async getStudyRiskState(id) {
+      if (options.risks?.[id]) {
+        return options.risks[id];
+      }
+
+      const found = options.studies?.find((item) => item.id === id);
+
+      return found ? { ...found, deletionBlockers: [] } : null;
+    },
     async findStudyActivationState(id) {
       if (options.onFindActivationState) {
         return options.onFindActivationState(id);
@@ -96,8 +137,10 @@ function fakeRepository(options: {
           }
         : null;
     },
-    async listStudies() {
-      return options.studies ?? [];
+    async listStudies(mode = "active") {
+      return (options.studies ?? []).filter((item) =>
+        mode === "archived" ? item.status === "ARCHIVED" : item.status !== "ARCHIVED"
+      );
     },
     async updateDraftStudy(input) {
       if (options.onUpdate) {
@@ -163,6 +206,36 @@ describe("study admin service", () => {
 
     expect(result.ok).toBe(true);
     expect(result.ok ? result.data.map((item) => item.code) : []).toEqual(["NEWER", "OLDER"]);
+  });
+
+  it("hides archived studies from the active list and exposes them in the archived list", async () => {
+    const active = study({ code: "ACTIVE", status: "ACTIVE" });
+    const archived = study({
+      code: "ARCHIVED",
+      id: "55555555-5555-4555-8555-555555555555",
+      status: "ARCHIVED"
+    });
+
+    await expect(
+      listStudiesForAdmin({
+        actor: adminActor,
+        repository: fakeRepository({ studies: [active, archived] })
+      })
+    ).resolves.toMatchObject({
+      data: [active],
+      ok: true
+    });
+
+    await expect(
+      listStudiesForAdmin({
+        actor: adminActor,
+        mode: "archived",
+        repository: fakeRepository({ studies: [active, archived] })
+      })
+    ).resolves.toMatchObject({
+      data: [archived],
+      ok: true
+    });
   });
 
   it("denies administration when there is no session actor", async () => {
@@ -366,5 +439,141 @@ describe("study admin service", () => {
         studyId: "study-1"
       })
     ).resolves.toMatchObject({ code: "SCREENER_NOT_PUBLISHED", ok: false });
+  });
+
+  it("allows ADMIN to inspect deletion blockers for a study", async () => {
+    const risk = {
+      ...study({ id: "22222222-2222-4222-8222-222222222222" }),
+      deletionBlockers: [
+        {
+          count: 2,
+          key: "screeningAttempts",
+          label: "intentos de screener"
+        }
+      ]
+    };
+
+    const result = await getStudyRiskForAdmin({
+      actor: adminActor,
+      repository: fakeRepository({ risks: { [risk.id]: risk } }),
+      studyId: risk.id
+    });
+
+    expect(result.ok ? result.data.deletionBlockers[0]?.label : null).toBe("intentos de screener");
+  });
+
+  it("archives a study and closes its public access when ADMIN confirms explicitly", async () => {
+    let archivedId: string | null = null;
+
+    const result = await archiveStudyForAdmin({
+      actor: adminActor,
+      confirmation: "ARCHIVAR ESTUDIO",
+      repository: fakeRepository({
+        onArchive(id) {
+          archivedId = id;
+          return {
+            code: "STUDY-01",
+            id,
+            portalDisabled: true,
+            status: "ARCHIVED"
+          };
+        }
+      }),
+      studyId: "study-1"
+    });
+
+    expect(result).toMatchObject({ ok: true });
+    expect(result.ok ? result.data.portalDisabled : false).toBe(true);
+    expect(archivedId).toBe("study-1");
+  });
+
+  it("does not archive when confirmation is missing or actor is not ADMIN", async () => {
+    await expect(
+      archiveStudyForAdmin({
+        actor: adminActor,
+        confirmation: "archivar",
+        repository: fakeRepository(),
+        studyId: "study-1"
+      })
+    ).resolves.toMatchObject({ code: "INVALID_CONFIRMATION", ok: false });
+
+    await expect(
+      archiveStudyForAdmin({
+        actor: actor("SUPERVISOR"),
+        confirmation: "ARCHIVAR ESTUDIO",
+        repository: fakeRepository(),
+        studyId: "study-1"
+      })
+    ).resolves.toMatchObject({ code: "UNAUTHORIZED", ok: false });
+  });
+
+  it("deletes a test study only when it has no operational blockers", async () => {
+    const empty = { ...study({ id: "study-empty" }), deletionBlockers: [] };
+
+    const result = await deleteEmptyStudyForAdmin({
+      actor: adminActor,
+      confirmation: "ELIMINAR ESTUDIO",
+      repository: fakeRepository({
+        onDelete(id) {
+          return { code: "EMPTY", id };
+        },
+        risks: {
+          "study-empty": empty
+        }
+      }),
+      studyId: "study-empty"
+    });
+
+    expect(result).toMatchObject({ ok: true });
+    expect(result.ok ? result.data.code : null).toBe("EMPTY");
+  });
+
+  it("blocks hard deletion when there are attempts, participants, evidence or folios", async () => {
+    const risk = {
+      ...study({ id: "study-with-data" }),
+      deletionBlockers: [
+        { count: 1, key: "screeningAttempts", label: "intentos de screener" },
+        { count: 1, key: "studyParticipants", label: "participantes del estudio" },
+        { count: 3, key: "participantEvidence", label: "evidencias" },
+        { count: 3, key: "participantReferenceCodes", label: "folios o codigos" }
+      ]
+    };
+
+    const result = await deleteEmptyStudyForAdmin({
+      actor: adminActor,
+      confirmation: "ELIMINAR ESTUDIO",
+      repository: fakeRepository({
+        risks: {
+          "study-with-data": risk
+        }
+      }),
+      studyId: "study-with-data"
+    });
+
+    expect(result).toMatchObject({ code: "STUDY_HAS_OPERATIONAL_DATA", ok: false });
+    expect(result.ok ? "" : result.message).toContain("intentos de screener");
+    expect(result.ok ? "" : result.message).toContain("participantes del estudio");
+    expect(result.ok ? "" : result.message).toContain("evidencias");
+    expect(result.ok ? "" : result.message).toContain("folios o codigos");
+  });
+
+  it("denies hard deletion to non ADMIN users and requires exact confirmation", async () => {
+    await expect(
+      deleteEmptyStudyForAdmin({
+        actor: actor("SUPERVISOR"),
+        confirmation: "ELIMINAR ESTUDIO",
+        repository: fakeRepository(),
+        studyId: "study-1"
+      })
+    ).resolves.toMatchObject({ code: "UNAUTHORIZED", ok: false });
+
+    await expect(
+      deleteEmptyStudyForAdmin({
+        actor: adminActor,
+        confirmation: "ELIMINAR",
+        repository: fakeRepository(),
+        studyId: "study-1"
+      })
+    ).resolves.toMatchObject({ code: "INVALID_CONFIRMATION", ok: false });
   });
 });

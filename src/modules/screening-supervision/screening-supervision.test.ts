@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { InternalUserRole } from "@/shared/auth/permissions";
 import type { ScreenerDefinition } from "@/modules/screener";
+import { DETERGENTS_STUDY_CODE, DETERGENT_RECRUITER_QUESTION_ID } from "@/modules/screener/study-overrides";
 import { exportScreeningAttemptsCsvForStudy } from "./export";
 import {
   getScreeningAttemptSupervisionDetail,
@@ -20,6 +21,13 @@ const study: SupervisionStudyRecord = {
   code: "FMASCULINA-NAVIGO-2026",
   id: "study-1",
   name: "Fragancia Masculina - Navigo Homme",
+  timeZoneIana: "America/Mexico_City"
+};
+
+const detergentStudy: SupervisionStudyRecord = {
+  code: DETERGENTS_STUDY_CODE,
+  id: "study-detergents",
+  name: "Detergentes y cuidado de la ropa",
   timeZoneIana: "America/Mexico_City"
 };
 
@@ -387,6 +395,59 @@ describe("screening supervision service", () => {
     expect(JSON.stringify(result)).not.toContain("StudyProduct.realName");
   });
 
+  it("shows the detergent recruiter answer in list and detail even when the active definition lacks F0", async () => {
+    const record = attempt({
+      questionnaireVersion: {
+        definitionHash: "hash-detergents-1",
+        definitionJson: definition(),
+        id: "version-detergents-1",
+        study: detergentStudy,
+        versionNumber: 1
+      },
+      studyParticipant: {
+        id: "study-participant-detergents",
+        participantProfile: {
+          createdAt: new Date("2026-06-23T14:30:00Z"),
+          email: "persona@example.com",
+          externalReference: "DET-1",
+          id: "profile-detergents",
+          name: "Participante Detergentes",
+          phone: "5550000000"
+        },
+        studyId: detergentStudy.id
+      }
+    });
+    record.answers = [
+      { answerJson: "MAR\u00cdA \u00d1AND\u00da", questionId: DETERGENT_RECRUITER_QUESTION_ID },
+      ...record.answers
+    ];
+    const repo = {
+      ...repository([record]),
+      async getStudy(studyId: string) {
+        return studyId === detergentStudy.id ? detergentStudy : null;
+      }
+    } satisfies ScreeningSupervisionRepository;
+
+    const list = await listScreeningAttemptsForStudy({
+      actor: admin,
+      filters: {},
+      repository: repo,
+      studyId: detergentStudy.id
+    });
+    const detail = await getScreeningAttemptSupervisionDetail({
+      actor: admin,
+      attemptId: record.id,
+      repository: repo
+    });
+
+    expect(list.ok ? list.data.attempts[0]?.recruiterName : null).toBe("MAR\u00cdA \u00d1AND\u00da");
+    expect(detail.ok ? detail.data.answers[0]?.questionId : null).toBe(DETERGENT_RECRUITER_QUESTION_ID);
+    expect(detail.ok ? detail.data.answers[0]?.answerText : null).toBe("MAR\u00cdA \u00d1AND\u00da");
+    expect(detail.ok ? detail.data.answers[0]?.questionText : null).toBe(
+      "Escribe el nombre de tu reclutador o reclutadora."
+    );
+  });
+
   it("prioritizes approved participant evidence review as confirmed in supervision labels", async () => {
     const record = attempt({
       participantConfirmation: {
@@ -520,6 +581,10 @@ describe("screening supervision service", () => {
       },
       source: "PARTICIPANT_PORTAL"
     });
+    record.answers = [
+      { answerJson: "MAR\u00cdA \u00d1AND\u00da", questionId: DETERGENT_RECRUITER_QUESTION_ID },
+      ...record.answers
+    ];
     const result = await exportScreeningAttemptsCsvForStudy({
       actor: admin,
       filters: { participantQuery: "Participante" },
@@ -550,7 +615,9 @@ describe("screening supervision service", () => {
     expect(result.ok ? result.data.rowCount : null).toBe(1);
     expect(result.ok ? result.data.fileContent.startsWith("\uFEFF") : false).toBe(true);
     expect(result.ok ? result.data.fileContent : "").toContain("Código del estudio\tNombre del estudio");
+    expect(result.ok ? result.data.fileContent : "").toContain("Reclutador\tConsentimiento");
     expect(result.ok ? result.data.fileContent : "").toContain("FMASCULINA-NAVIGO-2026");
+    expect(result.ok ? result.data.fileContent : "").toContain("MAR\u00cdA \u00d1AND\u00da");
     expect(result.ok ? result.data.fileContent : "").toContain("Portal participante");
     expect(result.ok ? result.data.fileContent : "").toContain("Elegible confirmado");
     expect(result.ok ? result.data.fileContent : "").toContain("23 jun 2026, 8:30 a.m.");

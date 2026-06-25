@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ScreenerDefinition } from "@/modules/screener";
+import { DETERGENTS_STUDY_CODE, DETERGENT_RECRUITER_QUESTION_ID } from "@/modules/screener/study-overrides";
 import type { ParticipantPortalIdentity } from "@/shared/auth/participant-portal";
 import { createParticipantPortalScreenerRepository } from "./screener-repository";
 import type {
@@ -12,6 +13,7 @@ import type {
   PortalStudyParticipantRecord
 } from "./screener-repository";
 import {
+  PARTICIPANT_PORTAL_PUBLIC_FILTER_ONLY_PASSED_MESSAGE,
   PARTICIPANT_PORTAL_PUBLIC_TERMINATED_MESSAGE,
   getParticipantPortalPublicResult,
   getParticipantPortalScreenerScreen,
@@ -401,7 +403,8 @@ async function answer(
   attemptId: string,
   questionId: string,
   value: string | string[],
-  otherText = ""
+  otherText = "",
+  studyCode = "FMASCULINA-NAVIGO-2026"
 ) {
   return saveParticipantPortalScreenerAnswer({
     attemptId,
@@ -409,30 +412,38 @@ async function answer(
     identity,
     questionId,
     repository,
-    studyCode: "FMASCULINA-NAVIGO-2026"
+    studyCode
   });
 }
 
-async function start(repository: ParticipantPortalScreenerRepository) {
+async function start(repository: ParticipantPortalScreenerRepository, studyCode = "FMASCULINA-NAVIGO-2026") {
   const result = await getParticipantPortalScreenerScreen({
     identity,
     repository,
-    studyCode: "FMASCULINA-NAVIGO-2026"
+    studyCode
   });
 
   expect(result.ok).toBe(true);
   return result.ok ? result.data.attempt.id : "";
 }
 
-async function answerEligible(repository: ParticipantPortalScreenerRepository, attemptId: string) {
-  await answer(repository, attemptId, "CONSENTIMIENTO", "SI");
-  await answer(repository, attemptId, "F1_GENERO", "HOMBRE");
-  await answer(repository, attemptId, "F6_MARCAS_UTILIZA", "Uso varias fragancias.");
-  await answer(repository, attemptId, "F9_FRECUENCIA_SEMANAL", "MAS_DE_UNA_VEZ_DIA");
-  await answer(repository, attemptId, "F9A_VECES_AL_DIA", "3");
+async function answerEligible(
+  repository: ParticipantPortalScreenerRepository,
+  attemptId: string,
+  studyCode = "FMASCULINA-NAVIGO-2026"
+) {
+  if (studyCode === DETERGENTS_STUDY_CODE) {
+    await answer(repository, attemptId, DETERGENT_RECRUITER_QUESTION_ID, "RECLUTADORA", "", studyCode);
+  }
+
+  await answer(repository, attemptId, "CONSENTIMIENTO", "SI", "", studyCode);
+  await answer(repository, attemptId, "F1_GENERO", "HOMBRE", "", studyCode);
+  await answer(repository, attemptId, "F6_MARCAS_UTILIZA", "Uso varias fragancias.", "", studyCode);
+  await answer(repository, attemptId, "F9_FRECUENCIA_SEMANAL", "MAS_DE_UNA_VEZ_DIA", "", studyCode);
+  await answer(repository, attemptId, "F9A_VECES_AL_DIA", "3", "", studyCode);
 
   for (const questionId of ["D1", "D2", "D3", "D4", "D5", "D6"]) {
-    await answer(repository, attemptId, questionId, "HIGH");
+    await answer(repository, attemptId, questionId, "HIGH", "", studyCode);
   }
 }
 
@@ -554,6 +565,39 @@ describe("participant portal screener service", () => {
     expect(screen.ok ? screen.data.currentQuestion?.id : null).toBe("F9A_VECES_AL_DIA");
   });
 
+  it("shows and saves the detergent recruiter question as normalized short text", async () => {
+    const { answers, repository } = createMemoryRepository({
+      study: activeStudy({
+        code: DETERGENTS_STUDY_CODE,
+        name: "Detergentes y cuidado de la ropa"
+      })
+    });
+    const screen = await getParticipantPortalScreenerScreen({
+      identity,
+      repository,
+      studyCode: DETERGENTS_STUDY_CODE
+    });
+    const attemptId = screen.ok ? screen.data.attempt.id : "";
+
+    expect(screen.ok ? screen.data.currentQuestion?.id : null).toBe(DETERGENT_RECRUITER_QUESTION_ID);
+    expect(screen.ok ? screen.data.visibleQuestions[0]?.id : null).toBe(DETERGENT_RECRUITER_QUESTION_ID);
+
+    const saved = await answer(
+      repository,
+      attemptId,
+      DETERGENT_RECRUITER_QUESTION_ID,
+      "  Mar\u00eda   \u00d1and\u00fa  \ud83d\ude0a ",
+      "",
+      DETERGENTS_STUDY_CODE
+    );
+
+    expect(saved.ok).toBe(true);
+    expect(saved.ok ? saved.data.nextQuestionId : null).toBe("CONSENTIMIENTO");
+    expect(answers.get(attemptId)?.find((item) => item.questionId === DETERGENT_RECRUITER_QUESTION_ID)?.answerJson).toBe(
+      "MAR\u00cdA \u00d1AND\u00da"
+    );
+  });
+
   it("saves single choice, short text, long text, integer and Other text with preserved spaces", async () => {
     const { answers, repository } = createMemoryRepository();
     const attemptId = await start(repository);
@@ -648,6 +692,33 @@ describe("participant portal screener service", () => {
 
     expect(result.ok ? result.data.kind : "").toBe("PENDING_EVIDENCE");
     expect(result.ok ? result.data.message : "").toContain("Falta tu selfie");
+  });
+
+  it("shows a final public message for a filter-only passed attempt without asking for selfie", async () => {
+    const { repository } = createMemoryRepository({
+      study: activeStudy({
+        code: DETERGENTS_STUDY_CODE,
+        name: "Detergentes"
+      })
+    });
+    const attemptId = await start(repository, DETERGENTS_STUDY_CODE);
+
+    await answerEligible(repository, attemptId, DETERGENTS_STUDY_CODE);
+
+    const result = await getParticipantPortalPublicResult({
+      identity,
+      repository,
+      studyCode: DETERGENTS_STUDY_CODE
+    });
+
+    expect(result).toMatchObject({
+      data: {
+        kind: "COMPLETED",
+        message: PARTICIPANT_PORTAL_PUBLIC_FILTER_ONLY_PASSED_MESSAGE,
+        showEvidencePlaceholder: false
+      },
+      ok: true
+    });
   });
 
   it("does not use QuestionnaireDraft to discover the active public screener", async () => {

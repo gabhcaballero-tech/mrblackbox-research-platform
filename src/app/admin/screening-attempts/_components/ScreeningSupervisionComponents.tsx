@@ -232,6 +232,14 @@ export function ScreeningAttemptTable({ attempts, studyId }: { attempts: Screeni
                     <p className="line-clamp-2 text-sm font-medium text-zinc-950" title={attempt.participant.name}>
                       {attempt.participant.name}
                     </p>
+                    {attempt.recruiterName ? (
+                      <p
+                        className="line-clamp-1 text-xs text-zinc-500"
+                        title={`Reclutador: ${attempt.recruiterName}`}
+                      >
+                        Reclutador: {attempt.recruiterName}
+                      </p>
+                    ) : null}
                     <Link
                       className="inline-flex w-fit rounded-md border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700 transition hover:border-teal-300 hover:bg-teal-100"
                       href={`/admin/screening-attempts/${attempt.id}`}

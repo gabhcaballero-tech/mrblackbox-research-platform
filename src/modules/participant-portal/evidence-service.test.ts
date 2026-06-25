@@ -16,6 +16,8 @@ import {
   requestParticipantEvidenceUpload
 } from "./evidence-service";
 import { PARTICIPANT_REFERENCE_CODE_PATTERN } from "./review";
+import { PARTICIPANT_PORTAL_PUBLIC_FILTER_ONLY_PASSED_MESSAGE } from "./screener-service";
+import { DETERGENTS_STUDY_CODE } from "@/modules/study-templates/study-behavior";
 
 const identity: ParticipantPortalIdentity = {
   email: "persona@example.com",
@@ -67,7 +69,10 @@ function attempt(overrides: Partial<PortalEvidenceAttemptRecord> = {}): PortalEv
   };
 }
 
-function createRepository(currentAttempt: PortalEvidenceAttemptRecord | null = attempt()) {
+function createRepository(
+  currentAttempt: PortalEvidenceAttemptRecord | null = attempt(),
+  options: { studyCode?: string } = {}
+) {
   const evidences = currentAttempt?.participantEvidence ?? [];
   const pendingReviews: Array<{ screeningAttemptId: string; studyParticipantId: string }> = [];
   const repository: ParticipantPortalEvidenceRepository = {
@@ -115,7 +120,7 @@ function createRepository(currentAttempt: PortalEvidenceAttemptRecord | null = a
     getAttempt: vi.fn(async () => currentAttempt),
     getStudyByCode: vi.fn(async () => ({
       activeScreenerVersionId: "version-1",
-      code: "FMASCULINA-NAVIGO-2026",
+      code: options.studyCode ?? "FMASCULINA-NAVIGO-2026",
       id: "study-1",
       name: "Fragancia Masculina",
       portalConfig: {
@@ -470,6 +475,65 @@ describe("participant portal evidence service", () => {
     expect(result.ok ? result.data.kind : null).toBe("PENDING_EVIDENCE");
     expect(result.ok ? result.data.message : "").toBe("Toma tu selfie final para enviar tu participación a revisión.");
     expect(result.ok ? result.data.showEvidenceLink : false).toBe(true);
+  });
+
+  it("returns a completed public result for a filter-only study without asking for evidence", async () => {
+    const { repository } = createRepository(
+      attempt({
+        participantEvidence: [],
+        participantScreeningReview: null,
+        status: "PASSED"
+      }),
+      { studyCode: DETERGENTS_STUDY_CODE }
+    );
+
+    const result = await getParticipantPortalEvidenceResult({
+      identity,
+      repository,
+      studyCode: DETERGENTS_STUDY_CODE
+    });
+
+    expect(result).toMatchObject({
+      data: {
+        kind: "COMPLETED",
+        message: PARTICIPANT_PORTAL_PUBLIC_FILTER_ONLY_PASSED_MESSAGE,
+        showEvidenceLink: false
+      },
+      ok: true
+    });
+  });
+
+  it("does not open selfie or evidence capture for a filter-only study", async () => {
+    const { repository } = createRepository(
+      attempt({
+        participantEvidence: [],
+        participantScreeningReview: null,
+        status: "PASSED"
+      }),
+      { studyCode: DETERGENTS_STUDY_CODE }
+    );
+
+    const selfie = await getParticipantPortalSelfieScreen({
+      identity,
+      repository,
+      studyCode: DETERGENTS_STUDY_CODE
+    });
+    const evidenceScreen = await getParticipantPortalEvidenceScreen({
+      identity,
+      repository,
+      studyCode: DETERGENTS_STUDY_CODE
+    });
+
+    expect(selfie).toMatchObject({
+      code: "ATTEMPT_NOT_READY",
+      message: "Este estudio no requiere selfie.",
+      ok: false
+    });
+    expect(evidenceScreen).toMatchObject({
+      code: "ATTEMPT_NOT_READY",
+      message: "Este estudio no requiere evidencias.",
+      ok: false
+    });
   });
 
   it("lets /evidencias act as recovery without forcing a repeated final upload step", async () => {

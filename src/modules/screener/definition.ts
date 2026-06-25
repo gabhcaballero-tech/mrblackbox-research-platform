@@ -187,6 +187,11 @@ export type ScreenerCondition =
       values: ScreenerComparableValue[];
     }
   | {
+      questionId: string;
+      type: "NONE_SELECTED";
+      values: ScreenerComparableValue[];
+    }
+  | {
       max?: number;
       min?: number;
       questionId: string;
@@ -223,6 +228,13 @@ export const screenerConditionSchema: z.ZodType<ScreenerCondition> = z.lazy(() =
       .object({
         questionId: technicalKeySchema,
         type: z.literal("ALL_SELECTED"),
+        values: z.array(comparableValueSchema).min(1)
+      })
+      .strict(),
+    z
+      .object({
+        questionId: technicalKeySchema,
+        type: z.literal("NONE_SELECTED"),
         values: z.array(comparableValueSchema).min(1)
       })
       .strict(),
@@ -320,6 +332,8 @@ export const nseScoreTableSchema = z
     inputs: z.array(nseInputSchema).min(1),
     label: nonEmptyTextSchema.max(120),
     ranges: z.array(nseRangeSchema).min(1),
+    terminationCode: technicalKeySchema.optional(),
+    terminationReason: nonEmptyTextSchema.max(240).optional(),
     type: z.literal("score_table")
   })
   .strict();
@@ -633,7 +647,11 @@ function validateConditionReferences(
     validateConditionValue(condition.value, question, context, [...path, "value"]);
   }
 
-  if (condition.type === "ANY_SELECTED" || condition.type === "ALL_SELECTED") {
+  if (
+    condition.type === "ANY_SELECTED" ||
+    condition.type === "ALL_SELECTED" ||
+    condition.type === "NONE_SELECTED"
+  ) {
     if (!("options" in question)) {
       context.addIssue({
         code: "custom",

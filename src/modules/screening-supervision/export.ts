@@ -5,6 +5,10 @@ import {
   type ScreenerQuestion
 } from "@/modules/screener";
 import {
+  applyStudyScreenerDefinitionOverrides,
+  DETERGENT_RECRUITER_QUESTION_ID
+} from "@/modules/screener/study-overrides";
+import {
   type ScreeningSupervisionRepository,
   type SupervisionAttemptExportRecord,
   type SupervisionAttemptRecord
@@ -43,6 +47,7 @@ export type ScreeningAttemptTabularExport = {
 };
 
 const keyAnswerColumns: KeyAnswerColumn[] = [
+  { header: "Reclutador", questionIds: [DETERGENT_RECRUITER_QUESTION_ID] },
   { header: "Consentimiento", questionIds: ["CONSENTIMIENTO"] },
   { header: "Género", questionIds: ["F1_GENERO"] },
   { header: "Edad", questionIds: ["F2_EDAD"] },
@@ -55,6 +60,28 @@ const keyAnswerColumns: KeyAnswerColumn[] = [
   { header: "Frecuencia/F9", questionIds: ["F9_FRECUENCIA_SEMANAL"] },
   { header: "Veces/día F9A", questionIds: ["F9A_VECES_AL_DIA"] },
   { header: "Última compra/F10", questionIds: ["F10_ULTIMA_COMPRA"] },
+  { header: "Detergentes ciudad/F1", questionIds: ["F1_CIUDAD"] },
+  { header: "Detergentes género/F2", questionIds: ["F2_GENERO"] },
+  { header: "Detergentes rango edad/F3", questionIds: ["F3_RANGO_EDAD"] },
+  { header: "Detergentes edad exacta/F4", questionIds: ["F4_EDAD_EXACTA"] },
+  { header: "Detergentes actividades sensibles/F5", questionIds: ["F5_ACTIVIDADES_SENSIBLES"] },
+  { header: "Detergentes participación previa/F6", questionIds: ["F6_PARTICIPACION_PREVIA"] },
+  { header: "Detergentes hogar/F7", questionIds: ["F7_MIEMBROS_HOGAR"] },
+  { header: "Detergentes compras/F8", questionIds: ["F8_RESPONSABLE_COMPRAS"] },
+  { header: "Detergentes lavado/F9", questionIds: ["F9_RESPONSABLE_LAVADO"] },
+  { header: "Detergentes productos frecuentes/F10", questionIds: ["F10_PRODUCTOS_USO_FRECUENTE"] },
+  { header: "Detergentes tipo/F11", questionIds: ["F11_TIPO_DETERGENTE"] },
+  { header: "Detergentes marca/F12", questionIds: ["F12_MARCA_DETERGENTE"] },
+  { header: "Detergentes variante/F13", questionIds: ["F13_VARIANTE_DETERGENTE"] },
+  { header: "Detergentes adicionales/F14", questionIds: ["F14_PRODUCTOS_ADICIONALES_ROPA"] },
+  { header: "NSE detergentes D1", questionIds: ["NSE_D1_CUARTOS"] },
+  { header: "NSE detergentes D2", questionIds: ["NSE_D2_BANOS"] },
+  { header: "NSE detergentes D3", questionIds: ["NSE_D3_REGADERA"] },
+  { header: "NSE detergentes D4", questionIds: ["NSE_D4_FOCOS"] },
+  { header: "NSE detergentes D5", questionIds: ["NSE_D5_PISO"] },
+  { header: "NSE detergentes D6", questionIds: ["NSE_D6_AUTOS"] },
+  { header: "NSE detergentes D7", questionIds: ["NSE_D7_ESTUFA"] },
+  { header: "NSE detergentes D8", questionIds: ["NSE_D8_ESCOLARIDAD"] },
   { header: "D1", questionIds: ["D1_ESCOLARIDAD_JEFE_HOGAR", "D1"] },
   { header: "D2", questionIds: ["D2_BANOS_COMPLETOS", "D2"] },
   { header: "D3", questionIds: ["D3_AUTOMOVILES_HOGAR", "D3"] },
@@ -178,7 +205,10 @@ export function buildScreeningAttemptsTsv(attempts: SupervisionAttemptExportReco
     }))
   ];
   const rows = attempts.map((attempt) => {
-    const definition = parseScreenerDefinition(attempt.questionnaireVersion.definitionJson);
+    const definition = applyStudyScreenerDefinitionOverrides(
+      attempt.questionnaireVersion.study.code,
+      parseScreenerDefinition(attempt.questionnaireVersion.definitionJson)
+    );
     const context = { definition, timeZoneIana };
 
     return columns.map((column) => tsvCell(column.value(attempt, context)));

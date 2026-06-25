@@ -368,6 +368,7 @@ export const RULE_CONDITION_LABELS = {
   ANSWER_EQUALS: "La respuesta es igual a",
   ANY: "Cualquiera de estas reglas",
   ANY_SELECTED: "Se seleccionó cualquiera de estas opciones",
+  NONE_SELECTED: "No se seleccionó ninguna de estas opciones",
   NUMBER_RANGE: "El número está dentro del rango"
 } as const;
 

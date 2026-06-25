@@ -46,6 +46,7 @@ const listItem: ScreeningAttemptListItem = {
     id: "profile-1",
     name: "Gabriela Uno"
   },
+  recruiterName: null,
   resultLabel: "Elegible",
   screenerVersionNumber: 1,
   startedAt: new Date("2026-06-23T15:00:00Z"),
@@ -184,6 +185,19 @@ describe("ScreeningSupervisionComponents", () => {
     expect(screen.getByText("—")).toBeInTheDocument();
     expect(screen.getByText("144 · C típico")).toBeInTheDocument();
     expect(screen.getByText("v1")).toBeInTheDocument();
+  });
+
+  it("shows recruiter below participant when present", () => {
+    render(
+      <ScreeningAttemptTable
+        attempts={[{ ...listItem, recruiterName: "MAR\u00cdA \u00d1AND\u00da" }]}
+        studyId={study.id}
+      />
+    );
+
+    expect(screen.getByText(/Reclutador:/)).toBeInTheDocument();
+    expect(screen.getByText(/MAR\u00cdA \u00d1AND\u00da/)).toBeInTheDocument();
+    expect(screen.getByTitle("Reclutador: MAR\u00cdA \u00d1AND\u00da")).toBeInTheDocument();
   });
 
   it("renders start and close times using the study time zone", () => {

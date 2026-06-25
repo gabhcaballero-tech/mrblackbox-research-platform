@@ -7,6 +7,10 @@ import {
   type ScreenerDefinition,
   type ScreenerQuestion
 } from "@/modules/screener";
+import {
+  applyStudyScreenerDefinitionOverrides,
+  DETERGENT_RECRUITER_QUESTION_ID
+} from "@/modules/screener/study-overrides";
 import type {
   ScreeningSupervisionRepository,
   SupervisionAnswerRecord,
@@ -66,6 +70,7 @@ export type ScreeningAttemptListItem = {
     id: string;
     name: string;
   };
+  recruiterName: string | null;
   resultLabel: string;
   screenerVersionNumber: number;
   startedAt: Date;
@@ -234,7 +239,7 @@ function unauthorizedResult<T>(): ScreeningSupervisionResult<T> {
 }
 
 function toListItem(attempt: SupervisionAttemptRecord): ScreeningAttemptListItem {
-  const definition = parseScreenerDefinition(attempt.questionnaireVersion.definitionJson);
+  const definition = parseStudyScreenerDefinition(attempt);
   const labels = statusLabelsForAttempt(attempt);
   const nseClassLabel = resolveNseClassLabel(definition, attempt.nseClass);
 
@@ -252,6 +257,7 @@ function toListItem(attempt: SupervisionAttemptRecord): ScreeningAttemptListItem
       id: attempt.studyParticipant.participantProfile.id,
       name: attempt.studyParticipant.participantProfile.name
     },
+    recruiterName: questionAnswerText(definition, attempt.answers ?? [], DETERGENT_RECRUITER_QUESTION_ID),
     resultLabel: labels.resultLabel,
     screenerVersionNumber: attempt.questionnaireVersion.versionNumber,
     startedAt: attempt.startedAt,
@@ -264,7 +270,7 @@ function toListItem(attempt: SupervisionAttemptRecord): ScreeningAttemptListItem
 }
 
 function toDetail(attempt: SupervisionAttemptDetailRecord): ScreeningAttemptDetail {
-  const definition = parseScreenerDefinition(attempt.questionnaireVersion.definitionJson);
+  const definition = parseStudyScreenerDefinition(attempt);
   const labels = statusLabelsForAttempt(attempt);
   const evaluation = parseEvaluation(attempt.evaluationJson);
 
@@ -334,6 +340,32 @@ function resolveNseClassLabel(definition: ScreenerDefinition, classCode: string 
   }
 
   return definition.nse?.ranges.find((range) => range.code === classCode)?.label ?? classCode;
+}
+
+function parseStudyScreenerDefinition(
+  attempt: Pick<SupervisionAttemptRecord, "questionnaireVersion">
+): ScreenerDefinition {
+  return applyStudyScreenerDefinitionOverrides(
+    attempt.questionnaireVersion.study.code,
+    parseScreenerDefinition(attempt.questionnaireVersion.definitionJson)
+  );
+}
+
+function questionAnswerText(
+  definition: ScreenerDefinition,
+  answerRecords: SupervisionAnswerRecord[],
+  questionId: string
+): string | null {
+  const answer = answerRecords.find((item) => item.questionId === questionId);
+
+  if (!answer) {
+    return null;
+  }
+
+  const question = definition.questions.find((item) => item.id === questionId);
+  const value = question ? formatAnswer(question, answer.answerJson as ScreenerAnswer) : String(answer.answerJson ?? "");
+
+  return value.trim() || null;
 }
 
 function buildAnswerViews(

@@ -37,7 +37,13 @@ const questionTypes = [
 const dataDestinations = ["SCREENING", "PARTICIPANT_PROFILE", "OPERATIONAL_INTERNAL"] as const;
 const profileBindings = ["", "NAME", "PHONE", "EMAIL", "ADDRESS", "CITY", "AGE", "GENDER", "EXTERNAL_REFERENCE"] as const;
 const optionActionTypes = ["NONE", "CONTINUE", "TERMINATE", "PENDING_REVIEW", "FLAG"] as const;
-const ruleConditionTypes = ["ANSWER_EQUALS", "ANY_SELECTED", "ALL_SELECTED", "NUMBER_RANGE"] as const;
+const ruleConditionTypes = [
+  "ANSWER_EQUALS",
+  "ANY_SELECTED",
+  "ALL_SELECTED",
+  "NONE_SELECTED",
+  "NUMBER_RANGE"
+] as const;
 const ruleOutcomeTypes = ["TERMINATE", "PENDING_REVIEW", "FLAG"] as const;
 const initialActionState: QuestionLibraryActionState = {
   message: "",

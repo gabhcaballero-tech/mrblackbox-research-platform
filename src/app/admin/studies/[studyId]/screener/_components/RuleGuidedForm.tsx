@@ -31,7 +31,7 @@ type RuleGuidedFormProps = {
 
 type RuleConditionType = Extract<
   ScreenerCondition["type"],
-  "ALL_SELECTED" | "ANSWER_EQUALS" | "ANY_SELECTED" | "NUMBER_RANGE"
+  "ALL_SELECTED" | "ANSWER_EQUALS" | "ANY_SELECTED" | "NONE_SELECTED" | "NUMBER_RANGE"
 >;
 
 type RuleOutcomeType = ScreenerRule["outcome"]["type"];
@@ -68,6 +68,7 @@ const ruleConditionTypes = [
   "ANSWER_EQUALS",
   "ANY_SELECTED",
   "ALL_SELECTED",
+  "NONE_SELECTED",
   "NUMBER_RANGE"
 ] satisfies RuleConditionType[];
 
@@ -538,7 +539,11 @@ function ConditionFields({
     );
   }
 
-  if (conditionType === "ANY_SELECTED" || conditionType === "ALL_SELECTED") {
+  if (
+    conditionType === "ANY_SELECTED" ||
+    conditionType === "ALL_SELECTED" ||
+    conditionType === "NONE_SELECTED"
+  ) {
     return (
       <fieldset className="rounded-md border border-zinc-200 bg-white p-3">
         <legend className="text-sm font-medium text-zinc-700">{UI_LABELS.screener.values}</legend>
@@ -624,7 +629,11 @@ function createRuleFormData(values: RuleFormValues): FormData {
     formData.set("value", values.value);
   }
 
-  if (values.conditionType === "ANY_SELECTED" || values.conditionType === "ALL_SELECTED") {
+  if (
+    values.conditionType === "ANY_SELECTED" ||
+    values.conditionType === "ALL_SELECTED" ||
+    values.conditionType === "NONE_SELECTED"
+  ) {
     formData.set("values", values.selectedValues.join(","));
   }
 
@@ -676,6 +685,13 @@ function createValuesFromRule(rule: ScreenerRule): RuleFormValues {
         questionId: rule.condition.questionId,
         selectedValues: rule.condition.values.map(stringifyComparableValue)
       };
+    case "NONE_SELECTED":
+      return {
+        ...base,
+        conditionType: "NONE_SELECTED",
+        questionId: rule.condition.questionId,
+        selectedValues: rule.condition.values.map(stringifyComparableValue)
+      };
     case "NUMBER_RANGE":
       return {
         ...base,
@@ -699,6 +715,7 @@ function isQuestionCompatibleWithCondition(
       return isSelectionQuestion(question) || question.type === "SHORT_TEXT" || question.type === "LONG_TEXT";
     case "ANY_SELECTED":
     case "ALL_SELECTED":
+    case "NONE_SELECTED":
       return question.type === "MULTIPLE_CHOICE" || question.type === "INTERVIEWER_CHECKLIST";
     case "NUMBER_RANGE":
       return question.type === "INTEGER";
@@ -734,7 +751,11 @@ function validateRuleForm(values: RuleFormValues): string[] {
   }
 
   if (
-    (values.conditionType === "ANY_SELECTED" || values.conditionType === "ALL_SELECTED") &&
+    (
+      values.conditionType === "ANY_SELECTED" ||
+      values.conditionType === "ALL_SELECTED" ||
+      values.conditionType === "NONE_SELECTED"
+    ) &&
     values.selectedValues.length === 0
   ) {
     messages.push("Selecciona al menos una opción para la condición.");
@@ -802,6 +823,10 @@ function formatConditionDetail(
         .join(", ")}`;
     case "ALL_SELECTED":
       return `${RULE_CONDITION_LABELS.ALL_SELECTED}: ${condition.values
+        .map((value) => formatQuestionValue(question, value))
+        .join(", ")}`;
+    case "NONE_SELECTED":
+      return `${RULE_CONDITION_LABELS.NONE_SELECTED}: ${condition.values
         .map((value) => formatQuestionValue(question, value))
         .join(", ")}`;
     case "NUMBER_RANGE":

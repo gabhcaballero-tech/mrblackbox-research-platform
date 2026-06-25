@@ -168,7 +168,14 @@ describe("ParticipantScreenerForm", () => {
   });
 
   it("requires perfume photos during F6 before continuing", () => {
-    render(<ParticipantScreenerForm screen={screenData()} />);
+    render(
+      <ParticipantScreenerForm
+        screen={screenData({
+          photoNotice:
+            "Más adelante se te solicitarán fotografías de los perfumes que utilizas para validar tu participación."
+        })}
+      />
+    );
 
     expect(screen.getByText("Fotos de perfumes")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tomar foto del perfume" })).toBeInTheDocument();

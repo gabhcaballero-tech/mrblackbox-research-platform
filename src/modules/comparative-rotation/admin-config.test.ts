@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { InternalUserRole } from "@/shared/auth/permissions";
+import { DETERGENTS_STUDY_CODE } from "@/modules/study-templates/study-behavior";
 import type {
   ComparativeConfigurationRepository,
   ComparativePrismaClient,
@@ -641,6 +642,27 @@ describe("manual rotation plans", () => {
 
     expect(result).toMatchObject({ ok: true });
     expect(buildComparativeChecklist(current).activeRotationCount).toBe(0);
+  });
+
+  it("does not require products, arms or rotations for a filter-only study", () => {
+    const checklist = buildComparativeChecklist(
+      config({
+        study: {
+          ...config().study,
+          code: DETERGENTS_STUDY_CODE
+        }
+      })
+    );
+
+    expect(checklist).toMatchObject({
+      activeRotationCount: 0,
+      armsCount: 0,
+      canCreateRotation: false,
+      mode: "FILTER_ONLY",
+      productsCount: 0,
+      requiresComparativeConfiguration: false,
+      rotationBlockReason: null
+    });
   });
 });
 

@@ -161,7 +161,11 @@ function readCondition(formData: FormData, prefix: string): ScreenerCondition {
     };
   }
 
-  if (conditionType === "ANY_SELECTED" || conditionType === "ALL_SELECTED") {
+  if (
+    conditionType === "ANY_SELECTED" ||
+    conditionType === "ALL_SELECTED" ||
+    conditionType === "NONE_SELECTED"
+  ) {
     return {
       questionId,
       type: conditionType,

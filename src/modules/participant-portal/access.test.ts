@@ -98,6 +98,7 @@ describe("participant portal access", () => {
     for (const study of [
       activePortalStudy({ portalConfig: { ...activePortalStudy().portalConfig!, enabled: false } }),
       activePortalStudy({ status: "DRAFT" }),
+      activePortalStudy({ status: "ARCHIVED" }),
       activePortalStudy({ activeScreenerVersionId: null })
     ]) {
       const { repository } = createRepository({ study });

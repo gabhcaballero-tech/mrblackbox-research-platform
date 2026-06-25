@@ -37,7 +37,7 @@ export function ParticipantScreenerForm({ error, screen }: ParticipantScreenerFo
   }
 
   const answer = screen.answers[question.id];
-  const isPerfumeQuestion = question.id === "F6_MARCAS_UTILIZA";
+  const isPerfumeQuestion = Boolean(screen.photoNotice);
   const hasMinimumPerfumePhotos = perfumePhotoCount >= screen.evidence.minPerfumePhotos;
   const canSubmit = !isPerfumeQuestion || hasMinimumPerfumePhotos;
 

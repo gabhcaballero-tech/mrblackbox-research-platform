@@ -133,8 +133,16 @@ export const screenerOptionInputSchema = z.object({
   }
 });
 
+const conditionTypeSchema = z.enum([
+  "ANSWER_EQUALS",
+  "ANY_SELECTED",
+  "ALL_SELECTED",
+  "NONE_SELECTED",
+  "NUMBER_RANGE"
+]);
+
 export const screenerRuleInputSchema = z.object({
-  conditionType: z.enum(["ANSWER_EQUALS", "ANY_SELECTED", "ALL_SELECTED", "NUMBER_RANGE"]),
+  conditionType: conditionTypeSchema,
   id: z.preprocess(
     normalizeTechnicalKey,
     z
@@ -162,7 +170,11 @@ export const screenerRuleInputSchema = z.object({
   }
 
   if (
-    (input.conditionType === "ANY_SELECTED" || input.conditionType === "ALL_SELECTED") &&
+    (
+      input.conditionType === "ANY_SELECTED" ||
+      input.conditionType === "ALL_SELECTED" ||
+      input.conditionType === "NONE_SELECTED"
+    ) &&
     !hasDelimitedValues(input.values)
   ) {
     context.addIssue({
@@ -211,7 +223,7 @@ export const screenerRuleInputSchema = z.object({
 });
 
 export const screenerVisibilityInputSchema = z.object({
-  conditionType: z.enum(["ANSWER_EQUALS", "ANY_SELECTED", "ALL_SELECTED", "NUMBER_RANGE"]).default("ANSWER_EQUALS"),
+  conditionType: conditionTypeSchema.default("ANSWER_EQUALS"),
   max: z.preprocess(optionalNumber, z.number().optional()),
   min: z.preprocess(optionalNumber, z.number().optional()),
   mode: z.enum(["ALWAYS", "CONDITIONAL"]).default("ALWAYS"),
@@ -240,7 +252,11 @@ export const screenerVisibilityInputSchema = z.object({
   }
 
   if (
-    (input.conditionType === "ANY_SELECTED" || input.conditionType === "ALL_SELECTED") &&
+    (
+      input.conditionType === "ANY_SELECTED" ||
+      input.conditionType === "ALL_SELECTED" ||
+      input.conditionType === "NONE_SELECTED"
+    ) &&
     !hasDelimitedValues(input.values)
   ) {
     context.addIssue({

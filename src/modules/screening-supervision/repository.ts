@@ -1,4 +1,5 @@
 import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
+import { DETERGENT_RECRUITER_QUESTION_ID } from "@/modules/screener/study-overrides";
 import type { ScreeningAttemptFilters, SupervisionAttemptStatus } from "./validation";
 
 export type SupervisionStudyRecord = {
@@ -43,6 +44,7 @@ export type SupervisionParticipantEvidenceRecord = {
 };
 
 export type SupervisionAttemptRecord = {
+  answers?: SupervisionAnswerRecord[];
   completedAt: Date | null;
   evaluationJson: unknown;
   fieldUser: SupervisionFieldUserRecord | null;
@@ -277,7 +279,14 @@ export function createScreeningSupervisionRepository(
 
       return prisma.screeningAttempt.findMany({
         orderBy: { startedAt: "desc" },
-        select: attemptSelect,
+        select: {
+          ...attemptSelect,
+          answers: {
+            orderBy: { createdAt: "asc" },
+            select: answerSelect,
+            where: { questionId: DETERGENT_RECRUITER_QUESTION_ID }
+          }
+        },
         take: 100,
         where
       }) as Promise<SupervisionAttemptRecord[]>;

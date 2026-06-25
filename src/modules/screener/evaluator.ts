@@ -137,8 +137,10 @@ export function evaluateScreener(
 
   if (nse && nse.eligible === false) {
     const nseTermination = {
-      code: `${nse.code}_not_eligible`,
-      reason: "La clasificacion calculada no es elegible para este estudio."
+      code: definition.nse?.terminationCode ?? `${nse.code}_not_eligible`,
+      reason:
+        definition.nse?.terminationReason ??
+        "La clasificacion calculada no es elegible para este estudio."
     };
 
     return buildEvaluationResult({
@@ -454,6 +456,10 @@ export function conditionMatches(
     case "ALL_SELECTED":
       return condition.values.every((value) =>
         selectedComparableValues(answers[condition.questionId]).includes(value)
+      );
+    case "NONE_SELECTED":
+      return condition.values.every(
+        (value) => !selectedComparableValues(answers[condition.questionId]).includes(value)
       );
     case "NUMBER_RANGE":
       return selectedComparableValues(answers[condition.questionId]).some((value) => {

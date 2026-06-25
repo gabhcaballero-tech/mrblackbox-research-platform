@@ -14,6 +14,9 @@ import { createParticipantPortalAdminRepository } from "@/modules/participant-po
 import { getParticipantPortalConfigForAdmin } from "@/modules/participant-portal/admin-service";
 import { createScreenerRepository } from "@/modules/screener/repository";
 import { getScreenerBuilderForAdmin } from "@/modules/screener/service";
+import { createStudiesRepository } from "@/modules/studies/repository";
+import { getStudyRiskForAdmin } from "@/modules/studies/service";
+import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
 import { ActivateStudyPanel } from "./_components/ActivateStudyPanel";
 import { ArmSection } from "./_components/ArmSection";
 import { ConfigurationChecklist } from "./_components/ConfigurationChecklist";
@@ -22,6 +25,7 @@ import { ParticipantPortalSection } from "./_components/ParticipantPortalSection
 import { ProductSection } from "./_components/ProductSection";
 import { RotationSection } from "./_components/RotationSection";
 import { SafePreviewSection } from "./_components/SafePreviewSection";
+import { StudyDangerZone } from "./_components/StudyDangerZone";
 
 export const dynamic = "force-dynamic";
 
@@ -59,12 +63,21 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
     repository: createParticipantPortalAdminRepository(),
     studyId
   });
+  const studyRiskResult = await getStudyRiskForAdmin({
+    actor: admin,
+    repository: createStudiesRepository(),
+    studyId
+  });
 
   if (!participantPortalResult.ok) {
     throw new Error(participantPortalResult.message);
   }
+  if (!studyRiskResult.ok) {
+    throw new Error(studyRiskResult.message);
+  }
 
   const checklist = buildComparativeChecklist(config);
+  const behavior = getStudyBehavior(config.study.code);
   const readOnly = config.study.status !== "DRAFT";
   const hasActiveScreener =
     screenerResult.ok && screenerResult.data.versions.some((version) => version.status === "ACTIVE");
@@ -77,9 +90,21 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
             {readOnly ? UI_LABELS.common.readOnly : STUDY_STATUS_LABELS.DRAFT}
           </StatusBadge>
         }
-        description="Configura productos, brazos y códigos de rotación manuales. No incluye participantes, filtros, cuotas, cuestionarios ni exportaciones."
-        eyebrow="Configuración comparativa"
-        title="Productos, brazos y rotaciones"
+        description={
+          behavior.requiresComparativeConfiguration
+            ? "Configura productos, brazos y códigos de rotación manuales. No incluye participantes, filtros, cuotas, cuestionarios ni exportaciones."
+            : "Administra el filtro autoaplicable del estudio. Productos, brazos y rotaciones no aplican para este flujo."
+        }
+        eyebrow={
+          behavior.requiresComparativeConfiguration
+            ? "Configuración comparativa"
+            : "Configuración solo filtro"
+        }
+        title={
+          behavior.requiresComparativeConfiguration
+            ? "Productos, brazos y rotaciones"
+            : "Filtro autoaplicable"
+        }
       />
 
       <div className="mb-6">
@@ -110,17 +135,22 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
         <ActivateStudyPanel canActivate={!readOnly && hasActiveScreener} studyId={studyId} />
         <ConfigurationChecklist checklist={checklist} />
         <ParticipantPortalSection data={participantPortalResult.data} studyId={studyId} />
-        <ProductSection products={config.products} readOnly={readOnly} studyId={studyId} />
-        <ArmSection arms={config.arms} readOnly={readOnly} studyId={studyId} />
-        <RotationSection
-          arms={config.arms}
-          checklist={checklist}
-          products={config.products}
-          readOnly={readOnly}
-          rotationPlans={config.rotationPlans}
-          studyId={studyId}
-        />
-        <SafePreviewSection rotationPlans={config.rotationPlans} />
+        {behavior.requiresComparativeConfiguration ? (
+          <>
+            <ProductSection products={config.products} readOnly={readOnly} studyId={studyId} />
+            <ArmSection arms={config.arms} readOnly={readOnly} studyId={studyId} />
+            <RotationSection
+              arms={config.arms}
+              checklist={checklist}
+              products={config.products}
+              readOnly={readOnly}
+              rotationPlans={config.rotationPlans}
+              studyId={studyId}
+            />
+            <SafePreviewSection rotationPlans={config.rotationPlans} />
+          </>
+        ) : null}
+        <StudyDangerZone risk={studyRiskResult.data} />
       </div>
     </AppShell>
   );

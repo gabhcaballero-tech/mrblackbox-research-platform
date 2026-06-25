@@ -6,6 +6,23 @@ type ConfigurationChecklistProps = {
 };
 
 export function ConfigurationChecklist({ checklist }: ConfigurationChecklistProps) {
+  if (!checklist.requiresComparativeConfiguration) {
+    return (
+      <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+        <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">
+          Checklist de configuración
+        </p>
+        <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-sm font-semibold text-emerald-900">Estudio solo filtro</p>
+          <p className="mt-2 text-sm text-emerald-800">
+            Productos, brazos canónicos, rotaciones manuales y códigos de brazos no aplican para
+            este estudio.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
   const items = [
     {
       label: UI_LABELS.comparative.productsCreated,

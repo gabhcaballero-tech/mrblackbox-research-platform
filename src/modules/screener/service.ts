@@ -1238,6 +1238,12 @@ function buildCondition(input: ScreenerRuleInput | ScreenerVisibilityInput): Scr
         type: "ALL_SELECTED",
         values: splitValues(input.values ?? input.value ?? "")
       };
+    case "NONE_SELECTED":
+      return {
+        questionId: input.questionId ?? "",
+        type: "NONE_SELECTED",
+        values: splitValues(input.values ?? input.value ?? "")
+      };
     case "NUMBER_RANGE":
       return {
         max: input.max,

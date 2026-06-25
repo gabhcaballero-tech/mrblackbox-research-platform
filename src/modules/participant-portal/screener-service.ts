@@ -25,6 +25,8 @@ import {
   type ScreenerEvaluationResult,
   type ScreenerQuestion
 } from "@/modules/screener";
+import { applyStudyScreenerDefinitionOverrides } from "@/modules/screener/study-overrides";
+import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
 
 export const PARTICIPANT_PORTAL_REGISTRATION_REQUIRED_MESSAGE =
   "Completa tu registro y consentimiento para continuar.";
@@ -34,6 +36,8 @@ export const PARTICIPANT_PORTAL_PUBLIC_PENDING_REVIEW_MESSAGE =
   "Gracias. Tus respuestas están registradas. En el siguiente paso se revisará tu evidencia para confirmar tu participación.";
 export const PARTICIPANT_PORTAL_PUBLIC_SELFIE_REQUIRED_MESSAGE =
   "Tu filtro fue registrado de forma preliminar. Falta tu selfie para enviar tu participación a revisión.";
+export const PARTICIPANT_PORTAL_PUBLIC_FILTER_ONLY_PASSED_MESSAGE =
+  "Gracias. Tus respuestas fueron registradas correctamente. Recibirás seguimiento de tu reclutador.";
 export const PARTICIPANT_PORTAL_PUBLIC_APPROVED_PLACEHOLDER_MESSAGE =
   "Tu participación fue aprobada. En una etapa posterior se mostrarán tus folios y códigos.";
 export const PARTICIPANT_PORTAL_PUBLIC_REJECTED_MESSAGE =
@@ -84,6 +88,7 @@ export type ParticipantPortalAnswerSaveResult = {
 export type ParticipantPortalPublicResultKind =
   | "APPROVED_PLACEHOLDER"
   | "BLOCKED_CLOSED_ATTEMPT"
+  | "COMPLETED"
   | "IN_PROGRESS"
   | "PENDING_EVIDENCE"
   | "PENDING_REVIEW"
@@ -229,7 +234,10 @@ export async function saveParticipantPortalScreenerAnswer({
   }
 
   const answerInput = parseAnswerInput(formInput);
-  const definition = parseScreenerDefinition(attempt.questionnaireVersion.definitionJson);
+  const definition = parseStudyScreenerDefinition(
+    context.data.study.code,
+    attempt.questionnaireVersion.definitionJson
+  );
   const currentAnswers = recordsToAnswers(await repository.listAnswers(attempt.id));
   const visibleQuestions = getVisibleQuestions(definition, currentAnswers);
   const question = visibleQuestions.find((candidate) => candidate.id === questionId);
@@ -290,7 +298,7 @@ export async function saveParticipantPortalScreenerAnswer({
 
   const evaluation = evaluateScreener(definition, answers);
 
-  if (questionId === "F6_MARCAS_UTILIZA") {
+  if (questionId === "F6_MARCAS_UTILIZA" && getStudyBehavior(context.data.study.code).requiresPerfumeEvidence) {
     const perfumePhotoCount = countPerfumePhotos(attempt.participantEvidence);
 
     if (perfumePhotoCount < context.data.study.portalConfig.minPerfumePhotos) {
@@ -430,6 +438,19 @@ export async function getParticipantPortalPublicResult({
   }
 
   if (latest.status === "PASSED") {
+    if (!getStudyBehavior(context.data.study.code).requiresFinalSelfie) {
+      return {
+        data: {
+          attemptId: latest.id,
+          kind: "COMPLETED",
+          message: PARTICIPANT_PORTAL_PUBLIC_FILTER_ONLY_PASSED_MESSAGE,
+          showEvidencePlaceholder: false,
+          study: publicStudy(context.data.study)
+        },
+        ok: true
+      };
+    }
+
     return {
       data: {
         attemptId: latest.id,
@@ -580,7 +601,7 @@ function buildAttemptScreen({
   questionId?: string;
   study: PortalContext["study"];
 }): ParticipantPortalAttemptScreen {
-  const definition = parseScreenerDefinition(attempt.questionnaireVersion.definitionJson);
+  const definition = parseStudyScreenerDefinition(study.code, attempt.questionnaireVersion.definitionJson);
   const visibleQuestions = getVisibleQuestions(definition, answers);
   const currentQuestion =
     visibleQuestions.find((question) => question.id === questionId) ??
@@ -602,7 +623,10 @@ function buildAttemptScreen({
       perfumePhotos: countPerfumePhotos(attempt.participantEvidence),
       selfieComplete: hasExactlyOneSelfie(attempt)
     },
-    photoNotice: currentQuestion?.id === "F6_MARCAS_UTILIZA" ? PARTICIPANT_PORTAL_F6_PHOTOS_NOTE : null,
+    photoNotice:
+      currentQuestion?.id === "F6_MARCAS_UTILIZA" && getStudyBehavior(study.code).requiresPerfumeEvidence
+        ? PARTICIPANT_PORTAL_F6_PHOTOS_NOTE
+        : null,
     progress: {
       answeredVisibleQuestions: visibleQuestions.filter((question) => hasAnswer(answers[question.id])).length,
       currentIndex,
@@ -620,6 +644,10 @@ function publicStudy(study: PortalContext["study"]) {
     id: study.id,
     name: study.name
   };
+}
+
+function parseStudyScreenerDefinition(studyCode: string, definitionJson: unknown): ScreenerDefinition {
+  return applyStudyScreenerDefinitionOverrides(studyCode, parseScreenerDefinition(definitionJson));
 }
 
 function parseAnswerInput(input: unknown): ParticipantPortalAnswerInput {

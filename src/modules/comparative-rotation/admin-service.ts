@@ -26,6 +26,7 @@ import {
   isPrismaForeignKeyConstraintError,
   isPrismaUniqueConstraintError
 } from "./admin-repository";
+import { getStudyBehavior, type StudyOperationalMode } from "@/modules/study-templates/study-behavior";
 
 export type ComparativeAdminActor = {
   id: string;
@@ -92,6 +93,8 @@ export type ComparativeChecklist = {
   armsCount: number;
   activeRotationCount: number;
   canCreateRotation: boolean;
+  mode: StudyOperationalMode;
+  requiresComparativeConfiguration: boolean;
   rotationBlockReason: string | null;
 };
 
@@ -270,9 +273,22 @@ function activeRotationPlans(config: ComparativeStudyConfig): ComparativeRotatio
 }
 
 export function buildComparativeChecklist(config: ComparativeStudyConfig): ComparativeChecklist {
+  const behavior = getStudyBehavior(config.study.code);
   const productsCount = config.products.length;
   const armsCount = config.arms.filter((arm) => arm.code === "left" || arm.code === "right").length;
   const activeRotationCount = activeRotationPlans(config).length;
+
+  if (!behavior.requiresComparativeConfiguration) {
+    return {
+      activeRotationCount,
+      armsCount,
+      canCreateRotation: false,
+      mode: behavior.mode,
+      productsCount,
+      requiresComparativeConfiguration: false,
+      rotationBlockReason: null
+    };
+  }
 
   let rotationBlockReason: string | null = null;
 
@@ -286,7 +302,9 @@ export function buildComparativeChecklist(config: ComparativeStudyConfig): Compa
     activeRotationCount,
     armsCount,
     canCreateRotation: rotationBlockReason === null,
+    mode: behavior.mode,
     productsCount,
+    requiresComparativeConfiguration: true,
     rotationBlockReason
   };
 }

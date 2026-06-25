@@ -23,7 +23,7 @@ type QuestionVisibilityFormProps = {
 
 type ConditionType = Extract<
   ScreenerCondition["type"],
-  "ALL_SELECTED" | "ANSWER_EQUALS" | "ANY_SELECTED" | "NUMBER_RANGE"
+  "ALL_SELECTED" | "ANSWER_EQUALS" | "ANY_SELECTED" | "NONE_SELECTED" | "NUMBER_RANGE"
 >;
 
 type VisibilityMode = "ALWAYS" | "CONDITIONAL";
@@ -42,6 +42,7 @@ const conditionTypes = [
   "ANSWER_EQUALS",
   "ANY_SELECTED",
   "ALL_SELECTED",
+  "NONE_SELECTED",
   "NUMBER_RANGE"
 ] satisfies ConditionType[];
 
@@ -283,7 +284,11 @@ function ConditionFields({
     );
   }
 
-  if (conditionType === "ANY_SELECTED" || conditionType === "ALL_SELECTED") {
+  if (
+    conditionType === "ANY_SELECTED" ||
+    conditionType === "ALL_SELECTED" ||
+    conditionType === "NONE_SELECTED"
+  ) {
     return (
       <fieldset className="rounded-md border border-zinc-200 bg-white p-3">
         <legend className="text-sm font-medium text-zinc-700">{UI_LABELS.screener.values}</legend>
@@ -375,7 +380,11 @@ function createValuesFromCondition(condition: ScreenerCondition | undefined): Vi
     return { ...base, value: stringifyComparableValue(condition.value) };
   }
 
-  if (condition.type === "ANY_SELECTED" || condition.type === "ALL_SELECTED") {
+  if (
+    condition.type === "ANY_SELECTED" ||
+    condition.type === "ALL_SELECTED" ||
+    condition.type === "NONE_SELECTED"
+  ) {
     return { ...base, selectedValues: condition.values.map(stringifyComparableValue) };
   }
 
@@ -414,7 +423,11 @@ function validateVisibilityForm(
   }
 
   if (
-    (values.conditionType === "ANY_SELECTED" || values.conditionType === "ALL_SELECTED") &&
+    (
+      values.conditionType === "ANY_SELECTED" ||
+      values.conditionType === "ALL_SELECTED" ||
+      values.conditionType === "NONE_SELECTED"
+    ) &&
     values.selectedValues.length === 0
   ) {
     messages.push("Selecciona al menos una opcion para la condicion.");
@@ -451,6 +464,7 @@ function isQuestionCompatibleWithCondition(
       return hasOptions(question) || question.type === "SHORT_TEXT" || question.type === "LONG_TEXT";
     case "ANY_SELECTED":
     case "ALL_SELECTED":
+    case "NONE_SELECTED":
       return question.type === "MULTIPLE_CHOICE" || question.type === "INTERVIEWER_CHECKLIST";
     case "NUMBER_RANGE":
       return question.type === "INTEGER";
