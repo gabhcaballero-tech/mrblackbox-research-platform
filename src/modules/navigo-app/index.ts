@@ -19,8 +19,30 @@ export {
   type NavigoFoundationResult
 } from "./loader";
 export {
+  createNavigoAppRepository,
+  hashToken,
+  type NavigoActionResult,
+  type NavigoActivityCaptureView,
+  type NavigoActivityListItem,
+  type NavigoAdminDashboard,
+  type NavigoAppRepository,
+  type NavigoInternalActor,
+  type NavigoParticipantActivitiesView,
+  type NavigoParticipantListItem,
+  type NavigoSignedActivityUpload,
+  type NavigoStartT0Result,
+  type NavigoStudySummary
+} from "./repository";
+export {
+  buildNavigoActivityTimeline,
+  getNextNavigoActivity,
+  navigoActivityLabel,
   prepareNavigoParticipantActivities,
+  validateNavigoMeasurementAnswers,
   type NavigoActivityRecord,
+  type NavigoActivityAvailability,
+  type NavigoActivityTimelineItem,
+  type NavigoAnswerInput,
   type NavigoParticipantRecord,
   type NavigoParticipantStatus,
   type NavigoPreparedActivity,

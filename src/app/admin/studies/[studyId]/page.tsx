@@ -16,7 +16,7 @@ import { createScreenerRepository } from "@/modules/screener/repository";
 import { getScreenerBuilderForAdmin } from "@/modules/screener/service";
 import { createStudiesRepository } from "@/modules/studies/repository";
 import { getStudyRiskForAdmin } from "@/modules/studies/service";
-import { DETERGENTS_STUDY_CODE, getStudyBehavior } from "@/modules/study-templates/study-behavior";
+import { DETERGENTS_STUDY_CODE, NAVIGO_STUDY_CODE, getStudyBehavior } from "@/modules/study-templates/study-behavior";
 import { ActivateStudyPanel } from "./_components/ActivateStudyPanel";
 import { ArmSection } from "./_components/ArmSection";
 import { ConfigurationChecklist } from "./_components/ConfigurationChecklist";
@@ -128,6 +128,14 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
           >
             Ver intentos de screener
           </Link>
+          {config.study.code === NAVIGO_STUDY_CODE ? (
+            <Link
+              className="text-sm font-semibold text-zinc-700 transition hover:text-zinc-950"
+              href={`/admin/studies/${studyId}/navigo-app`}
+            >
+              App Navigo
+            </Link>
+          ) : null}
         </div>
       </div>
 

@@ -5,11 +5,15 @@ import {
   createNavigoFoundationRepository,
   createNavigoMeasurementDefinition,
   createNavigoScheduleSeeds,
+  buildNavigoActivityTimeline,
   hashNavigoMeasurementDefinition,
+  hashToken,
   NAVIGO_ACTIVITY_CODES,
   NAVIGO_APP_DEFAULT_TIME_ZONE,
+  navigoActivityLabel,
   prepareNavigoParticipantActivities,
-  resolveNavigoTimeZone
+  resolveNavigoTimeZone,
+  validateNavigoMeasurementAnswers
 } from "./index";
 import { DETERGENTS_STUDY_CODE, NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
 
@@ -278,6 +282,144 @@ describe("navigo participant activities", () => {
     expect(resolveNavigoTimeZone("America/Mexico_City")).toBe("America/Mexico_City");
   });
 });
+
+describe("navigo app MVP rules", () => {
+  it("does not open T2 before 1.5 hours and opens it afterwards", () => {
+    const activities = navigoActivityRecords();
+    const before = buildNavigoActivityTimeline({
+      activities,
+      now: new Date("2026-06-25T16:20:00.000Z")
+    });
+    const after = buildNavigoActivityTimeline({
+      activities,
+      now: new Date("2026-06-25T16:31:00.000Z")
+    });
+
+    expect(before.find((activity) => activity.code === "T2_HORAS")?.availability).toMatchObject({
+      canCapture: false,
+      reason: "BEFORE_WINDOW"
+    });
+    expect(after.find((activity) => activity.code === "T2_HORAS")?.availability).toMatchObject({
+      canCapture: true,
+      reason: "AVAILABLE"
+    });
+  });
+
+  it("does not allow skipping T4 or T8 when previous measurements are pending", () => {
+    const t4Blocked = buildNavigoActivityTimeline({
+      activities: navigoActivityRecords(),
+      now: new Date("2026-06-25T18:40:00.000Z")
+    });
+    const t8Blocked = buildNavigoActivityTimeline({
+      activities: navigoActivityRecords({ t2Completed: true }),
+      now: new Date("2026-06-25T22:40:00.000Z")
+    });
+
+    expect(t4Blocked.find((activity) => activity.code === "T4_HORAS")?.availability).toMatchObject({
+      canCapture: false,
+      reason: "PREVIOUS_REQUIRED"
+    });
+    expect(t8Blocked.find((activity) => activity.code === "T8_HORAS")?.availability).toMatchObject({
+      canCapture: false,
+      reason: "PREVIOUS_REQUIRED"
+    });
+  });
+
+  it("marks pending measurements outside the maximum T0 + 10h window", () => {
+    const timeline = buildNavigoActivityTimeline({
+      activities: navigoActivityRecords(),
+      now: new Date("2026-06-26T01:01:00.000Z")
+    });
+
+    expect(timeline.find((activity) => activity.code === "T2_HORAS")?.availability).toMatchObject({
+      canCapture: false,
+      reason: "AFTER_WINDOW"
+    });
+  });
+
+  it("validates complete AP1 to AP7 answers and rejects incomplete submissions", () => {
+    const complete = validateNavigoMeasurementAnswers({
+      input: {
+        AP1_PREFERENCIA_GENERAL: "AMBAS",
+        AP2_PREFERENCIA_INTENSIDAD: "PRIMERA",
+        AP3_INTENSIDAD_PRIMERA: "4",
+        AP4_INTENSIDAD_SEGUNDA: "5",
+        AP5_CALIFICACION_PRIMERA: "8",
+        AP6_CALIFICACION_SEGUNDA: "7",
+        AP7_MAYOR_DURACION: "SEGUNDA"
+      }
+    });
+    const incomplete = validateNavigoMeasurementAnswers({
+      input: {
+        AP1_PREFERENCIA_GENERAL: "AMBAS"
+      }
+    });
+
+    expect(complete.ok).toBe(true);
+    expect(complete.ok ? complete.answers : []).toHaveLength(7);
+    expect(incomplete.ok).toBe(false);
+    expect(incomplete.ok ? [] : incomplete.missingQuestionIds).toContain("AP2_PREFERENCIA_INTENSIDAD");
+  });
+
+  it("keeps participant labels blind and token hashes deterministic", () => {
+    expect(navigoActivityLabel("T2_HORAS")).toBe("Evaluacion 2 horas");
+    expect(hashToken("token-123")).toBe(hashToken("token-123"));
+    expect(hashToken("token-123")).not.toBe("token-123");
+    expect(JSON.stringify(createNavigoMeasurementDefinition())).not.toContain("realName");
+  });
+
+  it("adds operable participant routes for token activities", () => {
+    expect(readWorkspaceFile("src", "app", "p", "[token]", "activities", "page.tsx")).toContain(
+      "Evaluaciones de fragancia"
+    );
+    expect(
+      readWorkspaceFile("src", "app", "p", "[token]", "activities", "_components", "NavigoActivityCapture.tsx")
+    ).toContain(
+      "Selfie"
+    );
+  });
+});
+
+function navigoActivityRecords({
+  t2Completed = false,
+  t4Completed = false
+}: {
+  t2Completed?: boolean;
+  t4Completed?: boolean;
+} = {}) {
+  const base = new Date("2026-06-25T15:00:00.000Z");
+  return [
+    navigoActivityRecord("T0_SALON", 0, 0, 0, "COMPLETED", base, base),
+    navigoActivityRecord("T2_HORAS", 120, -30, 480, t2Completed ? "COMPLETED" : "PENDING", null, null),
+    navigoActivityRecord("T4_HORAS", 240, -30, 360, t4Completed ? "COMPLETED" : "PENDING", null, null),
+    navigoActivityRecord("T8_HORAS", 480, -30, 120, "PENDING", null, null)
+  ];
+}
+
+function navigoActivityRecord(
+  code: (typeof NAVIGO_ACTIVITY_CODES)[number],
+  offsetMinutes: number,
+  windowStartsMinutes: number,
+  windowEndsMinutes: number,
+  status: "COMPLETED" | "PENDING",
+  actualStartedAt: Date | null,
+  actualCompletedAt: Date | null
+) {
+  const base = new Date("2026-06-25T15:00:00.000Z");
+  const scheduledAt = new Date(base.getTime() + offsetMinutes * 60000);
+  return {
+    activityScheduleId: `schedule-${code}`,
+    actualCompletedAt,
+    actualStartedAt,
+    availableFrom: new Date(scheduledAt.getTime() + windowStartsMinutes * 60000),
+    availableUntil: new Date(scheduledAt.getTime() + windowEndsMinutes * 60000),
+    code,
+    id: `activity-${code}`,
+    occurrenceKey: "DEFAULT",
+    scheduledAt,
+    status
+  };
+}
 
 function createNavigoFoundationState() {
   const studies = [
