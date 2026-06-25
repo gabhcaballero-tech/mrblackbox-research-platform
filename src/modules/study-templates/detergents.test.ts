@@ -15,8 +15,8 @@ import {
   loadDetergentsStudyTemplateForAdmin,
   type DetergentsTemplateRepository
 } from "./detergents-loader";
-import { DETERGENTS_STUDY_CODE, NAVIGO_STUDY_CODE } from "./study-behavior";
 import { applyStudyScreenerDefinitionOverrides } from "@/modules/screener/study-overrides";
+import { DETERGENTS_STUDY_CODE, NAVIGO_STUDY_CODE } from "./study-behavior";
 
 const adminActor = {
   id: "admin-1",
@@ -55,9 +55,12 @@ describe("detergents screener template", () => {
   });
 
   it("terminates when city is outside CDMX and GDL", () => {
-    const result = evaluateScreener(createDetergentsScreenerDefinition(), eligibleAnswers({
-      F1_CIUDAD: "OTRA_CIUDAD"
-    }));
+    const result = evaluateScreener(
+      createDetergentsScreenerDefinition(),
+      eligibleAnswers({
+        F1_CIUDAD: "OTRA_CIUDAD"
+      })
+    );
 
     expect(result).toMatchObject({
       status: "TERMINATED",
@@ -66,9 +69,12 @@ describe("detergents screener template", () => {
   });
 
   it("terminates when gender is not Mujer", () => {
-    const result = evaluateScreener(createDetergentsScreenerDefinition(), eligibleAnswers({
-      F2_GENERO: "HOMBRE"
-    }));
+    const result = evaluateScreener(
+      createDetergentsScreenerDefinition(),
+      eligibleAnswers({
+        F2_GENERO: "HOMBRE"
+      })
+    );
 
     expect(result).toMatchObject({
       status: "TERMINATED",
@@ -78,14 +84,20 @@ describe("detergents screener template", () => {
 
   it("terminates age below 18 and above 55", () => {
     const definition = createDetergentsScreenerDefinition();
-    const tooYoung = evaluateScreener(definition, eligibleAnswers({
-      F3_RANGO_EDAD: "MENOS_18",
-      F4_EDAD_EXACTA: 17
-    }));
-    const tooOld = evaluateScreener(definition, eligibleAnswers({
-      F3_RANGO_EDAD: "MAYOR_55",
-      F4_EDAD_EXACTA: 56
-    }));
+    const tooYoung = evaluateScreener(
+      definition,
+      eligibleAnswers({
+        F3_RANGO_EDAD: "MENOS_18",
+        F4_EDAD_EXACTA: 17
+      })
+    );
+    const tooOld = evaluateScreener(
+      definition,
+      eligibleAnswers({
+        F3_RANGO_EDAD: "MAYOR_55",
+        F4_EDAD_EXACTA: 56
+      })
+    );
 
     expect(tooYoung).toMatchObject({ status: "TERMINATED", termination: { code: "EDAD_MENOR_18" } });
     expect(tooOld).toMatchObject({ status: "TERMINATED", termination: { code: "EDAD_MAYOR_55" } });
@@ -118,9 +130,27 @@ describe("detergents screener template", () => {
   it("qualifies detergent liquid, powder or both and terminates when neither is selected", () => {
     const definition = createDetergentsScreenerDefinition();
 
-    expect(evaluateScreener(definition, eligibleAnswers({ F10_PRODUCTOS_USO_FRECUENTE: ["DETERGENTE_LIQUIDO"] })).status).toBe("PASSED");
-    expect(evaluateScreener(definition, eligibleAnswers({ F10_PRODUCTOS_USO_FRECUENTE: ["DETERGENTE_POLVO"], F11_TIPO_DETERGENTE: "POLVO" })).status).toBe("PASSED");
-    expect(evaluateScreener(definition, eligibleAnswers({ F10_PRODUCTOS_USO_FRECUENTE: ["DETERGENTE_LIQUIDO", "DETERGENTE_POLVO"], F11_TIPO_DETERGENTE: "AMBOS_POR_IGUAL" })).status).toBe("PASSED");
+    expect(
+      evaluateScreener(definition, eligibleAnswers({ F10_PRODUCTOS_USO_FRECUENTE: ["DETERGENTE_LIQUIDO"] })).status
+    ).toBe("PASSED");
+    expect(
+      evaluateScreener(
+        definition,
+        eligibleAnswers({
+          F10_PRODUCTOS_USO_FRECUENTE: ["DETERGENTE_POLVO"],
+          F11_TIPO_DETERGENTE: "POLVO"
+        })
+      ).status
+    ).toBe("PASSED");
+    expect(
+      evaluateScreener(
+        definition,
+        eligibleAnswers({
+          F10_PRODUCTOS_USO_FRECUENTE: ["DETERGENTE_LIQUIDO", "DETERGENTE_POLVO"],
+          F11_TIPO_DETERGENTE: "AMBOS_POR_IGUAL"
+        })
+      ).status
+    ).toBe("PASSED");
     expect(evaluateScreener(definition, eligibleAnswers({ F10_PRODUCTOS_USO_FRECUENTE: ["SUAVIZANTE"] }))).toMatchObject({
       status: "TERMINATED",
       termination: { code: "NO_USA_DETERGENTE" }
@@ -144,9 +174,12 @@ describe("detergents screener template", () => {
 
   it("shows F11 only when detergent liquid or powder was selected", () => {
     const definition = createDetergentsScreenerDefinition();
-    const withoutDetergent = getVisibleQuestions(definition, eligibleAnswers({
-      F10_PRODUCTOS_USO_FRECUENTE: ["SUAVIZANTE"]
-    }));
+    const withoutDetergent = getVisibleQuestions(
+      definition,
+      eligibleAnswers({
+        F10_PRODUCTOS_USO_FRECUENTE: ["SUAVIZANTE"]
+      })
+    );
     const withDetergent = getVisibleQuestions(definition, eligibleAnswers());
 
     expect(withoutDetergent.some((question) => question.id === "F11_TIPO_DETERGENTE")).toBe(false);
@@ -182,23 +215,37 @@ describe("detergents screener template", () => {
 });
 
 describe("detergents template loader", () => {
-  it("creates and reuses the detergent study template idempotently", async () => {
+  it("creates the study as an editable draft and keeps it idempotent", async () => {
     const state = createMemoryTemplateRepository();
 
     const first = await loadDetergentsStudyTemplateForAdmin({ actor: adminActor, repository: state.repository });
     const second = await loadDetergentsStudyTemplateForAdmin({ actor: adminActor, repository: state.repository });
 
-    expect(first.ok ? first.data.studyCreated : false).toBe(true);
-    expect(first.ok ? first.data.activeVersionCreated : false).toBe(true);
-    expect(second.ok ? second.data.studyCreated : true).toBe(false);
-    expect(second.ok ? second.data.activeVersionReused : false).toBe(true);
-    expect(second.ok ? second.data.matchedBy : "NONE").toBe("CODE");
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    if (!first.ok || !second.ok) {
+      return;
+    }
+
+    expect(first.data.studyCreated).toBe(true);
+    expect(first.data.studyActivated).toBe(false);
+    expect(first.data.activeVersionCreated).toBe(false);
+    expect(first.data.versionNumber).toBe(0);
+    expect(first.data.draftCreated).toBe(true);
+    expect(first.data.studyResetToDraft).toBe(false);
+
+    expect(second.data.studyCreated).toBe(false);
+    expect(second.data.matchedBy).toBe("CODE");
+    expect(second.data.draftUpdated).toBe(true);
+    expect(second.data.activeVersionReused).toBe(false);
+
     expect(state.studies).toHaveLength(1);
-    expect(state.versions).toHaveLength(1);
+    expect(state.studies[0]?.status).toBe("DRAFT");
     expect(state.drafts).toHaveLength(1);
+    expect(state.versions).toHaveLength(0);
   });
 
-  it("reuses a safe partial detergent study instead of creating a duplicate", async () => {
+  it("reuses a safe partial detergents study instead of creating a duplicate", async () => {
     const state = createMemoryTemplateRepository([
       {
         code: "DET-PARCIAL",
@@ -214,17 +261,78 @@ describe("detergents template loader", () => {
       repository: state.repository
     });
 
-    expect(result.ok ? result.data.studyCreated : true).toBe(false);
-    expect(result.ok ? result.data.matchedBy : "NONE").toBe("NAME");
-    expect(result.ok ? result.data.partialStudyUpdated : false).toBe(true);
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.data.studyCreated).toBe(false);
+    expect(result.data.matchedBy).toBe("NAME");
+    expect(result.data.partialStudyUpdated).toBe(true);
+    expect(result.data.studyActivated).toBe(false);
+    expect(result.data.versionNumber).toBe(0);
     expect(state.studies).toHaveLength(1);
     expect(state.studies[0]).toMatchObject({
       code: DETERGENTS_STUDY_CODE,
-      id: "partial-study"
+      id: "partial-study",
+      status: "DRAFT"
     });
   });
 
-  it("does not claim a partial detergent study when it already has operational data", async () => {
+  it("returns an existing active detergents study to draft when it has no operational data", async () => {
+    const state = createMemoryTemplateRepository([
+      {
+        code: DETERGENTS_STUDY_CODE,
+        id: "study-detergents",
+        name: "Detergentes y cuidado de la ropa — CDMX/GDL",
+        participantsCount: 0,
+        status: "ACTIVE"
+      }
+    ]);
+
+    const result = await loadDetergentsStudyTemplateForAdmin({
+      actor: adminActor,
+      repository: state.repository
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.data.studyCreated).toBe(false);
+    expect(result.data.studyResetToDraft).toBe(true);
+    expect(result.data.draftCreated).toBe(true);
+    expect(result.data.draftUpdated).toBe(false);
+    expect(state.studies[0]?.status).toBe("DRAFT");
+  });
+
+  it("blocks resetting an active detergents study when it already has operational data", async () => {
+    const state = createMemoryTemplateRepository([
+      {
+        code: DETERGENTS_STUDY_CODE,
+        id: "study-detergents",
+        name: "Detergentes y cuidado de la ropa — CDMX/GDL",
+        participantsCount: 2,
+        status: "ACTIVE"
+      }
+    ]);
+
+    const result = await loadDetergentsStudyTemplateForAdmin({
+      actor: adminActor,
+      repository: state.repository
+    });
+
+    expect(result).toMatchObject({
+      code: "PARTIAL_STUDY_HAS_DATA",
+      message: "El estudio ya tiene datos registrados. Para editarlo crea una nueva versión del filtro.",
+      ok: false
+    });
+    expect(state.studies[0]?.status).toBe("ACTIVE");
+    expect(state.drafts).toHaveLength(0);
+  });
+
+  it("does not claim a partial detergents study when it already has operational data", async () => {
     const repository: DetergentsTemplateRepository = {
       async ensureDetergentsStudy() {
         throw new DetergentsPartialStudyUnsafeError("partial-study");
@@ -236,10 +344,14 @@ describe("detergents template loader", () => {
       repository
     });
 
-    expect(result).toMatchObject({ code: "PARTIAL_STUDY_HAS_DATA", ok: false });
+    expect(result).toMatchObject({
+      code: "PARTIAL_STUDY_HAS_DATA",
+      message: "El estudio ya tiene datos registrados. Para editarlo crea una nueva versión del filtro.",
+      ok: false
+    });
   });
 
-  it("denies loading the detergent template to non-admin users", async () => {
+  it("denies loading the detergents template to non-admin users", async () => {
     const result = await loadDetergentsStudyTemplateForAdmin({
       actor: { id: "interviewer-1", role: "INTERVIEWER", status: "ACTIVE" },
       repository: createMemoryTemplateRepository().repository
@@ -328,7 +440,7 @@ function createMemoryTemplateRepository(
     status: "ACTIVE" | "DRAFT";
   }> = []
 ) {
-  const studies = [...initialStudies];
+  const studies = initialStudies.map((study) => ({ ...study }));
   const drafts: Array<{ definitionJson: ScreenerDefinition; id: string; studyId: string }> = [];
   const versions: Array<{ definitionHash: string; id: string; status: "ACTIVE" | "RETIRED"; versionNumber: number }> = [];
 
@@ -338,6 +450,7 @@ function createMemoryTemplateRepository(
       let matchedBy: "CODE" | "NAME" | "NONE" = study ? "CODE" : "NONE";
       let partialStudyUpdated = false;
       let studyCreated = false;
+      let studyResetToDraft = false;
 
       if (!study) {
         study = studies.find((item) => /detergentes|cuidado de la ropa/i.test(item.name));
@@ -346,12 +459,25 @@ function createMemoryTemplateRepository(
 
       if (study && study.code !== input.study.code) {
         if (study.participantsCount > 0) {
-          throw new Error("Unsafe partial study");
+          throw new DetergentsPartialStudyUnsafeError(study.id);
         }
 
+        studyResetToDraft = study.status !== "DRAFT";
         study.code = input.study.code;
         study.name = input.study.name;
+        study.status = "DRAFT";
         partialStudyUpdated = true;
+      } else if (study) {
+        if (study.status !== "DRAFT" && study.participantsCount > 0) {
+          throw new DetergentsPartialStudyUnsafeError(study.id);
+        }
+
+        if (study.status !== "DRAFT" || study.name !== input.study.name) {
+          studyResetToDraft = study.status !== "DRAFT";
+          study.name = input.study.name;
+          study.status = "DRAFT";
+          partialStudyUpdated = true;
+        }
       }
 
       if (!study) {
@@ -366,43 +492,36 @@ function createMemoryTemplateRepository(
         studyCreated = true;
       }
 
-      const active = versions.find((version) => version.status === "ACTIVE");
-      const activeVersionReused = active?.definitionHash === input.definitionHash;
-      let activeVersionCreated = false;
+      const existingDraft = drafts.find((draft) => draft.studyId === study.id);
       let draftCreated = false;
-      let versionNumber = active?.versionNumber ?? 0;
+      let draftUpdated = false;
 
-      if (!activeVersionReused) {
-        drafts.push({ definitionJson: input.definition, id: `draft-${drafts.length + 1}`, studyId: study.id });
+      if (existingDraft) {
+        existingDraft.definitionJson = input.definition;
+        draftUpdated = true;
+      } else {
+        drafts.push({
+          definitionJson: input.definition,
+          id: `draft-${drafts.length + 1}`,
+          studyId: study.id
+        });
         draftCreated = true;
-        versions.forEach((version) => {
-          version.status = "RETIRED";
-        });
-        versionNumber = versions.length + 1;
-        versions.push({
-          definitionHash: input.definitionHash,
-          id: `version-${versionNumber}`,
-          status: "ACTIVE",
-          versionNumber
-        });
-        activeVersionCreated = true;
       }
 
-      const studyActivated = study.status === "DRAFT";
-      study.status = "ACTIVE";
-
       return {
-        activeVersionCreated,
-        activeVersionReused,
+        activeVersionCreated: false,
+        activeVersionReused: false,
         draftCreated,
+        draftUpdated,
         matchedBy,
         matchedExistingStudy: !studyCreated,
         partialStudyUpdated,
         portalConfigUpserted: true,
-        studyActivated,
+        studyActivated: false,
         studyCreated,
         studyId: study.id,
-        versionNumber
+        studyResetToDraft,
+        versionNumber: 0
       };
     }
   };

@@ -32,13 +32,6 @@ export type DetergentsTemplateDraftRecord = {
   studyId: string;
 };
 
-export type DetergentsTemplateVersionRecord = {
-  definitionHash: string;
-  id: string;
-  status: "ACTIVE" | "RETIRED";
-  versionNumber: number;
-};
-
 export type EnsureDetergentsStudyInput = {
   actorUserId: string;
   definition: ScreenerDefinition;
@@ -60,17 +53,19 @@ export type EnsureDetergentsStudyInput = {
 };
 
 export type EnsureDetergentsStudyResult = {
-  activeVersionCreated: boolean;
-  activeVersionReused: boolean;
+  activeVersionCreated: false;
+  activeVersionReused: false;
   draftCreated: boolean;
+  draftUpdated: boolean;
   matchedBy: "CODE" | "NAME" | "NONE";
   matchedExistingStudy: boolean;
   partialStudyUpdated: boolean;
   portalConfigUpserted: boolean;
-  studyActivated: boolean;
+  studyActivated: false;
   studyCreated: boolean;
   studyId: string;
-  versionNumber: number;
+  studyResetToDraft: boolean;
+  versionNumber: 0;
 };
 
 export type DetergentsTemplateRepository = {
@@ -144,7 +139,7 @@ export async function loadDetergentsStudyTemplateForAdmin({
       return {
         code: "PARTIAL_STUDY_HAS_DATA",
         message:
-          "Se encontro un estudio parcial relacionado con detergentes, pero ya tiene datos operativos. Archivarlo o limpiarlo antes de cargar la plantilla definitiva.",
+          "El estudio ya tiene datos registrados. Para editarlo crea una nueva versión del filtro.",
         ok: false
       };
     }
@@ -157,32 +152,41 @@ export async function loadDetergentsStudyTemplateForAdmin({
   }
 }
 
+type CountDelegate = {
+  count: (args: unknown) => Promise<number>;
+};
+
 type DetergentsTemplatePrismaClient = PrismaClientLike & {
   $transaction: <T>(callback: (transaction: DetergentsTemplateTransaction) => Promise<T>) => Promise<T>;
 };
 
 type DetergentsTemplateTransaction = {
+  participantActivity: CountDelegate;
+  participantConfirmation: CountDelegate;
+  participantConsent: CountDelegate;
+  participantEvidence: CountDelegate;
   participantPortalStudyConfig: {
     upsert: (args: unknown) => Promise<unknown>;
   };
+  participantReferenceCode: CountDelegate;
   questionnaireDraft: {
     create: (args: unknown) => Promise<DetergentsTemplateDraftRecord>;
     findFirst: (args: unknown) => Promise<DetergentsTemplateDraftRecord | null>;
-  };
-  questionnaireVersion: {
-    create: (args: unknown) => Promise<DetergentsTemplateVersionRecord>;
-    findFirst: (args: unknown) => Promise<DetergentsTemplateVersionRecord | null>;
     updateMany: (args: unknown) => Promise<{ count: number }>;
   };
+  questionnaireVersion: {
+    deleteMany: (args: unknown) => Promise<{ count: number }>;
+  };
+  researchResponse: CountDelegate;
+  screeningAnswer: CountDelegate;
+  screeningAttempt: CountDelegate;
   study: {
     create: (args: unknown) => Promise<DetergentsTemplateStudyRecord>;
     findFirst: (args: unknown) => Promise<DetergentsTemplateStudyRecord | null>;
     findUnique: (args: unknown) => Promise<DetergentsTemplateStudyRecord | null>;
     update: (args: unknown) => Promise<DetergentsTemplateStudyRecord>;
   };
-  studyParticipant: {
-    count: (args: unknown) => Promise<number>;
-  };
+  studyParticipant: CountDelegate;
 };
 
 const studySelect = {
@@ -197,13 +201,6 @@ const draftSelect = {
   definitionJson: true,
   id: true,
   studyId: true
-} as const;
-
-const versionSelect = {
-  definitionHash: true,
-  id: true,
-  status: true,
-  versionNumber: true
 } as const;
 
 export function createDetergentsTemplateRepository(
@@ -223,8 +220,9 @@ export function createDetergentsTemplateRepository(
           where: { code: input.study.code }
         });
         let matchedBy: EnsureDetergentsStudyResult["matchedBy"] = study ? "CODE" : "NONE";
-        let studyCreated = false;
         let partialStudyUpdated = false;
+        let studyCreated = false;
+        let studyResetToDraft = false;
 
         if (!study) {
           study = await transaction.study.findFirst({
@@ -240,29 +238,43 @@ export function createDetergentsTemplateRepository(
           matchedBy = study ? "NAME" : "NONE";
         }
 
-        if (study && study.code !== input.study.code) {
-          const participantsCount = await transaction.studyParticipant.count({
-            where: { studyId: study.id }
-          });
+        const operationalRecords = study
+          ? await countOperationalStudyRecords(transaction, study.id)
+          : 0;
+        const hasOperationalData = operationalRecords > 0;
 
-          if (participantsCount > 0) {
+        if (study && study.code !== input.study.code) {
+          if (hasOperationalData) {
             throw new DetergentsPartialStudyUnsafeError(study.id);
           }
 
+          studyResetToDraft = study.status !== "DRAFT";
           study = await transaction.study.update({
             data: {
               code: input.study.code,
               name: input.study.name,
+              status: "DRAFT",
               timeZoneIana: input.study.timeZoneIana
             },
             select: studySelect,
             where: { id: study.id }
           });
           partialStudyUpdated = true;
-        } else if (study && (study.name !== input.study.name || study.timeZoneIana !== input.study.timeZoneIana)) {
+        } else if (
+          study &&
+          (study.name !== input.study.name ||
+            study.timeZoneIana !== input.study.timeZoneIana ||
+            study.status !== "DRAFT")
+        ) {
+          if (study.status !== "DRAFT" && hasOperationalData) {
+            throw new DetergentsPartialStudyUnsafeError(study.id);
+          }
+
+          studyResetToDraft = study.status !== "DRAFT";
           study = await transaction.study.update({
             data: {
               name: input.study.name,
+              status: "DRAFT",
               timeZoneIana: input.study.timeZoneIana
             },
             select: studySelect,
@@ -308,23 +320,41 @@ export function createDetergentsTemplateRepository(
           where: { studyId: study.id }
         });
 
-        const activeVersion = await transaction.questionnaireVersion.findFirst({
-          orderBy: { versionNumber: "desc" },
-          select: versionSelect,
+        await transaction.questionnaireVersion.deleteMany({
           where: {
             questionnaireDraft: { purpose: "SCREENER" },
-            status: "ACTIVE",
             studyId: study.id
           }
         });
 
-        let activeVersionReused = activeVersion?.definitionHash === input.definitionHash;
-        let activeVersionCreated = false;
-        let draftCreated = false;
-        let versionNumber = activeVersion?.versionNumber ?? 0;
+        const existingDraft = await transaction.questionnaireDraft.findFirst({
+          orderBy: { createdAt: "desc" },
+          select: draftSelect,
+          where: {
+            purpose: "SCREENER",
+            studyId: study.id
+          }
+        });
 
-        if (!activeVersionReused) {
-          const draft = await transaction.questionnaireDraft.create({
+        let draftCreated = false;
+        let draftUpdated = false;
+
+        if (existingDraft) {
+          const updated = await transaction.questionnaireDraft.updateMany({
+            data: {
+              definitionJson: input.definition,
+              name: DETERGENTS_SCREENER_TITLE,
+              status: "DRAFT",
+              updatedByUserId: input.actorUserId
+            },
+            where: {
+              id: existingDraft.id,
+              studyId: study.id
+            }
+          });
+          draftUpdated = updated.count === 1;
+        } else {
+          await transaction.questionnaireDraft.create({
             data: {
               createdByUserId: input.actorUserId,
               definitionJson: input.definition,
@@ -337,68 +367,22 @@ export function createDetergentsTemplateRepository(
             select: draftSelect
           });
           draftCreated = true;
-
-          const latestVersion = await transaction.questionnaireVersion.findFirst({
-            orderBy: { versionNumber: "desc" },
-            select: versionSelect,
-            where: {
-              questionnaireDraft: { purpose: "SCREENER" },
-              studyId: study.id
-            }
-          });
-
-          await transaction.questionnaireVersion.updateMany({
-            data: {
-              retiredAt: new Date(),
-              retiredByUserId: input.actorUserId,
-              status: "RETIRED"
-            },
-            where: {
-              questionnaireDraft: { purpose: "SCREENER" },
-              status: "ACTIVE",
-              studyId: study.id
-            }
-          });
-
-          const version = await transaction.questionnaireVersion.create({
-            data: {
-              definitionHash: input.definitionHash,
-              definitionJson: input.definition,
-              publishedByUserId: input.actorUserId,
-              questionnaireDraftId: draft.id,
-              status: "ACTIVE",
-              studyId: study.id,
-              versionNumber: (latestVersion?.versionNumber ?? 0) + 1
-            },
-            select: versionSelect
-          });
-          activeVersionCreated = true;
-          activeVersionReused = false;
-          versionNumber = version.versionNumber;
-        }
-
-        let studyActivated = false;
-        if (study.status === "DRAFT") {
-          study = await transaction.study.update({
-            data: { status: "ACTIVE" },
-            select: studySelect,
-            where: { id: study.id }
-          });
-          studyActivated = true;
         }
 
         return {
-          activeVersionCreated,
-          activeVersionReused,
+          activeVersionCreated: false,
+          activeVersionReused: false,
           draftCreated,
+          draftUpdated,
           matchedBy,
           matchedExistingStudy: !studyCreated,
           partialStudyUpdated,
           portalConfigUpserted: true,
-          studyActivated,
+          studyActivated: false,
           studyCreated,
           studyId: study.id,
-          versionNumber
+          studyResetToDraft,
+          versionNumber: 0
         };
       });
     }
@@ -411,7 +395,46 @@ function isAdmin(actor: DetergentsTemplateActor | null): actor is DetergentsTemp
 
 export class DetergentsPartialStudyUnsafeError extends Error {
   constructor(public readonly studyId: string) {
-    super("A partial detergents study already has operational data.");
+    super("A detergents study with operational data cannot be reset to draft.");
     this.name = "DetergentsPartialStudyUnsafeError";
   }
+}
+
+async function countOperationalStudyRecords(
+  transaction: DetergentsTemplateTransaction,
+  studyId: string
+): Promise<number> {
+  const [
+    studyParticipants,
+    screeningAttempts,
+    screeningAnswers,
+    participantConsents,
+    participantEvidence,
+    participantConfirmations,
+    participantReferenceCodes,
+    participantActivities,
+    researchResponses
+  ] = await Promise.all([
+    transaction.studyParticipant.count({ where: { studyId } }),
+    transaction.screeningAttempt.count({ where: { studyParticipant: { studyId } } }),
+    transaction.screeningAnswer.count({ where: { screeningAttempt: { studyParticipant: { studyId } } } }),
+    transaction.participantConsent.count({ where: { studyParticipant: { studyId } } }),
+    transaction.participantEvidence.count({ where: { studyParticipant: { studyId } } }),
+    transaction.participantConfirmation.count({ where: { studyId } }),
+    transaction.participantReferenceCode.count({ where: { confirmation: { studyId } } }),
+    transaction.participantActivity.count({ where: { studyParticipant: { studyId } } }),
+    transaction.researchResponse.count({ where: { participantActivity: { studyParticipant: { studyId } } } })
+  ]);
+
+  return (
+    studyParticipants +
+    screeningAttempts +
+    screeningAnswers +
+    participantConsents +
+    participantEvidence +
+    participantConfirmations +
+    participantReferenceCodes +
+    participantActivities +
+    researchResponses
+  );
 }

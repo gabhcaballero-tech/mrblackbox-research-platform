@@ -18,14 +18,19 @@ describe("DetergentsTemplateButton", () => {
     vi.clearAllMocks();
   });
 
-  it("calls the detergent template endpoint and redirects to the study screener on success", async () => {
+  it("calls the template endpoint and opens the editable screener draft on success", async () => {
     const fetchMock = vi.fn(async () => ({
-      json: async () => ({ ok: true }),
+      json: async () => ({
+        data: {
+          studyId: "study-detergents"
+        },
+        ok: true
+      }),
       ok: true
     }));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<DetergentsTemplateButton studyId="study-detergents" />);
+    render(<DetergentsTemplateButton studyId="fallback-study" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Cargar plantilla de detergentes" }));
 
@@ -35,18 +40,22 @@ describe("DetergentsTemplateButton", () => {
         method: "POST"
       });
     });
-    expect(await screen.findByText("Plantilla de detergentes cargada correctamente.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "Plantilla cargada como borrador editable. Revisa el cuestionario antes de publicarlo."
+      )
+    ).toBeInTheDocument();
     expect(push).toHaveBeenCalledWith("/admin/studies/study-detergents/screener");
     expect(refresh).toHaveBeenCalled();
   });
 
-  it("shows a safe error when a partial detergent study already has data", async () => {
+  it("shows a safe error when the detergents study already has operational data", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
         json: async () => ({
           message:
-            "Se encontro un estudio parcial relacionado con detergentes, pero ya tiene datos operativos.",
+            "El estudio ya tiene datos registrados. Para editarlo crea una nueva versión del filtro.",
           ok: false
         }),
         ok: false
@@ -59,7 +68,7 @@ describe("DetergentsTemplateButton", () => {
 
     expect(
       await screen.findByText(
-        "Ya existe un estudio de detergentes con datos registrados. No se actualizó automáticamente para evitar pérdida de información."
+        "El estudio ya tiene datos registrados. Para editarlo crea una nueva versión del filtro."
       )
     ).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();

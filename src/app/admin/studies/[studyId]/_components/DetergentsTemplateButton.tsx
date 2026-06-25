@@ -13,9 +13,18 @@ type LoadState = {
   status: "idle" | "loading" | "success" | "error";
 };
 
-const successMessage = "Plantilla de detergentes cargada correctamente.";
+type TemplateResponse = {
+  data?: {
+    studyId?: string;
+  };
+  message?: string;
+  ok?: boolean;
+};
+
+const successMessage =
+  "Plantilla cargada como borrador editable. Revisa el cuestionario antes de publicarlo.";
 const unsafePartialMessage =
-  "Ya existe un estudio de detergentes con datos registrados. No se actualizó automáticamente para evitar pérdida de información.";
+  "El estudio ya tiene datos registrados. Para editarlo crea una nueva versión del filtro.";
 
 export function DetergentsTemplateButton({
   compact = false,
@@ -35,10 +44,10 @@ export function DetergentsTemplateButton({
       const response = await fetch("/admin/studies/templates/detergents", {
         method: "POST"
       });
-      const body = await response.json().catch(() => null) as { message?: string; ok?: boolean } | null;
+      const body = (await response.json().catch(() => null)) as TemplateResponse | null;
 
       if (!response.ok || !body?.ok) {
-        const message = body?.message?.includes("datos operativos")
+        const message = body?.message?.includes("datos registrados")
           ? unsafePartialMessage
           : body?.message ?? "No fue posible cargar la plantilla de detergentes.";
         setState({ message, status: "error" });
@@ -46,7 +55,7 @@ export function DetergentsTemplateButton({
       }
 
       setState({ message: successMessage, status: "success" });
-      router.push(`/admin/studies/${studyId}/screener`);
+      router.push(`/admin/studies/${body.data?.studyId ?? studyId}/screener`);
       router.refresh();
     } catch {
       setState({

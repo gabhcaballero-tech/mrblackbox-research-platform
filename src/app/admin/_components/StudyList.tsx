@@ -8,13 +8,22 @@ type StudyListProps = {
   studies: StudyListItem[];
 };
 
-const dateFormatter = new Intl.DateTimeFormat("es-MX", {
-  dateStyle: "medium",
-  timeStyle: "short"
-});
+const DEFAULT_STUDY_TIME_ZONE = "America/Mexico_City";
 
-function formatDate(value: Date) {
-  return dateFormatter.format(value);
+export function formatStudyListDate(value: Date, timeZoneIana?: string) {
+  try {
+    return new Intl.DateTimeFormat("es-MX", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: timeZoneIana || DEFAULT_STUDY_TIME_ZONE
+    }).format(value);
+  } catch {
+    return new Intl.DateTimeFormat("es-MX", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: DEFAULT_STUDY_TIME_ZONE
+    }).format(value);
+  }
 }
 
 function StudyStatusBadge({ status }: { status: StudyListItem["status"] }) {
@@ -42,17 +51,13 @@ export function StudyList({ studies }: StudyListProps) {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="min-w-0 break-words text-xl font-semibold text-zinc-950">
-                  {study.name}
-                </h2>
+                <h2 className="min-w-0 break-words text-xl font-semibold text-zinc-950">{study.name}</h2>
                 <StudyStatusBadge status={study.status} />
               </div>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
                 <div className="min-w-0">
                   <dt className="font-medium text-zinc-500">{UI_LABELS.studies.code}</dt>
-                  <dd className="mt-1 break-all font-mono font-semibold text-zinc-900">
-                    {study.code}
-                  </dd>
+                  <dd className="mt-1 break-all font-mono font-semibold text-zinc-900">{study.code}</dd>
                 </div>
                 <div className="min-w-0">
                   <dt className="font-medium text-zinc-500">{UI_LABELS.studies.timeZone}</dt>
@@ -60,11 +65,15 @@ export function StudyList({ studies }: StudyListProps) {
                 </div>
                 <div>
                   <dt className="font-medium text-zinc-500">{UI_LABELS.common.created}</dt>
-                  <dd className="mt-1 text-zinc-900">{formatDate(study.createdAt)}</dd>
+                  <dd className="mt-1 text-zinc-900">
+                    {formatStudyListDate(study.createdAt, study.timeZoneIana)}
+                  </dd>
                 </div>
                 <div>
                   <dt className="font-medium text-zinc-500">{UI_LABELS.common.updated}</dt>
-                  <dd className="mt-1 text-zinc-900">{formatDate(study.updatedAt)}</dd>
+                  <dd className="mt-1 text-zinc-900">
+                    {formatStudyListDate(study.updatedAt, study.timeZoneIana)}
+                  </dd>
                 </div>
                 <div>
                   <dt className="font-medium text-zinc-500">{UI_LABELS.common.editing}</dt>
