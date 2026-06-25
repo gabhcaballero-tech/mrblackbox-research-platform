@@ -1216,83 +1216,72 @@ async function findUnsupportedDeleteRelations(
           notIn: attemptIds
         }
       : undefined;
-  const [
-    additionalAttempts,
-    additionalEvidence,
-    applicationTimeEvents,
-    quotaEvaluations,
-    rotationAssignments,
-    armAssignments,
-    activities,
-    attributeOrders
-  ] = await Promise.all([
-    tx.screeningAttempt.findMany({
-      select: {
-        id: true
-      },
-      where: {
-        ...(attemptFilter ? { id: attemptFilter } : {}),
-        studyParticipantId: input.studyParticipantId
-      }
-    }),
-    tx.participantEvidence.findMany({
-      select: {
-        id: true
-      },
-      where: {
-        ...(attemptFilter ? { screeningAttemptId: attemptFilter } : {}),
-        studyParticipantId: input.studyParticipantId
-      }
-    }),
-    tx.applicationTimeEvent.findMany({
-      select: {
-        id: true
-      },
-      where: {
-        studyParticipantId: input.studyParticipantId
-      }
-    }),
-    tx.quotaEvaluation.findMany({
-      select: {
-        id: true
-      },
-      where: {
-        studyParticipantId: input.studyParticipantId
-      }
-    }),
-    tx.participantRotationAssignment.findMany({
-      select: {
-        id: true
-      },
-      where: {
-        studyParticipantId: input.studyParticipantId
-      }
-    }),
-    tx.participantArmAssignment.findMany({
-      select: {
-        id: true
-      },
-      where: {
-        studyParticipantId: input.studyParticipantId
-      }
-    }),
-    tx.participantActivity.findMany({
-      select: {
-        id: true
-      },
-      where: {
-        studyParticipantId: input.studyParticipantId
-      }
-    }),
-    tx.participantAttributeOrder.findMany({
-      select: {
-        id: true
-      },
-      where: {
-        studyParticipantId: input.studyParticipantId
-      }
-    })
-  ]);
+  const additionalAttempts = await tx.screeningAttempt.findMany({
+    select: {
+      id: true
+    },
+    where: {
+      ...(attemptFilter ? { id: attemptFilter } : {}),
+      studyParticipantId: input.studyParticipantId
+    }
+  });
+  const additionalEvidence = await tx.participantEvidence.findMany({
+    select: {
+      id: true
+    },
+    where: {
+      ...(attemptFilter ? { screeningAttemptId: attemptFilter } : {}),
+      studyParticipantId: input.studyParticipantId
+    }
+  });
+  const applicationTimeEvents = await tx.applicationTimeEvent.findMany({
+    select: {
+      id: true
+    },
+    where: {
+      studyParticipantId: input.studyParticipantId
+    }
+  });
+  const quotaEvaluations = await tx.quotaEvaluation.findMany({
+    select: {
+      id: true
+    },
+    where: {
+      studyParticipantId: input.studyParticipantId
+    }
+  });
+  const rotationAssignments = await tx.participantRotationAssignment.findMany({
+    select: {
+      id: true
+    },
+    where: {
+      studyParticipantId: input.studyParticipantId
+    }
+  });
+  const armAssignments = await tx.participantArmAssignment.findMany({
+    select: {
+      id: true
+    },
+    where: {
+      studyParticipantId: input.studyParticipantId
+    }
+  });
+  const activities = await tx.participantActivity.findMany({
+    select: {
+      id: true
+    },
+    where: {
+      studyParticipantId: input.studyParticipantId
+    }
+  });
+  const attributeOrders = await tx.participantAttributeOrder.findMany({
+    select: {
+      id: true
+    },
+    where: {
+      studyParticipantId: input.studyParticipantId
+    }
+  });
 
   const relations: string[] = [];
 

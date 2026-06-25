@@ -446,22 +446,42 @@ export function conditionMatches(
     case "ALL":
       return condition.conditions.every((nestedCondition) => conditionMatches(nestedCondition, answers));
     case "ANSWER_EQUALS":
+      if (isMissingAnswer(answers[condition.questionId])) {
+        return false;
+      }
+
       return selectedComparableValues(answers[condition.questionId]).some(
         (value) => value === condition.value
       );
     case "ANY_SELECTED":
+      if (isMissingAnswer(answers[condition.questionId])) {
+        return false;
+      }
+
       return condition.values.some((value) =>
         selectedComparableValues(answers[condition.questionId]).includes(value)
       );
     case "ALL_SELECTED":
+      if (isMissingAnswer(answers[condition.questionId])) {
+        return false;
+      }
+
       return condition.values.every((value) =>
         selectedComparableValues(answers[condition.questionId]).includes(value)
       );
     case "NONE_SELECTED":
+      if (isMissingAnswer(answers[condition.questionId])) {
+        return false;
+      }
+
       return condition.values.every(
         (value) => !selectedComparableValues(answers[condition.questionId]).includes(value)
       );
     case "NUMBER_RANGE":
+      if (isMissingAnswer(answers[condition.questionId])) {
+        return false;
+      }
+
       return selectedComparableValues(answers[condition.questionId]).some((value) => {
         if (typeof value !== "number") {
           return false;

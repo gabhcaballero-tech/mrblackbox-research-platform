@@ -1,4 +1,3 @@
-import { randomInt } from "node:crypto";
 import { hasCapability, type InternalUserRole, type InternalUserStatus } from "@/shared/auth/permissions";
 import {
   F6_PERFUME_EVIDENCE_QUESTION_ID,
@@ -13,7 +12,7 @@ import type {
   EvidenceReviewAttemptRecord,
   EvidenceReviewRepository
 } from "./evidence-review-repository";
-import { buildManualWhatsAppMessage, PARTICIPANT_REFERENCE_CODE_ALPHABET } from "./review";
+import { buildManualWhatsAppMessage, generateParticipantReferenceCode } from "./review";
 import {
   isMexicoPhone,
   normalizeMexicoPhone,
@@ -774,13 +773,7 @@ export function buildWhatsAppUrl({
 }
 
 export function generateReferenceCode(): string {
-  let code = "";
-
-  for (let index = 0; index < 4; index += 1) {
-    code += PARTICIPANT_REFERENCE_CODE_ALPHABET[randomInt(0, PARTICIPANT_REFERENCE_CODE_ALPHABET.length)];
-  }
-
-  return code;
+  return generateParticipantReferenceCode();
 }
 
 function normalizeParticipantProfileInput(input: ParticipantEvidenceParticipantUpdateInput): EvidenceReviewResult<{

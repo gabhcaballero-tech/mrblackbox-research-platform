@@ -1,4 +1,10 @@
 import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
+import {
+  buildFolio,
+  isParticipantReferenceCode,
+  normalizeParticipantReferenceCode,
+  type ParticipantReferenceCodeDraft
+} from "./review";
 
 export type PortalScreenerStudyStatus = "ACTIVE" | "ARCHIVED" | "DRAFT" | "PAUSED";
 export type PortalScreeningStatus =
@@ -20,8 +26,11 @@ export type PortalOperationalStatus =
 
 export type PortalScreenerConfigRecord = {
   enabled: boolean;
+  folioMaxSequence: number;
+  folioPrefix: string;
   maxPerfumePhotos: number;
   minPerfumePhotos: number;
+  nextFolioSequence: number;
   privacyNoticeHash: string;
   privacyNoticeText: string;
   privacyNoticeVersion: string;
@@ -39,6 +48,7 @@ export type PortalScreenerVersionRecord = {
 export type PortalScreenerStudyRecord = {
   activeScreenerVersion: PortalScreenerVersionRecord | null;
   code: string;
+  createdByUserId: string;
   id: string;
   name: string;
   portalConfig: PortalScreenerConfigRecord | null;
@@ -67,6 +77,12 @@ export type PortalParticipantConsentRecord = {
   studyParticipantId: string;
 };
 
+export type PortalParticipantConfirmationRecord = {
+  folio: string;
+  folioSequence: number;
+  referenceCodes: ParticipantReferenceCodeDraft[];
+};
+
 export type PortalScreeningAttemptRecord = {
   completedAt: Date | null;
   evaluationJson: unknown;
@@ -74,7 +90,7 @@ export type PortalScreeningAttemptRecord = {
   id: string;
   nseClass: string | null;
   nseScore: number | null;
-  participantConfirmation: { id: string } | null;
+  participantConfirmation: PortalParticipantConfirmationRecord | null;
   participantEvidence: Array<{
     id: string;
     relatedQuestionId: string | null;
@@ -88,8 +104,14 @@ export type PortalScreeningAttemptRecord = {
   questionnaireVersion: PortalScreenerVersionRecord & {
     study: {
       code: string;
+      createdByUserId: string;
       id: string;
       name: string;
+      participantPortalConfig: {
+        folioMaxSequence: number;
+        folioPrefix: string;
+        nextFolioSequence: number;
+      } | null;
       status: PortalScreenerStudyStatus;
     };
   };
@@ -135,6 +157,23 @@ export type UpsertPortalAnswerInput = {
   screeningAttemptId: string;
 };
 
+export type EnsureFilterOnlyConfirmationInput = {
+  attemptId: string;
+  codeGenerator: () => string;
+  now?: Date;
+};
+
+export type EnsureFilterOnlyConfirmationResult =
+  | {
+      confirmation: PortalParticipantConfirmationRecord;
+      created: boolean;
+      ok: true;
+    }
+  | {
+      message: string;
+      ok: false;
+    };
+
 export type ParticipantPortalScreenerRepository = {
   createPortalScreeningAttempt: (
     input: CreatePortalScreeningAttemptInput
@@ -151,6 +190,9 @@ export type ParticipantPortalScreenerRepository = {
     participantProfileId: string;
     studyId: string;
   }) => Promise<PortalStudyParticipantRecord | null>;
+  ensureFilterOnlyConfirmation: (
+    input: EnsureFilterOnlyConfirmationInput
+  ) => Promise<EnsureFilterOnlyConfirmationResult>;
   getAttempt: (attemptId: string) => Promise<PortalScreeningAttemptRecord | null>;
   getStudyByCode: (studyCode: string) => Promise<PortalScreenerStudyRecord | null>;
   listAnswers: (attemptId: string) => Promise<PortalScreeningAnswerRecord[]>;
@@ -171,6 +213,7 @@ export type ParticipantPortalScreenerRepository = {
 };
 
 type ParticipantPortalScreenerPrismaClient = PrismaClientLike & {
+  $transaction: <T>(callback: (transaction: ParticipantPortalScreenerTransaction) => Promise<T>) => Promise<T>;
   participantConsent: {
     findUnique: (args: unknown) => Promise<PortalParticipantConsentRecord | null>;
   };
@@ -196,6 +239,22 @@ type ParticipantPortalScreenerPrismaClient = PrismaClientLike & {
   studyParticipant: {
     findUnique: (args: unknown) => Promise<PortalStudyParticipantRecord | null>;
     update: (args: unknown) => Promise<PortalStudyParticipantRecord>;
+  };
+};
+
+type ParticipantPortalScreenerTransaction = {
+  participantConfirmation: {
+    create: (args: unknown) => Promise<PortalParticipantConfirmationRecord>;
+    findMany: (args: unknown) => Promise<Array<{ folioSequence: number }>>;
+  };
+  participantPortalStudyConfig: {
+    update: (args: unknown) => Promise<unknown>;
+  };
+  participantReferenceCode: {
+    findMany: (args: unknown) => Promise<Array<{ code: string }>>;
+  };
+  screeningAttempt: {
+    findUnique: (args: unknown) => Promise<PortalScreeningAttemptRecord | null>;
   };
 };
 
@@ -228,6 +287,18 @@ const studyParticipantSelect = {
   studyId: true
 } as const;
 
+const confirmationForPortalSelect = {
+  folio: true,
+  folioSequence: true,
+  referenceCodes: {
+    orderBy: { slot: "asc" },
+    select: {
+      code: true,
+      slot: true
+    }
+  }
+} as const;
+
 const attemptSelect = {
   completedAt: true,
   evaluationJson: true,
@@ -236,9 +307,7 @@ const attemptSelect = {
   nseClass: true,
   nseScore: true,
   participantConfirmation: {
-    select: {
-      id: true
-    }
+    select: confirmationForPortalSelect
   },
   participantEvidence: {
     orderBy: { uploadedAt: "asc" },
@@ -261,8 +330,16 @@ const attemptSelect = {
       study: {
         select: {
           code: true,
+          createdByUserId: true,
           id: true,
           name: true,
+          participantPortalConfig: {
+            select: {
+              folioMaxSequence: true,
+              folioPrefix: true,
+              nextFolioSequence: true
+            }
+          },
           status: true
         }
       }
@@ -353,6 +430,86 @@ export function createParticipantPortalScreenerRepository(
         }
       });
     },
+    async ensureFilterOnlyConfirmation(input) {
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (transaction) => {
+        const attempt = await transaction.screeningAttempt.findUnique({
+          select: attemptSelect,
+          where: { id: input.attemptId }
+        });
+
+        if (!attempt) {
+          return { message: "El intento no existe.", ok: false };
+        }
+
+        if (attempt.participantConfirmation) {
+          return {
+            confirmation: attempt.participantConfirmation,
+            created: false,
+            ok: true
+          };
+        }
+
+        if (attempt.source !== "PARTICIPANT_PORTAL" || attempt.status !== "PASSED") {
+          return { message: "El intento no estÃ¡ listo para generar confirmaciÃ³n.", ok: false };
+        }
+
+        const study = attempt.questionnaireVersion.study;
+        const config = study.participantPortalConfig;
+
+        if (!config) {
+          return { message: "El portal no estÃ¡ configurado para este estudio.", ok: false };
+        }
+
+        const usedFolioSequences = await listUsedFolioSequences(transaction, study.id);
+        const folioSequence = findFirstAvailableFolioSequence(usedFolioSequences, config.folioMaxSequence);
+
+        if (folioSequence > config.folioMaxSequence) {
+          return {
+            message: "Se agotÃ³ la secuencia de folios configurada para este estudio.",
+            ok: false
+          };
+        }
+
+        const codes = await generateUniqueReferenceCodes(transaction, input.codeGenerator);
+        const nextFolioSequence = findFirstAvailableFolioSequence(
+          [...usedFolioSequences, folioSequence],
+          config.folioMaxSequence
+        );
+
+        await transaction.participantPortalStudyConfig.update({
+          data: {
+            nextFolioSequence
+          },
+          where: {
+            studyId: study.id
+          }
+        });
+
+        const confirmation = await transaction.participantConfirmation.create({
+          data: {
+            approvedAt: input.now ?? new Date(),
+            approvedByUserId: study.createdByUserId,
+            folio: buildFolio(config.folioPrefix, folioSequence),
+            folioSequence,
+            referenceCodes: {
+              create: codes
+            },
+            screeningAttemptId: attempt.id,
+            studyId: study.id,
+            studyParticipantId: attempt.studyParticipantId
+          },
+          select: confirmationForPortalSelect
+        });
+
+        return {
+          confirmation,
+          created: true,
+          ok: true
+        };
+      });
+    },
     async getAttempt(attemptId) {
       const prisma = await getPrisma();
 
@@ -366,13 +523,17 @@ export function createParticipantPortalScreenerRepository(
       const study = await prisma.study.findUnique({
         select: {
           code: true,
+          createdByUserId: true,
           id: true,
           name: true,
           participantPortalConfig: {
             select: {
               enabled: true,
+              folioMaxSequence: true,
+              folioPrefix: true,
               maxPerfumePhotos: true,
               minPerfumePhotos: true,
+              nextFolioSequence: true,
               privacyNoticeHash: true,
               privacyNoticeText: true,
               privacyNoticeVersion: true
@@ -402,6 +563,7 @@ export function createParticipantPortalScreenerRepository(
       return {
         activeScreenerVersion,
         code: study.code,
+        createdByUserId: study.createdByUserId,
         id: study.id,
         name: study.name,
         portalConfig: study.participantPortalConfig,
@@ -521,4 +683,72 @@ function isScreenerDefinition(input: unknown): boolean {
     "schemaVersion" in input &&
     (input as { schemaVersion?: unknown }).schemaVersion === "screening.v1"
   );
+}
+
+async function listUsedFolioSequences(
+  transaction: ParticipantPortalScreenerTransaction,
+  studyId: string
+): Promise<number[]> {
+  const confirmations = await transaction.participantConfirmation.findMany({
+    select: {
+      folioSequence: true
+    },
+    where: {
+      studyId
+    }
+  });
+
+  return confirmations.map((item) => item.folioSequence);
+}
+
+function findFirstAvailableFolioSequence(usedSequences: number[], folioMaxSequence: number): number {
+  const used = new Set(usedSequences.filter((value) => Number.isInteger(value) && value >= 1));
+
+  for (let sequence = 1; sequence <= folioMaxSequence; sequence += 1) {
+    if (!used.has(sequence)) {
+      return sequence;
+    }
+  }
+
+  return folioMaxSequence + 1;
+}
+
+async function generateUniqueReferenceCodes(
+  transaction: ParticipantPortalScreenerTransaction,
+  codeGenerator: () => string
+): Promise<ParticipantReferenceCodeDraft[]> {
+  const codes: ParticipantReferenceCodeDraft[] = [];
+  const generated = new Set<string>();
+  let attempts = 0;
+
+  while (codes.length < 3) {
+    attempts += 1;
+
+    if (attempts > 50) {
+      throw new Error("No fue posible generar tres cÃ³digos de referencia Ãºnicos.");
+    }
+
+    const code = normalizeParticipantReferenceCode(codeGenerator());
+
+    if (!isParticipantReferenceCode(code) || generated.has(code)) {
+      continue;
+    }
+
+    const existing = await transaction.participantReferenceCode.findMany({
+      select: { code: true },
+      where: { code: { in: [code] } }
+    });
+
+    if (existing.length > 0) {
+      continue;
+    }
+
+    generated.add(code);
+    codes.push({
+      code,
+      slot: (codes.length + 1) as 1 | 2 | 3
+    });
+  }
+
+  return codes;
 }

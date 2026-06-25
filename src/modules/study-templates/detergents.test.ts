@@ -157,6 +157,32 @@ describe("detergents screener template", () => {
     });
   });
 
+  it("does not terminate by detergent usage before F10 has been answered", () => {
+    const definition = createDetergentsScreenerDefinition();
+    const answers = eligibleAnswers({
+      F10_PRODUCTOS_USO_FRECUENTE: undefined,
+      F11_TIPO_DETERGENTE: undefined,
+      F12_MARCA_DETERGENTE: undefined,
+      F13_VARIANTE_DETERGENTE: undefined,
+      F14_PRODUCTOS_ADICIONALES_ROPA: undefined
+    });
+    const result = evaluateScreener(definition, answers);
+
+    expect(result.status).toBe("INCOMPLETE");
+    expect(result.termination?.code).not.toBe("NO_USA_DETERGENTE");
+    expect(result.missingQuestionIds).toContain("F10_PRODUCTOS_USO_FRECUENTE");
+  });
+
+  it("keeps the screener incomplete after only F0 recruiter has been answered", () => {
+    const result = evaluateScreener(createDetergentsScreenerDefinition(), {
+      F0_RECLUTADOR: "RECLUTADORA"
+    });
+
+    expect(result.status).toBe("INCOMPLETE");
+    expect(result.termination).toBeUndefined();
+    expect(result.missingQuestionIds).toContain("F1_CIUDAD");
+  });
+
   it("rejects an inconsistent detergent type answer", () => {
     const result = evaluateScreener(
       createDetergentsScreenerDefinition(),

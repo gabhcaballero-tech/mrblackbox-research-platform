@@ -1,3 +1,5 @@
+import { randomInt } from "node:crypto";
+
 export type ParticipantScreeningReviewDraft = {
   createdAt: Date;
   id?: string;
@@ -173,6 +175,16 @@ export function normalizeParticipantReferenceCode(value: string): string {
 
 export function isParticipantReferenceCode(value: string): boolean {
   return PARTICIPANT_REFERENCE_CODE_PATTERN.test(normalizeParticipantReferenceCode(value));
+}
+
+export function generateParticipantReferenceCode(): string {
+  let code = "";
+
+  for (let index = 0; index < 4; index += 1) {
+    code += PARTICIPANT_REFERENCE_CODE_ALPHABET[randomInt(0, PARTICIPANT_REFERENCE_CODE_ALPHABET.length)];
+  }
+
+  return code;
 }
 
 export function buildManualWhatsAppMessage({

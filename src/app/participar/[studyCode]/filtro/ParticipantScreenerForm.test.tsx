@@ -90,8 +90,14 @@ function screenData(overrides: Partial<ParticipantPortalAttemptScreen> = {}): Pa
         status: "ACTIVE",
         study: {
           code: "FMASCULINA-NAVIGO-2026",
+          createdByUserId: "admin-1",
           id: "study-1",
           name: "Fragancia Masculina",
+          participantPortalConfig: {
+            folioMaxSequence: 999,
+            folioPrefix: "NAV",
+            nextFolioSequence: 1
+          },
           status: "ACTIVE"
         },
         versionNumber: 1

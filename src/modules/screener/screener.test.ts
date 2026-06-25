@@ -496,6 +496,20 @@ describe("screener evaluator", () => {
     ).toBe(true);
   });
 
+  it("does not match direct conditions when the source question has not been answered", () => {
+    const currentAnswers = answers({
+      "q-choice": undefined,
+      "q-multiple": [],
+      "q-age": undefined
+    });
+
+    expect(conditionMatches({ questionId: "q-choice", type: "ANSWER_EQUALS", value: "yes" }, currentAnswers)).toBe(false);
+    expect(conditionMatches({ questionId: "q-multiple", type: "ANY_SELECTED", values: ["a"] }, currentAnswers)).toBe(false);
+    expect(conditionMatches({ questionId: "q-multiple", type: "ALL_SELECTED", values: ["a"] }, currentAnswers)).toBe(false);
+    expect(conditionMatches({ questionId: "q-multiple", type: "NONE_SELECTED", values: ["a"] }, currentAnswers)).toBe(false);
+    expect(conditionMatches({ questionId: "q-age", type: "NUMBER_RANGE", min: 18, max: 30 }, currentAnswers)).toBe(false);
+  });
+
   it("treats questions without visibility condition as always visible", () => {
     const current = definition();
 

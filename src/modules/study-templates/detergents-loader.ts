@@ -404,27 +404,27 @@ async function countOperationalStudyRecords(
   transaction: DetergentsTemplateTransaction,
   studyId: string
 ): Promise<number> {
-  const [
-    studyParticipants,
-    screeningAttempts,
-    screeningAnswers,
-    participantConsents,
-    participantEvidence,
-    participantConfirmations,
-    participantReferenceCodes,
-    participantActivities,
-    researchResponses
-  ] = await Promise.all([
-    transaction.studyParticipant.count({ where: { studyId } }),
-    transaction.screeningAttempt.count({ where: { studyParticipant: { studyId } } }),
-    transaction.screeningAnswer.count({ where: { screeningAttempt: { studyParticipant: { studyId } } } }),
-    transaction.participantConsent.count({ where: { studyParticipant: { studyId } } }),
-    transaction.participantEvidence.count({ where: { studyParticipant: { studyId } } }),
-    transaction.participantConfirmation.count({ where: { studyId } }),
-    transaction.participantReferenceCode.count({ where: { confirmation: { studyId } } }),
-    transaction.participantActivity.count({ where: { studyParticipant: { studyId } } }),
-    transaction.researchResponse.count({ where: { participantActivity: { studyParticipant: { studyId } } } })
-  ]);
+  const studyParticipants = await transaction.studyParticipant.count({ where: { studyId } });
+  const screeningAttempts = await transaction.screeningAttempt.count({ where: { studyParticipant: { studyId } } });
+  const screeningAnswers = await transaction.screeningAnswer.count({
+    where: { screeningAttempt: { studyParticipant: { studyId } } }
+  });
+  const participantConsents = await transaction.participantConsent.count({
+    where: { studyParticipant: { studyId } }
+  });
+  const participantEvidence = await transaction.participantEvidence.count({
+    where: { studyParticipant: { studyId } }
+  });
+  const participantConfirmations = await transaction.participantConfirmation.count({ where: { studyId } });
+  const participantReferenceCodes = await transaction.participantReferenceCode.count({
+    where: { confirmation: { studyId } }
+  });
+  const participantActivities = await transaction.participantActivity.count({
+    where: { studyParticipant: { studyId } }
+  });
+  const researchResponses = await transaction.researchResponse.count({
+    where: { participantActivity: { studyParticipant: { studyId } } }
+  });
 
   return (
     studyParticipants +

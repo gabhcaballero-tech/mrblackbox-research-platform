@@ -27,6 +27,7 @@ import {
 } from "@/modules/screener";
 import { applyStudyScreenerDefinitionOverrides } from "@/modules/screener/study-overrides";
 import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
+import { generateParticipantReferenceCode } from "./review";
 
 export const PARTICIPANT_PORTAL_REGISTRATION_REQUIRED_MESSAGE =
   "Completa tu registro y consentimiento para continuar.";
@@ -325,11 +326,30 @@ export async function saveParticipantPortalScreenerAnswer({
   }
 
   if (evaluation.status === "PASSED" || evaluation.status === "PENDING_REVIEW") {
+    const finalEvaluation = toPreliminaryPassedEvaluation(evaluation);
+
     await closePortalAttempt({
       attempt,
-      evaluation: toPreliminaryPassedEvaluation(evaluation),
+      evaluation: finalEvaluation,
       repository
     });
+
+    const behavior = getStudyBehavior(context.data.study.code);
+
+    if (!behavior.requiresFinalSelfie && !behavior.requiresPerfumeEvidence) {
+      const confirmation = await repository.ensureFilterOnlyConfirmation({
+        attemptId,
+        codeGenerator: generateParticipantReferenceCode
+      });
+
+      if (!confirmation.ok) {
+        return {
+          code: "VALIDATION_ERROR",
+          message: confirmation.message,
+          ok: false
+        };
+      }
+    }
 
     return {
       data: {
