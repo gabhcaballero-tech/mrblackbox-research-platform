@@ -1,18 +1,24 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { configureNavigoRotationAction, startNavigoT0Action } from "@/modules/navigo-app/actions";
 import {
   createNavigoAppRepository,
+  createNavigoMeasurementDefinition,
+  formatNavigoDateTimeLocal,
   navigoActivityLabel,
   type NavigoActivityListItem,
   type NavigoParticipantListItem
 } from "@/modules/navigo-app";
+import type { QuestionnaireQuestion } from "@/modules/questionnaire-engine";
 import { NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
 import { requireCapability } from "@/shared/auth/session";
 import { AppShell } from "@/shared/ui/AppShell";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { resolveRequestOrigin } from "@/shared/utils/request-origin";
+import { ParticipantLinkPanel } from "./_components/ParticipantLinkPanel";
 import { NavigoRotationImportPanel } from "./_components/NavigoRotationImportPanel";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +38,7 @@ type NavigoAppAdminPageProps = {
 export default async function NavigoAppAdminPage({ params, searchParams }: NavigoAppAdminPageProps) {
   const { studyId } = await params;
   const query = await searchParams;
+  const requestOrigin = resolveRequestOrigin(await headers());
   await requireCapability("screening:review");
   const result = await createNavigoAppRepository().getAdminDashboard(studyId);
 
@@ -76,7 +83,12 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
               {query.navigoError}
             </p>
           ) : null}
-          {query?.token ? <ParticipantLinkPanel token={query.token} participantId={query.participant} /> : null}
+          {query?.token ? (
+            <ParticipantLinkPanel
+              participantId={query.participant}
+              url={new URL(`/p/${encodeURIComponent(query.token)}/activities`, requestOrigin).toString()}
+            />
+          ) : null}
 
           <NavigoRotationImportPanel studyId={studyId} />
 
@@ -112,20 +124,6 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
   );
 }
 
-function ParticipantLinkPanel({ participantId, token }: { participantId?: string; token: string }) {
-  const path = `/p/${encodeURIComponent(token)}/activities`;
-  const message = `Hola, gracias por participar en el estudio Navigo Homme. Para realizar tus evaluaciones de fragancia a las 2, 4 y 8 horas, entra a este enlace: ${path}. Por favor conserva este mensaje y realiza cada evaluacion cuando corresponda.`;
-
-  return (
-    <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-      <p className="text-sm font-semibold text-emerald-900">Link participante listo</p>
-      <p className="mt-2 break-all font-mono text-sm text-emerald-950">{path}</p>
-      <p className="mt-3 text-sm leading-6 text-emerald-900">{message}</p>
-      {participantId ? <p className="mt-2 text-xs text-emerald-800">Participante actualizado: {participantId}</p> : null}
-    </section>
-  );
-}
-
 function ParticipantRow({
   participant,
   selectedToken,
@@ -139,6 +137,8 @@ function ParticipantRow({
 }) {
   const canStart = participant.status === "APPROVED" && participant.confirmation && participant.rotationReady;
   const pendingMessage = participant.rotation.startPendingMessage;
+  const t0Completed = participant.activities.some((activity) => activity.code === "T0_SALON" && activity.status === "COMPLETED");
+  const measurementQuestions = createNavigoMeasurementDefinition().questions;
 
   return (
     <article className="grid gap-5 p-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)_minmax(300px,0.95fr)]">
@@ -181,17 +181,31 @@ function ParticipantRow({
             Hora base T0
             <input
               className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-950"
-              defaultValue={formatDateTimeLocal(participant.applicationStartedAt ?? new Date(), timeZoneIana)}
+              defaultValue={formatNavigoDateTimeLocal(participant.applicationStartedAt ?? new Date(), timeZoneIana)}
               name="applicationStartedAt"
               type="datetime-local"
             />
+            <input name="timeZoneIana" type="hidden" value={timeZoneIana} />
           </label>
+          <details className="rounded-md border border-zinc-200 bg-white p-3" open={!t0Completed}>
+            <summary className="cursor-pointer text-sm font-semibold text-teal-700">
+              {t0Completed ? "Editar T0 AP1-AP7" : "Capturar T0 AP1-AP7"}
+            </summary>
+            <p className="mt-2 text-xs leading-5 text-zinc-600">
+              T0 se captura en salon por el equipo interno. No requiere selfie de participante.
+            </p>
+            <div className="mt-4 space-y-4">
+              {measurementQuestions.map((question, index) => (
+                <AdminT0QuestionControl index={index + 1} key={question.id} question={question} />
+              ))}
+            </div>
+          </details>
           <button
             className="inline-flex w-full justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
             disabled={!canStart}
             type="submit"
           >
-            {participant.applicationStartedAt ? "Actualizar T0 / generar link" : "Iniciar T0"}
+            {participant.applicationStartedAt ? "Editar T0 / generar link" : "Capturar T0 / generar link"}
           </button>
         </form>
         {!canStart ? (
@@ -343,6 +357,9 @@ function ActivitySummary({
       <p className="mt-1 text-xs text-zinc-500">
         Real: {activity?.actualCompletedAt ? formatDate(activity.actualCompletedAt, timeZoneIana) : "Sin captura"}
       </p>
+      {code === "T0_SALON" ? (
+        <p className="mt-2 text-xs text-zinc-500">T0 en salon · Respuestas {activity?.responseCount ?? 0}/7</p>
+      ) : null}
       {code !== "T0_SALON" ? (
         <p className="mt-2 text-xs text-zinc-500">
           Selfies {activity?.evidenceCount ?? 0} · Respuestas {activity?.responseCount ?? 0}/7
@@ -376,19 +393,36 @@ function formatDate(value: Date, timeZoneIana: string): string {
   }).format(value);
 }
 
-function formatDateTimeLocal(value: Date, timeZoneIana: string): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    day: "2-digit",
-    hour: "2-digit",
-    hour12: false,
-    minute: "2-digit",
-    month: "2-digit",
-    timeZone: timeZoneIana,
-    year: "numeric"
-  }).formatToParts(value);
-  const read = (type: string) => parts.find((part) => part.type === type)?.value ?? "00";
-
-  return `${read("year")}-${read("month")}-${read("day")}T${read("hour")}:${read("minute")}`;
+function AdminT0QuestionControl({ index, question }: { index: number; question: QuestionnaireQuestion }) {
+  return (
+    <fieldset className="rounded-md border border-zinc-200 p-3">
+      <legend className="px-1 text-xs font-semibold text-teal-700">AP{index}</legend>
+      <p className="text-sm font-semibold text-zinc-950">{question.text}</p>
+      {question.type === "single_choice" ? (
+        <div className="mt-3 space-y-2">
+          {question.options.map((option) => (
+            <label className="flex items-center gap-2 text-sm text-zinc-800" key={option.value}>
+              <input name={question.id} required={question.required} type="radio" value={option.value} />
+              {option.label}
+            </label>
+          ))}
+        </div>
+      ) : null}
+      {question.type === "scale" ? (
+        <div className="mt-3 grid grid-cols-5 gap-2">
+          {Array.from({ length: question.max - question.min + 1 }, (_, offset) => question.min + offset).map((value) => (
+            <label
+              className="flex flex-col items-center gap-1 rounded-md border border-zinc-200 px-2 py-2 text-xs text-zinc-800"
+              key={value}
+            >
+              <input name={question.id} required={question.required} type="radio" value={value} />
+              {value}
+            </label>
+          ))}
+        </div>
+      ) : null}
+    </fieldset>
+  );
 }
 
 const labelClass = "flex flex-col gap-1 text-sm font-medium text-zinc-700";

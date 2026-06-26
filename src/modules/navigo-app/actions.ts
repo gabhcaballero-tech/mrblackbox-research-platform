@@ -10,7 +10,12 @@ import {
   type NavigoActionResult,
   type NavigoSignedActivityUpload
 } from "./repository";
-import { parseNavigoRotationImportText, type NavigoRotationImportRowInput } from "./service";
+import {
+  parseNavigoDateTimeLocal,
+  parseNavigoRotationImportText,
+  type NavigoAnswerInput,
+  type NavigoRotationImportRowInput
+} from "./service";
 import type { NavigoRotationImportActionState } from "./rotation-import-state";
 import type { EvidenceUploadMetadata } from "@/modules/participant-portal/evidence-storage";
 
@@ -22,11 +27,14 @@ export async function startNavigoT0Action(studyId: string, studyParticipantId: s
     redirectWithNavigoMessage(studyId, { error: foundation.message });
   }
 
-  const applicationStartedAt = parseApplicationStartedAt(formData.get("applicationStartedAt"));
+  const timeZoneIana = String(formData.get("timeZoneIana") ?? "America/Mexico_City");
+  const applicationStartedAt = parseApplicationStartedAt(formData.get("applicationStartedAt"), timeZoneIana);
+  const t0Answers = parseNavigoAnswersFromFormData(formData);
   const result = await createNavigoAppRepository().startT0({
     actorUserId: actor.id,
     applicationStartedAt,
-    studyParticipantId
+    studyParticipantId,
+    t0Answers
   });
 
   if (!result.ok) {
@@ -314,20 +322,32 @@ export async function submitNavigoActivityResponsesAction(
   redirect(`/p/${encodeURIComponent(token)}/activities?message=${encodeURIComponent("Evaluacion registrada correctamente.")}`);
 }
 
-function parseApplicationStartedAt(value: FormDataEntryValue | null): Date {
+function parseApplicationStartedAt(value: FormDataEntryValue | null, timeZoneIana: string): Date {
   const raw = String(value ?? "").trim();
 
   if (!raw) {
     return new Date();
   }
 
-  const parsed = new Date(raw);
+  const parsed = parseNavigoDateTimeLocal(raw, timeZoneIana) ?? new Date(raw);
 
   if (Number.isNaN(parsed.getTime())) {
     return new Date();
   }
 
   return parsed;
+}
+
+function parseNavigoAnswersFromFormData(formData: FormData): NavigoAnswerInput {
+  const answers: NavigoAnswerInput = {};
+
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith("AP")) {
+      answers[key] = value;
+    }
+  }
+
+  return answers;
 }
 
 function parseToken(tokenInput: string): string {

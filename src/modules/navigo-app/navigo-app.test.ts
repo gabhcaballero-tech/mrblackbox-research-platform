@@ -8,12 +8,14 @@ import {
   createNavigoScheduleSeeds,
   buildNavigoActivityTimeline,
   buildNavigoStartT0PendingMessage,
+  formatNavigoDateTimeLocal,
   hashNavigoMeasurementDefinition,
   hashToken,
   NAVIGO_ACTIVITY_CODES,
   NAVIGO_APP_DEFAULT_TIME_ZONE,
   navigoActivityLabel,
   normalizeNavigoRotationCode,
+  parseNavigoDateTimeLocal,
   parseNavigoRotationImportText,
   prepareNavigoParticipantActivities,
   createNavigoAppRepository,
@@ -21,6 +23,7 @@ import {
   validateNavigoMeasurementAnswers
 } from "./index";
 import { DETERGENTS_STUDY_CODE, NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
+import { resolveRequestOrigin } from "@/shared/utils/request-origin";
 
 describe("navigo app schema foundation", () => {
   it("adds optional ActivitySchedule.code and composite uniqueness by study", () => {
@@ -367,6 +370,7 @@ describe("navigo app MVP rules", () => {
   });
 
   it("keeps participant labels blind and token hashes deterministic", () => {
+    expect(navigoActivityLabel("T0_SALON")).toBe("Evaluacion 0 / T0 en salon");
     expect(navigoActivityLabel("T2_HORAS")).toBe("Evaluacion 2 horas");
     expect(hashToken("token-123")).toBe(hashToken("token-123"));
     expect(hashToken("token-123")).not.toBe("token-123");
@@ -399,6 +403,7 @@ describe("navigo app MVP rules", () => {
   it("adds visible rotation preparation UI without exposing real product names to participants", () => {
     const adminPage = readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "page.tsx");
     const participantPage = readWorkspaceFile("src", "app", "p", "[token]", "activities", "page.tsx");
+    const participantShell = readWorkspaceFile("src", "shared", "ui", "PublicParticipantShell.tsx");
 
     expect(readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "_components", "NavigoRotationImportPanel.tsx")).toContain("Importar rotacion");
     expect(adminPage).toContain("Preparacion de rotacion");
@@ -406,6 +411,61 @@ describe("navigo app MVP rules", () => {
     expect(adminPage).not.toContain("Codigo aplicacion / kit ambos brazos");
     expect(participantPage).toContain("Primera fragancia");
     expect(participantPage).not.toContain("realName");
+    expect(participantShell).not.toContain("Administracion");
+    expect(participantShell).not.toContain("Campo");
+  });
+
+  it("builds participant links as absolute URLs in the admin panel", () => {
+    const adminPage = readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "page.tsx");
+    const linkPanel = readWorkspaceFile(
+      "src",
+      "app",
+      "admin",
+      "studies",
+      "[studyId]",
+      "navigo-app",
+      "_components",
+      "ParticipantLinkPanel.tsx"
+    );
+
+    expect(adminPage).toContain("resolveRequestOrigin");
+    expect(adminPage).toContain("new URL(`/p/${encodeURIComponent(query.token)}/activities`, requestOrigin).toString()");
+    expect(linkPanel).toContain("Copiar link");
+    expect(linkPanel).toContain("Abrir link");
+    expect(linkPanel).toContain("${url}");
+  });
+
+  it("resolves absolute origin from forwarded headers with local fallback", () => {
+    expect(
+      resolveRequestOrigin(
+        new Headers({
+          "x-forwarded-host": "mrblackbox-research-platform.vercel.app",
+          "x-forwarded-proto": "https"
+        }),
+        {}
+      )
+    ).toBe("https://mrblackbox-research-platform.vercel.app");
+    expect(resolveRequestOrigin(new Headers({ host: "localhost:3000" }), {})).toBe("http://localhost:3000");
+  });
+
+  it("shows T0 in admin and participant app without public capture", () => {
+    const adminPage = readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "page.tsx");
+    const participantPage = readWorkspaceFile("src", "app", "p", "[token]", "activities", "page.tsx");
+    const repository = readWorkspaceFile("src", "modules", "navigo-app", "repository.ts");
+
+    expect(adminPage).toContain("Capturar T0 AP1-AP7");
+    expect(adminPage).toContain("T0 se captura en salon");
+    expect(participantPage).toContain("Evaluación 0 — Completada en salón");
+    expect(repository).toContain("T0 fue capturada en salon por el equipo interno.");
+  });
+
+  it("converts Navigo datetime-local values using the study time zone", () => {
+    const parsed = parseNavigoDateTimeLocal("2026-06-26T09:33", "America/Mexico_City");
+
+    expect(parsed?.toISOString()).toBe("2026-06-26T15:33:00.000Z");
+    expect(formatNavigoDateTimeLocal(new Date("2026-06-26T15:33:00.000Z"), "America/Mexico_City")).toBe(
+      "2026-06-26T09:33"
+    );
   });
 
   it("creates and parses the rotation import template for CSV or TSV", () => {

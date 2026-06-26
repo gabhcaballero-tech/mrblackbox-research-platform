@@ -2,9 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { NavigoActivityCapture } from "@/app/p/[token]/activities/_components/NavigoActivityCapture";
 import { createNavigoAppRepository, navigoActivityLabel } from "@/modules/navigo-app";
-import { AppShell } from "@/shared/ui/AppShell";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { PageHeader } from "@/shared/ui/PageHeader";
+import { PublicParticipantShell } from "@/shared/ui/PublicParticipantShell";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { participantTokenSchema } from "@/shared/validation/participant";
 
@@ -36,7 +36,7 @@ export default async function NavigoActivityPage({ params, searchParams }: Navig
 
   if (!result.ok) {
     return (
-      <AppShell>
+      <PublicParticipantShell>
         <PageHeader eyebrow="App Navigo" title="Evaluacion no disponible" />
         <EmptyState
           action={
@@ -47,14 +47,14 @@ export default async function NavigoActivityPage({ params, searchParams }: Navig
           title="No disponible"
           description={result.message}
         />
-      </AppShell>
+      </PublicParticipantShell>
     );
   }
 
   const { data } = result;
 
   return (
-    <AppShell>
+    <PublicParticipantShell>
       <PageHeader
         actions={<StatusBadge status="ready">{data.folio}</StatusBadge>}
         description={`Horario ideal: ${formatDate(data.activity.scheduledAt, data.timeZoneIana)}. No veras nombres reales de productos; usa las etiquetas de primera y segunda fragancia.`}
@@ -90,7 +90,7 @@ export default async function NavigoActivityPage({ params, searchParams }: Navig
         selfieCount={data.selfieCount}
         token={parsedToken.data}
       />
-    </AppShell>
+    </PublicParticipantShell>
   );
 }
 

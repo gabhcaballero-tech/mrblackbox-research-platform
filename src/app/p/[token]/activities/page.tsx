@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createNavigoAppRepository, navigoActivityLabel } from "@/modules/navigo-app";
-import { AppShell } from "@/shared/ui/AppShell";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { PageHeader } from "@/shared/ui/PageHeader";
+import { PublicParticipantShell } from "@/shared/ui/PublicParticipantShell";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { participantTokenSchema } from "@/shared/validation/participant";
 
@@ -33,20 +33,20 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
 
   if (!result.ok) {
     return (
-      <AppShell>
+      <PublicParticipantShell>
         <PageHeader eyebrow="App Navigo" title="Evaluaciones de fragancia" />
         <EmptyState title="No disponible" description={result.message} />
-      </AppShell>
+      </PublicParticipantShell>
     );
   }
 
   const { data } = result;
 
   return (
-    <AppShell>
+    <PublicParticipantShell>
       <PageHeader
         actions={<StatusBadge status="ready">{data.folio}</StatusBadge>}
-        description="Aqui veras tus evaluaciones de fragancia a 2, 4 y 8 horas. Realiza cada toma cuando este disponible."
+        description="Aquí verás tus evaluaciones de fragancia a 0, 2, 4 y 8 horas. Realiza cada toma cuando esté disponible."
         eyebrow="App Navigo"
         title="Evaluaciones de fragancia"
       />
@@ -82,14 +82,15 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
             description="Cuando el equipo registre tu T0, aqui apareceran las tomas de 2, 4 y 8 horas."
           />
         ) : (
-          <section className="grid gap-4 md:grid-cols-3">
+          <section className="grid gap-4 md:grid-cols-4">
             {data.timeline
-              .filter((activity) => activity.code !== "T0_SALON")
               .map((activity) => (
                 <article className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm" key={activity.id}>
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <h2 className="text-lg font-semibold text-zinc-950">{navigoActivityLabel(activity.code)}</h2>
+                      <h2 className="text-lg font-semibold text-zinc-950">
+                        {activity.code === "T0_SALON" ? "Evaluación 0 — Completada en salón" : navigoActivityLabel(activity.code)}
+                      </h2>
                       <p className="mt-2 text-sm text-zinc-600">{availabilityMessage(activity.availability.reason)}</p>
                     </div>
                     <StatusBadge status={activity.availability.canCapture ? "ready" : "planned"}>
@@ -110,7 +111,7 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
                       <dd className="mt-1 text-zinc-950">{formatDate(activity.availableUntil, data.timeZoneIana)}</dd>
                     </div>
                   </dl>
-                  {activity.availability.canCapture ? (
+                  {activity.code !== "T0_SALON" && activity.availability.canCapture ? (
                     <Link
                       className="mt-5 inline-flex w-full justify-center rounded-md bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-800"
                       href={`/p/${encodeURIComponent(parsedToken.data)}/activities/${activity.id}`}
@@ -123,7 +124,7 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
           </section>
         )}
       </div>
-    </AppShell>
+    </PublicParticipantShell>
   );
 }
 
@@ -137,7 +138,7 @@ function availabilityMessage(reason: string): string {
     case "AFTER_WINDOW":
       return "Esta evaluacion esta fuera de la ventana permitida. Contacta a tu reclutador.";
     case "ALREADY_COMPLETED":
-      return "Evaluacion registrada correctamente.";
+      return "Evaluación registrada correctamente.";
     default:
       return "Completa primero la evaluacion anterior.";
   }

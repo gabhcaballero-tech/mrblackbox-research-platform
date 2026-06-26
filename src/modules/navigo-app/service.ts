@@ -15,6 +15,7 @@ export type NavigoScheduleRecord = {
   code: NavigoActivityCode;
   id: string;
   offsetMinutes: number;
+  questionnaireVersionId?: string | null;
   sortOrder: number;
   status: "ACTIVE" | "ARCHIVED" | "INACTIVE";
   type: "INTERNAL_FOLLOWUP" | "QUESTIONNAIRE_MEASUREMENT";
@@ -340,7 +341,7 @@ export function validateNavigoMeasurementAnswers({
 export function navigoActivityLabel(code: NavigoActivityCode): string {
   switch (code) {
     case "T0_SALON":
-      return "T0 en salon";
+      return "Evaluacion 0 / T0 en salon";
     case "T2_HORAS":
       return "Evaluacion 2 horas";
     case "T4_HORAS":
@@ -348,6 +349,55 @@ export function navigoActivityLabel(code: NavigoActivityCode): string {
     case "T8_HORAS":
       return "Evaluacion 8 horas";
   }
+}
+
+export function parseNavigoDateTimeLocal(value: unknown, timeZoneIana: string | null | undefined): Date | null {
+  const raw = String(value ?? "").trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(raw);
+
+  if (!match) {
+    return null;
+  }
+
+  const [, year, month, day, hour, minute] = match;
+  const localUtcGuess = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
+  const timeZone = resolveNavigoTimeZone(timeZoneIana);
+  const offset = getTimeZoneOffsetMs(timeZone, new Date(localUtcGuess));
+
+  return new Date(localUtcGuess - offset);
+}
+
+export function formatNavigoDateTimeLocal(value: Date, timeZoneIana: string | null | undefined): string {
+  const timeZone = resolveNavigoTimeZone(timeZoneIana);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
+    month: "2-digit",
+    timeZone,
+    year: "numeric"
+  }).formatToParts(value);
+  const read = (type: string) => parts.find((part) => part.type === type)?.value ?? "00";
+
+  return `${read("year")}-${read("month")}-${read("day")}T${read("hour")}:${read("minute")}`;
+}
+
+function getTimeZoneOffsetMs(timeZoneIana: string, value: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
+    month: "2-digit",
+    second: "2-digit",
+    timeZone: timeZoneIana,
+    year: "numeric"
+  }).formatToParts(value);
+  const read = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? "0");
+  const asUtc = Date.UTC(read("year"), read("month") - 1, read("day"), read("hour"), read("minute"), read("second"));
+
+  return asUtc - value.getTime();
 }
 
 export function normalizeNavigoRotationCode(value: unknown): string {
