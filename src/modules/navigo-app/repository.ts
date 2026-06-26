@@ -65,6 +65,9 @@ export type NavigoParticipantListItem = {
     name: string;
     phone: string | null;
   };
+  registeredSelfie: {
+    signedUrl: string;
+  } | null;
   rotation: {
     checklist: NavigoRotationChecklist;
     leftCode: string | null;
@@ -77,9 +80,25 @@ export type NavigoParticipantListItem = {
 };
 
 export type NavigoActivityListItem = NavigoActivityRecord & {
+  availability?: ReturnType<typeof buildNavigoActivityTimeline>[number]["availability"];
   code: NavigoActivityCode;
+  activitySelfie: {
+    id: string;
+    internalNote: string | null;
+    rejectionReason: string | null;
+    reviewStatus: "APPROVED" | "PENDING" | "REJECTED";
+    reviewedAt: Date | null;
+    signedUrl: string | null;
+    uploadedAt: Date;
+  } | null;
   evidenceCount: number;
   existingResponses: Record<string, unknown>;
+  readableResponses: Array<{
+    label: string;
+    questionId: string;
+    text: string;
+    value: string;
+  }>;
   responseCount: number;
 };
 
@@ -269,6 +288,14 @@ export type NavigoAppRepository = {
     storage?: EvidenceStorageClient;
     token: string;
   }) => Promise<NavigoActionResult<NavigoSignedActivityUpload>>;
+  reviewActivityIdentity: (input: {
+    actorUserId: string;
+    evidenceId: string;
+    internalNote?: string | null;
+    rejectionReason?: string | null;
+    status: "APPROVED" | "PENDING" | "REJECTED";
+    studyId: string;
+  }) => Promise<NavigoMaintenanceResult>;
   resetParticipantApp: (input: {
     actorUserId: string;
     reason: string;
@@ -362,6 +389,13 @@ const activitySelect = {
   participantActivityEvidence: {
     select: {
       id: true,
+      internalNote: true,
+      privateStorageKey: true,
+      rejectionReason: true,
+      reviewStatus: true,
+      reviewedAt: true,
+      storageBucket: true,
+      uploadedAt: true,
       type: true
     }
   },
@@ -506,7 +540,17 @@ type ParticipantRecord = {
 type ActivityRecord = NavigoActivityRecord & {
   activitySchedule: NavigoScheduleRecord & { questionnaireVersionId: string | null };
   id: string;
-  participantActivityEvidence: Array<{ id: string; type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION" }>;
+  participantActivityEvidence: Array<{
+    id: string;
+    internalNote: string | null;
+    privateStorageKey: string;
+    rejectionReason: string | null;
+    reviewStatus: "APPROVED" | "PENDING" | "REJECTED";
+    reviewedAt: Date | null;
+    storageBucket: string;
+    type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION";
+    uploadedAt: Date;
+  }>;
   responses: Array<{ answerJson: unknown; questionId: string }>;
 };
 type ConfirmationWithParticipant = {
@@ -936,8 +980,10 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         }
       })) as ParticipantRecord[];
 
+      const storage = createSupabaseEvidenceStorageClient();
+
       return {
-        participants: participants.map((participant) => toDashboardParticipant(participant, now)),
+        participants: await Promise.all(participants.map((participant) => toDashboardParticipant(participant, now, storage))),
         study,
         timeZoneIana: resolveNavigoTimeZone(study.timeZoneIana)
       };
@@ -1479,6 +1525,58 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           storageBucket: PARTICIPANT_EVIDENCE_BUCKET,
           token: signed.token
         },
+        ok: true
+      };
+    },
+
+    async reviewActivityIdentity(input) {
+      if (input.status === "REJECTED" && !input.rejectionReason?.trim()) {
+        return { message: "Captura el motivo cuando la identidad no coincide.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+      const evidence = (await prisma.participantActivityEvidence.findFirst?.({
+        select: {
+          id: true,
+          participantActivity: {
+            select: {
+              studyParticipant: {
+                select: {
+                  studyId: true
+                }
+              }
+            }
+          },
+          type: true
+        },
+        where: {
+          id: input.evidenceId,
+          type: "SELFIE_IDENTIFICATION"
+        }
+      })) as { id: string; participantActivity: { studyParticipant: { studyId: string } }; type: "SELFIE_IDENTIFICATION" } | null;
+
+      if (!evidence || evidence.participantActivity.studyParticipant.studyId !== input.studyId) {
+        return { message: "No encontramos la selfie de esta toma para el estudio.", ok: false };
+      }
+
+      await prisma.participantActivityEvidence.update?.({
+        data: {
+          internalNote: input.status === "PENDING" ? (input.internalNote?.trim() || "Requiere revisión manual de identidad.") : input.internalNote?.trim() || null,
+          rejectionReason: input.status === "REJECTED" ? input.rejectionReason?.trim() : null,
+          reviewStatus: input.status,
+          reviewedAt: new Date(),
+          reviewedByUserId: input.actorUserId
+        },
+        where: { id: input.evidenceId }
+      });
+
+      return {
+        message:
+          input.status === "APPROVED"
+            ? "Identidad marcada como coincidente."
+            : input.status === "REJECTED"
+              ? "Incidencia de identidad registrada."
+              : "Identidad marcada para revisión.",
         ok: true
       };
     },
@@ -2088,13 +2186,100 @@ async function createRegisteredSelfiePreview({
   return { signedUrl };
 }
 
+async function createActivitySelfieReadUrl({
+  evidence,
+  storage
+}: {
+  evidence: ActivityRecord["participantActivityEvidence"][number];
+  storage: EvidenceStorageClient;
+}): Promise<string | null> {
+  try {
+    return await storage.createSignedReadUrl({
+      bucket: evidence.storageBucket,
+      expiresInSeconds: 300,
+      privateStorageKey: evidence.privateStorageKey
+    });
+  } catch (error) {
+    const code = error instanceof Error ? error.name : "UNKNOWN";
+    console.error(
+      `navigo activity selfie signed read failed: step=createSignedReadUrl bucket=${evidence.storageBucket} code=${code}`
+    );
+    return null;
+  }
+}
+
+function createReadableNavigoResponses(
+  responses: Array<{ answerJson: unknown; questionId: string }>
+): NavigoActivityListItem["readableResponses"] {
+  const questions = createNavigoMeasurementDefinition().questions;
+
+  return questions.map((question) => {
+    const response = responses.find((item) => item.questionId === question.id);
+    const value = readResponseValue(response?.answerJson);
+
+    return {
+      label: value === null ? "Sin respuesta" : readableNavigoAnswerLabel(question, value),
+      questionId: question.id,
+      text: question.text,
+      value: value === null ? "" : String(value)
+    };
+  });
+}
+
+function readableNavigoAnswerLabel(question: ReturnType<typeof createNavigoMeasurementDefinition>["questions"][number], value: string | number): string {
+  if (question.type === "single_choice") {
+    return question.options.find((option) => option.value === value)?.label ?? String(value);
+  }
+
+  if (question.type === "scale") {
+    if (question.id === "AP3_INTENSIDAD_PRIMERA" || question.id === "AP4_INTENSIDAD_SEGUNDA") {
+      return navigoIntensityLabel(Number(value));
+    }
+
+    return `${value} / ${question.max}`;
+  }
+
+  return String(value);
+}
+
+function navigoIntensityLabel(value: number): string {
+  return (
+    {
+      1: "Extremadamente débil",
+      2: "Muy débil",
+      3: "Algo débil",
+      4: "Ni débil, ni fuerte",
+      5: "Algo fuerte",
+      6: "Muy fuerte",
+      7: "Extremadamente fuerte"
+    }[value] ?? String(value)
+  );
+}
+
+function readResponseValue(answer: unknown): string | number | null {
+  if (typeof answer === "object" && answer !== null && "value" in answer) {
+    const value = (answer as { value?: unknown }).value;
+    return typeof value === "string" || typeof value === "number" ? value : null;
+  }
+
+  return null;
+}
+
 export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-function toDashboardParticipant(participant: ParticipantRecord, now: Date): NavigoParticipantListItem {
-  const activities = (participant.activities ?? []).map(toActivityListItem);
+async function toDashboardParticipant(
+  participant: ParticipantRecord,
+  now: Date,
+  storage: EvidenceStorageClient
+): Promise<NavigoParticipantListItem> {
+  const activities = await Promise.all((participant.activities ?? []).map((activity) => toActivityListItem(activity, storage)));
   const timeline = buildNavigoActivityTimeline({ activities, now });
+  const activitiesWithAvailability = activities.map((activity) => ({
+    ...activity,
+    availability: timeline.find((item) => item.id === activity.id)?.availability
+  }));
   const rotation = buildParticipantRotationSummary(participant);
   const alert =
     timeline.find((activity) => activity.availability.reason === "AFTER_WINDOW")
@@ -2106,7 +2291,7 @@ function toDashboardParticipant(participant: ParticipantRecord, now: Date): Navi
           : "T0 pendiente";
 
   return {
-    activities,
+    activities: activitiesWithAvailability,
     alert,
     applicationStartedAt: participant.applicationStartedAt,
     confirmation: participant.participantConfirmation,
@@ -2117,6 +2302,10 @@ function toDashboardParticipant(participant: ParticipantRecord, now: Date): Navi
       name: participant.participantProfile.name,
       phone: participant.participantProfile.phone
     },
+    registeredSelfie: await createRegisteredSelfiePreview({
+      participant,
+      storage
+    }),
     rotation,
     rotationReady: rotation.ready,
     participantLinkToken: participant.accessTokens?.[0]?.id ?? null,
@@ -2747,13 +2936,29 @@ function buildParticipantRotationSummary(participant: ParticipantRecord): Navigo
   };
 }
 
-function toActivityListItem(activity: ActivityRecord): NavigoActivityListItem {
+async function toActivityListItem(activity: ActivityRecord, storage: EvidenceStorageClient): Promise<NavigoActivityListItem> {
   const record = toNavigoActivityRecord(activity);
+  const activitySelfie = activity.participantActivityEvidence.find((evidence) => evidence.type === "SELFIE_IDENTIFICATION") ?? null;
   return {
     ...record,
+    activitySelfie: activitySelfie
+      ? {
+          id: activitySelfie.id,
+          internalNote: activitySelfie.internalNote,
+          rejectionReason: activitySelfie.rejectionReason,
+          reviewStatus: activitySelfie.reviewStatus,
+          reviewedAt: activitySelfie.reviewedAt,
+          signedUrl: await createActivitySelfieReadUrl({
+            evidence: activitySelfie,
+            storage
+          }),
+          uploadedAt: activitySelfie.uploadedAt
+        }
+      : null,
     code: activity.activitySchedule.code,
     evidenceCount: activity.participantActivityEvidence.length,
     existingResponses: Object.fromEntries(activity.responses.map((response) => [response.questionId, response.answerJson])),
+    readableResponses: createReadableNavigoResponses(activity.responses),
     responseCount: countNavigoMeasurementResponses(activity.responses)
   };
 }

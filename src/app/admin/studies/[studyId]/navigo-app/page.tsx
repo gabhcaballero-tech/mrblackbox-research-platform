@@ -6,6 +6,7 @@ import {
   deleteNavigoParticipantStagesAction,
   generateNavigoParticipantLinkAction,
   resetNavigoParticipantAppAction,
+  reviewNavigoActivityIdentityAction,
   startNavigoT0Action
 } from "@/modules/navigo-app/actions";
 import {
@@ -187,6 +188,18 @@ function ParticipantRow({
               activity={participant.activities.find((item) => item.code === code)}
               code={code as NavigoActivityListItem["code"]}
               key={code}
+              timeZoneIana={timeZoneIana}
+            />
+          ))}
+        </div>
+        <div className="space-y-3">
+          {["T0_SALON", "T2_HORAS", "T4_HORAS", "T8_HORAS"].map((code) => (
+            <ActivityDetail
+              activity={participant.activities.find((item) => item.code === code)}
+              code={code as NavigoActivityListItem["code"]}
+              key={code}
+              registeredSelfie={participant.registeredSelfie}
+              studyId={studyId}
               timeZoneIana={timeZoneIana}
             />
           ))}
@@ -457,6 +470,205 @@ function ChecklistItem({
   );
 }
 
+function ActivityDetail({
+  activity,
+  code,
+  registeredSelfie,
+  studyId,
+  timeZoneIana
+}: {
+  activity?: NavigoActivityListItem;
+  code: NavigoActivityListItem["code"];
+  registeredSelfie: NavigoParticipantListItem["registeredSelfie"];
+  studyId: string;
+  timeZoneIana: string;
+}) {
+  const isT0 = code === "T0_SALON";
+
+  return (
+    <details className="rounded-md border border-zinc-200 bg-white p-3">
+      <summary className="cursor-pointer text-sm font-semibold text-teal-700">
+        Ver detalle · {navigoActivityLabel(code)}
+      </summary>
+      <div className="mt-4 space-y-4">
+        <dl className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+          <DetailItem label="Estado" value={activity ? navigoOperationalStatusLabel(activity) : "Pendiente"} />
+          <DetailItem label="Hora esperada" value={activity ? formatDate(activity.scheduledAt, timeZoneIana) : "Pendiente"} />
+          <DetailItem
+            label="Hora real"
+            value={
+              activity?.actualCompletedAt
+                ? formatDate(activity.actualCompletedAt, timeZoneIana)
+                : activity?.actualStartedAt
+                  ? formatDate(activity.actualStartedAt, timeZoneIana)
+                  : "Sin captura"
+            }
+          />
+          <DetailItem label="Respuestas" value={`${activity?.responseCount ?? 0}/7`} />
+        </dl>
+
+        {isT0 ? (
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            <p className="font-semibold">Identidad en salón: {identityStatusLabel(activity?.identityStatus)}</p>
+            {activity?.identityStatus === "REJECTED" ? (
+              <p className="mt-2 font-semibold text-rose-800">Incidencia de identidad en T0.</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        <ActivityResponses activity={activity} />
+
+        <ActivityIdentityReview
+          activity={activity}
+          isT0={isT0}
+          registeredSelfie={registeredSelfie}
+          studyId={studyId}
+          timeZoneIana={timeZoneIana}
+        />
+      </div>
+    </details>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-zinc-200 bg-zinc-50 p-2">
+      <dt className="font-medium text-zinc-500">{label}</dt>
+      <dd className="mt-1 text-zinc-900">{value}</dd>
+    </div>
+  );
+}
+
+function ActivityResponses({ activity }: { activity?: NavigoActivityListItem }) {
+  return (
+    <section>
+      <h4 className="text-sm font-semibold text-zinc-950">Respuestas AP1 a AP7</h4>
+      {!activity || activity.readableResponses.every((response) => response.value === "") ? (
+        <p className="mt-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
+          Sin respuestas capturadas.
+        </p>
+      ) : (
+        <dl className="mt-3 grid gap-2">
+          {activity.readableResponses.map((response, index) => (
+            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={response.questionId}>
+              <dt className="font-semibold text-zinc-950">AP{index + 1}: {response.text}</dt>
+              <dd className="mt-1 text-zinc-800">{response.label}</dd>
+              {response.value ? <p className="mt-1 text-xs text-zinc-500">Valor interno conservado: {response.value}</p> : null}
+            </div>
+          ))}
+        </dl>
+      )}
+    </section>
+  );
+}
+
+function ActivityIdentityReview({
+  activity,
+  isT0,
+  registeredSelfie,
+  studyId,
+  timeZoneIana
+}: {
+  activity?: NavigoActivityListItem;
+  isT0: boolean;
+  registeredSelfie: NavigoParticipantListItem["registeredSelfie"];
+  studyId: string;
+  timeZoneIana: string;
+}) {
+  const activitySelfie = activity?.activitySelfie ?? null;
+
+  return (
+    <section>
+      <h4 className="text-sm font-semibold text-zinc-950">Revisión visual de identidad</h4>
+      <p className="mt-1 text-xs text-zinc-500">Verificación automática: no configurada. La decisión es manual.</p>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <SelfiePreview title="Selfie registrada del filtro" url={registeredSelfie?.signedUrl ?? null} />
+        {isT0 ? (
+          <SelfiePreview title="Selfie de esta toma" url={null} emptyText="T0 no requiere selfie nueva." />
+        ) : (
+          <SelfiePreview
+            title="Selfie de esta toma"
+            url={activitySelfie?.signedUrl ?? null}
+            emptyText="Selfie pendiente"
+            uploadedAt={activitySelfie?.uploadedAt ? formatDate(activitySelfie.uploadedAt, timeZoneIana) : null}
+          />
+        )}
+      </div>
+
+      {!isT0 && activitySelfie ? (
+        <div className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+          <p className="text-sm font-semibold text-zinc-950">Estado: {identityReviewStatusLabel(activitySelfie)}</p>
+          {activitySelfie.reviewStatus === "REJECTED" ? (
+            <p className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
+              Incidencia de identidad en esta toma.
+            </p>
+          ) : null}
+          {activitySelfie.rejectionReason ? <p className="mt-2 text-sm text-zinc-700">Motivo: {activitySelfie.rejectionReason}</p> : null}
+          {activitySelfie.internalNote ? <p className="mt-1 text-sm text-zinc-700">Nota: {activitySelfie.internalNote}</p> : null}
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            <form action={reviewNavigoActivityIdentityAction.bind(null, studyId, activitySelfie.id, "APPROVED")}>
+              <SubmitButton pendingLabel="Guardando...">Marcar como coincide</SubmitButton>
+            </form>
+            <form action={reviewNavigoActivityIdentityAction.bind(null, studyId, activitySelfie.id, "PENDING")}>
+              <input name="internalNote" type="hidden" value="Requiere revisión manual de identidad." />
+              <SubmitButton pendingLabel="Guardando...">Marcar como requiere revisión</SubmitButton>
+            </form>
+            <form action={reviewNavigoActivityIdentityAction.bind(null, studyId, activitySelfie.id, "REJECTED")} className="space-y-2">
+              <textarea
+                className={inputClass}
+                name="rejectionReason"
+                placeholder="Motivo obligatorio si no coincide"
+                required
+                rows={2}
+              />
+              <SubmitButton pendingLabel="Guardando...">Marcar como no coincide</SubmitButton>
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function SelfiePreview({
+  emptyText = "Sin imagen disponible",
+  title,
+  uploadedAt,
+  url
+}: {
+  emptyText?: string;
+  title: string;
+  uploadedAt?: string | null;
+  url: string | null;
+}) {
+  return (
+    <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+      <p className="text-sm font-semibold text-zinc-950">{title}</p>
+      {uploadedAt ? <p className="mt-1 text-xs text-zinc-500">Capturada: {uploadedAt}</p> : null}
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img alt={title} className="mt-3 max-h-80 w-full rounded-md object-contain" src={url} />
+      ) : (
+        <p className="mt-3 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-600">{emptyText}</p>
+      )}
+    </div>
+  );
+}
+
+function identityReviewStatusLabel(activitySelfie: NonNullable<NavigoActivityListItem["activitySelfie"]>): string {
+  if (activitySelfie.reviewStatus === "APPROVED") {
+    return "Coincide";
+  }
+  if (activitySelfie.reviewStatus === "REJECTED") {
+    return "No coincide";
+  }
+  if (activitySelfie.internalNote?.toLowerCase().includes("requiere revisión")) {
+    return "Requiere revisión";
+  }
+
+  return "Pendiente";
+}
+
 function ActivitySummary({
   activity,
   code,
@@ -497,6 +709,39 @@ function navigoMeasurementProgressLabel(activity?: NavigoActivityListItem): stri
   }
 
   return "Completada";
+}
+
+function navigoOperationalStatusLabel(activity: NavigoActivityListItem): string {
+  if (activity.code !== "T0_SALON") {
+    if (activity.availability?.reason === "AFTER_WINDOW" && activity.status !== "COMPLETED") {
+      return "Requiere llamada";
+    }
+    if ((activity.selfieCount ?? 0) === 0) {
+      return "Selfie pendiente";
+    }
+    if (activity.activitySelfie?.reviewStatus === "REJECTED") {
+      return "Identidad no coincide";
+    }
+    if (activity.activitySelfie?.internalNote?.toLowerCase().includes("requiere revisión")) {
+      return "Requiere revisión de identidad";
+    }
+    if ((activity.responseCount ?? 0) < 7 || activity.status !== "COMPLETED") {
+      return "Respuestas pendientes";
+    }
+    return "Completada";
+  }
+
+  if (activity.availability?.reason === "BEFORE_WINDOW") {
+    return "Aún no disponible";
+  }
+  if (activity.availability?.reason === "AFTER_WINDOW") {
+    return "Fuera de ventana";
+  }
+  if (activity.availability?.canCapture) {
+    return "Disponible";
+  }
+
+  return statusLabel(activity.status);
 }
 
 function statusLabel(status: string) {

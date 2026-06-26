@@ -57,7 +57,7 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
     <PublicParticipantShell>
       <PageHeader
         actions={<StatusBadge status="ready">{data.folio}</StatusBadge>}
-        description="Aquí verás tus evaluaciones de fragancia a 0, 2, 4 y 8 horas. Realiza cada toma cuando esté disponible."
+        description="Aquí verás tus evaluaciones de fragancia a 0, 2, 4 y 8 horas. Realiza cada toma lo más cerca posible del horario recomendado."
         eyebrow="App Navigo"
         title="Evaluaciones de fragancia"
       />
@@ -132,11 +132,10 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
                     <dt className="font-medium text-zinc-500">Disponible desde</dt>
                     <dd className="mt-1 text-zinc-950">{formatDate(activity.availableFrom, data.timeZoneIana)}</dd>
                   </div>
-                  <div>
-                    <dt className="font-medium text-zinc-500">Cierre máximo</dt>
-                    <dd className="mt-1 text-zinc-950">{formatDate(activity.availableUntil, data.timeZoneIana)}</dd>
-                  </div>
                 </dl>
+                <p className="mt-4 rounded-md border border-teal-100 bg-teal-50 px-3 py-2 text-sm text-teal-900">
+                  Realiza esta evaluación lo más cerca posible del horario recomendado.
+                </p>
                 {activity.code === "T0_SALON" && activity.availability.canCapture ? (
                   <Link
                     className="mt-5 inline-flex w-full justify-center rounded-md bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-800"
@@ -181,11 +180,11 @@ function availabilityMessage(reason: string): string {
   switch (reason) {
     case "AVAILABLE":
     case "DUE_SOON":
-      return "Ya puedes realizar esta evaluación.";
+      return "Ya puedes realizar esta evaluación. Hazla lo antes posible.";
     case "BEFORE_WINDOW":
       return "Aún no es momento de realizar esta evaluación.";
     case "AFTER_WINDOW":
-      return "Esta evaluación está fuera de la ventana permitida. Contacta a tu reclutador.";
+      return "Esta evaluación ya no está disponible. Contacta a tu reclutador.";
     case "ALREADY_COMPLETED":
       return "Evaluación registrada correctamente.";
     case "PREVIOUS_REQUIRED":

@@ -594,6 +594,42 @@ describe("navigo app MVP rules", () => {
     expect(activityPage).toContain("fragranceCodes={data.blindLabels}");
   });
 
+  it("shows Navigo admin activity details with readable answers, selfies and manual identity review", () => {
+    const adminPage = readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "page.tsx");
+    const repository = readWorkspaceFile("src", "modules", "navigo-app", "repository.ts");
+    const actions = readWorkspaceFile("src", "modules", "navigo-app", "actions.ts");
+
+    expect(adminPage).toContain("Ver detalle");
+    expect(adminPage).toContain("Respuestas AP1 a AP7");
+    expect(adminPage).toContain("Selfie registrada del filtro");
+    expect(adminPage).toContain("Selfie de esta toma");
+    expect(adminPage).toContain("Revisión visual de identidad");
+    expect(adminPage).toContain("Marcar como coincide");
+    expect(adminPage).toContain("Marcar como no coincide");
+    expect(adminPage).toContain("Marcar como requiere revisión");
+    expect(adminPage).toContain("Incidencia de identidad en esta toma.");
+    expect(adminPage).toContain("Valor interno conservado");
+    expect(adminPage).not.toContain("privateStorageKey");
+    expect(adminPage).not.toContain("storageBucket");
+    expect(repository).toContain("createSignedReadUrl");
+    expect(repository).toContain("readableResponses");
+    expect(repository).toContain("reviewActivityIdentity");
+    expect(actions).toContain("reviewNavigoActivityIdentityAction");
+  });
+
+  it("keeps participant pages from exposing maximum closing times", () => {
+    const activitiesPage = readWorkspaceFile("src", "app", "p", "[token]", "activities", "page.tsx");
+    const activityPage = readWorkspaceFile("src", "app", "p", "[token]", "activities", "[activityId]", "page.tsx");
+
+    expect(activitiesPage).not.toContain("Cierre máximo");
+    expect(activitiesPage).not.toContain("availableUntil, data.timeZoneIana");
+    expect(activitiesPage).toContain("Horario ideal");
+    expect(activitiesPage).toContain("Disponible desde");
+    expect(activitiesPage).toContain("Hazla lo antes posible");
+    expect(activitiesPage).toContain("Esta evaluación ya no está disponible. Contacta a tu reclutador.");
+    expect(activityPage).not.toContain("Cierre máximo");
+  });
+
   it("converts Navigo datetime-local values using the study time zone", () => {
     const parsed = parseNavigoDateTimeLocal("2026-06-26T09:33", "America/Mexico_City");
 

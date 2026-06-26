@@ -445,6 +445,33 @@ export async function confirmNavigoT0IdentityAction(
   });
 }
 
+export async function reviewNavigoActivityIdentityAction(
+  studyId: string,
+  evidenceId: string,
+  status: "APPROVED" | "PENDING" | "REJECTED",
+  formData: FormData
+) {
+  const actor = await requireCapability("screening:review");
+  const rejectionReason = String(formData.get("rejectionReason") ?? "").trim();
+  const internalNote = String(formData.get("internalNote") ?? "").trim();
+
+  const result = await createNavigoAppRepository().reviewActivityIdentity({
+    actorUserId: actor.id,
+    evidenceId,
+    internalNote,
+    rejectionReason,
+    status,
+    studyId
+  });
+
+  if (!result.ok) {
+    redirectWithNavigoMessage(studyId, { error: result.message });
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+  redirectWithNavigoMessage(studyId, { message: result.message });
+}
+
 function parseApplicationStartedAt(value: FormDataEntryValue | null, timeZoneIana: string): Date | null {
   const raw = String(value ?? "").trim();
 
