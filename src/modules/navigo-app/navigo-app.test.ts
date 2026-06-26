@@ -341,6 +341,50 @@ describe("navigo app MVP rules", () => {
     });
   });
 
+  it("does not let test mode skip identity incidents from T0", () => {
+    const timeline = buildNavigoActivityTimeline({
+      activities: navigoActivityRecords({ t0IdentityStatus: "REJECTED" }),
+      now: new Date("2026-06-25T15:20:00.000Z"),
+      testMode: true
+    });
+
+    expect(timeline.find((activity) => activity.code === "T2_HORAS")?.availability).toMatchObject({
+      canCapture: false,
+      reason: "IDENTITY_REVIEW_REQUIRED"
+    });
+  });
+
+  it("blocks measurements with pending or rejected identity review and allows approved review", () => {
+    const pending = buildNavigoActivityTimeline({
+      activities: navigoActivityRecords({ t2Completed: false, t2IdentityReviewStatus: "PENDING", t2SelfieCount: 1 }),
+      now: new Date("2026-06-25T16:40:00.000Z"),
+      testMode: true
+    });
+    const rejected = buildNavigoActivityTimeline({
+      activities: navigoActivityRecords({ t2Completed: false, t2IdentityReviewStatus: "REJECTED", t2SelfieCount: 1 }),
+      now: new Date("2026-06-25T16:40:00.000Z"),
+      testMode: true
+    });
+    const approved = buildNavigoActivityTimeline({
+      activities: navigoActivityRecords({ t2Completed: false, t2IdentityReviewStatus: "APPROVED", t2SelfieCount: 1 }),
+      now: new Date("2026-06-25T16:40:00.000Z"),
+      testMode: true
+    });
+
+    expect(pending.find((activity) => activity.code === "T2_HORAS")?.availability).toMatchObject({
+      canCapture: false,
+      reason: "IDENTITY_REVIEW_REQUIRED"
+    });
+    expect(rejected.find((activity) => activity.code === "T2_HORAS")?.availability).toMatchObject({
+      canCapture: false,
+      reason: "IDENTITY_REVIEW_REQUIRED"
+    });
+    expect(approved.find((activity) => activity.code === "T2_HORAS")?.availability).toMatchObject({
+      canCapture: true,
+      reason: "AVAILABLE"
+    });
+  });
+
   it("does not allow skipping T4 or T8 when previous measurements are pending", () => {
     const t4Blocked = buildNavigoActivityTimeline({
       activities: navigoActivityRecords(),
@@ -607,7 +651,7 @@ describe("navigo app MVP rules", () => {
     expect(adminPage).toContain("Marcar como coincide");
     expect(adminPage).toContain("Marcar como no coincide");
     expect(adminPage).toContain("Marcar como requiere revisión");
-    expect(adminPage).toContain("Incidencia de identidad en esta toma.");
+    expect(adminPage).toContain("Incidencia de identidad: bloquear avance hasta revisión.");
     expect(adminPage).toContain("Valor interno conservado");
     expect(adminPage).not.toContain("privateStorageKey");
     expect(adminPage).not.toContain("storageBucket");
@@ -873,18 +917,29 @@ describe("navigo app MVP rules", () => {
 });
 
 function navigoActivityRecords({
+  t0IdentityStatus = "CONFIRMED",
   t0Status = "COMPLETED",
   t2Completed = false,
+  t2IdentityReviewStatus,
+  t2SelfieCount = 0,
   t4Completed = false
 }: {
+  t0IdentityStatus?: "CONFIRMED" | "PENDING" | "REJECTED";
   t0Status?: "COMPLETED" | "STARTED";
   t2Completed?: boolean;
+  t2IdentityReviewStatus?: "APPROVED" | "PENDING" | "REJECTED";
+  t2SelfieCount?: number;
   t4Completed?: boolean;
 } = {}) {
   const base = new Date("2026-06-25T15:00:00.000Z");
   return [
-    navigoActivityRecord("T0_SALON", 0, 0, 0, t0Status, base, t0Status === "COMPLETED" ? base : null),
-    navigoActivityRecord("T2_HORAS", 120, -30, 480, t2Completed ? "COMPLETED" : "PENDING", null, null),
+    navigoActivityRecord("T0_SALON", 0, 0, 0, t0Status, base, t0Status === "COMPLETED" ? base : null, {
+      identityStatus: t0IdentityStatus
+    }),
+    navigoActivityRecord("T2_HORAS", 120, -30, 480, t2Completed ? "COMPLETED" : "PENDING", null, null, {
+      identityReviewStatus: t2IdentityReviewStatus,
+      selfieCount: t2SelfieCount
+    }),
     navigoActivityRecord("T4_HORAS", 240, -30, 360, t4Completed ? "COMPLETED" : "PENDING", null, null),
     navigoActivityRecord("T8_HORAS", 480, -30, 120, "PENDING", null, null)
   ];
@@ -897,7 +952,12 @@ function navigoActivityRecord(
   windowEndsMinutes: number,
   status: "COMPLETED" | "PENDING" | "STARTED",
   actualStartedAt: Date | null,
-  actualCompletedAt: Date | null
+  actualCompletedAt: Date | null,
+  extra: Partial<{
+    identityReviewStatus: "APPROVED" | "PENDING" | "REJECTED";
+    identityStatus: "CONFIRMED" | "PENDING" | "REJECTED";
+    selfieCount: number;
+  }> = {}
 ) {
   const base = new Date("2026-06-25T15:00:00.000Z");
   const scheduledAt = new Date(base.getTime() + offsetMinutes * 60000);
@@ -911,7 +971,8 @@ function navigoActivityRecord(
     id: `activity-${code}`,
     occurrenceKey: "DEFAULT",
     scheduledAt,
-    status
+    status,
+    ...extra
   };
 }
 

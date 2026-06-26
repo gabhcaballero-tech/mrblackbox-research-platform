@@ -34,6 +34,7 @@ export type NavigoActivityRecord = {
   id?: string;
   occurrenceKey: string;
   identityStatus?: "CONFIRMED" | "PENDING" | "REJECTED";
+  identityReviewStatus?: "APPROVED" | "PENDING" | "REJECTED";
   scheduledAt: Date;
   selfieCount?: number;
   status: "AVAILABLE" | "COMPLETED" | "EXPIRED" | "INCOMPLETE" | "PENDING" | "REOPENED" | "STARTED";
@@ -94,7 +95,8 @@ export type NavigoActivityAvailability =
         | "BEFORE_WINDOW"
         | "NO_T0"
         | "PREVIOUS_REQUIRED"
-        | "T0_SLOT";
+        | "T0_SLOT"
+        | "IDENTITY_REVIEW_REQUIRED";
     }
   | {
       canCapture: true;
@@ -655,6 +657,14 @@ function getNavigoActivityAvailability({
     };
   }
 
+  if (hasBlockingIdentityIssue([...previousActivities, activity])) {
+    return {
+      canCapture: false,
+      label: "Pendiente",
+      reason: "IDENTITY_REVIEW_REQUIRED"
+    };
+  }
+
   const previousMeasurement = [...previousActivities].reverse().find((candidate) => candidate.id !== activity.id);
 
   if (previousMeasurement && previousMeasurement.status !== "COMPLETED") {
@@ -696,6 +706,20 @@ function getNavigoActivityAvailability({
     label: minutesUntilClose <= 60 ? "Proxima a vencer" : "Disponible",
     reason: minutesUntilClose <= 60 ? "DUE_SOON" : "AVAILABLE"
   };
+}
+
+function hasBlockingIdentityIssue(activities: Array<Pick<NavigoActivityRecord, "code" | "identityReviewStatus" | "identityStatus" | "selfieCount">>): boolean {
+  return activities.some((activity) => {
+    if (activity.code === "T0_SALON") {
+      return activity.identityStatus === "REJECTED";
+    }
+
+    if ((activity.selfieCount ?? 0) === 0) {
+      return false;
+    }
+
+    return activity.identityReviewStatus !== "APPROVED";
+  });
 }
 
 export function isNavigoT0Complete(activity: Pick<NavigoActivityRecord, "identityStatus" | "responseCount" | "status">): boolean {

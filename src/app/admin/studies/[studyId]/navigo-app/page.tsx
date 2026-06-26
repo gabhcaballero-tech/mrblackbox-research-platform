@@ -511,7 +511,9 @@ function ActivityDetail({
           <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
             <p className="font-semibold">Identidad en salón: {identityStatusLabel(activity?.identityStatus)}</p>
             {activity?.identityStatus === "REJECTED" ? (
-              <p className="mt-2 font-semibold text-rose-800">Incidencia de identidad en T0.</p>
+              <p className="mt-2 font-semibold text-rose-800">
+                Incidencia de identidad: bloquear avance hasta revisión.
+              </p>
             ) : null}
           </div>
         ) : null}
@@ -600,7 +602,7 @@ function ActivityIdentityReview({
           <p className="text-sm font-semibold text-zinc-950">Estado: {identityReviewStatusLabel(activitySelfie)}</p>
           {activitySelfie.reviewStatus === "REJECTED" ? (
             <p className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
-              Incidencia de identidad en esta toma.
+              Incidencia de identidad: bloquear avance hasta revisión.
             </p>
           ) : null}
           {activitySelfie.rejectionReason ? <p className="mt-2 text-sm text-zinc-700">Motivo: {activitySelfie.rejectionReason}</p> : null}
@@ -702,6 +704,14 @@ function ActivitySummary({
 function navigoMeasurementProgressLabel(activity?: NavigoActivityListItem): string {
   if (!activity || (activity.selfieCount ?? 0) === 0) {
     return "Selfie pendiente";
+  }
+
+  if (activity.identityReviewStatus === "REJECTED") {
+    return "Identidad no coincide";
+  }
+
+  if (activity.identityReviewStatus !== "APPROVED") {
+    return "Requiere revisión de identidad";
   }
 
   if ((activity.responseCount ?? 0) < 7 || activity.status !== "COMPLETED") {

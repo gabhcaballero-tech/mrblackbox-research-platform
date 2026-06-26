@@ -187,6 +187,8 @@ function availabilityMessage(reason: string): string {
       return "Esta evaluación ya no está disponible. Contacta a tu reclutador.";
     case "ALREADY_COMPLETED":
       return "Evaluación registrada correctamente.";
+    case "IDENTITY_REVIEW_REQUIRED":
+      return "Tu participación requiere revisión de identidad. Contacta a tu reclutador.";
     case "PREVIOUS_REQUIRED":
       return "La evaluación 0 en salón aún no está completa.";
     default:
@@ -202,9 +204,17 @@ function t0ParticipantLabel(activity: { identityStatus?: string; responseCount?:
   return "Evaluación 0 / T0 en salón";
 }
 
-function measurementParticipantLabel(activity: { responseCount?: number; selfieCount?: number; status: string }): string {
+function measurementParticipantLabel(activity: { identityReviewStatus?: string; responseCount?: number; selfieCount?: number; status: string }): string {
   if ((activity.selfieCount ?? 0) === 0) {
     return "Selfie pendiente";
+  }
+
+  if (activity.identityReviewStatus === "REJECTED") {
+    return "Identidad no coincide";
+  }
+
+  if (activity.identityReviewStatus !== "APPROVED") {
+    return "Revisión de identidad pendiente";
   }
 
   if ((activity.responseCount ?? 0) < 7 || activity.status !== "COMPLETED") {

@@ -373,7 +373,11 @@ export async function confirmNavigoActivitySelfieUploadAction(
     privateStorageKey: string;
     storageBucket: string;
   }
-): Promise<NavigoActionResult<{ selfieCount: number }>> {
+): Promise<NavigoActionResult<{
+  internalNote: string | null;
+  reviewStatus: "APPROVED" | "PENDING" | "REJECTED";
+  selfieCount: number;
+}>> {
   const token = parseToken(tokenInput);
   const result = await createNavigoAppRepository().confirmActivitySelfieUpload({
     activityId,

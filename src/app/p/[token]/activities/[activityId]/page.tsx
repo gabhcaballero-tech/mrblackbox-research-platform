@@ -115,6 +115,7 @@ export default async function NavigoActivityPage({ params, searchParams }: Navig
         registeredSelfie={data.registeredSelfie}
         requiresSelfie={data.activity.code !== "T0_SALON"}
         selfieCount={data.selfieCount}
+        selfieReviewStatus={data.selfieReviewStatus}
         testModeParams={data.testMode ? testModeParams : null}
         token={parsedToken.data}
       />

@@ -212,6 +212,7 @@ export type NavigoActivityCaptureView =
         registeredSelfie: {
           signedUrl: string;
         } | null;
+        selfieReviewStatus: "APPROVED" | "PENDING" | "REJECTED" | null;
         selfieCount: number;
         study: NavigoStudySummary;
         testMode: boolean;
@@ -251,7 +252,11 @@ export type NavigoAppRepository = {
       storageBucket: string;
     };
     token: string;
-  }) => Promise<NavigoActionResult<{ selfieCount: number }>>;
+  }) => Promise<NavigoActionResult<{
+    internalNote: string | null;
+    reviewStatus: "APPROVED" | "PENDING" | "REJECTED";
+    selfieCount: number;
+  }>>;
   confirmT0Identity: (input: {
     activityId: string;
     identityConfirmed: "NO" | "YES";
@@ -1400,6 +1405,8 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         };
       }
 
+      const activitySelfie = activity.participantActivityEvidence.find((evidence) => evidence.type === "SELFIE_IDENTIFICATION") ?? null;
+
       return {
         data: {
           activity: timelineActivity,
@@ -1415,6 +1422,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
                   storage: input.storage ?? createSupabaseEvidenceStorageClient()
                 })
               : null,
+          selfieReviewStatus: activitySelfie?.reviewStatus ?? null,
           selfieCount: activity.participantActivityEvidence.filter((evidence) => evidence.type === "SELFIE_IDENTIFICATION").length,
           study: participant.study,
           testMode: Boolean(input.testMode),
@@ -1616,6 +1624,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
       await prisma.participantActivityEvidence.create?.({
         data: {
           extension: extensionFromFilename(input.metadata.originalFilename),
+          internalNote: "Verificación automática de identidad no configurada. Requiere revisión manual.",
           mimeType: input.metadata.mimeType,
           originalFilename: input.metadata.originalFilename,
           participantActivityId: activity.id,
@@ -1623,12 +1632,17 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           sizeBytes: input.metadata.sizeBytes,
           storageBucket: input.metadata.storageBucket,
           studyParticipantId: participant.id,
+          reviewStatus: "PENDING",
           type: "SELFIE_IDENTIFICATION"
         }
       });
 
       return {
-        data: { selfieCount: 1 },
+        data: {
+          internalNote: "Verificación automática de identidad no configurada. Requiere revisión manual.",
+          reviewStatus: "PENDING",
+          selfieCount: 1
+        },
         ok: true
       };
     },
@@ -2981,6 +2995,7 @@ function toNavigoActivityRecord(activity: ActivityRecord): NavigoActivityRecord 
     code: activity.activitySchedule.code,
     id: activity.id,
     identityStatus: activity.activitySchedule.code === "T0_SALON" ? identityStatus : undefined,
+    identityReviewStatus: activity.participantActivityEvidence.find((evidence) => evidence.type === "SELFIE_IDENTIFICATION")?.reviewStatus,
     occurrenceKey: activity.occurrenceKey,
     responseCount,
     scheduledAt: activity.scheduledAt,
@@ -3176,6 +3191,10 @@ function availabilityMessage(reason: string): string {
 
   if (reason === "ALREADY_COMPLETED") {
     return "Esta evaluacion ya fue registrada.";
+  }
+
+  if (reason === "IDENTITY_REVIEW_REQUIRED") {
+    return "Tu participación requiere revisión de identidad. Contacta a tu reclutador.";
   }
 
   return "Debes completar la evaluacion anterior antes de continuar.";

@@ -42,6 +42,7 @@ function renderCapture(overrides: Partial<Parameters<typeof NavigoActivityCaptur
       registeredSelfie={null}
       requiresSelfie
       selfieCount={0}
+      selfieReviewStatus={null}
       testModeParams={null}
       token="participant-token"
       {...overrides}
@@ -67,7 +68,7 @@ beforeEach(() => {
     ok: true
   });
   vi.mocked(confirmNavigoActivitySelfieUploadAction).mockResolvedValue({
-    data: { selfieCount: 1 },
+    data: { internalNote: null, reviewStatus: "APPROVED", selfieCount: 1 },
     ok: true
   });
   vi.mocked(confirmNavigoT0IdentityAction).mockResolvedValue({
@@ -117,10 +118,23 @@ describe("NavigoActivityCapture", () => {
   });
 
   it("shows AP1 to AP7 for T2/T4/T8 when the activity selfie already exists", () => {
-    renderCapture({ selfieCount: 1 });
+    renderCapture({ selfieCount: 1, selfieReviewStatus: "APPROVED" });
 
     expect(screen.getByText("Preguntas AP1 a AP7")).toBeInTheDocument();
     expect(screen.getByText(questions[0]?.text ?? "")).toBeInTheDocument();
+  });
+
+  it("keeps AP1 to AP7 hidden when activity identity review is pending or rejected", () => {
+    const pending = renderCapture({ selfieCount: 1, selfieReviewStatus: "PENDING" });
+
+    expect(screen.queryByText("Preguntas AP1 a AP7")).not.toBeInTheDocument();
+    expect(screen.getByText("No fue posible confirmar tu identidad automáticamente. Contacta a tu reclutador.")).toBeInTheDocument();
+    pending.unmount();
+
+    renderCapture({ selfieCount: 1, selfieReviewStatus: "REJECTED" });
+
+    expect(screen.queryByText("Preguntas AP1 a AP7")).not.toBeInTheDocument();
+    expect(screen.getByText("No fue posible confirmar tu identidad. Contacta a tu reclutador.")).toBeInTheDocument();
   });
 
   it("keeps T0 on identity confirmation and only shows AP1 to AP7 after identity YES", async () => {
