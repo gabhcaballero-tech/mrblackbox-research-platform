@@ -70,9 +70,17 @@ export function NavigoRotationImportPanel({ studyId }: NavigoRotationImportPanel
 
     try {
       const result = await applyNavigoRotationImportRowsAction(studyId, state.rows);
-      setState(result);
+      const nextState =
+        result.status === "error" && !result.preview && state.preview
+          ? {
+              ...result,
+              preview: state.preview,
+              rows: state.rows
+            }
+          : result;
+      setState(nextState);
 
-      if (result.status === "success") {
+      if (nextState.status === "success") {
         router.refresh();
       }
     } catch {
@@ -143,6 +151,10 @@ export function NavigoRotationImportPanel({ studyId }: NavigoRotationImportPanel
         </button>
         {!canApply ? (
           <p className="mt-2 text-xs text-zinc-600">Corrige errores y vuelve a previsualizar antes de aplicar.</p>
+        ) : state.status === "error" ? (
+          <p className="mt-2 text-xs text-amber-800">
+            La previsualizacion sigue siendo valida, pero ocurrio un error al guardar. Puedes intentar aplicar nuevamente.
+          </p>
         ) : null}
       </form>
     </section>

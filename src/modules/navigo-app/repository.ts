@@ -181,6 +181,7 @@ export type NavigoActionResult<T = unknown> =
       ok: true;
     }
   | {
+      data?: T;
       message: string;
       ok: false;
     };
@@ -779,62 +780,101 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
     async applyRotationImport(input) {
       const prisma = await getPrisma();
 
-      return prisma.$transaction(async (tx) => {
-        const study = (await tx.study.findUnique?.({
-          select: studySelect,
-          where: { id: input.studyId }
-        })) as StudyRecord | null;
+      try {
+        return await prisma.$transaction(async (tx) => {
+          const study = (await tx.study.findUnique?.({
+            select: studySelect,
+            where: { id: input.studyId }
+          })) as StudyRecord | null;
 
-        if (!study || study.code !== NAVIGO_STUDY_CODE) {
-          return { message: "Solo el estudio Navigo permite importar rotacion.", ok: false };
-        }
-
-        const preview = await buildRotationImportPreview({
-          prisma: tx,
-          rows: input.rows,
-          studyId: input.studyId
-        });
-
-        if (preview.summary.rowsWithError > 0) {
-          return {
-            message: "Corrige los errores de la previsualizacion antes de aplicar la importacion.",
-            ok: false
-          };
-        }
-
-        const confirmations = await findConfirmationsByFolio({
-          prisma: tx,
-          rows: input.rows,
-          studyId: input.studyId
-        });
-
-        for (const row of preview.rows) {
-          const confirmation = confirmations.get(row.folio);
-
-          if (!confirmation) {
-            continue;
+          if (!study || study.code !== NAVIGO_STUDY_CODE) {
+            return { message: "Solo el estudio Navigo permite importar rotacion.", ok: false };
           }
 
-          await upsertParticipantRotationForCodes({
-            actorUserId: input.actorUserId,
-            leftFragranceCode: row.primeraFragancia,
-            participant: confirmation.studyParticipant,
+          const preview = await buildRotationImportPreview({
             prisma: tx,
-            rightFragranceCode: row.segundaFragancia
+            rows: input.rows,
+            studyId: input.studyId
+          });
+
+          if (preview.summary.rowsWithError > 0) {
+            return {
+              data: preview,
+              message: "Corrige los errores de la previsualizacion antes de aplicar la importacion.",
+              ok: false
+            };
+          }
+
+          const confirmations = await findConfirmationsByFolio({
+            prisma: tx,
+            rows: input.rows,
+            studyId: input.studyId
+          });
+
+          for (const row of preview.rows) {
+            const confirmation = confirmations.get(row.folio);
+
+            if (!confirmation) {
+              throw new NavigoRotationApplyError({
+                folio: row.folio,
+                message: `No se encontro confirmacion para el folio ${row.folio}.`,
+                step: "confirmation"
+              });
+            }
+
+            await upsertParticipantRotationForCodes({
+              actorUserId: input.actorUserId,
+              leftFragranceCode: row.primeraFragancia,
+              participant: confirmation.studyParticipant,
+              prisma: tx,
+              rightFragranceCode: row.segundaFragancia
+            });
+          }
+
+          const appliedPreview = await buildRotationImportPreview({
+            prisma: tx,
+            rows: input.rows,
+            studyId: input.studyId
+          });
+
+          return {
+            data: appliedPreview,
+            ok: true
+          };
+        });
+      } catch (error) {
+        const failure = toNavigoRotationApplyFailure(error);
+        logNavigoRotationApplyFailure({
+          error,
+          folio: failure.folio,
+          message: failure.logMessage,
+          step: failure.step,
+          studyId: input.studyId
+        });
+
+        let preview: NavigoRotationImportPreview | undefined;
+        try {
+          preview = await buildRotationImportPreview({
+            prisma,
+            rows: input.rows,
+            studyId: input.studyId
+          });
+        } catch (previewError) {
+          logNavigoRotationApplyFailure({
+            error: previewError,
+            folio: failure.folio,
+            message: sanitizeRotationImportLogMessage(previewError),
+            step: "preview-after-failure",
+            studyId: input.studyId
           });
         }
 
-        const appliedPreview = await buildRotationImportPreview({
-          prisma: tx,
-          rows: input.rows,
-          studyId: input.studyId
-        });
-
         return {
-          data: appliedPreview,
-          ok: true
+          data: preview,
+          message: failure.message,
+          ok: false
         };
-      });
+      }
     },
 
     async startT0(input) {
@@ -1425,198 +1465,476 @@ async function upsertParticipantRotationForCodes({
   }
 
   const studyId = participant.study.id;
+  const folio = participant.participantConfirmation.folio;
   const rotationCode = createNavigoRotationPlanCode({
-    folio: participant.participantConfirmation.folio,
+    folio,
     leftFragranceCode,
     rightFragranceCode
   });
-  const leftArm = (await prisma.studyArm.upsert?.({
-    create: {
-      code: "LEFT",
-      label: "Brazo izquierdo",
-      sortOrder: 1,
-      studyId
-    },
-    update: {
-      label: "Brazo izquierdo",
-      sortOrder: 1
-    },
-    where: {
-      studyId_code: {
-        code: "LEFT",
-        studyId
-      }
-    }
-  })) as { id: string };
-  const rightArm = (await prisma.studyArm.upsert?.({
-    create: {
-      code: "RIGHT",
-      label: "Brazo derecho",
-      sortOrder: 2,
-      studyId
-    },
-    update: {
-      label: "Brazo derecho",
-      sortOrder: 2
-    },
-    where: {
-      studyId_code: {
-        code: "RIGHT",
-        studyId
-      }
-    }
-  })) as { id: string };
-  const leftProduct = (await prisma.studyProduct.upsert?.({
-    create: {
-      displayLabel: "Primera fragancia",
-      internalCode: leftFragranceCode,
-      isSensitive: true,
-      realName: leftFragranceCode,
-      studyId
-    },
-    update: {
-      displayLabel: "Primera fragancia",
-      isSensitive: true
-    },
-    where: {
-      studyId_internalCode: {
-        internalCode: leftFragranceCode,
-        studyId
-      }
-    }
-  })) as { id: string };
-  const rightProduct = (await prisma.studyProduct.upsert?.({
-    create: {
-      displayLabel: "Segunda fragancia",
-      internalCode: rightFragranceCode,
-      isSensitive: true,
-      realName: rightFragranceCode,
-      studyId
-    },
-    update: {
-      displayLabel: "Segunda fragancia",
-      isSensitive: true
-    },
-    where: {
-      studyId_internalCode: {
-        internalCode: rightFragranceCode,
-        studyId
-      }
-    }
-  })) as { id: string };
-  const rotationPlan = (await prisma.rotationPlan.upsert?.({
-    create: {
-      assignmentModeAllowed: "MANUAL",
-      name: rotationCode,
-      rotationCode,
-      status: "ACTIVE",
-      studyId
-    },
-    select: {
-      id: true
-    },
-    update: {
-      assignmentModeAllowed: "MANUAL",
-      name: rotationCode,
-      status: "ACTIVE"
-    },
-    where: {
-      studyId_rotationCode: {
-        rotationCode,
-        studyId
-      }
-    }
-  })) as { id: string };
-
-  await prisma.rotationPlanArm.deleteMany?.({
-    where: { rotationPlanId: rotationPlan.id }
+  const leftArm = await resolveNavigoStudyArm({
+    code: "LEFT",
+    folio,
+    label: "Brazo izquierdo",
+    preferredSortOrder: 1,
+    prisma,
+    studyId,
+    userMessage: "No se pudo crear la asignacion de brazo izquierdo."
   });
-  await prisma.rotationPlanArm.createMany?.({
-    data: [
-      {
-        applicationOrder: 1,
-        participantVisibleLabel: "Primera fragancia",
-        rotationPlanId: rotationPlan.id,
-        studyArmId: leftArm.id,
-        studyProductId: leftProduct.id
-      },
-      {
-        applicationOrder: 2,
-        participantVisibleLabel: "Segunda fragancia",
-        rotationPlanId: rotationPlan.id,
-        studyArmId: rightArm.id,
-        studyProductId: rightProduct.id
-      }
-    ]
+  const rightArm = await resolveNavigoStudyArm({
+    code: "RIGHT",
+    folio,
+    label: "Brazo derecho",
+    preferredSortOrder: 2,
+    prisma,
+    studyId,
+    userMessage: "No se pudo crear la asignacion de brazo derecho."
+  });
+  const leftProduct = await runNavigoRotationImportStep({
+    folio,
+    operation: () =>
+      prisma.studyProduct.upsert?.({
+        create: {
+          displayLabel: "Primera fragancia",
+          internalCode: leftFragranceCode,
+          isSensitive: true,
+          realName: leftFragranceCode,
+          studyId
+        },
+        update: {
+          displayLabel: "Primera fragancia",
+          isSensitive: true
+        },
+        where: {
+          studyId_internalCode: {
+            internalCode: leftFragranceCode,
+            studyId
+          }
+        }
+      }) as Promise<{ id: string }>,
+    step: "study-product-left",
+    userMessage: "No se pudo crear el producto de brazo izquierdo."
+  });
+  const rightProduct = await runNavigoRotationImportStep({
+    folio,
+    operation: () =>
+      prisma.studyProduct.upsert?.({
+        create: {
+          displayLabel: "Segunda fragancia",
+          internalCode: rightFragranceCode,
+          isSensitive: true,
+          realName: rightFragranceCode,
+          studyId
+        },
+        update: {
+          displayLabel: "Segunda fragancia",
+          isSensitive: true
+        },
+        where: {
+          studyId_internalCode: {
+            internalCode: rightFragranceCode,
+            studyId
+          }
+        }
+      }) as Promise<{ id: string }>,
+    step: "study-product-right",
+    userMessage: "No se pudo crear el producto de brazo derecho."
+  });
+  const rotationPlan = await runNavigoRotationImportStep({
+    folio,
+    operation: () =>
+      prisma.rotationPlan.upsert?.({
+        create: {
+          assignmentModeAllowed: "MANUAL",
+          name: rotationCode,
+          rotationCode,
+          status: "ACTIVE",
+          studyId
+        },
+        select: {
+          id: true
+        },
+        update: {
+          assignmentModeAllowed: "MANUAL",
+          name: rotationCode,
+          status: "ACTIVE"
+        },
+        where: {
+          studyId_rotationCode: {
+            rotationCode,
+            studyId
+          }
+        }
+      }) as Promise<{ id: string }>,
+    step: "rotation-plan",
+    userMessage: "Faltan datos requeridos para crear RotationPlan."
   });
 
-  const rotationAssignment = (await prisma.participantRotationAssignment.upsert?.({
-    create: {
-      assignedByUserId: actorUserId,
-      assignmentMode: "MANUAL_COVER_CODE",
-      rotationCode,
-      rotationPlanId: rotationPlan.id,
-      studyParticipantId: participant.id
+  await runNavigoRotationImportStep({
+    folio,
+    operation: async () => {
+      await prisma.rotationPlanArm.deleteMany?.({
+        where: { rotationPlanId: rotationPlan.id }
+      });
+      await prisma.rotationPlanArm.createMany?.({
+        data: [
+          {
+            applicationOrder: 1,
+            participantVisibleLabel: "Primera fragancia",
+            rotationPlanId: rotationPlan.id,
+            studyArmId: leftArm.id,
+            studyProductId: leftProduct.id
+          },
+          {
+            applicationOrder: 2,
+            participantVisibleLabel: "Segunda fragancia",
+            rotationPlanId: rotationPlan.id,
+            studyArmId: rightArm.id,
+            studyProductId: rightProduct.id
+          }
+        ]
+      });
+      return { id: rotationPlan.id };
     },
-    select: { id: true },
-    update: {
-      changedAt: new Date(),
-      rotationCode,
-      rotationPlanId: rotationPlan.id
-    },
-    where: {
-      studyParticipantId: participant.id
-    }
-  })) as { id: string };
-
-  await prisma.participantArmAssignment.upsert?.({
-    create: {
-      applicationOrder: 1,
-      participantRotationAssignmentId: rotationAssignment.id,
-      participantVisibleLabel: "Primera fragancia",
-      studyArmId: leftArm.id,
-      studyParticipantId: participant.id,
-      studyProductId: leftProduct.id
-    },
-    update: {
-      applicationOrder: 1,
-      participantRotationAssignmentId: rotationAssignment.id,
-      participantVisibleLabel: "Primera fragancia",
-      studyProductId: leftProduct.id
-    },
-    where: {
-      studyParticipantId_studyArmId: {
-        studyArmId: leftArm.id,
-        studyParticipantId: participant.id
-      }
-    }
+    step: "rotation-plan-arms",
+    userMessage: "No se pudieron guardar los brazos del plan de rotacion."
   });
-  await prisma.participantArmAssignment.upsert?.({
-    create: {
-      applicationOrder: 2,
-      participantRotationAssignmentId: rotationAssignment.id,
-      participantVisibleLabel: "Segunda fragancia",
-      studyArmId: rightArm.id,
-      studyParticipantId: participant.id,
-      studyProductId: rightProduct.id
-    },
-    update: {
-      applicationOrder: 2,
-      participantRotationAssignmentId: rotationAssignment.id,
-      participantVisibleLabel: "Segunda fragancia",
-      studyProductId: rightProduct.id
-    },
-    where: {
-      studyParticipantId_studyArmId: {
-        studyArmId: rightArm.id,
-        studyParticipantId: participant.id
-      }
-    }
+
+  const rotationAssignment = await runNavigoRotationImportStep({
+    folio,
+    operation: () =>
+      prisma.participantRotationAssignment.upsert?.({
+        create: {
+          assignedByUserId: actorUserId,
+          assignmentMode: "MANUAL_COVER_CODE",
+          rotationCode,
+          rotationPlanId: rotationPlan.id,
+          studyParticipantId: participant.id
+        },
+        select: { id: true },
+        update: {
+          changedAt: new Date(),
+          rotationCode,
+          rotationPlanId: rotationPlan.id
+        },
+        where: {
+          studyParticipantId: participant.id
+        }
+      }) as Promise<{ id: string }>,
+    step: "participant-rotation-assignment",
+    userMessage: "No se pudo crear la asignacion de rotacion del participante."
+  });
+
+  await runNavigoRotationImportStep({
+    folio,
+    operation: () =>
+      prisma.participantArmAssignment.upsert?.({
+        create: {
+          applicationOrder: 1,
+          participantRotationAssignmentId: rotationAssignment.id,
+          participantVisibleLabel: "Primera fragancia",
+          studyArmId: leftArm.id,
+          studyParticipantId: participant.id,
+          studyProductId: leftProduct.id
+        },
+        update: {
+          applicationOrder: 1,
+          participantRotationAssignmentId: rotationAssignment.id,
+          participantVisibleLabel: "Primera fragancia",
+          studyProductId: leftProduct.id
+        },
+        where: {
+          studyParticipantId_studyArmId: {
+            studyArmId: leftArm.id,
+            studyParticipantId: participant.id
+          }
+        }
+      }) as Promise<{ id: string }>,
+    step: "participant-arm-left",
+    userMessage: "No se pudo crear la asignacion de brazo izquierdo."
+  });
+  await runNavigoRotationImportStep({
+    folio,
+    operation: () =>
+      prisma.participantArmAssignment.upsert?.({
+        create: {
+          applicationOrder: 2,
+          participantRotationAssignmentId: rotationAssignment.id,
+          participantVisibleLabel: "Segunda fragancia",
+          studyArmId: rightArm.id,
+          studyParticipantId: participant.id,
+          studyProductId: rightProduct.id
+        },
+        update: {
+          applicationOrder: 2,
+          participantRotationAssignmentId: rotationAssignment.id,
+          participantVisibleLabel: "Segunda fragancia",
+          studyProductId: rightProduct.id
+        },
+        where: {
+          studyParticipantId_studyArmId: {
+            studyArmId: rightArm.id,
+            studyParticipantId: participant.id
+          }
+        }
+      }) as Promise<{ id: string }>,
+    step: "participant-arm-right",
+    userMessage: "No se pudo crear la asignacion de brazo derecho."
   });
 
   return {
     rotationCode
   };
+}
+
+async function resolveNavigoStudyArm({
+  code,
+  folio,
+  label,
+  preferredSortOrder,
+  prisma,
+  studyId,
+  userMessage
+}: {
+  code: "LEFT" | "RIGHT";
+  folio: string;
+  label: string;
+  preferredSortOrder: number;
+  prisma: NavigoTransactionClient;
+  studyId: string;
+  userMessage: string;
+}): Promise<{ id: string }> {
+  let existing: { id: string; sortOrder: number } | null;
+  try {
+    existing = (await prisma.studyArm.findFirst?.({
+      select: { id: true, sortOrder: true },
+      where: { code, studyId }
+    })) as { id: string; sortOrder: number } | null;
+  } catch (error) {
+    throw new NavigoRotationApplyError({
+      code: getPrismaErrorCode(error),
+      folio,
+      logMessage: sanitizeRotationImportLogMessage(error),
+      message: isLikelyDatabaseError(error) ? "Error de base de datos al guardar la rotacion. Revisa logs." : userMessage,
+      step: `study-arm-${code.toLowerCase()}-lookup`
+    });
+  }
+
+  if (existing) {
+    await runNavigoRotationImportStep({
+      folio,
+      operation: async () => {
+        await prisma.studyArm.update?.({
+          data: { label },
+          where: { id: existing.id }
+        });
+        return existing;
+      },
+      step: `study-arm-${code.toLowerCase()}-update`,
+      userMessage
+    });
+
+    return existing;
+  }
+
+  const sortOrder = await resolveAvailableStudyArmSortOrder({
+    folio,
+    preferredSortOrder,
+    prisma,
+    studyId,
+    userMessage
+  });
+
+  return runNavigoRotationImportStep({
+    folio,
+    operation: () =>
+      prisma.studyArm.create?.({
+        data: {
+          code,
+          label,
+          sortOrder,
+          studyId
+        },
+        select: { id: true }
+      }) as Promise<{ id: string }>,
+    step: `study-arm-${code.toLowerCase()}-create`,
+    userMessage
+  });
+}
+
+async function resolveAvailableStudyArmSortOrder({
+  folio,
+  preferredSortOrder,
+  prisma,
+  studyId,
+  userMessage
+}: {
+  folio: string;
+  preferredSortOrder: number;
+  prisma: NavigoTransactionClient;
+  studyId: string;
+  userMessage: string;
+}): Promise<number> {
+  let existingAtPreferred: { id: string } | null;
+  try {
+    existingAtPreferred = (await prisma.studyArm.findFirst?.({
+      select: { id: true },
+      where: {
+        sortOrder: preferredSortOrder,
+        studyId
+      }
+    })) as { id: string } | null;
+  } catch (error) {
+    throw new NavigoRotationApplyError({
+      code: getPrismaErrorCode(error),
+      folio,
+      logMessage: sanitizeRotationImportLogMessage(error),
+      message: isLikelyDatabaseError(error) ? "Error de base de datos al guardar la rotacion. Revisa logs." : userMessage,
+      step: "study-arm-sort-order-lookup"
+    });
+  }
+
+  if (!existingAtPreferred) {
+    return preferredSortOrder;
+  }
+
+  const arms = await runNavigoRotationImportStep({
+    folio,
+    operation: () =>
+      prisma.studyArm.findMany?.({
+        orderBy: { sortOrder: "desc" },
+        select: { sortOrder: true },
+        take: 1,
+        where: { studyId }
+      }) as Promise<Array<{ sortOrder: number }>>,
+    step: "study-arm-next-sort-order",
+    userMessage
+  });
+
+  return Math.max(preferredSortOrder, (arms[0]?.sortOrder ?? preferredSortOrder) + 1);
+}
+
+async function runNavigoRotationImportStep<T>({
+  folio,
+  operation,
+  step,
+  userMessage
+}: {
+  folio: string;
+  operation: () => Promise<T | null | undefined>;
+  step: string;
+  userMessage: string;
+}): Promise<T> {
+  try {
+    const result = await operation();
+
+    if (result === null || result === undefined) {
+      throw new Error("Prisma operation did not return a record.");
+    }
+
+    return result;
+  } catch (error) {
+    throw new NavigoRotationApplyError({
+      code: getPrismaErrorCode(error),
+      folio,
+      logMessage: sanitizeRotationImportLogMessage(error),
+      message: isLikelyDatabaseError(error) ? "Error de base de datos al guardar la rotacion. Revisa logs." : userMessage,
+      step
+    });
+  }
+}
+
+class NavigoRotationApplyError extends Error {
+  code?: string;
+  folio?: string;
+  logMessage: string;
+  step: string;
+
+  constructor({
+    code,
+    folio,
+    logMessage,
+    message,
+    step
+  }: {
+    code?: string;
+    folio?: string;
+    logMessage?: string;
+    message: string;
+    step: string;
+  }) {
+    super(message);
+    this.name = "NavigoRotationApplyError";
+    this.code = code;
+    this.folio = folio;
+    this.logMessage = logMessage ?? message;
+    this.step = step;
+  }
+}
+
+function toNavigoRotationApplyFailure(error: unknown): {
+  folio?: string;
+  logMessage: string;
+  message: string;
+  step: string;
+} {
+  if (error instanceof NavigoRotationApplyError) {
+    return {
+      folio: error.folio,
+      logMessage: error.logMessage,
+      message: error.message,
+      step: error.step
+    };
+  }
+
+  const code = getPrismaErrorCode(error);
+  return {
+    logMessage: sanitizeRotationImportLogMessage(error),
+    message: code ? "Error de base de datos al guardar la rotacion. Revisa logs." : "No fue posible guardar la rotacion. Revisa logs.",
+    step: "apply"
+  };
+}
+
+function logNavigoRotationApplyFailure({
+  error,
+  folio,
+  message,
+  step,
+  studyId
+}: {
+  error: unknown;
+  folio?: string;
+  message: string;
+  step: string;
+  studyId: string;
+}) {
+  const code = getPrismaErrorCode(error) ?? "UNKNOWN";
+  console.error(
+    `navigo rotation import apply failed: studyId=${studyId} folio=${folio ?? "unknown"} step=${step} code=${code} message=${message}`
+  );
+}
+
+function getPrismaErrorCode(error: unknown): string | undefined {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    return typeof code === "string" ? code : undefined;
+  }
+
+  return undefined;
+}
+
+function isLikelyDatabaseError(error: unknown): boolean {
+  return Boolean(getPrismaErrorCode(error));
+}
+
+function sanitizeRotationImportLogMessage(error: unknown): string {
+  const raw =
+    error instanceof Error
+      ? error.message
+      : typeof error === "object" && error !== null && "message" in error
+        ? String((error as { message?: unknown }).message ?? "")
+        : String(error ?? "unknown");
+
+  return raw.replace(/\s+/g, " ").slice(0, 220);
 }
 
 function buildParticipantRotationSummary(participant: ParticipantRecord): NavigoParticipantListItem["rotation"] {

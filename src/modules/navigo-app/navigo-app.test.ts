@@ -16,6 +16,7 @@ import {
   normalizeNavigoRotationCode,
   parseNavigoRotationImportText,
   prepareNavigoParticipantActivities,
+  createNavigoAppRepository,
   resolveNavigoTimeZone,
   validateNavigoMeasurementAnswers
 } from "./index";
@@ -481,10 +482,100 @@ describe("navigo app MVP rules", () => {
     expect(panel).toContain("previewNavigoRotationImportTextAction");
     expect(panel).toContain("file.text()");
     expect(panel).toContain("setIsPreviewing(false)");
+    expect(panel).toContain("result.status === \"error\" && !result.preview && state.preview");
     expect(panel).toContain("validRows > 0");
+    expect(panel).toContain("La previsualizacion sigue siendo valida");
     expect(panel).toContain("Filas validas");
     expect(panel).toContain("Errores encontrados");
     expect(panel).not.toContain("useActionState");
+  });
+
+  it("applies valid rotation import rows with LEFT and RIGHT assignments", async () => {
+    const state = createNavigoRotationImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+
+    const result = await repository.applyRotationImport({
+      actorUserId: "admin-1",
+      rows: [{ folio: "NAV-001", primeraFragancia: "AAA", segundaFragancia: "BBB" }],
+      studyId: "study-navigo"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(state.arms.map((arm) => arm.code)).toEqual(["LEFT", "RIGHT"]);
+    expect(state.products.map((product) => product.internalCode)).toEqual(["AAA", "BBB"]);
+    expect(state.rotationPlans[0]?.rotationCode).toBe("NAV-001__AAA__BBB");
+    expect(state.rotationPlanArms).toMatchObject([
+      { applicationOrder: 1, participantVisibleLabel: "Primera fragancia" },
+      { applicationOrder: 2, participantVisibleLabel: "Segunda fragancia" }
+    ]);
+    expect(state.armAssignments).toMatchObject([
+      { applicationOrder: 1, participantVisibleLabel: "Primera fragancia" },
+      { applicationOrder: 2, participantVisibleLabel: "Segunda fragancia" }
+    ]);
+  });
+
+  it("retries rotation import without duplicating plans or assignments", async () => {
+    const state = createNavigoRotationImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const input = {
+      actorUserId: "admin-1",
+      rows: [{ folio: "NAV-001", primeraFragancia: "AAA", segundaFragancia: "BBB" }],
+      studyId: "study-navigo"
+    };
+
+    await repository.applyRotationImport(input);
+    await repository.applyRotationImport(input);
+
+    expect(state.arms).toHaveLength(2);
+    expect(state.products).toHaveLength(2);
+    expect(state.rotationPlans).toHaveLength(1);
+    expect(state.rotationPlanArms).toHaveLength(2);
+    expect(state.rotationAssignments).toHaveLength(1);
+    expect(state.armAssignments).toHaveLength(2);
+  });
+
+  it("updates rotation import before T0 and blocks changes after T0", async () => {
+    const state = createNavigoRotationImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+
+    await repository.applyRotationImport({
+      actorUserId: "admin-1",
+      rows: [{ folio: "NAV-001", primeraFragancia: "AAA", segundaFragancia: "BBB" }],
+      studyId: "study-navigo"
+    });
+    const updated = await repository.applyRotationImport({
+      actorUserId: "admin-1",
+      rows: [{ folio: "NAV-001", primeraFragancia: "CCC", segundaFragancia: "DDD" }],
+      studyId: "study-navigo"
+    });
+    state.participant.applicationStartedAt = new Date("2026-06-26T16:00:00.000Z");
+    const blocked = await repository.applyRotationImport({
+      actorUserId: "admin-1",
+      rows: [{ folio: "NAV-001", primeraFragancia: "EEE", segundaFragancia: "FFF" }],
+      studyId: "study-navigo"
+    });
+
+    expect(updated.ok).toBe(true);
+    expect(state.rotationPlans.map((plan) => plan.rotationCode)).toContain("NAV-001__CCC__DDD");
+    expect(blocked.ok).toBe(false);
+    expect(blocked.ok ? "" : blocked.message).toBe("Corrige los errores de la previsualizacion antes de aplicar la importacion.");
+    expect(blocked.ok ? 0 : blocked.data?.summary.rowsWithError).toBe(1);
+  });
+
+  it("returns sanitized database errors without dropping the valid preview", async () => {
+    const state = createNavigoRotationImportState({ failProductUpsert: true });
+    const repository = createNavigoAppRepository(state.prisma as never);
+
+    const result = await repository.applyRotationImport({
+      actorUserId: "admin-1",
+      rows: [{ folio: "NAV-001", primeraFragancia: "AAA", segundaFragancia: "BBB" }],
+      studyId: "study-navigo"
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.message).toBe("Error de base de datos al guardar la rotacion. Revisa logs.");
+    expect(result.ok ? null : result.data?.summary.rowsWithError).toBe(0);
+    expect(result.ok ? null : result.data?.summary.validRows).toBe(1);
   });
 
   it("serves the rotation template as a tab-separated file with UTF-8 BOM", () => {
@@ -769,6 +860,300 @@ function createNavigoFoundationState() {
     schedules,
     studies,
     versions
+  };
+}
+
+function createNavigoRotationImportState({ failProductUpsert = false }: { failProductUpsert?: boolean } = {}) {
+  const study = {
+    code: NAVIGO_STUDY_CODE,
+    id: "study-navigo",
+    name: "Fragancia Masculina",
+    status: "ACTIVE" as const,
+    timeZoneIana: "America/Mexico_City"
+  };
+  const participant = {
+    accessTokens: [],
+    activities: [],
+    applicationStartedAt: null as Date | null,
+    id: "study-participant-1",
+    participantConfirmation: {
+      folio: "NAV-001",
+      referenceCodes: []
+    },
+    participantProfile: {
+      email: null,
+      id: "profile-1",
+      name: "Participante Uno",
+      phone: null
+    },
+    participantScreeningReviews: [{ status: "APPROVED" as const }],
+    rotationAssignment: null as null | {
+      arms: Array<{
+        applicationOrder: number;
+        participantVisibleLabel: string;
+        studyArm: { code: string; label: string; sortOrder: number };
+        studyProduct: { displayLabel: string; id: string; internalCode: string };
+      }>;
+      rotationCode: string;
+    },
+    screeningStatus: "PASSED" as const,
+    study
+  };
+  const arms: Array<{ code: string; id: string; label: string; sortOrder: number; studyId: string }> = [];
+  const products: Array<{
+    displayLabel: string;
+    id: string;
+    internalCode: string;
+    isSensitive: boolean;
+    realName: string;
+    studyId: string;
+  }> = [];
+  const rotationPlans: Array<{ id: string; name: string; rotationCode: string; studyId: string }> = [];
+  const rotationPlanArms: Array<{
+    applicationOrder: number;
+    participantVisibleLabel: string;
+    rotationPlanId: string;
+    studyArmId: string;
+    studyProductId: string;
+  }> = [];
+  const rotationAssignments: Array<{
+    id: string;
+    rotationCode: string;
+    rotationPlanId: string;
+    studyParticipantId: string;
+  }> = [];
+  const armAssignments: Array<{
+    applicationOrder: number;
+    id: string;
+    participantRotationAssignmentId: string;
+    participantVisibleLabel: string;
+    studyArmId: string;
+    studyParticipantId: string;
+    studyProductId: string;
+  }> = [];
+
+  function syncParticipantRotation() {
+    const assignment = rotationAssignments.find((candidate) => candidate.studyParticipantId === participant.id) ?? null;
+
+    if (!assignment) {
+      participant.rotationAssignment = null;
+      return;
+    }
+
+    participant.rotationAssignment = {
+      arms: armAssignments
+        .filter((armAssignment) => armAssignment.participantRotationAssignmentId === assignment.id)
+        .sort((left, right) => left.applicationOrder - right.applicationOrder)
+        .map((armAssignment) => {
+          const arm = arms.find((candidate) => candidate.id === armAssignment.studyArmId);
+          const product = products.find((candidate) => candidate.id === armAssignment.studyProductId);
+
+          if (!arm || !product) {
+            throw new Error("test fixture missing rotation relation");
+          }
+
+          return {
+            applicationOrder: armAssignment.applicationOrder,
+            participantVisibleLabel: armAssignment.participantVisibleLabel,
+            studyArm: { code: arm.code, label: arm.label, sortOrder: arm.sortOrder },
+            studyProduct: {
+              displayLabel: product.displayLabel,
+              id: product.id,
+              internalCode: product.internalCode
+            }
+          };
+        }),
+      rotationCode: assignment.rotationCode
+    };
+  }
+
+  const tx = {
+    participantArmAssignment: {
+      async upsert(args: {
+        create: Omit<(typeof armAssignments)[number], "id">;
+        update: Partial<(typeof armAssignments)[number]>;
+        where: { studyParticipantId_studyArmId: { studyArmId: string; studyParticipantId: string } };
+      }) {
+        const target = armAssignments.find(
+          (assignment) =>
+            assignment.studyArmId === args.where.studyParticipantId_studyArmId.studyArmId &&
+            assignment.studyParticipantId === args.where.studyParticipantId_studyArmId.studyParticipantId
+        );
+
+        if (target) {
+          Object.assign(target, args.update);
+          syncParticipantRotation();
+          return target;
+        }
+
+        const record = { ...args.create, id: `arm-assignment-${armAssignments.length + 1}` };
+        armAssignments.push(record);
+        syncParticipantRotation();
+        return record;
+      }
+    },
+    participantConfirmation: {
+      async findMany(args: { where: { folio: { in: string[] }; studyId: string } }) {
+        if (args.where.studyId !== study.id || !args.where.folio.in.includes(participant.participantConfirmation.folio)) {
+          return [];
+        }
+
+        syncParticipantRotation();
+        return [
+          {
+            folio: participant.participantConfirmation.folio,
+            studyParticipant: participant
+          }
+        ];
+      }
+    },
+    participantRotationAssignment: {
+      async upsert(args: {
+        create: {
+          rotationCode: string;
+          rotationPlanId: string;
+          studyParticipantId: string;
+        };
+        update: {
+          rotationCode: string;
+          rotationPlanId: string;
+        };
+        where: { studyParticipantId: string };
+      }) {
+        const target = rotationAssignments.find(
+          (assignment) => assignment.studyParticipantId === args.where.studyParticipantId
+        );
+
+        if (target) {
+          Object.assign(target, args.update);
+          syncParticipantRotation();
+          return { id: target.id };
+        }
+
+        const record = { ...args.create, id: `rotation-assignment-${rotationAssignments.length + 1}` };
+        rotationAssignments.push(record);
+        syncParticipantRotation();
+        return { id: record.id };
+      }
+    },
+    rotationPlan: {
+      async upsert(args: {
+        create: {
+          name: string;
+          rotationCode: string;
+          studyId: string;
+        };
+        update: {
+          name: string;
+        };
+        where: { studyId_rotationCode: { rotationCode: string; studyId: string } };
+      }) {
+        const target = rotationPlans.find(
+          (plan) =>
+            plan.rotationCode === args.where.studyId_rotationCode.rotationCode &&
+            plan.studyId === args.where.studyId_rotationCode.studyId
+        );
+
+        if (target) {
+          Object.assign(target, args.update);
+          return { id: target.id };
+        }
+
+        const record = { ...args.create, id: `rotation-plan-${rotationPlans.length + 1}` };
+        rotationPlans.push(record);
+        return { id: record.id };
+      }
+    },
+    rotationPlanArm: {
+      async createMany(args: { data: typeof rotationPlanArms }) {
+        rotationPlanArms.push(...args.data);
+        return { count: args.data.length };
+      },
+      async deleteMany(args: { where: { rotationPlanId: string } }) {
+        const retained = rotationPlanArms.filter((arm) => arm.rotationPlanId !== args.where.rotationPlanId);
+        const count = rotationPlanArms.length - retained.length;
+        rotationPlanArms.splice(0, rotationPlanArms.length, ...retained);
+        return { count };
+      }
+    },
+    study: {
+      async findUnique(args: { where: { id: string } }) {
+        return args.where.id === study.id ? study : null;
+      }
+    },
+    studyArm: {
+      async create(args: { data: Omit<(typeof arms)[number], "id"> }) {
+        const record = { ...args.data, id: `arm-${arms.length + 1}` };
+        arms.push(record);
+        return { id: record.id };
+      },
+      async findFirst(args: { where: { code?: string; sortOrder?: number; studyId: string } }) {
+        return (
+          arms.find(
+            (arm) =>
+              arm.studyId === args.where.studyId &&
+              (args.where.code === undefined || arm.code === args.where.code) &&
+              (args.where.sortOrder === undefined || arm.sortOrder === args.where.sortOrder)
+          ) ?? null
+        );
+      },
+      async findMany(args: { where: { studyId: string } }) {
+        return [...arms].filter((arm) => arm.studyId === args.where.studyId).sort((left, right) => right.sortOrder - left.sortOrder);
+      },
+      async update(args: { data: Partial<(typeof arms)[number]>; where: { id: string } }) {
+        const target = arms.find((arm) => arm.id === args.where.id);
+        if (!target) {
+          throw new Error("arm not found");
+        }
+        Object.assign(target, args.data);
+        return { id: target.id };
+      }
+    },
+    studyProduct: {
+      async upsert(args: {
+        create: Omit<(typeof products)[number], "id">;
+        update: Partial<(typeof products)[number]>;
+        where: { studyId_internalCode: { internalCode: string; studyId: string } };
+      }) {
+        if (failProductUpsert) {
+          throw { code: "P2002", message: "duplicate sensitive database detail" };
+        }
+
+        const target = products.find(
+          (product) =>
+            product.internalCode === args.where.studyId_internalCode.internalCode &&
+            product.studyId === args.where.studyId_internalCode.studyId
+        );
+
+        if (target) {
+          Object.assign(target, args.update);
+          return { id: target.id };
+        }
+
+        const record = { ...args.create, id: `product-${products.length + 1}` };
+        products.push(record);
+        return { id: record.id };
+      }
+    }
+  };
+
+  const prisma = {
+    ...tx,
+    async $transaction<T>(callback: (transaction: typeof tx) => Promise<T>) {
+      return callback(tx);
+    }
+  };
+
+  return {
+    armAssignments,
+    arms,
+    participant,
+    prisma,
+    products,
+    rotationAssignments,
+    rotationPlanArms,
+    rotationPlans,
+    study
   };
 }
 

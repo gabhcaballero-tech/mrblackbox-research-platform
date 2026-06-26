@@ -214,7 +214,7 @@ export async function applyNavigoRotationImportRowsAction(
     });
 
     return {
-      message: "No fue posible aplicar la importacion. Revisa la previsualizacion e intenta de nuevo.",
+      message: "No fue posible guardar la rotacion. Revisa logs.",
       preview: null,
       rows,
       status: "error"
@@ -224,7 +224,7 @@ export async function applyNavigoRotationImportRowsAction(
   if (!result.ok) {
     return {
       message: result.message,
-      preview: null,
+      preview: result.data ?? null,
       rows,
       status: "error"
     };
@@ -233,7 +233,7 @@ export async function applyNavigoRotationImportRowsAction(
   revalidatePath(`/admin/studies/${studyId}/navigo-app`);
 
   return {
-    message: "Rotacion importada correctamente.",
+    message: `Rotacion importada correctamente. Filas aplicadas: ${result.data.summary.validRows}. Filas omitidas: 0. Filas con error: ${result.data.summary.rowsWithError}. Participantes actualizados: ${result.data.summary.updatable}.`,
     preview: result.data,
     rows,
     status: "success"
