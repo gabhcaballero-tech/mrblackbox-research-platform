@@ -254,9 +254,11 @@ export function prepareNavigoParticipantActivities({
 
 export function buildNavigoActivityTimeline({
   activities,
+  testMode = false,
   now = new Date()
 }: {
   activities: NavigoActivityRecord[];
+  testMode?: boolean;
   now?: Date;
 }): NavigoActivityTimelineItem[] {
   const byCode = new Map<NavigoActivityCode, NavigoActivityRecord>();
@@ -281,7 +283,8 @@ export function buildNavigoActivityTimeline({
       availability: getNavigoActivityAvailability({
         activity: { ...activity, code },
         now,
-        previousActivities: timeline
+        previousActivities: timeline,
+        testMode
       }),
       code
     });
@@ -619,11 +622,13 @@ function normalizeRotationHeader(value: string): string {
 function getNavigoActivityAvailability({
   activity,
   now,
-  previousActivities
+  previousActivities,
+  testMode
 }: {
   activity: NavigoActivityRecord & { code: NavigoActivityCode };
   now: Date;
   previousActivities: NavigoActivityTimelineItem[];
+  testMode: boolean;
 }): NavigoActivityAvailability {
   if (activity.code === "T0_SALON") {
     if (activity.status === "COMPLETED") {
@@ -656,6 +661,14 @@ function getNavigoActivityAvailability({
       canCapture: false,
       label: "Pendiente",
       reason: "PREVIOUS_REQUIRED"
+    };
+  }
+
+  if (testMode) {
+    return {
+      canCapture: true,
+      label: "Disponible",
+      reason: "AVAILABLE"
     };
   }
 

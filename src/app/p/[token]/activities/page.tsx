@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createNavigoAppRepository, navigoActivityLabel } from "@/modules/navigo-app";
+import { appendNavigoTestModeParams, isValidNavigoTestMode, type NavigoTestModeParams } from "@/modules/navigo-app/test-mode";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { PublicParticipantShell } from "@/shared/ui/PublicParticipantShell";
@@ -15,6 +16,8 @@ type NavigoActivitiesPageProps = {
   }>;
   searchParams?: Promise<{
     message?: string;
+    navigoTestMode?: string;
+    navigoTestSignature?: string;
   }>;
 };
 
@@ -27,7 +30,15 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
     notFound();
   }
 
+  const testModeParams = readTestModeParams(query);
+  const testMode = isValidNavigoTestMode({
+    mode: testModeParams?.navigoTestMode,
+    secret: process.env.PARTICIPANT_PORTAL_HASH_SECRET,
+    signature: testModeParams?.navigoTestSignature,
+    token: parsedToken.data
+  });
   const result = await createNavigoAppRepository().getParticipantActivitiesView({
+    testMode,
     token: parsedToken.data
   });
 
@@ -57,21 +68,30 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
             {query.message}
           </p>
         ) : null}
+        {data.testMode ? (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">
+            MODO PRUEBA: las ventanas de tiempo están desactivadas.
+          </p>
+        ) : null}
 
         <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-zinc-950">Tu participación</h2>
-          <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-3">
+          <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <dt className="font-medium text-zinc-500">Participante</dt>
+              <dd className="mt-1 text-zinc-950">{data.participantName}</dd>
+            </div>
             <div>
               <dt className="font-medium text-zinc-500">Folio</dt>
               <dd className="mt-1 font-mono text-zinc-950">{data.folio}</dd>
             </div>
             <div>
-              <dt className="font-medium text-zinc-500">Primera fragancia</dt>
-              <dd className="mt-1 text-zinc-950">{data.blindLabels.left}</dd>
+              <dt className="font-medium text-zinc-500">Primera fragancia / brazo izquierdo</dt>
+              <dd className="mt-1 font-mono text-zinc-950">{data.blindLabels.left}</dd>
             </div>
             <div>
-              <dt className="font-medium text-zinc-500">Segunda fragancia</dt>
-              <dd className="mt-1 text-zinc-950">{data.blindLabels.right}</dd>
+              <dt className="font-medium text-zinc-500">Segunda fragancia / brazo derecho</dt>
+              <dd className="mt-1 font-mono text-zinc-950">{data.blindLabels.right}</dd>
             </div>
           </dl>
         </section>
@@ -117,7 +137,7 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
                 {activity.code === "T0_SALON" && activity.availability.canCapture ? (
                   <Link
                     className="mt-5 inline-flex w-full justify-center rounded-md bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-800"
-                    href={`/p/${encodeURIComponent(parsedToken.data)}/activities/${activity.id}`}
+                    href={activityHref(parsedToken.data, activity.id ?? "", data.testMode ? testModeParams : null)}
                   >
                     Iniciar evaluación 0 en salón
                   </Link>
@@ -125,7 +145,7 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
                 {activity.code !== "T0_SALON" && activity.availability.canCapture ? (
                   <Link
                     className="mt-5 inline-flex w-full justify-center rounded-md bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-800"
-                    href={`/p/${encodeURIComponent(parsedToken.data)}/activities/${activity.id}`}
+                    href={activityHref(parsedToken.data, activity.id ?? "", data.testMode ? testModeParams : null)}
                   >
                     Realizar evaluación
                   </Link>
@@ -137,6 +157,21 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
       </div>
     </PublicParticipantShell>
   );
+}
+
+function activityHref(token: string, activityId: string, params: NavigoTestModeParams | null): string {
+  return appendNavigoTestModeParams(`/p/${encodeURIComponent(token)}/activities/${activityId}`, params);
+}
+
+function readTestModeParams(query: { navigoTestMode?: string; navigoTestSignature?: string } | undefined): NavigoTestModeParams | null {
+  if (!query?.navigoTestMode || !query.navigoTestSignature) {
+    return null;
+  }
+
+  return {
+    navigoTestMode: query.navigoTestMode,
+    navigoTestSignature: query.navigoTestSignature
+  };
 }
 
 function availabilityMessage(reason: string): string {

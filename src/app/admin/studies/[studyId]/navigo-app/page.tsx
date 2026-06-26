@@ -19,6 +19,7 @@ import {
 } from "@/modules/navigo-app";
 import type { QuestionnaireQuestion } from "@/modules/questionnaire-engine";
 import { NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
+import { appendNavigoTestModeParams, createNavigoTestModeParams } from "@/modules/navigo-app/test-mode";
 import { SubmitButton } from "@/app/admin/_components/SubmitButton";
 import { requireCapability } from "@/shared/auth/session";
 import { AppShell } from "@/shared/ui/AppShell";
@@ -47,7 +48,7 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
   const { studyId } = await params;
   const query = await searchParams;
   const requestOrigin = resolveRequestOrigin(await headers());
-  await requireCapability("screening:review");
+  const actor = await requireCapability("screening:review");
   const result = await createNavigoAppRepository().getAdminDashboard(studyId);
 
   if (!result) {
@@ -110,6 +111,7 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
                 {result.participants.map((participant) => (
                   <ParticipantRow
                     key={participant.id}
+                    canUseTestMode={actor.role === "ADMIN"}
                     participant={participant}
                     requestOrigin={requestOrigin}
                     studyId={studyId}
@@ -126,11 +128,13 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
 }
 
 function ParticipantRow({
+  canUseTestMode,
   participant,
   requestOrigin,
   studyId,
   timeZoneIana
 }: {
+  canUseTestMode: boolean;
   participant: NavigoParticipantListItem;
   requestOrigin: string;
   studyId: string;
@@ -142,6 +146,16 @@ function ParticipantRow({
   const measurementQuestions = createNavigoMeasurementDefinition().questions;
   const participantUrl = participant.participantLinkToken
     ? new URL(`/p/${encodeURIComponent(participant.participantLinkToken)}/activities`, requestOrigin).toString()
+    : null;
+  const participantTestModeParams =
+    canUseTestMode && participant.participantLinkToken
+      ? createNavigoTestModeParams({
+          secret: process.env.PARTICIPANT_PORTAL_HASH_SECRET,
+          token: participant.participantLinkToken
+        })
+      : null;
+  const participantTestUrl = participantUrl && participantTestModeParams
+    ? appendNavigoTestModeParams(participantUrl, participantTestModeParams)
     : null;
 
   return (
@@ -196,6 +210,11 @@ function ParticipantRow({
               <dd className="inline">{identityStatusLabel(t0Activity?.identityStatus)}</dd>
             </div>
           </dl>
+          {t0Activity?.identityStatus === "REJECTED" ? (
+            <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800">
+              Incidencia de identidad en T0. No continúes con T2/T4/T8 hasta que supervisor revise el caso.
+            </p>
+          ) : null}
           {participantUrl ? (
             <Link
               className="mt-3 inline-flex w-full justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800"
@@ -249,7 +268,7 @@ function ParticipantRow({
             {pendingMessage ?? "Pendiente para iniciar T0: configuracion de rotacion."}
           </p>
         ) : null}
-        {participantUrl ? <ParticipantLinkPanel url={participantUrl} /> : null}
+        {participantUrl ? <ParticipantLinkPanel testUrl={participantTestUrl} url={participantUrl} /> : null}
         <form action={generateNavigoParticipantLinkAction.bind(null, studyId, participant.id, Boolean(participantUrl))}>
           <SubmitButton disabled={!canStart} pendingLabel="Generando link...">
             {participantUrl ? "Regenerar link participante" : "Generar link participante"}

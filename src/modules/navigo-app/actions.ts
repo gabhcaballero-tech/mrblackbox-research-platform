@@ -6,6 +6,11 @@ import { requireCapability } from "@/shared/auth/session";
 import { participantTokenSchema } from "@/shared/validation/participant";
 import { ensureNavigoAppFoundation } from "./loader";
 import {
+  appendNavigoTestModeParams,
+  isValidNavigoTestMode,
+  type NavigoTestModeParams
+} from "./test-mode";
+import {
   createNavigoAppRepository,
   type NavigoActionResult,
   type NavigoSignedActivityUpload
@@ -393,18 +398,51 @@ export async function submitNavigoActivityResponsesAction(
     answers[key] = value;
   }
 
+  const testModeParams = readNavigoTestModeParams(formData);
+  const testMode = isValidNavigoTestMode({
+    mode: testModeParams?.navigoTestMode,
+    secret: process.env.PARTICIPANT_PORTAL_HASH_SECRET,
+    signature: testModeParams?.navigoTestSignature,
+    token
+  });
+
   const result = await createNavigoAppRepository().submitActivityResponses({
     activityId,
     answers,
+    testMode,
     token
   });
 
   if (!result.ok) {
-    redirect(`/p/${encodeURIComponent(token)}/activities/${activityId}?error=${encodeURIComponent(result.message)}`);
+    redirect(
+      appendNavigoTestModeParams(
+        `/p/${encodeURIComponent(token)}/activities/${activityId}?error=${encodeURIComponent(result.message)}`,
+        testMode ? testModeParams : null
+      )
+    );
   }
 
   revalidatePath(`/p/${encodeURIComponent(token)}/activities`);
-  redirect(`/p/${encodeURIComponent(token)}/activities?message=${encodeURIComponent("Evaluacion registrada correctamente.")}`);
+  redirect(
+    appendNavigoTestModeParams(
+      `/p/${encodeURIComponent(token)}/activities?message=${encodeURIComponent("Evaluacion registrada correctamente.")}`,
+      testMode ? testModeParams : null
+    )
+  );
+}
+
+export async function confirmNavigoT0IdentityAction(
+  tokenInput: string,
+  activityId: string,
+  identityConfirmed: "NO" | "YES"
+): Promise<NavigoActionResult<{ identityStatus: "CONFIRMED" | "REJECTED" }>> {
+  const token = parseToken(tokenInput);
+
+  return createNavigoAppRepository().confirmT0Identity({
+    activityId,
+    identityConfirmed,
+    token
+  });
 }
 
 function parseApplicationStartedAt(value: FormDataEntryValue | null, timeZoneIana: string): Date | null {
@@ -443,6 +481,20 @@ function parseToken(tokenInput: string): string {
   }
 
   return parsed.data;
+}
+
+function readNavigoTestModeParams(formData: FormData): NavigoTestModeParams | null {
+  const navigoTestMode = String(formData.get("navigoTestMode") ?? "");
+  const navigoTestSignature = String(formData.get("navigoTestSignature") ?? "");
+
+  if (!navigoTestMode || !navigoTestSignature) {
+    return null;
+  }
+
+  return {
+    navigoTestMode,
+    navigoTestSignature
+  };
 }
 
 function parseRowsJson(value: string): NavigoRotationImportRowInput[] {

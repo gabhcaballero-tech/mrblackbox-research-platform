@@ -3,10 +3,11 @@
 import { useState } from "react";
 
 type ParticipantLinkPanelProps = {
+  testUrl?: string | null;
   url: string;
 };
 
-export function ParticipantLinkPanel({ url }: ParticipantLinkPanelProps) {
+export function ParticipantLinkPanel({ testUrl, url }: ParticipantLinkPanelProps) {
   const [copied, setCopied] = useState(false);
   const message = `Hola, gracias por participar en el estudio Navigo Homme. Para realizar tus evaluaciones de fragancia a 0, 2, 4 y 8 horas, entra a este enlace: ${url}. Por favor conserva este mensaje y realiza cada evaluacion cuando corresponda.`;
 
@@ -35,7 +36,22 @@ export function ParticipantLinkPanel({ url }: ParticipantLinkPanelProps) {
         >
           Abrir link
         </a>
+        {testUrl ? (
+          <a
+            className="inline-flex justify-center rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-100"
+            href={testUrl}
+            rel="noreferrer"
+            target="_blank"
+          >
+            Abrir link en modo prueba
+          </a>
+        ) : null}
       </div>
+      {testUrl ? (
+        <p className="mt-2 text-xs font-semibold text-amber-900">
+          Modo prueba: link firmado temporal para desactivar ventanas de tiempo sin saltar el orden.
+        </p>
+      ) : null}
       <p className="mt-3 text-sm leading-6 text-emerald-900">{message}</p>
     </section>
   );

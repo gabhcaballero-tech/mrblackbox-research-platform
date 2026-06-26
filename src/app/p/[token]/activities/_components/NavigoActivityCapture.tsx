@@ -3,23 +3,30 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { NAVIGO_T0_IDENTITY_QUESTION_ID } from "@/modules/navigo-app/definition";
 import {
+  confirmNavigoT0IdentityAction,
   confirmNavigoActivitySelfieUploadAction,
   requestNavigoActivitySelfieUploadAction,
   submitNavigoActivityResponsesAction
 } from "@/modules/navigo-app/actions";
 import type { QuestionnaireQuestion } from "@/modules/questionnaire-engine";
+import type { NavigoTestModeParams } from "@/modules/navigo-app/test-mode";
 import { createBrowserSupabaseClient } from "@/shared/auth/supabase/browser";
 
 type NavigoActivityCaptureProps = {
   activityId: string;
   error?: string;
   existingResponses: Record<string, unknown>;
+  fragranceCodes: {
+    left: string;
+    right: string;
+  };
   questions: QuestionnaireQuestion[];
   registeredSelfie: {
     signedUrl: string;
   } | null;
   requiresSelfie: boolean;
   selfieCount: number;
+  testModeParams: NavigoTestModeParams | null;
   token: string;
 };
 
@@ -27,10 +34,12 @@ export function NavigoActivityCapture({
   activityId,
   error,
   existingResponses,
+  fragranceCodes,
   questions,
   registeredSelfie,
   requiresSelfie,
   selfieCount,
+  testModeParams,
   token
 }: NavigoActivityCaptureProps) {
   const [selfies, setSelfies] = useState(selfieCount);
@@ -40,12 +49,25 @@ export function NavigoActivityCapture({
   const [identityRejected, setIdentityRejected] = useState(
     readAnswerValue(existingResponses[NAVIGO_T0_IDENTITY_QUESTION_ID]) === "NO"
   );
+  const [identityStep, setIdentityStep] = useState<"identity" | "incident" | "questions">(() => {
+    if (requiresSelfie) {
+      return "questions";
+    }
+    if (readAnswerValue(existingResponses[NAVIGO_T0_IDENTITY_QUESTION_ID]) === "YES") {
+      return "questions";
+    }
+    if (readAnswerValue(existingResponses[NAVIGO_T0_IDENTITY_QUESTION_ID]) === "NO") {
+      return "incident";
+    }
+    return "identity";
+  });
   const [message, setMessage] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [cameraState, setCameraState] = useState<"idle" | "opening" | "ready">("idle");
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [identityError, setIdentityError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [cameraSupported] = useState(
     () =>
@@ -269,6 +291,7 @@ export function NavigoActivityCapture({
   }
 
   const busy = isUploading || isPending;
+  const showQuestions = requiresSelfie || identityStep === "questions";
 
   return (
     <div className="space-y-6">
@@ -335,25 +358,39 @@ export function NavigoActivityCapture({
         </section>
       ) : null}
 
+      {!requiresSelfie && identityStep === "incident" ? <IdentityIncidentState registeredSelfie={registeredSelfie} /> : null}
+
+      {!requiresSelfie && identityStep === "identity" ? (
+        <IdentityConfirmation
+          busy={busy}
+          identityConfirmed={identityConfirmed}
+          identityError={identityError}
+          identityRejected={identityRejected}
+          onContinue={confirmIdentity}
+          registeredSelfie={registeredSelfie}
+          setIdentityConfirmed={setIdentityConfirmed}
+          setIdentityRejected={setIdentityRejected}
+        />
+      ) : null}
+
+      {showQuestions ? (
       <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-zinc-950">Preguntas AP1 a AP7</h2>
-        <p className="mt-2 text-sm leading-6 text-zinc-600">Responde todas las preguntas para completar esta toma.</p>
+        <p className="mt-2 text-sm leading-6 text-zinc-600">
+          Recuerda oler ambos antebrazos antes de responder.
+        </p>
+        <div className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+          <p>Primera fragancia = brazo izquierdo</p>
+          <p>Segunda fragancia = brazo derecho</p>
+          <p className="mt-1 font-mono">Brazo izquierdo: {fragranceCodes.left}</p>
+          <p className="font-mono">Brazo derecho: {fragranceCodes.right}</p>
+        </div>
         {error ? <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}</p> : null}
         {requiresSelfie && selfies === 0 ? (
           <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             Toma y guarda la selfie antes de enviar las respuestas.
           </p>
         ) : null}
-        {!requiresSelfie ? (
-          <IdentityConfirmation
-            identityConfirmed={identityConfirmed}
-            identityRejected={identityRejected}
-            registeredSelfie={registeredSelfie}
-            setIdentityConfirmed={setIdentityConfirmed}
-            setIdentityRejected={setIdentityRejected}
-          />
-        ) : null}
-
         <form action={submitNavigoActivityResponsesAction.bind(null, token, activityId)} className="mt-5 space-y-6">
           {questions.map((question, index) => (
             <QuestionControl
@@ -370,6 +407,12 @@ export function NavigoActivityCapture({
               value={identityConfirmed ? "YES" : identityRejected ? "NO" : ""}
             />
           ) : null}
+          {testModeParams ? (
+            <>
+              <input name="navigoTestMode" type="hidden" value={testModeParams.navigoTestMode} />
+              <input name="navigoTestSignature" type="hidden" value={testModeParams.navigoTestSignature} />
+            </>
+          ) : null}
           {identityRejected ? (
             <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
               No se puede continuar. Contacta al supervisor para revisar la identidad del participante.
@@ -380,25 +423,76 @@ export function NavigoActivityCapture({
           </button>
         </form>
       </section>
+      ) : null}
     </div>
+  );
+
+  function confirmIdentity() {
+    if (!identityConfirmed && !identityRejected) {
+      setIdentityError("Selecciona si la persona coincide o no con la foto registrada.");
+      return;
+    }
+
+    const value = identityConfirmed ? "YES" : "NO";
+    setIdentityError(null);
+
+    startTransition(async () => {
+      const result = await confirmNavigoT0IdentityAction(token, activityId, value);
+      if (!result.ok) {
+        setIdentityError(result.message);
+        return;
+      }
+      if (result.data.identityStatus === "REJECTED") {
+        setIdentityStep("incident");
+        return;
+      }
+      setIdentityStep("questions");
+    });
+  }
+}
+
+function IdentityIncidentState({ registeredSelfie }: { registeredSelfie: { signedUrl: string } | null }) {
+  return (
+    <section className="rounded-lg border border-rose-200 bg-rose-50 p-5 shadow-sm">
+      <h3 className="text-base font-semibold text-rose-950">Incidencia de identidad en T0</h3>
+      <p className="mt-2 text-sm leading-6 text-rose-900">
+        No se puede continuar. Contacta al supervisor para revisar la identidad del participante.
+      </p>
+      {registeredSelfie ? (
+        <div className="mt-4 rounded-lg border border-rose-200 bg-white p-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            alt="Foto registrada del participante"
+            className="max-h-[70vh] w-full rounded-md object-contain"
+            src={registeredSelfie.signedUrl}
+          />
+        </div>
+      ) : null}
+    </section>
   );
 }
 
 function IdentityConfirmation({
+  busy,
   identityConfirmed,
+  identityError,
   identityRejected,
+  onContinue,
   registeredSelfie,
   setIdentityConfirmed,
   setIdentityRejected
 }: {
+  busy: boolean;
   identityConfirmed: boolean;
+  identityError: string | null;
   identityRejected: boolean;
+  onContinue: () => void;
   registeredSelfie: { signedUrl: string } | null;
   setIdentityConfirmed: (value: boolean) => void;
   setIdentityRejected: (value: boolean) => void;
 }) {
   return (
-    <section className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4">
+    <section className="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
       <h3 className="text-base font-semibold text-amber-950">Verificación visual de identidad</h3>
       <p className="mt-2 text-sm leading-6 text-amber-900">
         El encuestador debe confirmar que la persona presente coincide con la foto registrada en el filtro.
@@ -447,6 +541,24 @@ function IdentityConfirmation({
           </label>
         </div>
       </fieldset>
+      {identityRejected ? (
+        <p className="mt-4 rounded-md border border-rose-200 bg-white px-3 py-2 text-sm text-rose-800">
+          No se puede continuar. Contacta al supervisor para revisar la identidad del participante.
+        </p>
+      ) : null}
+      {identityError ? (
+        <p className="mt-4 rounded-md border border-rose-200 bg-white px-3 py-2 text-sm text-rose-800">
+          {identityError}
+        </p>
+      ) : null}
+      <button
+        className={primaryButtonClass}
+        disabled={busy || (!identityConfirmed && !identityRejected) || (identityConfirmed && !registeredSelfie)}
+        onClick={onContinue}
+        type="button"
+      >
+        {busy ? "Guardando identidad..." : "Continuar"}
+      </button>
     </section>
   );
 }

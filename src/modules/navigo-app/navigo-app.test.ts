@@ -25,6 +25,11 @@ import {
 } from "./index";
 import { DETERGENTS_STUDY_CODE, NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
 import { resolveRequestOrigin } from "@/shared/utils/request-origin";
+import {
+  appendNavigoTestModeParams,
+  createNavigoTestModeParams,
+  isValidNavigoTestMode
+} from "./test-mode";
 
 describe("navigo app schema foundation", () => {
   it("adds optional ActivitySchedule.code and composite uniqueness by study", () => {
@@ -314,6 +319,28 @@ describe("navigo app MVP rules", () => {
     });
   });
 
+  it("allows admin test mode to skip time windows without skipping measurement order", () => {
+    const beforeWindow = buildNavigoActivityTimeline({
+      activities: navigoActivityRecords(),
+      now: new Date("2026-06-25T15:20:00.000Z"),
+      testMode: true
+    });
+    const t4BeforeT2 = buildNavigoActivityTimeline({
+      activities: navigoActivityRecords(),
+      now: new Date("2026-06-25T15:20:00.000Z"),
+      testMode: true
+    });
+
+    expect(beforeWindow.find((activity) => activity.code === "T2_HORAS")?.availability).toMatchObject({
+      canCapture: true,
+      reason: "AVAILABLE"
+    });
+    expect(t4BeforeT2.find((activity) => activity.code === "T4_HORAS")?.availability).toMatchObject({
+      canCapture: false,
+      reason: "PREVIOUS_REQUIRED"
+    });
+  });
+
   it("does not allow skipping T4 or T8 when previous measurements are pending", () => {
     const t4Blocked = buildNavigoActivityTimeline({
       activities: navigoActivityRecords(),
@@ -408,6 +435,42 @@ describe("navigo app MVP rules", () => {
     expect(JSON.stringify(createNavigoMeasurementDefinition())).not.toContain("realName");
   });
 
+  it("signs temporary test mode links for one participant token only", () => {
+    const params = createNavigoTestModeParams({
+      now: new Date("2026-06-26T12:00:00.000Z"),
+      secret: "server-secret",
+      token: "participant-token-1"
+    });
+
+    expect(params).not.toBeNull();
+    if (!params) {
+      return;
+    }
+
+    expect(isValidNavigoTestMode({
+      mode: params.navigoTestMode,
+      now: new Date("2026-06-26T12:30:00.000Z"),
+      secret: "server-secret",
+      signature: params.navigoTestSignature,
+      token: "participant-token-1"
+    })).toBe(true);
+    expect(isValidNavigoTestMode({
+      mode: params.navigoTestMode,
+      now: new Date("2026-06-26T12:30:00.000Z"),
+      secret: "server-secret",
+      signature: params.navigoTestSignature,
+      token: "other-token"
+    })).toBe(false);
+    expect(isValidNavigoTestMode({
+      mode: params.navigoTestMode,
+      now: new Date("2026-06-26T15:01:00.000Z"),
+      secret: "server-secret",
+      signature: params.navigoTestSignature,
+      token: "participant-token-1"
+    })).toBe(false);
+    expect(appendNavigoTestModeParams("/p/token/activities", params)).toContain("navigoTestMode=");
+  });
+
   it("normalizes rotation codes and reports missing arms without blaming folio", () => {
     expect(normalizeNavigoRotationCode("  ab 12 \n")).toBe("AB12");
     expect(
@@ -497,7 +560,38 @@ describe("navigo app MVP rules", () => {
     expect(repository).toContain("ensureNavigoT0Activity");
     expect(repository).toContain("createRegisteredSelfiePreview");
     expect(capture).toContain("Verificación visual de identidad");
+    expect(capture).toContain("IdentityConfirmation");
+    expect(capture).toContain("IdentityIncidentState");
+    expect(capture).toContain("confirmNavigoT0IdentityAction");
+    expect(capture).toContain("Recuerda oler ambos antebrazos antes de responder.");
     expect(capture).toContain("Toma y guarda la selfie antes de enviar las respuestas.");
+  });
+
+  it("shows participant name, blind codes and admin-only test links in Navigo app UI", () => {
+    const adminPage = readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "page.tsx");
+    const activitiesPage = readWorkspaceFile("src", "app", "p", "[token]", "activities", "page.tsx");
+    const activityPage = readWorkspaceFile("src", "app", "p", "[token]", "activities", "[activityId]", "page.tsx");
+    const linkPanel = readWorkspaceFile(
+      "src",
+      "app",
+      "admin",
+      "studies",
+      "[studyId]",
+      "navigo-app",
+      "_components",
+      "ParticipantLinkPanel.tsx"
+    );
+
+    expect(adminPage).toContain("actor.role === \"ADMIN\"");
+    expect(adminPage).toContain("PARTICIPANT_PORTAL_HASH_SECRET");
+    expect(adminPage).toContain("Incidencia de identidad en T0");
+    expect(linkPanel).toContain("Abrir link en modo prueba");
+    expect(linkPanel).toContain("Modo prueba: link firmado temporal");
+    expect(activitiesPage).toContain("Participante");
+    expect(activitiesPage).toContain("Primera fragancia / brazo izquierdo");
+    expect(activitiesPage).toContain("Segunda fragancia / brazo derecho");
+    expect(activityPage).toContain("Datos de participación");
+    expect(activityPage).toContain("fragranceCodes={data.blindLabels}");
   });
 
   it("converts Navigo datetime-local values using the study time zone", () => {
