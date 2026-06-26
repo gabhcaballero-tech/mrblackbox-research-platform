@@ -3,11 +3,10 @@
 import { useState } from "react";
 
 type ParticipantLinkPanelProps = {
-  participantId?: string;
   url: string;
 };
 
-export function ParticipantLinkPanel({ participantId, url }: ParticipantLinkPanelProps) {
+export function ParticipantLinkPanel({ url }: ParticipantLinkPanelProps) {
   const [copied, setCopied] = useState(false);
   const message = `Hola, gracias por participar en el estudio Navigo Homme. Para realizar tus evaluaciones de fragancia a 0, 2, 4 y 8 horas, entra a este enlace: ${url}. Por favor conserva este mensaje y realiza cada evaluacion cuando corresponda.`;
 
@@ -38,7 +37,6 @@ export function ParticipantLinkPanel({ participantId, url }: ParticipantLinkPane
         </a>
       </div>
       <p className="mt-3 text-sm leading-6 text-emerald-900">{message}</p>
-      {participantId ? <p className="mt-2 text-xs text-emerald-800">Participante actualizado: {participantId}</p> : null}
     </section>
   );
 }

@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { configureNavigoRotationAction, startNavigoT0Action } from "@/modules/navigo-app/actions";
+import {
+  configureNavigoRotationAction,
+  generateNavigoParticipantLinkAction,
+  startNavigoT0Action
+} from "@/modules/navigo-app/actions";
 import {
   createNavigoAppRepository,
   createNavigoMeasurementDefinition,
@@ -12,6 +16,7 @@ import {
 } from "@/modules/navigo-app";
 import type { QuestionnaireQuestion } from "@/modules/questionnaire-engine";
 import { NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
+import { SubmitButton } from "@/app/admin/_components/SubmitButton";
 import { requireCapability } from "@/shared/auth/session";
 import { AppShell } from "@/shared/ui/AppShell";
 import { EmptyState } from "@/shared/ui/EmptyState";
@@ -83,13 +88,6 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
               {query.navigoError}
             </p>
           ) : null}
-          {query?.token ? (
-            <ParticipantLinkPanel
-              participantId={query.participant}
-              url={new URL(`/p/${encodeURIComponent(query.token)}/activities`, requestOrigin).toString()}
-            />
-          ) : null}
-
           <NavigoRotationImportPanel studyId={studyId} />
 
           {result.participants.length === 0 ? (
@@ -110,7 +108,7 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
                   <ParticipantRow
                     key={participant.id}
                     participant={participant}
-                    selectedToken={query?.participant === participant.id ? query.token : undefined}
+                    requestOrigin={requestOrigin}
                     studyId={studyId}
                     timeZoneIana={result.timeZoneIana}
                   />
@@ -126,12 +124,12 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
 
 function ParticipantRow({
   participant,
-  selectedToken,
+  requestOrigin,
   studyId,
   timeZoneIana
 }: {
   participant: NavigoParticipantListItem;
-  selectedToken?: string;
+  requestOrigin: string;
   studyId: string;
   timeZoneIana: string;
 }) {
@@ -139,6 +137,9 @@ function ParticipantRow({
   const pendingMessage = participant.rotation.startPendingMessage;
   const t0Completed = participant.activities.some((activity) => activity.code === "T0_SALON" && activity.status === "COMPLETED");
   const measurementQuestions = createNavigoMeasurementDefinition().questions;
+  const participantUrl = participant.participantLinkToken
+    ? new URL(`/p/${encodeURIComponent(participant.participantLinkToken)}/activities`, requestOrigin).toString()
+    : null;
 
   return (
     <article className="grid gap-5 p-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)_minmax(300px,0.95fr)]">
@@ -178,7 +179,7 @@ function ParticipantRow({
       <div className="space-y-3">
         <form action={startNavigoT0Action.bind(null, studyId, participant.id)} className="space-y-3">
           <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
-            Hora base T0
+            {participant.applicationStartedAt ? "Corregir hora base T0" : "Hora base T0"}
             <input
               className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-950"
               defaultValue={formatNavigoDateTimeLocal(participant.applicationStartedAt ?? new Date(), timeZoneIana)}
@@ -200,25 +201,23 @@ function ParticipantRow({
               ))}
             </div>
           </details>
-          <button
-            className="inline-flex w-full justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
-            disabled={!canStart}
-            type="submit"
-          >
-            {participant.applicationStartedAt ? "Editar T0 / generar link" : "Capturar T0 / generar link"}
-          </button>
+          <SubmitButton disabled={!canStart} pendingLabel="Guardando T0...">
+            {participant.applicationStartedAt ? "Guardar T0" : "Capturar T0"}
+          </SubmitButton>
         </form>
         {!canStart ? (
           <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
             {pendingMessage ?? "Pendiente para iniciar T0: configuracion de rotacion."}
           </p>
         ) : null}
-        {selectedToken ? (
-          <Link className="text-sm font-semibold text-teal-700 transition hover:text-teal-800" href={`/p/${selectedToken}/activities`}>
-            Abrir link participante
-          </Link>
-        ) : participant.hasRecoverableToken ? (
-          <p className="text-xs text-zinc-500">El participante ya tiene link activo. Puedes regenerarlo con T0.</p>
+        {participantUrl ? <ParticipantLinkPanel url={participantUrl} /> : null}
+        <form action={generateNavigoParticipantLinkAction.bind(null, studyId, participant.id, Boolean(participantUrl))}>
+          <SubmitButton disabled={!canStart || !participant.applicationStartedAt} pendingLabel="Generando link...">
+            {participantUrl ? "Regenerar link participante" : "Generar link participante"}
+          </SubmitButton>
+        </form>
+        {participant.applicationStartedAt ? (
+          <p className="text-xs text-zinc-500">Para corregir hora base T0, ajusta el campo de hora y presiona Guardar T0.</p>
         ) : null}
       </div>
     </article>

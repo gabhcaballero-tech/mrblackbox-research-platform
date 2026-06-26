@@ -429,10 +429,16 @@ describe("navigo app MVP rules", () => {
     );
 
     expect(adminPage).toContain("resolveRequestOrigin");
-    expect(adminPage).toContain("new URL(`/p/${encodeURIComponent(query.token)}/activities`, requestOrigin).toString()");
+    expect(adminPage).toContain("participant.participantLinkToken");
+    expect(adminPage).toContain("new URL(`/p/${encodeURIComponent(participant.participantLinkToken)}/activities`, requestOrigin).toString()");
+    expect(adminPage).toContain("Guardar T0");
+    expect(adminPage).toContain("Generar link participante");
+    expect(adminPage).toContain("Regenerar link participante");
+    expect(adminPage).toContain("Corregir hora base T0");
     expect(linkPanel).toContain("Copiar link");
     expect(linkPanel).toContain("Abrir link");
     expect(linkPanel).toContain("${url}");
+    expect(linkPanel).not.toContain("Participante actualizado");
   });
 
   it("resolves absolute origin from forwarded headers with local fallback", () => {

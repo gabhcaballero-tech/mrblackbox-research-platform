@@ -54,6 +54,7 @@ export type NavigoParticipantListItem = {
     referenceCodes: Array<{ code: string; slot: number }>;
   } | null;
   hasRecoverableToken: boolean;
+  participantLinkToken: string | null;
   id: string;
   participant: {
     email: string | null;
@@ -84,6 +85,17 @@ export type NavigoAdminDashboard = {
 };
 
 export type NavigoStartT0Result =
+  | {
+      linkToken: string;
+      message: string;
+      ok: true;
+    }
+  | {
+      message: string;
+      ok: false;
+    };
+
+export type NavigoParticipantLinkResult =
   | {
       linkToken: string;
       message: string;
@@ -207,6 +219,12 @@ export type NavigoAppRepository = {
   }) => Promise<NavigoActivityCaptureView>;
   getAdminDashboard: (studyId: string, now?: Date) => Promise<NavigoAdminDashboard | null>;
   getParticipantActivitiesView: (input: { now?: Date; token: string }) => Promise<NavigoParticipantActivitiesView>;
+  generateParticipantLink: (input: {
+    actorUserId: string;
+    forceRegenerate?: boolean;
+    now?: Date;
+    studyParticipantId: string;
+  }) => Promise<NavigoParticipantLinkResult>;
   previewRotationImport: (input: {
     rows: NavigoRotationImportRowInput[];
     studyId: string;
@@ -1166,6 +1184,46 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
       };
     },
 
+    async generateParticipantLink(input) {
+      const prisma = await getPrisma();
+      const now = input.now ?? new Date();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = (await tx.studyParticipant.findUnique?.({
+          select: participantWithActivitiesSelect,
+          where: { id: input.studyParticipantId }
+        })) as ParticipantRecord | null;
+
+        if (!participant) {
+          return { message: "No encontramos el participante.", ok: false };
+        }
+
+        const guard = validateParticipantForT0(participant);
+
+        if (!guard.ok) {
+          return guard;
+        }
+
+        if (!participant.applicationStartedAt) {
+          return { message: "Captura T0 antes de generar el link participante.", ok: false };
+        }
+
+        const linkToken = await ensureParticipantAccessToken({
+          actorUserId: input.actorUserId,
+          forceRegenerate: input.forceRegenerate,
+          now,
+          participant,
+          prisma: tx
+        });
+
+        return {
+          linkToken,
+          message: input.forceRegenerate ? "Link participante regenerado correctamente." : "Link participante generado correctamente.",
+          ok: true
+        };
+      });
+    },
+
     async requestActivitySelfieUpload(input) {
       const prisma = await getPrisma();
       const participant = await getParticipantByToken(input.token, prisma);
@@ -1410,7 +1468,7 @@ function toDashboardParticipant(participant: ParticipantRecord, now: Date): Navi
     alert,
     applicationStartedAt: participant.applicationStartedAt,
     confirmation: participant.participantConfirmation,
-    hasRecoverableToken: (participant.accessTokens ?? []).some((token) => token.tokenHash === hashToken(token.id)),
+    hasRecoverableToken: Boolean(participant.accessTokens?.[0]),
     id: participant.id,
     participant: {
       email: participant.participantProfile.email,
@@ -1419,6 +1477,7 @@ function toDashboardParticipant(participant: ParticipantRecord, now: Date): Navi
     },
     rotation,
     rotationReady: rotation.ready,
+    participantLinkToken: participant.accessTokens?.[0]?.id ?? null,
     status: participantStatus(participant)
   };
 }
@@ -2167,18 +2226,20 @@ function hasT0Started(participant: ParticipantRecord): boolean {
 
 async function ensureParticipantAccessToken({
   actorUserId,
+  forceRegenerate = false,
   now,
   participant,
   prisma
 }: {
   actorUserId: string;
+  forceRegenerate?: boolean;
   now: Date;
   participant: ParticipantRecord;
   prisma: NavigoTransactionClient;
 }): Promise<string> {
   const activeToken = participant.accessTokens?.[0];
 
-  if (activeToken && activeToken.tokenHash === hashToken(activeToken.id) && activeToken.expiresAt.getTime() > now.getTime()) {
+  if (!forceRegenerate && activeToken && activeToken.tokenHash === hashToken(activeToken.id) && activeToken.expiresAt.getTime() > now.getTime()) {
     return activeToken.id;
   }
 

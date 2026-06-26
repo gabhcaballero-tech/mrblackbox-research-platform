@@ -43,10 +43,28 @@ export async function startNavigoT0Action(studyId: string, studyParticipantId: s
 
   revalidatePath(`/admin/studies/${studyId}/navigo-app`);
   redirectWithNavigoMessage(studyId, {
-    message: result.message,
-    participant: studyParticipantId,
-    token: result.linkToken
+    message: result.message
   });
+}
+
+export async function generateNavigoParticipantLinkAction(
+  studyId: string,
+  studyParticipantId: string,
+  forceRegenerate: boolean
+) {
+  const actor = await requireCapability("application-time:record");
+  const result = await createNavigoAppRepository().generateParticipantLink({
+    actorUserId: actor.id,
+    forceRegenerate,
+    studyParticipantId
+  });
+
+  if (!result.ok) {
+    redirectWithNavigoMessage(studyId, { error: result.message });
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+  redirectWithNavigoMessage(studyId, { message: result.message });
 }
 
 export async function configureNavigoRotationAction(studyId: string, studyParticipantId: string, formData: FormData) {
