@@ -21,6 +21,10 @@ import {
 import type { QuestionnaireQuestion } from "@/modules/questionnaire-engine";
 import { NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
 import { appendNavigoTestModeParams, createNavigoTestModeParams } from "@/modules/navigo-app/test-mode";
+import {
+  faceVerificationResultLabel,
+  parseNavigoFaceVerificationNote
+} from "@/modules/navigo-app/face-verification-contract";
 import { SubmitButton } from "@/app/admin/_components/SubmitButton";
 import { requireCapability } from "@/shared/auth/session";
 import { AppShell } from "@/shared/ui/AppShell";
@@ -93,6 +97,9 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
               {query.navigoError}
             </p>
           ) : null}
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            Antes de usar verificación facial automática en producción, confirma que el aviso de privacidad y consentimiento cubren verificación biométrica automatizada.
+          </p>
           <NavigoRotationImportPanel studyId={studyId} />
 
           {result.participants.length === 0 ? (
@@ -578,11 +585,12 @@ function ActivityIdentityReview({
   timeZoneIana: string;
 }) {
   const activitySelfie = activity?.activitySelfie ?? null;
+  const automaticFaceReview = parseNavigoFaceVerificationNote(activitySelfie?.internalNote);
 
   return (
     <section>
       <h4 className="text-sm font-semibold text-zinc-950">Revisión visual de identidad</h4>
-      <p className="mt-1 text-xs text-zinc-500">Verificación automática: no configurada. La decisión es manual.</p>
+      <p className="mt-1 text-xs text-zinc-500">T0 mantiene confirmación visual humana. T2/T4/T8 usan verificación facial automática y permiten revisión manual.</p>
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         <SelfiePreview title="Selfie registrada del filtro" url={registeredSelfie?.signedUrl ?? null} />
         {isT0 ? (
@@ -600,6 +608,24 @@ function ActivityIdentityReview({
       {!isT0 && activitySelfie ? (
         <div className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-3">
           <p className="text-sm font-semibold text-zinc-950">Estado: {identityReviewStatusLabel(activitySelfie)}</p>
+          <dl className="mt-3 grid gap-2 rounded-md border border-zinc-200 bg-white p-3 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Resultado automático</dt>
+              <dd className="mt-1 text-zinc-900">{faceVerificationResultLabel(automaticFaceReview.status)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Score/similitud</dt>
+              <dd className="mt-1 text-zinc-900">{automaticFaceReview.score ?? "No disponible"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Método/modelo</dt>
+              <dd className="mt-1 break-words text-zinc-900">{automaticFaceReview.method ?? "No configurado"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Evaluado</dt>
+              <dd className="mt-1 text-zinc-900">{automaticFaceReview.evaluatedAt ?? "No disponible"}</dd>
+            </div>
+          </dl>
           {activitySelfie.reviewStatus === "REJECTED" ? (
             <p className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
               Incidencia de identidad: bloquear avance hasta revisión.

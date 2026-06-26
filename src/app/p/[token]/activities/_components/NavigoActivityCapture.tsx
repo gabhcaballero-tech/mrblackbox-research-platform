@@ -10,6 +10,8 @@ import {
 } from "@/modules/navigo-app/actions";
 import type { QuestionnaireQuestion } from "@/modules/questionnaire-engine";
 import type { NavigoTestModeParams } from "@/modules/navigo-app/test-mode";
+import { verifyNavigoFaceIdentity } from "@/modules/navigo-app/face-verification-client";
+import type { NavigoFaceVerificationClientResult } from "@/modules/navigo-app/face-verification-contract";
 import { createBrowserSupabaseClient } from "@/shared/auth/supabase/browser";
 
 type NavigoActivityCaptureProps = {
@@ -69,6 +71,7 @@ export function NavigoActivityCapture({
   const [cameraState, setCameraState] = useState<"idle" | "opening" | "ready">("idle");
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selfieProcessingLabel, setSelfieProcessingLabel] = useState("Subiendo selfie...");
   const [isUploading, setIsUploading] = useState(false);
   const [identityError, setIdentityError] = useState<string | null>(null);
   const [activeStream, setActiveStream] = useState<MediaStream | null>(null);
@@ -235,6 +238,7 @@ export function NavigoActivityCapture({
 
     const file = capturedFile;
     setIsUploading(true);
+    setSelfieProcessingLabel("Subiendo selfie...");
     setUploadError(null);
     setMessage(null);
 
@@ -264,7 +268,14 @@ export function NavigoActivityCapture({
           return;
         }
 
+        setSelfieProcessingLabel("Verificando identidad...");
+        const faceVerification = await runActivityFaceVerification({
+          capturedSelfie: file,
+          registeredSelfieUrl: registeredSelfie?.signedUrl ?? null
+        });
+
         const confirmed = await confirmNavigoActivitySelfieUploadAction(token, activityId, {
+          faceVerification,
           ...metadata,
           privateStorageKey: signed.data.privateStorageKey,
           storageBucket: signed.data.storageBucket
@@ -282,6 +293,7 @@ export function NavigoActivityCapture({
       } catch {
         setUploadError("No fue posible subir la selfie. Revisa tu conexión e intenta nuevamente.");
       } finally {
+        setSelfieProcessingLabel("Subiendo selfie...");
         setIsUploading(false);
       }
     });
@@ -321,7 +333,7 @@ export function NavigoActivityCapture({
           </p>
           <p className="mt-2 text-sm text-zinc-500">Selfie registrada: {selfies}/1</p>
 
-          {message ? (
+          {message && identityReviewStatus === "APPROVED" ? (
             <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
               {message}
             </p>
@@ -361,7 +373,7 @@ export function NavigoActivityCapture({
                   Repetir foto
                 </button>
                 <button className={primaryButtonClass} disabled={busy} onClick={useCapturedPhoto} type="button">
-                  {busy ? "Subiendo selfie..." : "Usar esta selfie"}
+                  {busy ? selfieProcessingLabel : "Usar esta selfie"}
                 </button>
               </div>
             </div>
@@ -493,6 +505,13 @@ function IdentityIncidentState({ registeredSelfie }: { registeredSelfie: { signe
       ) : null}
     </section>
   );
+}
+
+async function runActivityFaceVerification(input: {
+  capturedSelfie: File;
+  registeredSelfieUrl: string | null;
+}): Promise<NavigoFaceVerificationClientResult> {
+  return verifyNavigoFaceIdentity(input);
 }
 
 function IdentityConfirmation({

@@ -6,6 +6,7 @@ import {
   requestNavigoActivitySelfieUploadAction
 } from "@/modules/navigo-app/actions";
 import { createNavigoMeasurementDefinition } from "@/modules/navigo-app";
+import { verifyNavigoFaceIdentity } from "@/modules/navigo-app/face-verification-client";
 import { createBrowserSupabaseClient } from "@/shared/auth/supabase/browser";
 import { NavigoActivityCapture } from "./NavigoActivityCapture";
 
@@ -26,6 +27,10 @@ vi.mock("@/shared/auth/supabase/browser", () => ({
       }))
     }
   }))
+}));
+
+vi.mock("@/modules/navigo-app/face-verification-client", () => ({
+  verifyNavigoFaceIdentity: vi.fn()
 }));
 
 let videoSize = { height: 480, width: 640 };
@@ -67,9 +72,23 @@ beforeEach(() => {
     },
     ok: true
   });
-  vi.mocked(confirmNavigoActivitySelfieUploadAction).mockResolvedValue({
-    data: { internalNote: null, reviewStatus: "APPROVED", selfieCount: 1 },
-    ok: true
+  vi.mocked(verifyNavigoFaceIdentity).mockResolvedValue({
+    evaluatedAt: "2026-06-26T12:00:00.000Z",
+    method: "@vladmandic/human:faceres+blazeface:v1",
+    score: 0.82,
+    status: "MATCH"
+  });
+  vi.mocked(confirmNavigoActivitySelfieUploadAction).mockImplementation(async (_token, _activityId, metadata) => {
+    const status = metadata.faceVerification?.status;
+
+    if (status === "MATCH") {
+      return { data: { internalNote: "MATCH", reviewStatus: "APPROVED", selfieCount: 1 }, ok: true };
+    }
+    if (status === "NO_MATCH") {
+      return { data: { internalNote: "NO_MATCH", reviewStatus: "REJECTED", selfieCount: 1 }, ok: true };
+    }
+
+    return { data: { internalNote: "PENDING", reviewStatus: "PENDING", selfieCount: 1 }, ok: true };
   });
   vi.mocked(confirmNavigoT0IdentityAction).mockResolvedValue({
     data: { identityStatus: "CONFIRMED" },
@@ -173,11 +192,22 @@ describe("NavigoActivityCapture", () => {
   });
 
   it("uploads a selfie and only then opens AP1 to AP7", async () => {
-    renderCapture();
+    renderCapture({ registeredSelfie: { signedUrl: "https://example.test/base-selfie.jpg" } });
 
     await uploadSelfie();
 
     expect(createBrowserSupabaseClient).toHaveBeenCalled();
+    expect(verifyNavigoFaceIdentity).toHaveBeenCalledWith({
+      capturedSelfie: expect.any(File),
+      registeredSelfieUrl: "https://example.test/base-selfie.jpg"
+    });
+    expect(confirmNavigoActivitySelfieUploadAction).toHaveBeenCalledWith(
+      "participant-token",
+      "activity-t2",
+      expect.objectContaining({
+        faceVerification: expect.objectContaining({ status: "MATCH" })
+      })
+    );
     expect(uploadToSignedUrl).toHaveBeenCalledWith(
       "studies/study-1/participants/profile-1/activities/activity-t2/selfie.jpg",
       "signed-token",
@@ -185,6 +215,54 @@ describe("NavigoActivityCapture", () => {
       expect.objectContaining({ upsert: false })
     );
     expect(await screen.findByText("Preguntas AP1 a AP7")).toBeInTheDocument();
+  });
+
+  it("rejects an automatic NO_MATCH result and keeps AP1 to AP7 hidden", async () => {
+    vi.mocked(verifyNavigoFaceIdentity).mockResolvedValueOnce({
+      evaluatedAt: "2026-06-26T12:00:00.000Z",
+      method: "@vladmandic/human:faceres+blazeface:v1",
+      reason: "LOW_SIMILARITY",
+      score: 0.2,
+      status: "NO_MATCH"
+    });
+    renderCapture({ registeredSelfie: { signedUrl: "https://example.test/base-selfie.jpg" } });
+
+    await uploadSelfie();
+
+    expect(await screen.findByText("No fue posible confirmar tu identidad. Contacta a tu reclutador.")).toBeInTheDocument();
+    expect(screen.queryByText("Preguntas AP1 a AP7")).not.toBeInTheDocument();
+  });
+
+  it("keeps AP1 to AP7 hidden when automatic verification is uncertain", async () => {
+    vi.mocked(verifyNavigoFaceIdentity).mockResolvedValueOnce({
+      evaluatedAt: "2026-06-26T12:00:00.000Z",
+      method: "@vladmandic/human:faceres+blazeface:v1",
+      reason: "CAPTURED_NO_FACE",
+      score: null,
+      status: "UNCERTAIN"
+    });
+    renderCapture({ registeredSelfie: { signedUrl: "https://example.test/base-selfie.jpg" } });
+
+    await uploadSelfie();
+
+    expect(await screen.findByText("No fue posible confirmar tu identidad automáticamente. Contacta a tu reclutador.")).toBeInTheDocument();
+    expect(screen.queryByText("Preguntas AP1 a AP7")).not.toBeInTheDocument();
+  });
+
+  it("keeps AP1 to AP7 hidden when the facial model returns an error", async () => {
+    vi.mocked(verifyNavigoFaceIdentity).mockResolvedValueOnce({
+      evaluatedAt: "2026-06-26T12:00:00.000Z",
+      method: "@vladmandic/human:faceres+blazeface:v1",
+      reason: "MODEL_ERROR",
+      score: null,
+      status: "ERROR"
+    });
+    renderCapture({ registeredSelfie: { signedUrl: "https://example.test/base-selfie.jpg" } });
+
+    await uploadSelfie();
+
+    expect(await screen.findByText("No fue posible confirmar tu identidad automáticamente. Contacta a tu reclutador.")).toBeInTheDocument();
+    expect(screen.queryByText("Preguntas AP1 a AP7")).not.toBeInTheDocument();
   });
 
   it("keeps AP1 to AP7 hidden when upload fails", async () => {

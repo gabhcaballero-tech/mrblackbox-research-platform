@@ -34,6 +34,10 @@ import {
   type NavigoRotationImportRowInput,
   type NavigoScheduleRecord
 } from "./service";
+import {
+  normalizeNavigoFaceVerificationForStorage,
+  type NavigoFaceVerificationClientResult
+} from "./face-verification-contract";
 
 export type NavigoInternalActor = {
   id: string;
@@ -248,6 +252,7 @@ export type NavigoAppRepository = {
   confirmActivitySelfieUpload: (input: {
     activityId: string;
     metadata: EvidenceUploadMetadata & {
+      faceVerification?: NavigoFaceVerificationClientResult | null;
       privateStorageKey: string;
       storageBucket: string;
     };
@@ -1415,13 +1420,10 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           folio: participant.participantConfirmation?.folio ?? "Sin folio",
           participantName: participant.participantProfile.name,
           questions: createNavigoMeasurementDefinition().questions,
-          registeredSelfie:
-            activity.activitySchedule.code === "T0_SALON"
-              ? await createRegisteredSelfiePreview({
-                  participant,
-                  storage: input.storage ?? createSupabaseEvidenceStorageClient()
-                })
-              : null,
+          registeredSelfie: await createRegisteredSelfiePreview({
+            participant,
+            storage: input.storage ?? createSupabaseEvidenceStorageClient()
+          }),
           selfieReviewStatus: activitySelfie?.reviewStatus ?? null,
           selfieCount: activity.participantActivityEvidence.filter((evidence) => evidence.type === "SELFIE_IDENTIFICATION").length,
           study: participant.study,
@@ -1546,6 +1548,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
       const evidence = (await prisma.participantActivityEvidence.findFirst?.({
         select: {
           id: true,
+          internalNote: true,
           participantActivity: {
             select: {
               studyParticipant: {
@@ -1561,7 +1564,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           id: input.evidenceId,
           type: "SELFIE_IDENTIFICATION"
         }
-      })) as { id: string; participantActivity: { studyParticipant: { studyId: string } }; type: "SELFIE_IDENTIFICATION" } | null;
+      })) as { id: string; internalNote: string | null; participantActivity: { studyParticipant: { studyId: string } }; type: "SELFIE_IDENTIFICATION" } | null;
 
       if (!evidence || evidence.participantActivity.studyParticipant.studyId !== input.studyId) {
         return { message: "No encontramos la selfie de esta toma para el estudio.", ok: false };
@@ -1569,7 +1572,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
 
       await prisma.participantActivityEvidence.update?.({
         data: {
-          internalNote: input.status === "PENDING" ? (input.internalNote?.trim() || "Requiere revisión manual de identidad.") : input.internalNote?.trim() || null,
+          internalNote: input.internalNote?.trim() || evidence.internalNote || (input.status === "PENDING" ? "Requiere revisión manual de identidad." : null),
           rejectionReason: input.status === "REJECTED" ? input.rejectionReason?.trim() : null,
           reviewStatus: input.status,
           reviewedAt: new Date(),
@@ -1621,26 +1624,29 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         studyId: participant.study.id
       });
 
+      const faceVerification = normalizeNavigoFaceVerificationForStorage(input.metadata.faceVerification);
+
       await prisma.participantActivityEvidence.create?.({
         data: {
           extension: extensionFromFilename(input.metadata.originalFilename),
-          internalNote: "Verificación automática de identidad no configurada. Requiere revisión manual.",
+          internalNote: faceVerification.internalNote,
           mimeType: input.metadata.mimeType,
           originalFilename: input.metadata.originalFilename,
           participantActivityId: activity.id,
           privateStorageKey: input.metadata.privateStorageKey,
+          rejectionReason: faceVerification.rejectionReason,
           sizeBytes: input.metadata.sizeBytes,
           storageBucket: input.metadata.storageBucket,
           studyParticipantId: participant.id,
-          reviewStatus: "PENDING",
+          reviewStatus: faceVerification.reviewStatus,
           type: "SELFIE_IDENTIFICATION"
         }
       });
 
       return {
         data: {
-          internalNote: "Verificación automática de identidad no configurada. Requiere revisión manual.",
-          reviewStatus: "PENDING",
+          internalNote: faceVerification.internalNote,
+          reviewStatus: faceVerification.reviewStatus,
           selfieCount: 1
         },
         ok: true

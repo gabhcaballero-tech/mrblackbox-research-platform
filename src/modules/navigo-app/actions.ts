@@ -15,6 +15,7 @@ import {
   type NavigoActionResult,
   type NavigoSignedActivityUpload
 } from "./repository";
+import type { NavigoFaceVerificationClientResult } from "./face-verification-contract";
 import {
   parseNavigoDateTimeLocal,
   parseNavigoRotationImportText,
@@ -370,6 +371,7 @@ export async function confirmNavigoActivitySelfieUploadAction(
   tokenInput: string,
   activityId: string,
   metadata: EvidenceUploadMetadata & {
+    faceVerification?: NavigoFaceVerificationClientResult | null;
     privateStorageKey: string;
     storageBucket: string;
   }

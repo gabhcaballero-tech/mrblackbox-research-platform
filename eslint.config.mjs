@@ -13,6 +13,7 @@ export default defineConfig([
     "node_modules/**",
     "out/**",
     "playwright-report/**",
+    "public/vendor/**",
     "test-results/**"
   ])
 ]);

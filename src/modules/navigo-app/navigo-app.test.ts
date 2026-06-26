@@ -30,6 +30,12 @@ import {
   createNavigoTestModeParams,
   isValidNavigoTestMode
 } from "./test-mode";
+import {
+  FACE_SIMILARITY_APPROVE_THRESHOLD,
+  FACE_SIMILARITY_REJECT_THRESHOLD,
+  classifyNavigoFaceSimilarity,
+  normalizeNavigoFaceVerificationForStorage
+} from "./face-verification-contract";
 
 describe("navigo app schema foundation", () => {
   it("adds optional ActivitySchedule.code and composite uniqueness by study", () => {
@@ -298,6 +304,44 @@ describe("navigo participant activities", () => {
 });
 
 describe("navigo app MVP rules", () => {
+  it("classifies local face verification similarity with conservative thresholds", () => {
+    expect(classifyNavigoFaceSimilarity(FACE_SIMILARITY_APPROVE_THRESHOLD)).toBe("MATCH");
+    expect(classifyNavigoFaceSimilarity(FACE_SIMILARITY_REJECT_THRESHOLD)).toBe("NO_MATCH");
+    expect(classifyNavigoFaceSimilarity((FACE_SIMILARITY_APPROVE_THRESHOLD + FACE_SIMILARITY_REJECT_THRESHOLD) / 2)).toBe(
+      "UNCERTAIN"
+    );
+    expect(classifyNavigoFaceSimilarity(null)).toBe("ERROR");
+  });
+
+  it("normalizes face verification results before storing ParticipantActivityEvidence", () => {
+    const match = normalizeNavigoFaceVerificationForStorage({
+      evaluatedAt: "2026-06-26T12:00:00.000Z",
+      method: "@vladmandic/human:faceres+blazeface:v1",
+      score: 0.9,
+      status: "MATCH"
+    });
+    const noMatch = normalizeNavigoFaceVerificationForStorage({
+      evaluatedAt: "2026-06-26T12:00:00.000Z",
+      method: "@vladmandic/human:faceres+blazeface:v1",
+      score: 0.2,
+      status: "NO_MATCH"
+    });
+    const uncertain = normalizeNavigoFaceVerificationForStorage({
+      evaluatedAt: "2026-06-26T12:00:00.000Z",
+      method: "@vladmandic/human:faceres+blazeface:v1",
+      reason: "CAPTURED_NO_FACE",
+      score: null,
+      status: "UNCERTAIN"
+    });
+
+    expect(match.reviewStatus).toBe("APPROVED");
+    expect(match.internalNote).toContain("Verificacion facial automatica: MATCH");
+    expect(noMatch.reviewStatus).toBe("REJECTED");
+    expect(noMatch.rejectionReason).toBe("La verificacion automatica indica que la selfie no coincide con la foto registrada.");
+    expect(uncertain.reviewStatus).toBe("PENDING");
+    expect(uncertain.internalNote).toContain("CAPTURED_NO_FACE");
+  });
+
   it("does not open T2 before 1.5 hours and opens it afterwards", () => {
     const activities = navigoActivityRecords();
     const before = buildNavigoActivityTimeline({
@@ -652,12 +696,16 @@ describe("navigo app MVP rules", () => {
     expect(adminPage).toContain("Marcar como no coincide");
     expect(adminPage).toContain("Marcar como requiere revisión");
     expect(adminPage).toContain("Incidencia de identidad: bloquear avance hasta revisión.");
+    expect(adminPage).toContain("Resultado automático");
+    expect(adminPage).toContain("Score/similitud");
+    expect(adminPage).toContain("verificación biométrica automatizada");
     expect(adminPage).toContain("Valor interno conservado");
     expect(adminPage).not.toContain("privateStorageKey");
     expect(adminPage).not.toContain("storageBucket");
     expect(repository).toContain("createSignedReadUrl");
     expect(repository).toContain("readableResponses");
     expect(repository).toContain("reviewActivityIdentity");
+    expect(repository).toContain("evidence.internalNote");
     expect(actions).toContain("reviewNavigoActivityIdentityAction");
   });
 
