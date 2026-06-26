@@ -35,6 +35,7 @@ export type NavigoActivityRecord = {
   occurrenceKey: string;
   identityStatus?: "CONFIRMED" | "PENDING" | "REJECTED";
   scheduledAt: Date;
+  selfieCount?: number;
   status: "AVAILABLE" | "COMPLETED" | "EXPIRED" | "INCOMPLETE" | "PENDING" | "REOPENED" | "STARTED";
   responseCount?: number;
 };

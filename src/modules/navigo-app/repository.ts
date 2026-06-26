@@ -2779,6 +2779,7 @@ function toNavigoActivityRecord(activity: ActivityRecord): NavigoActivityRecord 
     occurrenceKey: activity.occurrenceKey,
     responseCount,
     scheduledAt: activity.scheduledAt,
+    selfieCount: activity.participantActivityEvidence.filter((evidence) => evidence.type === "SELFIE_IDENTIFICATION").length,
     status: isIncompleteT0 ? "STARTED" : activity.status
   };
 }

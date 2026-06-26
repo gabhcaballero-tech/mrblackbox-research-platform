@@ -68,6 +68,7 @@ export function NavigoActivityCapture({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [identityError, setIdentityError] = useState<string | null>(null);
+  const [activeStream, setActiveStream] = useState<MediaStream | null>(null);
   const [isPending, startTransition] = useTransition();
   const [cameraSupported] = useState(
     () =>
@@ -88,7 +89,10 @@ export function NavigoActivityCapture({
       }
     }
     streamRef.current = null;
-    if (updateState && videoRef.current) {
+    if (updateState) {
+      setActiveStream(null);
+    }
+    if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
   }, []);
@@ -107,7 +111,7 @@ export function NavigoActivityCapture({
   );
 
   useEffect(() => {
-    const stream = streamRef.current;
+    const stream = activeStream;
     const video = videoRef.current;
 
     if (!stream || !video || cameraState === "idle") {
@@ -130,12 +134,15 @@ export function NavigoActivityCapture({
       }
     }
 
-    function failCamera() {
+    function failCamera(message = "No fue posible preparar la cámara. Intenta nuevamente.") {
       if (settled) {
         return;
       }
       settled = true;
       stopCamera();
+      setUploadError(message);
+      setTimeout(() => setUploadError(message), 0);
+      setUploadError(message);
       setUploadError("No fue posible abrir la cámara. Permite el acceso a la cámara o intenta desde un celular.");
     }
 
@@ -144,8 +151,12 @@ export function NavigoActivityCapture({
     video.playsInline = true;
     video.addEventListener("loadedmetadata", markReady);
     video.addEventListener("canplay", markReady);
-    void video.play().then(markReady).catch(failCamera);
-    timeoutId = setTimeout(failCamera, 4000);
+    void video.play().then(markReady).catch(() => failCamera());
+    timeoutId = setTimeout(() => {
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        failCamera("La cámara no entregó imagen. Cierra otras apps que usen la cámara y vuelve a intentarlo.");
+      }
+    }, 9000);
 
     return () => {
       video.removeEventListener("loadedmetadata", markReady);
@@ -154,7 +165,7 @@ export function NavigoActivityCapture({
         clearTimeout(timeoutId);
       }
     };
-  }, [cameraState, stopCamera]);
+  }, [activeStream, cameraState, stopCamera]);
 
   async function openCamera() {
     setMessage(null);
@@ -175,8 +186,10 @@ export function NavigoActivityCapture({
       });
       stopCameraTracks();
       streamRef.current = stream;
-    } catch {
+      setActiveStream(stream);
+    } catch (caughtError) {
       stopCamera();
+      setTimeout(() => setUploadError(cameraErrorMessage(caughtError)), 0);
       setUploadError("No fue posible abrir la cámara. Permite el acceso a la cámara o intenta desde un celular.");
     }
   }
@@ -186,7 +199,7 @@ export function NavigoActivityCapture({
     const canvas = canvasRef.current;
 
     if (!video || !canvas || cameraState !== "ready" || video.videoWidth === 0 || video.videoHeight === 0) {
-      setUploadError("No fue posible capturar la imagen. Intenta nuevamente.");
+      setUploadError("La cámara no entregó imagen. Cierra otras apps que usen la cámara y vuelve a intentarlo.");
       return;
     }
 
@@ -260,7 +273,7 @@ export function NavigoActivityCapture({
         }
 
         setSelfies(confirmed.data.selfieCount);
-        setMessage("Selfie registrada correctamente.");
+        setMessage("Selfie registrada correctamente. Continúa con la evaluación.");
         clearCapturedPhoto();
       } catch {
         setUploadError("No fue posible subir la selfie. Revisa tu conexión e intenta nuevamente.");
@@ -291,7 +304,8 @@ export function NavigoActivityCapture({
   }
 
   const busy = isUploading || isPending;
-  const showQuestions = requiresSelfie || identityStep === "questions";
+  const hasRequiredSelfie = !requiresSelfie || selfies >= 1;
+  const showQuestions = requiresSelfie ? hasRequiredSelfie : identityStep === "questions";
 
   return (
     <div className="space-y-6">
@@ -316,7 +330,7 @@ export function NavigoActivityCapture({
 
           {selfies === 0 && cameraState === "idle" && !previewUrl ? (
             <button className={primaryButtonClass} disabled={busy} onClick={openCamera} type="button">
-              Tomar selfie
+              {uploadError ? "Intentar de nuevo" : "Tomar selfie"}
             </button>
           ) : null}
 
@@ -643,6 +657,18 @@ function readAnswerValue(answer: unknown): string | number | null {
   }
 
   return null;
+}
+
+function cameraErrorMessage(error: unknown): string {
+  if (error instanceof DOMException && error.name === "NotAllowedError") {
+    return "No se pudo acceder a la cámara. Revisa los permisos del navegador y vuelve a intentarlo.";
+  }
+
+  if (error instanceof DOMException && error.name === "NotFoundError") {
+    return "No se encontró una cámara disponible en este dispositivo.";
+  }
+
+  return "No fue posible preparar la cámara. Intenta nuevamente.";
 }
 
 const primaryButtonClass =

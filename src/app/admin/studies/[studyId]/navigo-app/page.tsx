@@ -479,11 +479,24 @@ function ActivitySummary({
       ) : null}
       {code !== "T0_SALON" ? (
         <p className="mt-2 text-xs text-zinc-500">
+          <span className="block font-semibold text-zinc-700">{navigoMeasurementProgressLabel(activity)}</span>
           Selfies {activity?.evidenceCount ?? 0} · Respuestas {activity?.responseCount ?? 0}/7
         </p>
       ) : null}
     </div>
   );
+}
+
+function navigoMeasurementProgressLabel(activity?: NavigoActivityListItem): string {
+  if (!activity || (activity.selfieCount ?? 0) === 0) {
+    return "Selfie pendiente";
+  }
+
+  if ((activity.responseCount ?? 0) < 7 || activity.status !== "COMPLETED") {
+    return "Selfie registrada / respuestas pendientes";
+  }
+
+  return "Completada";
 }
 
 function statusLabel(status: string) {

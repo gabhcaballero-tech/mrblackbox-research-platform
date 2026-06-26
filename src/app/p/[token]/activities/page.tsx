@@ -110,6 +110,9 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
                     <h2 className="text-lg font-semibold text-zinc-950">
                       {activity.code === "T0_SALON" ? t0ParticipantLabel(activity) : navigoActivityLabel(activity.code)}
                     </h2>
+                    {activity.code !== "T0_SALON" ? (
+                      <p className="mt-1 text-sm font-semibold text-teal-700">{measurementParticipantLabel(activity)}</p>
+                    ) : null}
                     <p className="mt-2 text-sm text-zinc-600">
                       {activity.code === "T0_SALON" && activity.availability.canCapture
                         ? "Esta evaluación debe completarse en el salón con apoyo del encuestador."
@@ -198,6 +201,18 @@ function t0ParticipantLabel(activity: { identityStatus?: string; responseCount?:
   }
 
   return "Evaluación 0 / T0 en salón";
+}
+
+function measurementParticipantLabel(activity: { responseCount?: number; selfieCount?: number; status: string }): string {
+  if ((activity.selfieCount ?? 0) === 0) {
+    return "Selfie pendiente";
+  }
+
+  if ((activity.responseCount ?? 0) < 7 || activity.status !== "COMPLETED") {
+    return "Selfie registrada / respuestas pendientes";
+  }
+
+  return "Completada";
 }
 
 function formatDate(value: Date, timeZoneIana: string): string {
