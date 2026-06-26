@@ -14,6 +14,7 @@ import {
   NAVIGO_ACTIVITY_CODES,
   NAVIGO_APP_DEFAULT_TIME_ZONE,
   navigoActivityLabel,
+  nowInStudyTimezoneForDateTimeLocal,
   normalizeNavigoRotationCode,
   parseNavigoDateTimeLocal,
   parseNavigoRotationImportText,
@@ -472,6 +473,39 @@ describe("navigo app MVP rules", () => {
     expect(formatNavigoDateTimeLocal(new Date("2026-06-26T15:33:00.000Z"), "America/Mexico_City")).toBe(
       "2026-06-26T09:33"
     );
+    expect(nowInStudyTimezoneForDateTimeLocal("America/Mexico_City", new Date("2026-06-26T15:30:00.000Z"))).toBe(
+      "2026-06-26T09:30"
+    );
+  });
+
+  it("keeps T0 form operable and separates correction actions in admin", () => {
+    const adminPage = readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "page.tsx");
+    const actions = readWorkspaceFile("src", "modules", "navigo-app", "actions.ts");
+    const repository = readWorkspaceFile("src", "modules", "navigo-app", "repository.ts");
+
+    expect(adminPage).toContain("nowInStudyTimezoneForDateTimeLocal");
+    expect(adminPage).not.toContain("toISOString().slice");
+    expect(adminPage).toContain("defaultChecked={readAnswerValue(answer)");
+    expect(adminPage).toContain("Guardar T0");
+    expect(adminPage).toContain("Guardando T0...");
+    expect(adminPage).toContain("Acciones de correccion");
+    expect(adminPage).toContain("REINICIAR APP");
+    expect(adminPage).toContain("ELIMINAR ETAPAS");
+    expect(actions).toContain("resetNavigoParticipantAppAction");
+    expect(actions).toContain("Selecciona la hora base T0.");
+    expect(repository).toContain("Completa AP1-AP7 para guardar T0.");
+    expect(repository).toContain("resetParticipantApp");
+    expect(repository).toContain("deleteParticipantStagesFrom");
+  });
+
+  it("does not treat T0 as completed only because an application time exists", () => {
+    const repository = readWorkspaceFile("src", "modules", "navigo-app", "repository.ts");
+    const participantPage = readWorkspaceFile("src", "app", "p", "[token]", "activities", "page.tsx");
+
+    expect(repository).toContain("activity.responses.length < createNavigoMeasurementDefinition().questions.length");
+    expect(repository).toContain("status: isIncompleteT0 ? \"STARTED\" : activity.status");
+    expect(participantPage).toContain("Evaluación 0 en salón pendiente de completar por el equipo.");
+    expect(participantPage).toContain("responseCount >= 7");
   });
 
   it("creates and parses the rotation import template for CSV or TSV", () => {

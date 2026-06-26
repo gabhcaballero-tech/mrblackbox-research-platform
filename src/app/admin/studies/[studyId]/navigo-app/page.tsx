@@ -3,7 +3,9 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
   configureNavigoRotationAction,
+  deleteNavigoParticipantStagesAction,
   generateNavigoParticipantLinkAction,
+  resetNavigoParticipantAppAction,
   startNavigoT0Action
 } from "@/modules/navigo-app/actions";
 import {
@@ -11,6 +13,7 @@ import {
   createNavigoMeasurementDefinition,
   formatNavigoDateTimeLocal,
   navigoActivityLabel,
+  nowInStudyTimezoneForDateTimeLocal,
   type NavigoActivityListItem,
   type NavigoParticipantListItem
 } from "@/modules/navigo-app";
@@ -135,7 +138,8 @@ function ParticipantRow({
 }) {
   const canStart = participant.status === "APPROVED" && participant.confirmation && participant.rotationReady;
   const pendingMessage = participant.rotation.startPendingMessage;
-  const t0Completed = participant.activities.some((activity) => activity.code === "T0_SALON" && activity.status === "COMPLETED");
+  const t0Activity = participant.activities.find((activity) => activity.code === "T0_SALON");
+  const t0Completed = Boolean(t0Activity && t0Activity.status === "COMPLETED" && t0Activity.responseCount >= 7);
   const measurementQuestions = createNavigoMeasurementDefinition().questions;
   const participantUrl = participant.participantLinkToken
     ? new URL(`/p/${encodeURIComponent(participant.participantLinkToken)}/activities`, requestOrigin).toString()
@@ -182,7 +186,11 @@ function ParticipantRow({
             {participant.applicationStartedAt ? "Corregir hora base T0" : "Hora base T0"}
             <input
               className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-950"
-              defaultValue={formatNavigoDateTimeLocal(participant.applicationStartedAt ?? new Date(), timeZoneIana)}
+              defaultValue={
+                participant.applicationStartedAt
+                  ? formatNavigoDateTimeLocal(participant.applicationStartedAt, timeZoneIana)
+                  : nowInStudyTimezoneForDateTimeLocal(timeZoneIana)
+              }
               name="applicationStartedAt"
               type="datetime-local"
             />
@@ -197,7 +205,12 @@ function ParticipantRow({
             </p>
             <div className="mt-4 space-y-4">
               {measurementQuestions.map((question, index) => (
-                <AdminT0QuestionControl index={index + 1} key={question.id} question={question} />
+                <AdminT0QuestionControl
+                  answer={t0Activity?.existingResponses[question.id]}
+                  index={index + 1}
+                  key={question.id}
+                  question={question}
+                />
               ))}
             </div>
           </details>
@@ -219,8 +232,68 @@ function ParticipantRow({
         {participant.applicationStartedAt ? (
           <p className="text-xs text-zinc-500">Para corregir hora base T0, ajusta el campo de hora y presiona Guardar T0.</p>
         ) : null}
+        <CorrectionActions participant={participant} studyId={studyId} />
       </div>
     </article>
+  );
+}
+
+function CorrectionActions({
+  participant,
+  studyId
+}: {
+  participant: NavigoParticipantListItem;
+  studyId: string;
+}) {
+  return (
+    <details className="rounded-md border border-rose-200 bg-rose-50 p-3">
+      <summary className="cursor-pointer text-sm font-semibold text-rose-800">Acciones de correccion</summary>
+      <p className="mt-2 text-xs leading-5 text-rose-900">
+        Usa estas acciones solo ante errores de operacion o pruebas. Se conserva participante, folio, screening y rotacion.
+      </p>
+
+      <form action={resetNavigoParticipantAppAction.bind(null, studyId, participant.id)} className="mt-4 space-y-2">
+        <p className="text-sm font-semibold text-rose-950">Reiniciar App Navigo del participante</p>
+        <input
+          className={inputClass}
+          name="confirmation"
+          placeholder="REINICIAR APP"
+          required
+        />
+        <textarea
+          className={inputClass}
+          name="reason"
+          placeholder="Motivo obligatorio"
+          required
+          rows={2}
+        />
+        <SubmitButton pendingLabel="Reiniciando App...">Reiniciar App</SubmitButton>
+      </form>
+
+      <form action={deleteNavigoParticipantStagesAction.bind(null, studyId, participant.id)} className="mt-5 space-y-2">
+        <p className="text-sm font-semibold text-rose-950">Eliminar etapa y posteriores</p>
+        <select className={inputClass} name="fromCode" required>
+          <option value="T0_SALON">T0 y posteriores</option>
+          <option value="T2_HORAS">T2 y posteriores</option>
+          <option value="T4_HORAS">T4 y posteriores</option>
+          <option value="T8_HORAS">T8 solamente</option>
+        </select>
+        <input
+          className={inputClass}
+          name="confirmation"
+          placeholder="ELIMINAR ETAPAS"
+          required
+        />
+        <textarea
+          className={inputClass}
+          name="reason"
+          placeholder="Motivo obligatorio"
+          required
+          rows={2}
+        />
+        <SubmitButton pendingLabel="Eliminando etapas...">Eliminar etapas</SubmitButton>
+      </form>
+    </details>
   );
 }
 
@@ -392,7 +465,15 @@ function formatDate(value: Date, timeZoneIana: string): string {
   }).format(value);
 }
 
-function AdminT0QuestionControl({ index, question }: { index: number; question: QuestionnaireQuestion }) {
+function AdminT0QuestionControl({
+  answer,
+  index,
+  question
+}: {
+  answer: unknown;
+  index: number;
+  question: QuestionnaireQuestion;
+}) {
   return (
     <fieldset className="rounded-md border border-zinc-200 p-3">
       <legend className="px-1 text-xs font-semibold text-teal-700">AP{index}</legend>
@@ -401,7 +482,13 @@ function AdminT0QuestionControl({ index, question }: { index: number; question: 
         <div className="mt-3 space-y-2">
           {question.options.map((option) => (
             <label className="flex items-center gap-2 text-sm text-zinc-800" key={option.value}>
-              <input name={question.id} required={question.required} type="radio" value={option.value} />
+              <input
+                defaultChecked={readAnswerValue(answer) === option.value}
+                name={question.id}
+                required={question.required}
+                type="radio"
+                value={option.value}
+              />
               {option.label}
             </label>
           ))}
@@ -414,7 +501,13 @@ function AdminT0QuestionControl({ index, question }: { index: number; question: 
               className="flex flex-col items-center gap-1 rounded-md border border-zinc-200 px-2 py-2 text-xs text-zinc-800"
               key={value}
             >
-              <input name={question.id} required={question.required} type="radio" value={value} />
+              <input
+                defaultChecked={readAnswerValue(answer) === value}
+                name={question.id}
+                required={question.required}
+                type="radio"
+                value={value}
+              />
               {value}
             </label>
           ))}
@@ -422,6 +515,15 @@ function AdminT0QuestionControl({ index, question }: { index: number; question: 
       ) : null}
     </fieldset>
   );
+}
+
+function readAnswerValue(answer: unknown): string | number | null {
+  if (typeof answer === "object" && answer !== null && "value" in answer) {
+    const value = (answer as { value?: unknown }).value;
+    return typeof value === "string" || typeof value === "number" ? value : null;
+  }
+
+  return null;
 }
 
 const labelClass = "flex flex-col gap-1 text-sm font-medium text-zinc-700";

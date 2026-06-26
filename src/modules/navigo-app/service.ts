@@ -34,6 +34,7 @@ export type NavigoActivityRecord = {
   occurrenceKey: string;
   scheduledAt: Date;
   status: "AVAILABLE" | "COMPLETED" | "EXPIRED" | "INCOMPLETE" | "PENDING" | "REOPENED" | "STARTED";
+  responseCount?: number;
 };
 
 export type NavigoParticipantRecord = {
@@ -381,6 +382,13 @@ export function formatNavigoDateTimeLocal(value: Date, timeZoneIana: string | nu
   const read = (type: string) => parts.find((part) => part.type === type)?.value ?? "00";
 
   return `${read("year")}-${read("month")}-${read("day")}T${read("hour")}:${read("minute")}`;
+}
+
+export function nowInStudyTimezoneForDateTimeLocal(
+  timeZoneIana: string | null | undefined,
+  now = new Date()
+): string {
+  return formatNavigoDateTimeLocal(now, timeZoneIana);
 }
 
 function getTimeZoneOffsetMs(timeZoneIana: string, value: Date): number {

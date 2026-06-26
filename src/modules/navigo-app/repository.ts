@@ -75,6 +75,7 @@ export type NavigoParticipantListItem = {
 export type NavigoActivityListItem = NavigoActivityRecord & {
   code: NavigoActivityCode;
   evidenceCount: number;
+  existingResponses: Record<string, unknown>;
   responseCount: number;
 };
 
@@ -98,6 +99,16 @@ export type NavigoStartT0Result =
 export type NavigoParticipantLinkResult =
   | {
       linkToken: string;
+      message: string;
+      ok: true;
+    }
+  | {
+      message: string;
+      ok: false;
+    };
+
+export type NavigoMaintenanceResult =
+  | {
       message: string;
       ok: true;
     }
@@ -240,6 +251,17 @@ export type NavigoAppRepository = {
     storage?: EvidenceStorageClient;
     token: string;
   }) => Promise<NavigoActionResult<NavigoSignedActivityUpload>>;
+  resetParticipantApp: (input: {
+    actorUserId: string;
+    reason: string;
+    studyParticipantId: string;
+  }) => Promise<NavigoMaintenanceResult>;
+  deleteParticipantStagesFrom: (input: {
+    actorUserId: string;
+    fromCode: NavigoActivityCode;
+    reason: string;
+    studyParticipantId: string;
+  }) => Promise<NavigoMaintenanceResult>;
   startT0: (input: {
     actorUserId: string;
     applicationStartedAt: Date;
@@ -497,6 +519,115 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
     });
 
     return record.studyParticipant;
+  }
+
+  async function resetOrDeleteNavigoStages({
+    actorUserId,
+    fromCode,
+    mode,
+    reason,
+    studyParticipantId
+  }: {
+    actorUserId: string;
+    fromCode: NavigoActivityCode;
+    mode: "delete-from-stage" | "reset-app";
+    reason: string;
+    studyParticipantId: string;
+  }): Promise<NavigoMaintenanceResult> {
+    const prisma = await getPrisma();
+    const now = new Date();
+
+    return prisma.$transaction(async (tx) => {
+      const participant = (await tx.studyParticipant.findUnique?.({
+        select: participantWithActivitiesSelect,
+        where: { id: studyParticipantId }
+      })) as ParticipantRecord | null;
+
+      if (!participant) {
+        return { message: "No encontramos el participante.", ok: false };
+      }
+
+      if (participant.study.code !== NAVIGO_STUDY_CODE) {
+        return { message: "Solo el estudio Navigo permite estas correcciones.", ok: false };
+      }
+
+      const codesToDelete = navigoCodesFrom(fromCode);
+      const activitiesToDelete = (participant.activities ?? []).filter((activity) =>
+        codesToDelete.includes(activity.activitySchedule.code)
+      );
+      const activityIds = activitiesToDelete.map((activity) => activity.id);
+
+      if (activityIds.length > 0) {
+        await tx.researchResponse.deleteMany?.({
+          where: {
+            participantActivityId: { in: activityIds }
+          }
+        });
+        await tx.participantActivityEvidence.deleteMany?.({
+          where: {
+            participantActivityId: { in: activityIds }
+          }
+        });
+        await tx.participantActivity.deleteMany?.({
+          where: {
+            id: { in: activityIds }
+          }
+        });
+      }
+
+      if (fromCode === "T0_SALON") {
+        await tx.studyParticipant.update?.({
+          data: {
+            applicationStartedAt: null,
+            applicationStartedAtCorrectedAt: now,
+            operationalStatus: "CREATED"
+          },
+          where: { id: participant.id }
+        });
+        await tx.participantAccessToken.updateMany?.({
+          data: {
+            revokedAt: now,
+            revokedByUserId: actorUserId,
+            revocationReason: "REGENERATED",
+            status: "REVOKED"
+          },
+          where: {
+            status: "ACTIVE",
+            studyParticipantId: participant.id
+          }
+        });
+      } else if (participant.applicationStartedAt) {
+        await recreatePendingNavigoActivities({
+          now,
+          participant,
+          prisma: tx,
+          remainingActivities: (participant.activities ?? [])
+            .filter((activity) => !activityIds.includes(activity.id))
+            .map(toNavigoActivityRecord)
+        });
+      }
+
+      await tx.applicationTimeEvent.create?.({
+        data: {
+          activityStateAtEvent: activityStateAtEvent((participant.activities ?? []).map(toNavigoActivityRecord)),
+          createdByUserId: actorUserId,
+          eventType: "CORRECTED",
+          newApplicationStartedAt: participant.applicationStartedAt ?? now,
+          previousApplicationStartedAt: participant.applicationStartedAt,
+          reason: `${mode === "reset-app" ? "Reinicio App Navigo" : `Eliminacion de etapa ${fromCode} y posteriores`}: ${reason}`,
+          studyParticipantId: participant.id,
+          timeZoneIana: resolveNavigoTimeZone(participant.study.timeZoneIana)
+        }
+      });
+
+      return {
+        message:
+          mode === "reset-app"
+            ? "App Navigo reiniciada correctamente."
+            : "Etapas seleccionadas eliminadas correctamente.",
+        ok: true
+      };
+    });
   }
 
   return {
@@ -776,6 +907,26 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
       };
     },
 
+    async resetParticipantApp(input) {
+      return resetOrDeleteNavigoStages({
+        actorUserId: input.actorUserId,
+        fromCode: "T0_SALON",
+        mode: "reset-app",
+        reason: input.reason,
+        studyParticipantId: input.studyParticipantId
+      });
+    },
+
+    async deleteParticipantStagesFrom(input) {
+      return resetOrDeleteNavigoStages({
+        actorUserId: input.actorUserId,
+        fromCode: input.fromCode,
+        mode: "delete-from-stage",
+        reason: input.reason,
+        studyParticipantId: input.studyParticipantId
+      });
+    },
+
     async previewRotationImport(input) {
       const prisma = await getPrisma();
       const study = (await prisma.study.findUnique?.({
@@ -965,7 +1116,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         const previousApplicationStartedAt = participant.applicationStartedAt;
         const validation = validateNavigoMeasurementAnswers({ input: input.t0Answers });
         if (!validation.ok) {
-          return { message: validation.message, ok: false };
+          return { message: "Completa AP1-AP7 para guardar T0.", ok: false };
         }
 
         const questionnaireVersionId = schedules.find((schedule) => schedule.questionnaireVersionId)?.questionnaireVersionId;
@@ -973,7 +1124,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           return { message: "No encontramos cuestionario AP1 a AP7 para T0.", ok: false };
         }
         const existingT0Activity = (participant.activities ?? []).find((activity) => activity.activitySchedule.code === "T0_SALON");
-        let t0ActivityId = existingT0Activity?.id ?? null;
+        let t0ActivityId: string | null = null;
 
         await tx.studyParticipant.update?.({
           data: {
@@ -1047,11 +1198,13 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           }
         }
 
-        if (existingT0Activity && !t0ActivityId) {
+        if (existingT0Activity) {
           const updatedT0 = (await tx.participantActivity.update?.({
             data: {
               actualCompletedAt: applicationStartedAt,
               actualStartedAt: applicationStartedAt,
+              availableFrom: applicationStartedAt,
+              availableUntil: applicationStartedAt,
               lastSavedAt: now,
               scheduledAt: applicationStartedAt,
               status: "COMPLETED"
@@ -1440,6 +1593,98 @@ async function saveNavigoMeasurementResponses({
         participantActivityId_responseKey: {
           participantActivityId: activityId,
           responseKey
+        }
+      }
+    });
+  }
+}
+
+function navigoCodesFrom(fromCode: NavigoActivityCode): NavigoActivityCode[] {
+  const start = NAVIGO_ACTIVITY_CODES.indexOf(fromCode);
+  return start < 0 ? [] : NAVIGO_ACTIVITY_CODES.slice(start);
+}
+
+async function recreatePendingNavigoActivities({
+  now,
+  participant,
+  prisma,
+  remainingActivities
+}: {
+  now: Date;
+  participant: ParticipantRecord;
+  prisma: NavigoTransactionClient;
+  remainingActivities: NavigoActivityRecord[];
+}) {
+  if (!participant.applicationStartedAt) {
+    return;
+  }
+
+  const schedules = (await prisma.activitySchedule.findMany?.({
+    orderBy: { sortOrder: "asc" },
+    select: {
+      code: true,
+      id: true,
+      offsetMinutes: true,
+      questionnaireVersionId: true,
+      sortOrder: true,
+      status: true,
+      type: true,
+      windowEndsMinutes: true,
+      windowStartsMinutes: true
+    },
+    where: {
+      code: { in: NAVIGO_ACTIVITY_CODES },
+      status: "ACTIVE",
+      studyId: participant.study.id
+    }
+  })) as NavigoScheduleRecord[];
+
+  const prepared = prepareNavigoParticipantActivities({
+    existingActivities: remainingActivities,
+    now,
+    participant: {
+      applicationStartedAt: participant.applicationStartedAt,
+      id: participant.id,
+      reviewStatus: participantStatus(participant),
+      studyCode: participant.study.code,
+      timeZoneIana: participant.study.timeZoneIana
+    },
+    schedules
+  });
+
+  if (!prepared.ok) {
+    return;
+  }
+
+  for (const activity of prepared.created) {
+    await prisma.participantActivity.create?.({
+      data: {
+        activityScheduleId: activity.activityScheduleId,
+        actualCompletedAt: null,
+        actualStartedAt: null,
+        availableFrom: activity.availableFrom,
+        availableUntil: activity.availableUntil,
+        occurrenceKey: activity.occurrenceKey,
+        scheduledAt: activity.scheduledAt,
+        status: activity.status,
+        studyParticipantId: activity.studyParticipantId
+      }
+    });
+  }
+
+  for (const activity of prepared.updated) {
+    await prisma.participantActivity.update?.({
+      data: {
+        availableFrom: activity.availableFrom,
+        availableUntil: activity.availableUntil,
+        scheduledAt: activity.scheduledAt,
+        status: activity.status
+      },
+      where: {
+        studyParticipantId_activityScheduleId_occurrenceKey: {
+          activityScheduleId: activity.activityScheduleId,
+          occurrenceKey: "DEFAULT",
+          studyParticipantId: participant.id
         }
       }
     });
@@ -2111,11 +2356,17 @@ function toActivityListItem(activity: ActivityRecord): NavigoActivityListItem {
     ...record,
     code: activity.activitySchedule.code,
     evidenceCount: activity.participantActivityEvidence.length,
+    existingResponses: Object.fromEntries(activity.responses.map((response) => [response.questionId, response.answerJson])),
     responseCount: activity.responses.length
   };
 }
 
 function toNavigoActivityRecord(activity: ActivityRecord): NavigoActivityRecord & { code: NavigoActivityCode } {
+  const isIncompleteT0 =
+    activity.activitySchedule.code === "T0_SALON" &&
+    activity.status === "COMPLETED" &&
+    activity.responses.length < createNavigoMeasurementDefinition().questions.length;
+
   return {
     activityScheduleId: activity.activityScheduleId,
     actualCompletedAt: activity.actualCompletedAt,
@@ -2125,8 +2376,9 @@ function toNavigoActivityRecord(activity: ActivityRecord): NavigoActivityRecord 
     code: activity.activitySchedule.code,
     id: activity.id,
     occurrenceKey: activity.occurrenceKey,
+    responseCount: activity.responses.length,
     scheduledAt: activity.scheduledAt,
-    status: activity.status
+    status: isIncompleteT0 ? "STARTED" : activity.status
   };
 }
 

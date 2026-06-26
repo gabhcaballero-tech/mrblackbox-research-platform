@@ -29,6 +29,9 @@ export async function startNavigoT0Action(studyId: string, studyParticipantId: s
 
   const timeZoneIana = String(formData.get("timeZoneIana") ?? "America/Mexico_City");
   const applicationStartedAt = parseApplicationStartedAt(formData.get("applicationStartedAt"), timeZoneIana);
+  if (!applicationStartedAt) {
+    redirectWithNavigoMessage(studyId, { error: "Selecciona la hora base T0." });
+  }
   const t0Answers = parseNavigoAnswersFromFormData(formData);
   const result = await createNavigoAppRepository().startT0({
     actorUserId: actor.id,
@@ -56,6 +59,70 @@ export async function generateNavigoParticipantLinkAction(
   const result = await createNavigoAppRepository().generateParticipantLink({
     actorUserId: actor.id,
     forceRegenerate,
+    studyParticipantId
+  });
+
+  if (!result.ok) {
+    redirectWithNavigoMessage(studyId, { error: result.message });
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+  redirectWithNavigoMessage(studyId, { message: result.message });
+}
+
+export async function resetNavigoParticipantAppAction(studyId: string, studyParticipantId: string, formData: FormData) {
+  const actor = await requireCapability("activity:reopen");
+  const confirmation = String(formData.get("confirmation") ?? "").trim();
+  const reason = String(formData.get("reason") ?? "").trim();
+
+  if (confirmation !== "REINICIAR APP") {
+    redirectWithNavigoMessage(studyId, { error: "Escribe REINICIAR APP para confirmar." });
+  }
+
+  if (!reason) {
+    redirectWithNavigoMessage(studyId, { error: "Captura el motivo de la correccion." });
+  }
+
+  const result = await createNavigoAppRepository().resetParticipantApp({
+    actorUserId: actor.id,
+    reason,
+    studyParticipantId
+  });
+
+  if (!result.ok) {
+    redirectWithNavigoMessage(studyId, { error: result.message });
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+  redirectWithNavigoMessage(studyId, { message: result.message });
+}
+
+export async function deleteNavigoParticipantStagesAction(
+  studyId: string,
+  studyParticipantId: string,
+  formData: FormData
+) {
+  const actor = await requireCapability("activity:reopen");
+  const confirmation = String(formData.get("confirmation") ?? "").trim();
+  const reason = String(formData.get("reason") ?? "").trim();
+  const fromCode = String(formData.get("fromCode") ?? "");
+
+  if (confirmation !== "ELIMINAR ETAPAS") {
+    redirectWithNavigoMessage(studyId, { error: "Escribe ELIMINAR ETAPAS para confirmar." });
+  }
+
+  if (!reason) {
+    redirectWithNavigoMessage(studyId, { error: "Captura el motivo de la correccion." });
+  }
+
+  if (!["T0_SALON", "T2_HORAS", "T4_HORAS", "T8_HORAS"].includes(fromCode)) {
+    redirectWithNavigoMessage(studyId, { error: "Selecciona una etapa valida." });
+  }
+
+  const result = await createNavigoAppRepository().deleteParticipantStagesFrom({
+    actorUserId: actor.id,
+    fromCode: fromCode as "T0_SALON" | "T2_HORAS" | "T4_HORAS" | "T8_HORAS",
+    reason,
     studyParticipantId
   });
 
@@ -340,17 +407,17 @@ export async function submitNavigoActivityResponsesAction(
   redirect(`/p/${encodeURIComponent(token)}/activities?message=${encodeURIComponent("Evaluacion registrada correctamente.")}`);
 }
 
-function parseApplicationStartedAt(value: FormDataEntryValue | null, timeZoneIana: string): Date {
+function parseApplicationStartedAt(value: FormDataEntryValue | null, timeZoneIana: string): Date | null {
   const raw = String(value ?? "").trim();
 
   if (!raw) {
-    return new Date();
+    return null;
   }
 
   const parsed = parseNavigoDateTimeLocal(raw, timeZoneIana) ?? new Date(raw);
 
   if (Number.isNaN(parsed.getTime())) {
-    return new Date();
+    return null;
   }
 
   return parsed;

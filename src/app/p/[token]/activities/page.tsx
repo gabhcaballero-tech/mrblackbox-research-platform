@@ -89,7 +89,9 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h2 className="text-lg font-semibold text-zinc-950">
-                        {activity.code === "T0_SALON" ? "Evaluación 0 — Completada en salón" : navigoActivityLabel(activity.code)}
+                        {activity.code === "T0_SALON"
+                          ? t0ParticipantLabel(activity.responseCount ?? 0)
+                          : navigoActivityLabel(activity.code)}
                       </h2>
                       <p className="mt-2 text-sm text-zinc-600">{availabilityMessage(activity.availability.reason)}</p>
                     </div>
@@ -142,6 +144,12 @@ function availabilityMessage(reason: string): string {
     default:
       return "Completa primero la evaluacion anterior.";
   }
+}
+
+function t0ParticipantLabel(responseCount: number): string {
+  return responseCount >= 7
+    ? "Evaluación 0 — Completada en salón"
+    : "Evaluación 0 en salón pendiente de completar por el equipo.";
 }
 
 function formatDate(value: Date, timeZoneIana: string): string {

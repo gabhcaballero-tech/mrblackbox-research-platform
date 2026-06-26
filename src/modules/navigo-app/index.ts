@@ -43,6 +43,7 @@ export {
   isSupportedRotationImportFilename,
   formatNavigoDateTimeLocal,
   navigoActivityLabel,
+  nowInStudyTimezoneForDateTimeLocal,
   normalizeNavigoRotationCode,
   parseNavigoDateTimeLocal,
   parseNavigoRotationImportText,
