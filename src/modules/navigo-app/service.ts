@@ -1,6 +1,7 @@
 import { calculateParticipantActivities, type ActivitySchedule as BaseActivitySchedule } from "@/modules/activities";
 import {
   NAVIGO_ACTIVITY_CODES,
+  NAVIGO_T0_IDENTITY_QUESTION_ID,
   createNavigoMeasurementDefinition,
   resolveNavigoTimeZone,
   type NavigoActivityCode,
@@ -32,6 +33,7 @@ export type NavigoActivityRecord = {
   code?: NavigoActivityCode | null;
   id?: string;
   occurrenceKey: string;
+  identityStatus?: "CONFIRMED" | "PENDING" | "REJECTED";
   scheduledAt: Date;
   status: "AVAILABLE" | "COMPLETED" | "EXPIRED" | "INCOMPLETE" | "PENDING" | "REOPENED" | "STARTED";
   responseCount?: number;
@@ -291,11 +293,7 @@ export function buildNavigoActivityTimeline({
 export function getNextNavigoActivity(
   timeline: NavigoActivityTimelineItem[]
 ): NavigoActivityTimelineItem | null {
-  return (
-    timeline.find((activity) => activity.code !== "T0_SALON" && activity.status !== "COMPLETED") ??
-    timeline.find((activity) => activity.code !== "T0_SALON") ??
-    null
-  );
+  return timeline.find((activity) => activity.status !== "COMPLETED") ?? timeline[0] ?? null;
 }
 
 export function validateNavigoMeasurementAnswers({
@@ -637,9 +635,9 @@ function getNavigoActivityAvailability({
     }
 
     return {
-      canCapture: false,
-      label: "No iniciado",
-      reason: "T0_SLOT"
+      canCapture: true,
+      label: "Disponible",
+      reason: "AVAILABLE"
     };
   }
 
@@ -651,9 +649,7 @@ function getNavigoActivityAvailability({
     };
   }
 
-  const previousMeasurement = [...previousActivities]
-    .reverse()
-    .find((candidate) => candidate.code !== "T0_SALON");
+  const previousMeasurement = [...previousActivities].reverse().find((candidate) => candidate.id !== activity.id);
 
   if (previousMeasurement && previousMeasurement.status !== "COMPLETED") {
     return {
@@ -686,6 +682,36 @@ function getNavigoActivityAvailability({
     label: minutesUntilClose <= 60 ? "Proxima a vencer" : "Disponible",
     reason: minutesUntilClose <= 60 ? "DUE_SOON" : "AVAILABLE"
   };
+}
+
+export function isNavigoT0Complete(activity: Pick<NavigoActivityRecord, "identityStatus" | "responseCount" | "status">): boolean {
+  return activity.status === "COMPLETED" && activity.identityStatus === "CONFIRMED" && (activity.responseCount ?? 0) >= 7;
+}
+
+export function readNavigoIdentityStatusFromResponses(
+  responses: Array<{ answerJson: unknown; questionId: string }>
+): "CONFIRMED" | "PENDING" | "REJECTED" {
+  const identity = responses.find((response) => response.questionId === NAVIGO_T0_IDENTITY_QUESTION_ID)?.answerJson;
+
+  if (typeof identity === "object" && identity !== null && "value" in identity) {
+    const value = (identity as { value?: unknown }).value;
+    if (value === "YES") {
+      return "CONFIRMED";
+    }
+    if (value === "NO") {
+      return "REJECTED";
+    }
+  }
+
+  return "PENDING";
+}
+
+export function countNavigoMeasurementResponses(
+  responses: Array<{ answerJson: unknown; questionId: string }>
+): number {
+  const questionIds = new Set(createNavigoMeasurementDefinition().questions.map((question) => question.id));
+
+  return responses.filter((response) => questionIds.has(response.questionId)).length;
 }
 
 function parseNavigoAnswer(question: QuestionnaireQuestion, raw: FormDataEntryValue | FormDataEntryValue[] | null | undefined) {

@@ -57,7 +57,7 @@ export default async function NavigoActivityPage({ params, searchParams }: Navig
     <PublicParticipantShell>
       <PageHeader
         actions={<StatusBadge status="ready">{data.folio}</StatusBadge>}
-        description={`Horario ideal: ${formatDate(data.activity.scheduledAt, data.timeZoneIana)}. No veras nombres reales de productos; usa las etiquetas de primera y segunda fragancia.`}
+        description={`Horario ideal: ${formatDate(data.activity.scheduledAt, data.timeZoneIana)}. No verás nombres reales de productos; usa las etiquetas de primera y segunda fragancia.`}
         eyebrow="App Navigo"
         title={navigoActivityLabel(data.activity.code)}
       />
@@ -87,6 +87,8 @@ export default async function NavigoActivityPage({ params, searchParams }: Navig
         error={query?.error}
         existingResponses={data.existingResponses}
         questions={data.questions}
+        registeredSelfie={data.registeredSelfie}
+        requiresSelfie={data.activity.code !== "T0_SALON"}
         selfieCount={data.selfieCount}
         token={parsedToken.data}
       />

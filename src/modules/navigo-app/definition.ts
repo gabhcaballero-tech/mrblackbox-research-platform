@@ -5,6 +5,7 @@ import { NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
 export const NAVIGO_APP_DEFAULT_TIME_ZONE = "America/Mexico_City";
 export const NAVIGO_MEASUREMENT_DRAFT_NAME = "App Navigo - mediciones T0/T2/T4/T8";
 export const NAVIGO_MEASUREMENT_VERSION_NAME = "App Navigo - AP1 a AP7";
+export const NAVIGO_T0_IDENTITY_QUESTION_ID = "T0_IDENTITY_CONFIRMED";
 
 export const NAVIGO_ACTIVITY_CODES = ["T0_SALON", "T2_HORAS", "T4_HORAS", "T8_HORAS"] as const;
 
@@ -34,58 +35,58 @@ export function createNavigoMeasurementDefinition(): NavigoMeasurementDefinition
     questions: [
       singleChoiceQuestion({
         id: "AP1_PREFERENCIA_GENERAL",
-        text: "Cual de las dos fragancias prefiere en general?",
+        text: "¿Cuál de las dos fragancias prefiere en general?",
         options: [
-          option("PRIMERA_IZQUIERDA", "La primera izquierda"),
-          option("SEGUNDA_DERECHA", "La segunda derecha"),
+          option("PRIMERA_IZQUIERDA", "La primera fragancia / brazo izquierdo"),
+          option("SEGUNDA_DERECHA", "La segunda fragancia / brazo derecho"),
           option("AMBAS", "Ambas"),
           option("NINGUNA", "Ninguna")
         ]
       }),
       singleChoiceQuestion({
         id: "AP2_PREFERENCIA_INTENSIDAD",
-        text: "Pensando en la intensidad del aroma de estas fragancias, cual de las dos prefiere en intensidad?",
+        text: "Pensando en la intensidad del aroma de estas fragancias, ¿cuál de las dos prefiere en intensidad?",
         options: [
-          option("PRIMERA", "La primera"),
-          option("SEGUNDA", "La segunda"),
+          option("PRIMERA", "La primera fragancia"),
+          option("SEGUNDA", "La segunda fragancia"),
           option("AMBAS", "Ambas"),
           option("NINGUNA", "Ninguna")
         ]
       }),
       scaleQuestion({
         id: "AP3_INTENSIDAD_PRIMERA",
-        text: "Pensando en la intensidad de la PRIMERA fragancia, brazo izquierdo, usted diria que es...?",
+        text: "Pensando en la intensidad de la PRIMERA fragancia, brazo izquierdo, ¿usted diría que es...?",
         min: 1,
         max: 7,
-        minLabel: "Extremadamente debil",
+        minLabel: "Extremadamente débil",
         maxLabel: "Extremadamente fuerte"
       }),
       scaleQuestion({
         id: "AP4_INTENSIDAD_SEGUNDA",
-        text: "Pensando en la intensidad de la SEGUNDA fragancia, brazo derecho, usted diria que es...?",
+        text: "Pensando en la intensidad de la SEGUNDA fragancia, brazo derecho, ¿usted diría que es...?",
         min: 1,
         max: 7,
-        minLabel: "Extremadamente debil",
+        minLabel: "Extremadamente débil",
         maxLabel: "Extremadamente fuerte"
       }),
       scaleQuestion({
         id: "AP5_CALIFICACION_PRIMERA",
-        text: "Con una escala de 1 a 10 como en la escuela, como calificas la PRIMERA fragancia, brazo izquierdo, en este momento?",
+        text: "Con una escala de 1 a 10 como en la escuela, ¿cómo calificas la PRIMERA fragancia, brazo izquierdo, en este momento?",
         min: 1,
         max: 10
       }),
       scaleQuestion({
         id: "AP6_CALIFICACION_SEGUNDA",
-        text: "Con una escala de 1 a 10 como en la escuela, como calificas la SEGUNDA fragancia, brazo derecho, en este momento?",
+        text: "Con una escala de 1 a 10 como en la escuela, ¿cómo calificas la SEGUNDA fragancia, brazo derecho, en este momento?",
         min: 1,
         max: 10
       }),
       singleChoiceQuestion({
         id: "AP7_MAYOR_DURACION",
-        text: "Cual de las dos fragancias considera que tiene mayor duracion?",
+        text: "¿Cuál de las dos fragancias considera que tiene mayor duración?",
         options: [
-          option("PRIMERA", "La primera"),
-          option("SEGUNDA", "La segunda"),
+          option("PRIMERA", "La primera fragancia"),
+          option("SEGUNDA", "La segunda fragancia"),
           option("AMBAS", "Ambas"),
           option("NINGUNA", "Ninguna")
         ]

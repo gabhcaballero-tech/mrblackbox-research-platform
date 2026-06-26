@@ -139,7 +139,6 @@ function ParticipantRow({
   const canStart = participant.status === "APPROVED" && participant.confirmation && participant.rotationReady;
   const pendingMessage = participant.rotation.startPendingMessage;
   const t0Activity = participant.activities.find((activity) => activity.code === "T0_SALON");
-  const t0Completed = Boolean(t0Activity && t0Activity.status === "COMPLETED" && t0Activity.responseCount >= 7);
   const measurementQuestions = createNavigoMeasurementDefinition().questions;
   const participantUrl = participant.participantLinkToken
     ? new URL(`/p/${encodeURIComponent(participant.participantLinkToken)}/activities`, requestOrigin).toString()
@@ -181,6 +180,33 @@ function ParticipantRow({
       </div>
 
       <div className="space-y-3">
+        <section className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+          <h3 className="text-sm font-semibold text-zinc-950">T0 en salón</h3>
+          <dl className="mt-3 space-y-1 text-xs text-zinc-700">
+            <div>
+              <dt className="inline font-medium text-zinc-500">Estado: </dt>
+              <dd className="inline">{t0StatusLabel(t0Activity)}</dd>
+            </div>
+            <div>
+              <dt className="inline font-medium text-zinc-500">Respuestas: </dt>
+              <dd className="inline">{t0Activity?.responseCount ?? 0}/7</dd>
+            </div>
+            <div>
+              <dt className="inline font-medium text-zinc-500">Identidad: </dt>
+              <dd className="inline">{identityStatusLabel(t0Activity?.identityStatus)}</dd>
+            </div>
+          </dl>
+          {participantUrl ? (
+            <Link
+              className="mt-3 inline-flex w-full justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800"
+              href={participantUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Abrir link para capturar T0 en salón
+            </Link>
+          ) : null}
+        </section>
         <form action={startNavigoT0Action.bind(null, studyId, participant.id)} className="space-y-3">
           <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
             {participant.applicationStartedAt ? "Corregir hora base T0" : "Hora base T0"}
@@ -196,12 +222,12 @@ function ParticipantRow({
             />
             <input name="timeZoneIana" type="hidden" value={timeZoneIana} />
           </label>
-          <details className="rounded-md border border-zinc-200 bg-white p-3" open={!t0Completed}>
+          <details className="rounded-md border border-zinc-200 bg-white p-3">
             <summary className="cursor-pointer text-sm font-semibold text-teal-700">
-              {t0Completed ? "Editar T0 AP1-AP7" : "Capturar T0 AP1-AP7"}
+              Corrección administrativa de T0
             </summary>
             <p className="mt-2 text-xs leading-5 text-zinc-600">
-              T0 se captura en salon por el equipo interno. No requiere selfie de participante.
+              El flujo normal de T0 se captura desde el link participante en salón. Usa esta sección solo para rescate operativo.
             </p>
             <div className="mt-4 space-y-4">
               {measurementQuestions.map((question, index) => (
@@ -214,8 +240,8 @@ function ParticipantRow({
               ))}
             </div>
           </details>
-          <SubmitButton disabled={!canStart} pendingLabel="Guardando T0...">
-            {participant.applicationStartedAt ? "Guardar T0" : "Capturar T0"}
+          <SubmitButton disabled={!canStart} pendingLabel="Guardando corrección T0...">
+            Guardar corrección T0
           </SubmitButton>
         </form>
         {!canStart ? (
@@ -225,12 +251,12 @@ function ParticipantRow({
         ) : null}
         {participantUrl ? <ParticipantLinkPanel url={participantUrl} /> : null}
         <form action={generateNavigoParticipantLinkAction.bind(null, studyId, participant.id, Boolean(participantUrl))}>
-          <SubmitButton disabled={!canStart || !participant.applicationStartedAt} pendingLabel="Generando link...">
+          <SubmitButton disabled={!canStart} pendingLabel="Generando link...">
             {participantUrl ? "Regenerar link participante" : "Generar link participante"}
           </SubmitButton>
         </form>
         {participant.applicationStartedAt ? (
-          <p className="text-xs text-zinc-500">Para corregir hora base T0, ajusta el campo de hora y presiona Guardar T0.</p>
+          <p className="text-xs text-zinc-500">Para corregir hora base T0, ajusta el campo de hora y presiona Guardar corrección T0.</p>
         ) : null}
         <CorrectionActions participant={participant} studyId={studyId} />
       </div>
@@ -452,6 +478,31 @@ function statusLabel(status: string) {
     case "STARTED":
     case "INCOMPLETE":
       return "En captura";
+    default:
+      return "Pendiente";
+  }
+}
+
+function t0StatusLabel(activity?: NavigoActivityListItem) {
+  if (!activity) {
+    return "No iniciado";
+  }
+  if (activity.status === "COMPLETED" && activity.identityStatus === "CONFIRMED" && activity.responseCount >= 7) {
+    return "Completado en salón";
+  }
+  if (activity.actualStartedAt || activity.status === "STARTED" || activity.status === "INCOMPLETE") {
+    return "Iniciado en salón";
+  }
+
+  return "No iniciado";
+}
+
+function identityStatusLabel(status?: "CONFIRMED" | "PENDING" | "REJECTED") {
+  switch (status) {
+    case "CONFIRMED":
+      return "Confirmada";
+    case "REJECTED":
+      return "Rechazada";
     default:
       return "Pendiente";
   }

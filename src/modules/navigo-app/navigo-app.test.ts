@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+﻿import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -370,6 +370,36 @@ describe("navigo app MVP rules", () => {
     expect(incomplete.ok ? [] : incomplete.missingQuestionIds).toContain("AP2_PREFERENCIA_INTENSIDAD");
   });
 
+  it("keeps T2 closed while T0 is not fully completed", () => {
+    const timeline = buildNavigoActivityTimeline({
+      activities: navigoActivityRecords({ t0Status: "STARTED" }),
+      now: new Date("2026-06-25T16:40:00.000Z")
+    });
+
+    expect(timeline.find((activity) => activity.code === "T2_HORAS")?.availability).toMatchObject({
+      canCapture: false,
+      reason: "PREVIOUS_REQUIRED"
+    });
+  });
+
+  it("shows readable labels for AP options and keeps coded values for analysis", () => {
+    const definition = createNavigoMeasurementDefinition();
+    const ap1 = definition.questions.find((question) => question.id === "AP1_PREFERENCIA_GENERAL");
+    const ap3 = definition.questions.find((question) => question.id === "AP3_INTENSIDAD_PRIMERA");
+
+    if (!ap1 || ap1.type !== "single_choice") {
+      throw new Error("AP1 should be single choice");
+    }
+    expect(ap1.options[0]).toEqual({ label: "La primera fragancia / brazo izquierdo", requiresText: false, value: "PRIMERA_IZQUIERDA" });
+    expect(ap1.options[1]).toEqual({ label: "La segunda fragancia / brazo derecho", requiresText: false, value: "SEGUNDA_DERECHA" });
+    expect(ap3).toMatchObject({
+      max: 7,
+      maxLabel: "Extremadamente fuerte",
+      min: 1,
+      minLabel: "Extremadamente débil"
+    });
+  });
+
   it("keeps participant labels blind and token hashes deterministic", () => {
     expect(navigoActivityLabel("T0_SALON")).toBe("Evaluacion 0 / T0 en salon");
     expect(navigoActivityLabel("T2_HORAS")).toBe("Evaluacion 2 horas");
@@ -432,7 +462,7 @@ describe("navigo app MVP rules", () => {
     expect(adminPage).toContain("resolveRequestOrigin");
     expect(adminPage).toContain("participant.participantLinkToken");
     expect(adminPage).toContain("new URL(`/p/${encodeURIComponent(participant.participantLinkToken)}/activities`, requestOrigin).toString()");
-    expect(adminPage).toContain("Guardar T0");
+    expect(adminPage).toContain("Guardar corrección T0");
     expect(adminPage).toContain("Generar link participante");
     expect(adminPage).toContain("Regenerar link participante");
     expect(adminPage).toContain("Corregir hora base T0");
@@ -455,15 +485,19 @@ describe("navigo app MVP rules", () => {
     expect(resolveRequestOrigin(new Headers({ host: "localhost:3000" }), {})).toBe("http://localhost:3000");
   });
 
-  it("shows T0 in admin and participant app without public capture", () => {
+  it("shows T0 in the participant app as the salon capture step", () => {
     const adminPage = readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "page.tsx");
     const participantPage = readWorkspaceFile("src", "app", "p", "[token]", "activities", "page.tsx");
     const repository = readWorkspaceFile("src", "modules", "navigo-app", "repository.ts");
 
-    expect(adminPage).toContain("Capturar T0 AP1-AP7");
-    expect(adminPage).toContain("T0 se captura en salon");
-    expect(participantPage).toContain("Evaluación 0 — Completada en salón");
-    expect(repository).toContain("T0 fue capturada en salon por el equipo interno.");
+    const capture = readWorkspaceFile("src", "app", "p", "[token]", "activities", "_components", "NavigoActivityCapture.tsx");
+
+    expect(adminPage).toContain("Abrir link para capturar T0 en salón");
+    expect(participantPage).toContain("Iniciar evaluación 0 en salón");
+    expect(repository).toContain("ensureNavigoT0Activity");
+    expect(repository).toContain("createRegisteredSelfiePreview");
+    expect(capture).toContain("Verificación visual de identidad");
+    expect(capture).toContain("Toma y guarda la selfie antes de enviar las respuestas.");
   });
 
   it("converts Navigo datetime-local values using the study time zone", () => {
@@ -486,14 +520,14 @@ describe("navigo app MVP rules", () => {
     expect(adminPage).toContain("nowInStudyTimezoneForDateTimeLocal");
     expect(adminPage).not.toContain("toISOString().slice");
     expect(adminPage).toContain("defaultChecked={readAnswerValue(answer)");
-    expect(adminPage).toContain("Guardar T0");
-    expect(adminPage).toContain("Guardando T0...");
+    expect(adminPage).toContain("Guardar corrección T0");
+    expect(adminPage).toContain("Guardando corrección T0...");
     expect(adminPage).toContain("Acciones de correccion");
     expect(adminPage).toContain("REINICIAR APP");
     expect(adminPage).toContain("ELIMINAR ETAPAS");
     expect(actions).toContain("resetNavigoParticipantAppAction");
     expect(actions).toContain("Selecciona la hora base T0.");
-    expect(repository).toContain("Completa AP1-AP7 para guardar T0.");
+    expect(repository).toContain("NAVIGO_T0_IDENTITY_QUESTION_ID");
     expect(repository).toContain("resetParticipantApp");
     expect(repository).toContain("deleteParticipantStagesFrom");
   });
@@ -502,10 +536,10 @@ describe("navigo app MVP rules", () => {
     const repository = readWorkspaceFile("src", "modules", "navigo-app", "repository.ts");
     const participantPage = readWorkspaceFile("src", "app", "p", "[token]", "activities", "page.tsx");
 
-    expect(repository).toContain("activity.responses.length < createNavigoMeasurementDefinition().questions.length");
+    expect(repository).toContain("isNavigoT0Complete");
     expect(repository).toContain("status: isIncompleteT0 ? \"STARTED\" : activity.status");
-    expect(participantPage).toContain("Evaluación 0 en salón pendiente de completar por el equipo.");
-    expect(participantPage).toContain("responseCount >= 7");
+    expect(participantPage).toContain("Evaluación 0 / T0 en salón");
+    expect(participantPage).toContain("(activity.responseCount ?? 0) >= 7");
   });
 
   it("creates and parses the rotation import template for CSV or TSV", () => {
@@ -709,15 +743,17 @@ describe("navigo app MVP rules", () => {
 });
 
 function navigoActivityRecords({
+  t0Status = "COMPLETED",
   t2Completed = false,
   t4Completed = false
 }: {
+  t0Status?: "COMPLETED" | "STARTED";
   t2Completed?: boolean;
   t4Completed?: boolean;
 } = {}) {
   const base = new Date("2026-06-25T15:00:00.000Z");
   return [
-    navigoActivityRecord("T0_SALON", 0, 0, 0, "COMPLETED", base, base),
+    navigoActivityRecord("T0_SALON", 0, 0, 0, t0Status, base, t0Status === "COMPLETED" ? base : null),
     navigoActivityRecord("T2_HORAS", 120, -30, 480, t2Completed ? "COMPLETED" : "PENDING", null, null),
     navigoActivityRecord("T4_HORAS", 240, -30, 360, t4Completed ? "COMPLETED" : "PENDING", null, null),
     navigoActivityRecord("T8_HORAS", 480, -30, 120, "PENDING", null, null)
@@ -729,7 +765,7 @@ function navigoActivityRecord(
   offsetMinutes: number,
   windowStartsMinutes: number,
   windowEndsMinutes: number,
-  status: "COMPLETED" | "PENDING",
+  status: "COMPLETED" | "PENDING" | "STARTED",
   actualStartedAt: Date | null,
   actualCompletedAt: Date | null
 ) {
@@ -980,6 +1016,7 @@ function createNavigoRotationImportState({ failProductUpsert = false }: { failPr
       folio: "NAV-001",
       referenceCodes: []
     },
+    participantEvidence: [],
     participantProfile: {
       email: null,
       id: "profile-1",
@@ -1260,3 +1297,4 @@ function createNavigoRotationImportState({ failProductUpsert = false }: { failPr
 function readWorkspaceFile(...segments: string[]) {
   return readFileSync(join(process.cwd(), ...segments), "utf8");
 }
+

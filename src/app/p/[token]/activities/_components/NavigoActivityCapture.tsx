@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { NAVIGO_T0_IDENTITY_QUESTION_ID } from "@/modules/navigo-app/definition";
 import {
   confirmNavigoActivitySelfieUploadAction,
   requestNavigoActivitySelfieUploadAction,
@@ -14,6 +15,10 @@ type NavigoActivityCaptureProps = {
   error?: string;
   existingResponses: Record<string, unknown>;
   questions: QuestionnaireQuestion[];
+  registeredSelfie: {
+    signedUrl: string;
+  } | null;
+  requiresSelfie: boolean;
   selfieCount: number;
   token: string;
 };
@@ -23,10 +28,18 @@ export function NavigoActivityCapture({
   error,
   existingResponses,
   questions,
+  registeredSelfie,
+  requiresSelfie,
   selfieCount,
   token
 }: NavigoActivityCaptureProps) {
   const [selfies, setSelfies] = useState(selfieCount);
+  const [identityConfirmed, setIdentityConfirmed] = useState(
+    readAnswerValue(existingResponses[NAVIGO_T0_IDENTITY_QUESTION_ID]) === "YES"
+  );
+  const [identityRejected, setIdentityRejected] = useState(
+    readAnswerValue(existingResponses[NAVIGO_T0_IDENTITY_QUESTION_ID]) === "NO"
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [cameraState, setCameraState] = useState<"idle" | "opening" | "ready">("idle");
@@ -101,7 +114,7 @@ export function NavigoActivityCapture({
       }
       settled = true;
       stopCamera();
-      setUploadError("No fue posible abrir la camara. Permite el acceso a la camara o intenta desde un celular.");
+      setUploadError("No fue posible abrir la cámara. Permite el acceso a la cámara o intenta desde un celular.");
     }
 
     video.srcObject = stream;
@@ -127,7 +140,7 @@ export function NavigoActivityCapture({
     clearCapturedPhoto();
 
     if (!cameraSupported) {
-      setUploadError("Para continuar necesitas usar un dispositivo con camara.");
+      setUploadError("Para continuar necesitas usar un dispositivo con cámara.");
       return;
     }
 
@@ -142,7 +155,7 @@ export function NavigoActivityCapture({
       streamRef.current = stream;
     } catch {
       stopCamera();
-      setUploadError("No fue posible abrir la camara. Permite el acceso a la camara o intenta desde un celular.");
+      setUploadError("No fue posible abrir la cámara. Permite el acceso a la cámara o intenta desde un celular.");
     }
   }
 
@@ -209,7 +222,7 @@ export function NavigoActivityCapture({
           });
 
         if (upload.error) {
-          setUploadError("No fue posible subir la selfie. Revisa tu conexion e intenta nuevamente.");
+          setUploadError("No fue posible subir la selfie. Revisa tu conexión e intenta nuevamente.");
           return;
         }
 
@@ -228,7 +241,7 @@ export function NavigoActivityCapture({
         setMessage("Selfie registrada correctamente.");
         clearCapturedPhoto();
       } catch {
-        setUploadError("No fue posible subir la selfie. Revisa tu conexion e intenta nuevamente.");
+        setUploadError("No fue posible subir la selfie. Revisa tu conexión e intenta nuevamente.");
       } finally {
         setIsUploading(false);
       }
@@ -259,67 +272,86 @@ export function NavigoActivityCapture({
 
   return (
     <div className="space-y-6">
-      <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-zinc-950">Selfie de identificacion</h2>
-        <p className="mt-2 text-sm leading-6 text-zinc-600">
-          Toma una selfie clara para confirmar que eres la misma persona que participa en el estudio.
-        </p>
-        <p className="mt-2 text-sm text-zinc-500">Selfie registrada: {selfies}/1</p>
-
-        {message ? <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{message}</p> : null}
-        {uploadError ? <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{uploadError}</p> : null}
-
-        {selfies === 0 && cameraState === "idle" && !previewUrl ? (
-          <button className={primaryButtonClass} disabled={busy} onClick={openCamera} type="button">
-            Tomar selfie
-          </button>
-        ) : null}
-
-        {cameraState !== "idle" ? (
-          <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-950 p-3">
-            <video autoPlay className="max-h-[70vh] min-h-64 w-full rounded-md object-cover" muted playsInline ref={videoRef} />
-            <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-              <button className={primaryButtonClass} disabled={busy || cameraState !== "ready"} onClick={captureFromCamera} type="button">
-                {cameraState === "ready" ? "Tomar foto" : "Preparando camara..."}
-              </button>
-              <button className={secondaryButtonClass} onClick={stopCamera} type="button">
-                Cancelar camara
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        {previewUrl ? (
-          <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img alt="Vista previa de selfie" className="max-h-[70vh] w-full rounded-md object-contain" src={previewUrl} />
-            <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-              <button className={secondaryButtonClass} disabled={busy} onClick={clearCapturedPhoto} type="button">
-                Repetir foto
-              </button>
-              <button className={primaryButtonClass} disabled={busy} onClick={useCapturedPhoto} type="button">
-                {busy ? "Subiendo selfie..." : "Usar esta selfie"}
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        {selfies >= 1 ? (
-          <p className="mt-4 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
-            Selfie lista. Ya puedes guardar la evaluacion.
+      {requiresSelfie ? (
+        <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-zinc-950">Selfie de identificación</h2>
+          <p className="mt-2 text-sm leading-6 text-zinc-600">
+            Toma una selfie clara para confirmar que eres la misma persona que participa en el estudio.
           </p>
-        ) : null}
-        <canvas className="hidden" ref={canvasRef} />
-      </section>
+          <p className="mt-2 text-sm text-zinc-500">Selfie registrada: {selfies}/1</p>
+
+          {message ? (
+            <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              {message}
+            </p>
+          ) : null}
+          {uploadError ? (
+            <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+              {uploadError}
+            </p>
+          ) : null}
+
+          {selfies === 0 && cameraState === "idle" && !previewUrl ? (
+            <button className={primaryButtonClass} disabled={busy} onClick={openCamera} type="button">
+              Tomar selfie
+            </button>
+          ) : null}
+
+          {cameraState !== "idle" ? (
+            <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-950 p-3">
+              <video autoPlay className="max-h-[70vh] min-h-64 w-full rounded-md object-cover" muted playsInline ref={videoRef} />
+              <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+                <button className={primaryButtonClass} disabled={busy || cameraState !== "ready"} onClick={captureFromCamera} type="button">
+                  {cameraState === "ready" ? "Tomar foto" : "Preparando cámara..."}
+                </button>
+                <button className={secondaryButtonClass} onClick={stopCamera} type="button">
+                  Cancelar cámara
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {previewUrl ? (
+            <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img alt="Vista previa de selfie" className="max-h-[70vh] w-full rounded-md object-contain" src={previewUrl} />
+              <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+                <button className={secondaryButtonClass} disabled={busy} onClick={clearCapturedPhoto} type="button">
+                  Repetir foto
+                </button>
+                <button className={primaryButtonClass} disabled={busy} onClick={useCapturedPhoto} type="button">
+                  {busy ? "Subiendo selfie..." : "Usar esta selfie"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {selfies >= 1 ? (
+            <p className="mt-4 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
+              Selfie lista. Ya puedes guardar la evaluación.
+            </p>
+          ) : null}
+          <canvas className="hidden" ref={canvasRef} />
+        </section>
+      ) : null}
 
       <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-zinc-950">Preguntas AP1 a AP7</h2>
         <p className="mt-2 text-sm leading-6 text-zinc-600">Responde todas las preguntas para completar esta toma.</p>
         {error ? <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}</p> : null}
-        {selfies === 0 ? (
+        {requiresSelfie && selfies === 0 ? (
           <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             Toma y guarda la selfie antes de enviar las respuestas.
           </p>
+        ) : null}
+        {!requiresSelfie ? (
+          <IdentityConfirmation
+            identityConfirmed={identityConfirmed}
+            identityRejected={identityRejected}
+            registeredSelfie={registeredSelfie}
+            setIdentityConfirmed={setIdentityConfirmed}
+            setIdentityRejected={setIdentityRejected}
+          />
         ) : null}
 
         <form action={submitNavigoActivityResponsesAction.bind(null, token, activityId)} className="mt-5 space-y-6">
@@ -331,12 +363,91 @@ export function NavigoActivityCapture({
               question={question}
             />
           ))}
-          <button className={primaryButtonClass} disabled={selfies === 0} type="submit">
-            Guardar evaluacion
+          {!requiresSelfie ? (
+            <input
+              name={NAVIGO_T0_IDENTITY_QUESTION_ID}
+              type="hidden"
+              value={identityConfirmed ? "YES" : identityRejected ? "NO" : ""}
+            />
+          ) : null}
+          {identityRejected ? (
+            <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+              No se puede continuar. Contacta al supervisor para revisar la identidad del participante.
+            </p>
+          ) : null}
+          <button className={primaryButtonClass} disabled={(requiresSelfie && selfies === 0) || (!requiresSelfie && !identityConfirmed)} type="submit">
+            Guardar evaluación
           </button>
         </form>
       </section>
     </div>
+  );
+}
+
+function IdentityConfirmation({
+  identityConfirmed,
+  identityRejected,
+  registeredSelfie,
+  setIdentityConfirmed,
+  setIdentityRejected
+}: {
+  identityConfirmed: boolean;
+  identityRejected: boolean;
+  registeredSelfie: { signedUrl: string } | null;
+  setIdentityConfirmed: (value: boolean) => void;
+  setIdentityRejected: (value: boolean) => void;
+}) {
+  return (
+    <section className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4">
+      <h3 className="text-base font-semibold text-amber-950">Verificación visual de identidad</h3>
+      <p className="mt-2 text-sm leading-6 text-amber-900">
+        El encuestador debe confirmar que la persona presente coincide con la foto registrada en el filtro.
+      </p>
+      {registeredSelfie ? (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-white p-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            alt="Foto registrada del participante"
+            className="max-h-[70vh] w-full rounded-md object-contain"
+            src={registeredSelfie.signedUrl}
+          />
+        </div>
+      ) : (
+        <p className="mt-4 rounded-md border border-rose-200 bg-white px-3 py-2 text-sm text-rose-800">
+          No encontramos una foto registrada para comparar. Contacta al supervisor antes de continuar.
+        </p>
+      )}
+      <fieldset className="mt-4">
+        <legend className="text-sm font-semibold text-amber-950">
+          El encuestador debe confirmar: ¿la persona presente coincide con la foto registrada?
+        </legend>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="flex items-center gap-3 rounded-md border border-amber-200 bg-white px-3 py-3 text-sm font-semibold text-zinc-900">
+            <input
+              checked={identityConfirmed}
+              disabled={!registeredSelfie}
+              onChange={() => {
+                setIdentityConfirmed(true);
+                setIdentityRejected(false);
+              }}
+              type="radio"
+            />
+            Sí, coincide.
+          </label>
+          <label className="flex items-center gap-3 rounded-md border border-amber-200 bg-white px-3 py-3 text-sm font-semibold text-zinc-900">
+            <input
+              checked={identityRejected}
+              onChange={() => {
+                setIdentityConfirmed(false);
+                setIdentityRejected(true);
+              }}
+              type="radio"
+            />
+            No, no coincide.
+          </label>
+        </div>
+      </fieldset>
+    </section>
   );
 }
 
@@ -365,11 +476,14 @@ function QuestionControl({
       ) : null}
       {question.type === "scale" ? (
         <div className="mt-4">
-          <div className="grid grid-cols-5 gap-2 sm:grid-cols-10">
+          <div className={question.max <= 7 ? "grid gap-2 sm:grid-cols-2" : "grid grid-cols-2 gap-2 sm:grid-cols-5"}>
             {Array.from({ length: question.max - question.min + 1 }, (_, offset) => question.min + offset).map((value) => (
-              <label className="flex flex-col items-center gap-1 rounded-md border border-zinc-200 px-2 py-2 text-sm text-zinc-800" key={value}>
+              <label className="flex items-center gap-3 rounded-md border border-zinc-200 px-3 py-3 text-sm text-zinc-800" key={value}>
                 <input defaultChecked={readAnswerValue(answer) === value} name={question.id} required={question.required} type="radio" value={value} />
-                {value}
+                <span>
+                  <span className="font-semibold">{value}</span>
+                  <span className="ml-2">{scaleOptionLabel(question.id, value)}</span>
+                </span>
               </label>
             ))}
           </div>
@@ -383,6 +497,31 @@ function QuestionControl({
       ) : null}
     </fieldset>
   );
+}
+
+function scaleOptionLabel(questionId: string, value: number): string {
+  if (questionId === "AP3_INTENSIDAD_PRIMERA" || questionId === "AP4_INTENSIDAD_SEGUNDA") {
+    return (
+      {
+        1: "Extremadamente débil",
+        2: "Muy débil",
+        3: "Algo débil",
+        4: "Ni débil, ni fuerte",
+        5: "Algo fuerte",
+        6: "Muy fuerte",
+        7: "Extremadamente fuerte"
+      }[value] ?? ""
+    );
+  }
+
+  if (value === 1) {
+    return "Muy baja calificación";
+  }
+  if (value === 10) {
+    return "Excelente calificación";
+  }
+
+  return "";
 }
 
 function readAnswerValue(answer: unknown): string | number | null {

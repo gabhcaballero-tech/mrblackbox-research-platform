@@ -59,7 +59,7 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
         ) : null}
 
         <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-zinc-950">Tu participacion</h2>
+          <h2 className="text-lg font-semibold text-zinc-950">Tu participación</h2>
           <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-3">
             <div>
               <dt className="font-medium text-zinc-500">Folio</dt>
@@ -78,51 +78,60 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
 
         {data.timeline.length === 0 ? (
           <EmptyState
-            title="Tu evaluacion aun no ha sido iniciada en salon"
-            description="Cuando el equipo registre tu T0, aqui apareceran las tomas de 2, 4 y 8 horas."
+            title="Tu evaluación aún no está lista"
+            description="Cuando el equipo prepare tu enlace, aquí aparecerá la evaluación 0 en salón."
           />
         ) : (
           <section className="grid gap-4 md:grid-cols-4">
-            {data.timeline
-              .map((activity) => (
-                <article className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm" key={activity.id}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-lg font-semibold text-zinc-950">
-                        {activity.code === "T0_SALON"
-                          ? t0ParticipantLabel(activity.responseCount ?? 0)
-                          : navigoActivityLabel(activity.code)}
-                      </h2>
-                      <p className="mt-2 text-sm text-zinc-600">{availabilityMessage(activity.availability.reason)}</p>
-                    </div>
-                    <StatusBadge status={activity.availability.canCapture ? "ready" : "planned"}>
-                      {activity.availability.label}
-                    </StatusBadge>
+            {data.timeline.map((activity) => (
+              <article className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm" key={activity.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-zinc-950">
+                      {activity.code === "T0_SALON" ? t0ParticipantLabel(activity) : navigoActivityLabel(activity.code)}
+                    </h2>
+                    <p className="mt-2 text-sm text-zinc-600">
+                      {activity.code === "T0_SALON" && activity.availability.canCapture
+                        ? "Esta evaluación debe completarse en el salón con apoyo del encuestador."
+                        : availabilityMessage(activity.availability.reason)}
+                    </p>
                   </div>
-                  <dl className="mt-4 space-y-2 text-sm">
-                    <div>
-                      <dt className="font-medium text-zinc-500">Horario ideal</dt>
-                      <dd className="mt-1 text-zinc-950">{formatDate(activity.scheduledAt, data.timeZoneIana)}</dd>
-                    </div>
-                    <div>
-                      <dt className="font-medium text-zinc-500">Disponible desde</dt>
-                      <dd className="mt-1 text-zinc-950">{formatDate(activity.availableFrom, data.timeZoneIana)}</dd>
-                    </div>
-                    <div>
-                      <dt className="font-medium text-zinc-500">Cierre maximo</dt>
-                      <dd className="mt-1 text-zinc-950">{formatDate(activity.availableUntil, data.timeZoneIana)}</dd>
-                    </div>
-                  </dl>
-                  {activity.code !== "T0_SALON" && activity.availability.canCapture ? (
-                    <Link
-                      className="mt-5 inline-flex w-full justify-center rounded-md bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-800"
-                      href={`/p/${encodeURIComponent(parsedToken.data)}/activities/${activity.id}`}
-                    >
-                      Realizar evaluacion
-                    </Link>
-                  ) : null}
-                </article>
-              ))}
+                  <StatusBadge status={activity.availability.canCapture ? "ready" : "planned"}>
+                    {activity.availability.label}
+                  </StatusBadge>
+                </div>
+                <dl className="mt-4 space-y-2 text-sm">
+                  <div>
+                    <dt className="font-medium text-zinc-500">Horario ideal</dt>
+                    <dd className="mt-1 text-zinc-950">{formatDate(activity.scheduledAt, data.timeZoneIana)}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-zinc-500">Disponible desde</dt>
+                    <dd className="mt-1 text-zinc-950">{formatDate(activity.availableFrom, data.timeZoneIana)}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-zinc-500">Cierre máximo</dt>
+                    <dd className="mt-1 text-zinc-950">{formatDate(activity.availableUntil, data.timeZoneIana)}</dd>
+                  </div>
+                </dl>
+                {activity.code === "T0_SALON" && activity.availability.canCapture ? (
+                  <Link
+                    className="mt-5 inline-flex w-full justify-center rounded-md bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-800"
+                    href={`/p/${encodeURIComponent(parsedToken.data)}/activities/${activity.id}`}
+                  >
+                    Iniciar evaluación 0 en salón
+                  </Link>
+                ) : null}
+                {activity.code !== "T0_SALON" && activity.availability.canCapture ? (
+                  <Link
+                    className="mt-5 inline-flex w-full justify-center rounded-md bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-800"
+                    href={`/p/${encodeURIComponent(parsedToken.data)}/activities/${activity.id}`}
+                  >
+                    Realizar evaluación
+                  </Link>
+                ) : null}
+              </article>
+            ))}
           </section>
         )}
       </div>
@@ -134,22 +143,26 @@ function availabilityMessage(reason: string): string {
   switch (reason) {
     case "AVAILABLE":
     case "DUE_SOON":
-      return "Ya puedes realizar esta evaluacion.";
+      return "Ya puedes realizar esta evaluación.";
     case "BEFORE_WINDOW":
-      return "Aun no es momento de realizar esta evaluacion.";
+      return "Aún no es momento de realizar esta evaluación.";
     case "AFTER_WINDOW":
-      return "Esta evaluacion esta fuera de la ventana permitida. Contacta a tu reclutador.";
+      return "Esta evaluación está fuera de la ventana permitida. Contacta a tu reclutador.";
     case "ALREADY_COMPLETED":
       return "Evaluación registrada correctamente.";
+    case "PREVIOUS_REQUIRED":
+      return "La evaluación 0 en salón aún no está completa.";
     default:
-      return "Completa primero la evaluacion anterior.";
+      return "Completa primero la evaluación anterior.";
   }
 }
 
-function t0ParticipantLabel(responseCount: number): string {
-  return responseCount >= 7
-    ? "Evaluación 0 — Completada en salón"
-    : "Evaluación 0 en salón pendiente de completar por el equipo.";
+function t0ParticipantLabel(activity: { identityStatus?: string; responseCount?: number; status: string }): string {
+  if (activity.status === "COMPLETED" && activity.identityStatus === "CONFIRMED" && (activity.responseCount ?? 0) >= 7) {
+    return "Evaluación 0 / T0 en salón completada";
+  }
+
+  return "Evaluación 0 / T0 en salón";
 }
 
 function formatDate(value: Date, timeZoneIana: string): string {
