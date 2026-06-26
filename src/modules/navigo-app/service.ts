@@ -436,8 +436,14 @@ export function parseNavigoRotationImportText({
   };
 
   if (indexes.folio < 0 || indexes.primeraFragancia < 0 || indexes.segundaFragancia < 0) {
+    const missing = [
+      indexes.folio < 0 ? "columna folio faltante" : null,
+      indexes.primeraFragancia < 0 ? "columna primera_fragancia faltante" : null,
+      indexes.segundaFragancia < 0 ? "columna segunda_fragancia faltante" : null
+    ].filter(Boolean);
+
     return {
-      message: "El archivo debe incluir columnas folio, primera_fragancia y segunda_fragancia.",
+      message: `Encabezados no reconocidos: ${missing.join(", ")}.`,
       ok: false
     };
   }
@@ -534,7 +540,9 @@ function normalizeRotationHeader(value: string): string {
   if (
     normalized === "1a_fragancia" ||
     normalized === "primera_fragancia" ||
-    normalized === "brazo_izquierdo"
+    normalized === "brazo_izquierdo" ||
+    normalized === "izquierdo" ||
+    normalized === "left"
   ) {
     return "primera_fragancia";
   }
@@ -542,7 +550,9 @@ function normalizeRotationHeader(value: string): string {
   if (
     normalized === "2a_fragancia" ||
     normalized === "segunda_fragancia" ||
-    normalized === "brazo_derecho"
+    normalized === "brazo_derecho" ||
+    normalized === "derecho" ||
+    normalized === "right"
   ) {
     return "segunda_fragancia";
   }

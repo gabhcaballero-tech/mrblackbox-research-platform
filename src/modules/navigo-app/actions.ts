@@ -80,10 +80,52 @@ export async function previewNavigoRotationImportAction(
     };
   }
 
-  const parsed = parseNavigoRotationImportText({
-    filename: file.name,
-    text: await file.text()
-  });
+  try {
+    return await previewNavigoRotationImportTextAction(studyId, file.name, await file.text());
+  } catch (error) {
+    logNavigoRotationImportError({
+      error,
+      step: "preview-file",
+      studyId
+    });
+
+    return {
+      message: "No fue posible previsualizar el archivo. Revisa que sea CSV o TSV y vuelve a intentarlo.",
+      preview: null,
+      rows: [],
+      status: "error"
+    };
+  }
+}
+
+export async function previewNavigoRotationImportTextAction(
+  studyId: string,
+  filename: string,
+  text: string
+): Promise<NavigoRotationImportActionState> {
+  await requireCapability("rotation:register");
+
+  let parsed: ReturnType<typeof parseNavigoRotationImportText>;
+
+  try {
+    parsed = parseNavigoRotationImportText({
+      filename,
+      text
+    });
+  } catch (error) {
+    logNavigoRotationImportError({
+      error,
+      step: "parse",
+      studyId
+    });
+
+    return {
+      message: "No fue posible previsualizar el archivo. Revisa que sea CSV o TSV y vuelve a intentarlo.",
+      preview: null,
+      rows: [],
+      status: "error"
+    };
+  }
 
   if (!parsed.ok) {
     return {
@@ -94,10 +136,27 @@ export async function previewNavigoRotationImportAction(
     };
   }
 
-  const result = await createNavigoAppRepository().previewRotationImport({
-    rows: parsed.rows,
-    studyId
-  });
+  let result: Awaited<ReturnType<ReturnType<typeof createNavigoAppRepository>["previewRotationImport"]>>;
+
+  try {
+    result = await createNavigoAppRepository().previewRotationImport({
+      rows: parsed.rows,
+      studyId
+    });
+  } catch (error) {
+    logNavigoRotationImportError({
+      error,
+      step: "preview",
+      studyId
+    });
+
+    return {
+      message: "No fue posible previsualizar el archivo. Revisa que sea CSV o TSV y vuelve a intentarlo.",
+      preview: null,
+      rows: parsed.rows,
+      status: "error"
+    };
+  }
 
   if (!result.ok) {
     return {
@@ -121,8 +180,14 @@ export async function applyNavigoRotationImportAction(
   _previousState: NavigoRotationImportActionState,
   formData: FormData
 ): Promise<NavigoRotationImportActionState> {
+  return applyNavigoRotationImportRowsAction(studyId, parseRowsJson(String(formData.get("rowsJson") ?? "[]")));
+}
+
+export async function applyNavigoRotationImportRowsAction(
+  studyId: string,
+  rows: NavigoRotationImportRowInput[]
+): Promise<NavigoRotationImportActionState> {
   const actor = await requireCapability("rotation:register");
-  const rows = parseRowsJson(String(formData.get("rowsJson") ?? "[]"));
 
   if (rows.length === 0) {
     return {
@@ -133,11 +198,28 @@ export async function applyNavigoRotationImportAction(
     };
   }
 
-  const result = await createNavigoAppRepository().applyRotationImport({
-    actorUserId: actor.id,
-    rows,
-    studyId
-  });
+  let result: Awaited<ReturnType<ReturnType<typeof createNavigoAppRepository>["applyRotationImport"]>>;
+
+  try {
+    result = await createNavigoAppRepository().applyRotationImport({
+      actorUserId: actor.id,
+      rows,
+      studyId
+    });
+  } catch (error) {
+    logNavigoRotationImportError({
+      error,
+      step: "apply",
+      studyId
+    });
+
+    return {
+      message: "No fue posible aplicar la importacion. Revisa la previsualizacion e intenta de nuevo.",
+      preview: null,
+      rows,
+      status: "error"
+    };
+  }
 
   if (!result.ok) {
     return {
@@ -156,6 +238,19 @@ export async function applyNavigoRotationImportAction(
     rows,
     status: "success"
   };
+}
+
+function logNavigoRotationImportError({
+  error,
+  step,
+  studyId
+}: {
+  error: unknown;
+  step: "apply" | "parse" | "preview" | "preview-file";
+  studyId: string;
+}) {
+  const message = error instanceof Error ? error.message : "unknown";
+  console.error(`navigo rotation import failed: step=${step} studyId=${studyId} message=${message}`);
 }
 
 export async function requestNavigoActivitySelfieUploadAction(

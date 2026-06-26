@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useRouter } from "next/navigation";
+import type { FormEvent } from "react";
+import { useRef, useState } from "react";
 import {
-  applyNavigoRotationImportAction,
-  previewNavigoRotationImportAction
+  applyNavigoRotationImportRowsAction,
+  previewNavigoRotationImportTextAction
 } from "@/modules/navigo-app/actions";
 import {
   initialNavigoRotationImportActionState,
@@ -16,16 +18,74 @@ type NavigoRotationImportPanelProps = {
 };
 
 export function NavigoRotationImportPanel({ studyId }: NavigoRotationImportPanelProps) {
-  const [previewState, previewAction, previewPending] = useActionState(
-    previewNavigoRotationImportAction.bind(null, studyId),
-    initialNavigoRotationImportActionState
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [state, setState] = useState<NavigoRotationImportActionState>(initialNavigoRotationImportActionState);
+  const [isApplying, setIsApplying] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const canApply = Boolean(
+    state.preview && state.preview.summary.validRows > 0 && state.preview.summary.rowsWithError === 0
   );
-  const [applyState, applyAction, applyPending] = useActionState(
-    applyNavigoRotationImportAction.bind(null, studyId),
-    initialNavigoRotationImportActionState
-  );
-  const activeState = applyState.status !== "idle" ? applyState : previewState;
-  const canApply = Boolean(previewState.preview && previewState.preview.summary.rowsWithError === 0);
+
+  async function handlePreviewSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const file = fileInputRef.current?.files?.[0] ?? null;
+
+    if (!file) {
+      setState({
+        message: "Selecciona un archivo CSV o TSV compatible con Excel.",
+        preview: null,
+        rows: [],
+        status: "error"
+      });
+      return;
+    }
+
+    setIsPreviewing(true);
+
+    try {
+      const text = await file.text();
+      const result = await previewNavigoRotationImportTextAction(studyId, file.name, text);
+      setState(result);
+    } catch {
+      setState({
+        message: "No fue posible previsualizar el archivo. Revisa que sea CSV o TSV y vuelve a intentarlo.",
+        preview: null,
+        rows: [],
+        status: "error"
+      });
+    } finally {
+      setIsPreviewing(false);
+    }
+  }
+
+  async function handleApplySubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!canApply || isApplying) {
+      return;
+    }
+
+    setIsApplying(true);
+
+    try {
+      const result = await applyNavigoRotationImportRowsAction(studyId, state.rows);
+      setState(result);
+
+      if (result.status === "success") {
+        router.refresh();
+      }
+    } catch {
+      setState({
+        message: "No fue posible aplicar la importacion. Revisa la previsualizacion e intenta de nuevo.",
+        preview: state.preview,
+        rows: state.rows,
+        status: "error"
+      });
+    } finally {
+      setIsApplying(false);
+    }
+  }
 
   return (
     <section className="rounded-lg border border-teal-200 bg-teal-50 p-5">
@@ -34,8 +94,11 @@ export function NavigoRotationImportPanel({ studyId }: NavigoRotationImportPanel
           <p className="text-sm font-semibold uppercase tracking-wide text-teal-800">Importar rotacion</p>
           <h2 className="mt-2 text-xl font-semibold text-zinc-950">Asignacion masiva por folio</h2>
           <p className="mt-2 text-sm leading-6 text-zinc-700">
-            Sube un archivo CSV o TSV compatible con Excel con columnas folio, primera_fragancia y segunda_fragancia.
-            En esta etapa no se procesa XLSX directamente.
+            Usa un archivo CSV o TSV compatible con Excel. No se procesa XLSX directamente.
+          </p>
+          <p className="mt-1 text-sm leading-6 text-zinc-700">
+            El archivo debe incluir folio, primera fragancia y segunda fragancia. Tambien se aceptan columnas como
+            izquierdo/derecho o left/right.
           </p>
         </div>
         <Link
@@ -46,37 +109,37 @@ export function NavigoRotationImportPanel({ studyId }: NavigoRotationImportPanel
         </Link>
       </div>
 
-      <form action={previewAction} className="mt-5 flex flex-col gap-3 md:flex-row md:items-end">
+      <form className="mt-5 flex flex-col gap-3 md:flex-row md:items-end" onSubmit={handlePreviewSubmit}>
         <label className="flex flex-1 flex-col gap-1 text-sm font-medium text-zinc-700">
           Archivo CSV/TSV
           <input
             accept=".csv,.tsv,text/csv,text/tab-separated-values"
             className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-950"
             name="rotationFile"
+            ref={fileInputRef}
             required
             type="file"
           />
         </label>
         <button
           className="inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
-          disabled={previewPending}
+          disabled={isPreviewing || isApplying}
           type="submit"
         >
-          {previewPending ? "Previsualizando..." : "Previsualizar archivo"}
+          {isPreviewing ? "Previsualizando..." : "Previsualizar archivo"}
         </button>
       </form>
 
-      <StatusMessage state={activeState} />
-      {previewState.preview ? <ImportPreview state={previewState} /> : null}
+      <StatusMessage state={state} />
+      {state.preview ? <ImportPreview state={state} /> : null}
 
-      <form action={applyAction} className="mt-5">
-        <input name="rowsJson" type="hidden" value={JSON.stringify(previewState.rows)} />
+      <form className="mt-5" onSubmit={handleApplySubmit}>
         <button
           className="inline-flex rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
-          disabled={!canApply || applyPending}
+          disabled={!canApply || isApplying || isPreviewing}
           type="submit"
         >
-          {applyPending ? "Aplicando importacion..." : "Aplicar importacion"}
+          {isApplying ? "Aplicando importacion..." : "Aplicar importacion"}
         </button>
         {!canApply ? (
           <p className="mt-2 text-xs text-zinc-600">Corrige errores y vuelve a previsualizar antes de aplicar.</p>
@@ -111,6 +174,9 @@ function ImportPreview({ state }: { state: NavigoRotationImportActionState }) {
     return null;
   }
 
+  const validRows = preview.rows.filter((row) => row.errors.length === 0);
+  const errorRows = preview.rows.filter((row) => row.errors.length > 0);
+
   return (
     <div className="mt-5 rounded-lg border border-zinc-200 bg-white p-4">
       <h3 className="text-base font-semibold text-zinc-950">Previsualizacion</h3>
@@ -127,37 +193,79 @@ function ImportPreview({ state }: { state: NavigoRotationImportActionState }) {
           {preview.summary.t0Started} participante(s) ya tienen T0 iniciado y no se actualizaran.
         </p>
       ) : null}
-      <div className="mt-4 overflow-x-auto">
-        <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500">
-            <tr>
-              <th className="px-2 py-2">Fila</th>
-              <th className="px-2 py-2">Folio</th>
-              <th className="px-2 py-2">1a fragancia</th>
-              <th className="px-2 py-2">2a fragancia</th>
-              <th className="px-2 py-2">Estado</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
-            {preview.rows.map((row) => (
-              <tr key={`${row.rowNumber}-${row.folio}`}>
-                <td className="px-2 py-2 font-mono text-xs text-zinc-500">{row.rowNumber}</td>
-                <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.folio || "-"}</td>
-                <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.primeraFragancia || "-"}</td>
-                <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.segundaFragancia || "-"}</td>
-                <td className="px-2 py-2">
-                  {row.errors.length > 0 ? (
-                    <span className="text-xs font-semibold text-rose-700">{row.errors.join("; ")}</span>
-                  ) : row.existingRotation ? (
-                    <span className="text-xs font-semibold text-amber-700">Actualizara rotacion existente</span>
-                  ) : (
-                    <span className="text-xs font-semibold text-emerald-700">Lista para importar</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-5">
+        <h4 className="text-sm font-semibold text-zinc-950">Filas validas</h4>
+        {validRows.length === 0 ? (
+          <p className="mt-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
+            No hay filas listas para importar.
+          </p>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500">
+                <tr>
+                  <th className="px-2 py-2">Fila</th>
+                  <th className="px-2 py-2">Folio</th>
+                  <th className="px-2 py-2">1a fragancia</th>
+                  <th className="px-2 py-2">2a fragancia</th>
+                  <th className="px-2 py-2">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {validRows.map((row) => (
+                  <tr key={`${row.rowNumber}-${row.folio}-valid`}>
+                    <td className="px-2 py-2 font-mono text-xs text-zinc-500">{row.rowNumber}</td>
+                    <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.folio || "-"}</td>
+                    <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.primeraFragancia || "-"}</td>
+                    <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.segundaFragancia || "-"}</td>
+                    <td className="px-2 py-2">
+                      {row.existingRotation ? (
+                        <span className="text-xs font-semibold text-amber-700">Actualizara rotacion existente</span>
+                      ) : (
+                        <span className="text-xs font-semibold text-emerald-700">Lista para importar</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      <div className="mt-5">
+        <h4 className="text-sm font-semibold text-zinc-950">Errores encontrados</h4>
+        {errorRows.length === 0 ? (
+          <p className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            No se encontraron errores bloqueantes.
+          </p>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500">
+                <tr>
+                  <th className="px-2 py-2">Fila</th>
+                  <th className="px-2 py-2">Folio</th>
+                  <th className="px-2 py-2">1a fragancia</th>
+                  <th className="px-2 py-2">2a fragancia</th>
+                  <th className="px-2 py-2">Error</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {errorRows.map((row) => (
+                  <tr key={`${row.rowNumber}-${row.folio}-error`}>
+                    <td className="px-2 py-2 font-mono text-xs text-zinc-500">{row.rowNumber}</td>
+                    <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.folio || "-"}</td>
+                    <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.primeraFragancia || "-"}</td>
+                    <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.segundaFragancia || "-"}</td>
+                    <td className="px-2 py-2">
+                      <span className="text-xs font-semibold text-rose-700">{row.errors.join("; ")}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

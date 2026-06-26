@@ -432,6 +432,79 @@ describe("navigo app MVP rules", () => {
     expect(xlsx.ok).toBe(false);
   });
 
+  it("parses rotation imports with BOM, semicolon files and header aliases", () => {
+    const withBom = parseNavigoRotationImportText({
+      filename: "rotacion.tsv",
+      text: "\uFEFFFolio\tIzquierdo\tDerecho\r\nNAV-009\t codigo-a \t codigo-b \r\n"
+    });
+    const semicolon = parseNavigoRotationImportText({
+      filename: "rotacion.csv",
+      text: "folio;left;right\nNAV-010;frag-a;frag-b"
+    });
+
+    expect(withBom.ok ? withBom.rows[0] : null).toEqual({
+      folio: "NAV-009",
+      primeraFragancia: "CODIGO-A",
+      segundaFragancia: "CODIGO-B"
+    });
+    expect(semicolon.ok ? semicolon.rows[0] : null).toEqual({
+      folio: "NAV-010",
+      primeraFragancia: "FRAG-A",
+      segundaFragancia: "FRAG-B"
+    });
+  });
+
+  it("returns clear errors for missing rotation import columns", () => {
+    const missing = parseNavigoRotationImportText({
+      filename: "rotacion.tsv",
+      text: "folio\totra_columna\nNAV-001\tCODIGO-A"
+    });
+
+    expect(missing.ok).toBe(false);
+    expect(missing.ok ? "" : missing.message).toContain("columna primera_fragancia faltante");
+    expect(missing.ok ? "" : missing.message).toContain("columna segunda_fragancia faltante");
+  });
+
+  it("keeps the rotation import panel from depending on multipart server action upload", () => {
+    const panel = readWorkspaceFile(
+      "src",
+      "app",
+      "admin",
+      "studies",
+      "[studyId]",
+      "navigo-app",
+      "_components",
+      "NavigoRotationImportPanel.tsx"
+    );
+
+    expect(panel).toContain("Usa un archivo CSV o TSV compatible con Excel. No se procesa XLSX directamente.");
+    expect(panel).toContain("previewNavigoRotationImportTextAction");
+    expect(panel).toContain("file.text()");
+    expect(panel).toContain("setIsPreviewing(false)");
+    expect(panel).toContain("validRows > 0");
+    expect(panel).toContain("Filas validas");
+    expect(panel).toContain("Errores encontrados");
+    expect(panel).not.toContain("useActionState");
+  });
+
+  it("serves the rotation template as a tab-separated file with UTF-8 BOM", () => {
+    const route = readWorkspaceFile(
+      "src",
+      "app",
+      "admin",
+      "studies",
+      "[studyId]",
+      "navigo-app",
+      "rotation-template",
+      "route.ts"
+    );
+
+    expect(createNavigoRotationTemplateTsv()).toContain("\t");
+    expect(route).toContain("\\uFEFF");
+    expect(route).toContain("text/tab-separated-values; charset=utf-8");
+    expect(route).toContain(".tsv");
+  });
+
   it("adds operable participant routes for token activities", () => {
     expect(readWorkspaceFile("src", "app", "p", "[token]", "activities", "page.tsx")).toContain(
       "Evaluaciones de fragancia"
