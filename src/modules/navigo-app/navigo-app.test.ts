@@ -304,12 +304,14 @@ describe("navigo participant activities", () => {
 });
 
 describe("navigo app MVP rules", () => {
-  it("classifies local face verification similarity with conservative thresholds", () => {
+  it("classifies local face verification similarity with the updated thresholds", () => {
+    expect(classifyNavigoFaceSimilarity(0.62)).toBe("MATCH");
+    expect(classifyNavigoFaceSimilarity(0.6)).toBe("MATCH");
+    expect(classifyNavigoFaceSimilarity(0.599)).toBe("UNCERTAIN");
+    expect(classifyNavigoFaceSimilarity(0.35)).toBe("NO_MATCH");
+    expect(classifyNavigoFaceSimilarity(0.351)).toBe("UNCERTAIN");
     expect(classifyNavigoFaceSimilarity(FACE_SIMILARITY_APPROVE_THRESHOLD)).toBe("MATCH");
     expect(classifyNavigoFaceSimilarity(FACE_SIMILARITY_REJECT_THRESHOLD)).toBe("NO_MATCH");
-    expect(classifyNavigoFaceSimilarity((FACE_SIMILARITY_APPROVE_THRESHOLD + FACE_SIMILARITY_REJECT_THRESHOLD) / 2)).toBe(
-      "UNCERTAIN"
-    );
     expect(classifyNavigoFaceSimilarity(null)).toBe("ERROR");
   });
 
@@ -336,6 +338,7 @@ describe("navigo app MVP rules", () => {
 
     expect(match.reviewStatus).toBe("APPROVED");
     expect(match.internalNote).toContain("Verificacion facial automatica: MATCH");
+    expect(match.internalNote).toContain("Umbrales: MATCH >= 0.6, NO_MATCH <= 0.35");
     expect(noMatch.reviewStatus).toBe("REJECTED");
     expect(noMatch.rejectionReason).toBe("La verificacion automatica indica que la selfie no coincide con la foto registrada.");
     expect(uncertain.reviewStatus).toBe("PENDING");
@@ -686,6 +689,7 @@ describe("navigo app MVP rules", () => {
     const adminPage = readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "page.tsx");
     const repository = readWorkspaceFile("src", "modules", "navigo-app", "repository.ts");
     const actions = readWorkspaceFile("src", "modules", "navigo-app", "actions.ts");
+    const participantPage = readWorkspaceFile("src", "app", "p", "[token]", "activities", "_components", "NavigoActivityCapture.tsx");
 
     expect(adminPage).toContain("Ver detalle");
     expect(adminPage).toContain("Respuestas AP1 a AP7");
@@ -696,10 +700,12 @@ describe("navigo app MVP rules", () => {
     expect(adminPage).toContain("Marcar como no coincide");
     expect(adminPage).toContain("Marcar como requiere revisión");
     expect(adminPage).toContain("Incidencia de identidad: bloquear avance hasta revisión.");
-    expect(adminPage).toContain("Resultado automático");
+    expect(adminPage).toContain("Verificación automática");
     expect(adminPage).toContain("Score/similitud");
+    expect(adminPage).toContain("Umbrales: MATCH &gt;= 0.60, NO_MATCH &lt;= 0.35");
     expect(adminPage).toContain("verificación biométrica automatizada");
     expect(adminPage).toContain("Valor interno conservado");
+    expect(participantPage).not.toContain("Score/similitud");
     expect(adminPage).not.toContain("privateStorageKey");
     expect(adminPage).not.toContain("storageBucket");
     expect(repository).toContain("createSignedReadUrl");

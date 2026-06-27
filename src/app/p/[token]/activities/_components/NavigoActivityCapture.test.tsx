@@ -192,6 +192,12 @@ describe("NavigoActivityCapture", () => {
   });
 
   it("uploads a selfie and only then opens AP1 to AP7", async () => {
+    vi.mocked(verifyNavigoFaceIdentity).mockResolvedValueOnce({
+      evaluatedAt: "2026-06-26T12:00:00.000Z",
+      method: "@vladmandic/human:faceres+blazeface:v1",
+      score: 0.62,
+      status: "MATCH"
+    });
     renderCapture({ registeredSelfie: { signedUrl: "https://example.test/base-selfie.jpg" } });
 
     await uploadSelfie();
@@ -237,8 +243,24 @@ describe("NavigoActivityCapture", () => {
     vi.mocked(verifyNavigoFaceIdentity).mockResolvedValueOnce({
       evaluatedAt: "2026-06-26T12:00:00.000Z",
       method: "@vladmandic/human:faceres+blazeface:v1",
-      reason: "CAPTURED_NO_FACE",
-      score: null,
+      reason: "LOW_SIMILARITY",
+      score: 0.599,
+      status: "UNCERTAIN"
+    });
+    renderCapture({ registeredSelfie: { signedUrl: "https://example.test/base-selfie.jpg" } });
+
+    await uploadSelfie();
+
+    expect(await screen.findByText("No fue posible confirmar tu identidad automáticamente. Contacta a tu reclutador.")).toBeInTheDocument();
+    expect(screen.queryByText("Preguntas AP1 a AP7")).not.toBeInTheDocument();
+  });
+
+  it("keeps AP1 to AP7 hidden when the similarity is 0.351 and remains uncertain", async () => {
+    vi.mocked(verifyNavigoFaceIdentity).mockResolvedValueOnce({
+      evaluatedAt: "2026-06-26T12:00:00.000Z",
+      method: "@vladmandic/human:faceres+blazeface:v1",
+      reason: "LOW_SIMILARITY",
+      score: 0.351,
       status: "UNCERTAIN"
     });
     renderCapture({ registeredSelfie: { signedUrl: "https://example.test/base-selfie.jpg" } });

@@ -610,7 +610,7 @@ function ActivityIdentityReview({
           <p className="text-sm font-semibold text-zinc-950">Estado: {identityReviewStatusLabel(activitySelfie)}</p>
           <dl className="mt-3 grid gap-2 rounded-md border border-zinc-200 bg-white p-3 text-sm sm:grid-cols-2">
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Resultado automático</dt>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Verificación automática</dt>
               <dd className="mt-1 text-zinc-900">{faceVerificationResultLabel(automaticFaceReview.status)}</dd>
             </div>
             <div>
@@ -626,6 +626,7 @@ function ActivityIdentityReview({
               <dd className="mt-1 text-zinc-900">{automaticFaceReview.evaluatedAt ?? "No disponible"}</dd>
             </div>
           </dl>
+          <p className="mt-3 text-xs text-zinc-500">Umbrales: MATCH &gt;= 0.60, NO_MATCH &lt;= 0.35</p>
           {activitySelfie.reviewStatus === "REJECTED" ? (
             <p className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
               Incidencia de identidad: bloquear avance hasta revisión.

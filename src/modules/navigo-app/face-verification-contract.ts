@@ -1,5 +1,5 @@
 export const NAVIGO_FACE_VERIFICATION_METHOD = "@vladmandic/human:faceres+blazeface:v1";
-export const FACE_SIMILARITY_APPROVE_THRESHOLD = 0.72;
+export const FACE_SIMILARITY_APPROVE_THRESHOLD = 0.6;
 export const FACE_SIMILARITY_REJECT_THRESHOLD = 0.35;
 
 export type NavigoFaceVerificationOutcome = "ERROR" | "MATCH" | "NO_MATCH" | "UNCERTAIN";
