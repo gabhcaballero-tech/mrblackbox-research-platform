@@ -8,7 +8,7 @@ import {
 import { createNavigoMeasurementDefinition } from "@/modules/navigo-app";
 import { verifyNavigoFaceIdentity } from "@/modules/navigo-app/face-verification-client";
 import { createBrowserSupabaseClient } from "@/shared/auth/supabase/browser";
-import { NavigoActivityCapture } from "./NavigoActivityCapture";
+import { NavigoActivityCapture, shouldMirrorCameraPreview } from "./NavigoActivityCapture";
 
 vi.mock("@/modules/navigo-app/actions", () => ({
   confirmNavigoActivitySelfieUploadAction: vi.fn(),
@@ -128,6 +128,17 @@ afterEach(() => {
 });
 
 describe("NavigoActivityCapture", () => {
+  it("shows the front camera preview mirrored for selfies", async () => {
+    const view = renderCapture();
+
+    fireEvent.click(screen.getByRole("button", { name: "Tomar selfie" }));
+
+    const video = await waitForVideoElement(view.container);
+    expect(video).toHaveAttribute("data-mirrored", "true");
+    expect(video).toHaveStyle({ transform: "scaleX(-1)" });
+    expect(screen.getByText("La vista de cámara se muestra como espejo para facilitar la selfie.")).toBeInTheDocument();
+  });
+
   it("does not show AP1 to AP7 for T2/T4/T8 until the activity selfie is saved", () => {
     renderCapture();
 
@@ -328,6 +339,35 @@ describe("NavigoActivityCapture", () => {
       await screen.findByText("No se pudo acceder a la cámara. Revisa los permisos del navegador y vuelve a intentarlo.")
     ).toBeInTheDocument();
   });
+
+  it("shows the captured selfie preview mirrored without changing facial verification", async () => {
+    renderCapture({ registeredSelfie: { signedUrl: "https://example.test/base-selfie.jpg" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Tomar selfie" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Tomar foto" }));
+
+    const preview = await screen.findByAltText("Vista previa de selfie");
+    expect(preview).toHaveAttribute("data-mirrored", "true");
+    expect(preview).toHaveStyle({ transform: "scaleX(-1)" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Usar esta selfie" }));
+    await waitFor(() =>
+      expect(verifyNavigoFaceIdentity).toHaveBeenCalledWith({
+        capturedSelfie: expect.any(File),
+        registeredSelfieUrl: "https://example.test/base-selfie.jpg"
+      })
+    );
+  });
+});
+
+describe("shouldMirrorCameraPreview", () => {
+  it("mirrors the front camera preview", () => {
+    expect(shouldMirrorCameraPreview("user")).toBe(true);
+  });
+
+  it("does not mirror a rear camera preview", () => {
+    expect(shouldMirrorCameraPreview("environment")).toBe(false);
+  });
 });
 
 async function uploadSelfie({ waitForConfirmation = true }: { waitForConfirmation?: boolean } = {}) {
@@ -337,4 +377,9 @@ async function uploadSelfie({ waitForConfirmation = true }: { waitForConfirmatio
   if (waitForConfirmation) {
     await waitFor(() => expect(confirmNavigoActivitySelfieUploadAction).toHaveBeenCalled());
   }
+}
+
+async function waitForVideoElement(container: HTMLElement) {
+  await waitFor(() => expect(container.querySelector("video")).not.toBeNull());
+  return container.querySelector("video") as HTMLVideoElement;
 }

@@ -33,6 +33,9 @@ type NavigoActivityCaptureProps = {
   token: string;
 };
 
+const FRONT_CAMERA_FACING_MODE = "user";
+const MIRRORED_SELFIE_PREVIEW_STYLE = { transform: "scaleX(-1)" } as const;
+
 export function NavigoActivityCapture({
   activityId,
   error,
@@ -187,7 +190,7 @@ export function NavigoActivityCapture({
       setCameraState("opening");
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: "user"
+          facingMode: FRONT_CAMERA_FACING_MODE
         }
       });
       stopCameraTracks();
@@ -352,7 +355,18 @@ export function NavigoActivityCapture({
 
           {cameraState !== "idle" ? (
             <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-950 p-3">
-              <video autoPlay className="max-h-[70vh] min-h-64 w-full rounded-md object-cover" muted playsInline ref={videoRef} />
+              <video
+                autoPlay
+                className="max-h-[70vh] min-h-64 w-full rounded-md object-cover"
+                data-mirrored={shouldMirrorCameraPreview(FRONT_CAMERA_FACING_MODE) ? "true" : "false"}
+                muted
+                playsInline
+                ref={videoRef}
+                style={shouldMirrorCameraPreview(FRONT_CAMERA_FACING_MODE) ? MIRRORED_SELFIE_PREVIEW_STYLE : undefined}
+              />
+              <p className="mt-2 text-xs text-zinc-400">
+                La vista de c&aacute;mara se muestra como espejo para facilitar la selfie.
+              </p>
               <div className="mt-3 flex flex-col gap-3 sm:flex-row">
                 <button className={primaryButtonClass} disabled={busy || cameraState !== "ready"} onClick={captureFromCamera} type="button">
                   {cameraState === "ready" ? "Tomar foto" : "Preparando cámara..."}
@@ -367,7 +381,13 @@ export function NavigoActivityCapture({
           {previewUrl ? (
             <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img alt="Vista previa de selfie" className="max-h-[70vh] w-full rounded-md object-contain" src={previewUrl} />
+              <img
+                alt="Vista previa de selfie"
+                className="max-h-[70vh] w-full rounded-md object-contain"
+                data-mirrored={shouldMirrorCameraPreview(FRONT_CAMERA_FACING_MODE) ? "true" : "false"}
+                src={previewUrl}
+                style={shouldMirrorCameraPreview(FRONT_CAMERA_FACING_MODE) ? MIRRORED_SELFIE_PREVIEW_STYLE : undefined}
+              />
               <div className="mt-3 flex flex-col gap-3 sm:flex-row">
                 <button className={secondaryButtonClass} disabled={busy} onClick={clearCapturedPhoto} type="button">
                   Repetir foto
@@ -709,6 +729,10 @@ function activityIdentityMessage(status: "APPROVED" | "PENDING" | "REJECTED" | n
   }
 
   return "No fue posible confirmar tu identidad automáticamente. Contacta a tu reclutador.";
+}
+
+export function shouldMirrorCameraPreview(facingMode: "user" | "environment") {
+  return facingMode === "user";
 }
 
 const primaryButtonClass =
