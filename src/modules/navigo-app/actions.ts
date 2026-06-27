@@ -6,7 +6,6 @@ import { requireCapability } from "@/shared/auth/session";
 import { participantTokenSchema } from "@/shared/validation/participant";
 import { ensureNavigoAppFoundation } from "./loader";
 import {
-  appendNavigoTestModeParams,
   isValidNavigoTestMode,
   type NavigoTestModeParams
 } from "./test-mode";
@@ -396,7 +395,7 @@ export async function submitNavigoActivityResponsesAction(
   tokenInput: string,
   activityId: string,
   formData: FormData
-): Promise<void> {
+): Promise<NavigoActionResult<{ completedAt: string; message: string }>> {
   const token = parseToken(tokenInput);
   const answers: Record<string, FormDataEntryValue | null> = {};
 
@@ -420,21 +419,22 @@ export async function submitNavigoActivityResponsesAction(
   });
 
   if (!result.ok) {
-    redirect(
-      appendNavigoTestModeParams(
-        `/p/${encodeURIComponent(token)}/activities/${activityId}?error=${encodeURIComponent(result.message)}`,
-        testMode ? testModeParams : null
-      )
-    );
+    return {
+      message: result.message,
+      ok: false
+    };
   }
 
   revalidatePath(`/p/${encodeURIComponent(token)}/activities`);
-  redirect(
-    appendNavigoTestModeParams(
-      `/p/${encodeURIComponent(token)}/activities?message=${encodeURIComponent("Evaluacion registrada correctamente.")}`,
-      testMode ? testModeParams : null
-    )
-  );
+  revalidatePath(`/p/${encodeURIComponent(token)}/activities/${activityId}`);
+
+  return {
+    data: {
+      completedAt: result.data.completedAt.toISOString(),
+      message: "Evaluación guardada correctamente."
+    },
+    ok: true
+  };
 }
 
 export async function confirmNavigoT0IdentityAction(

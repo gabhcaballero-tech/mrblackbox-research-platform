@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   confirmNavigoActivitySelfieUploadAction,
   confirmNavigoT0IdentityAction,
-  requestNavigoActivitySelfieUploadAction
+  requestNavigoActivitySelfieUploadAction,
+  submitNavigoActivityResponsesAction
 } from "@/modules/navigo-app/actions";
 import { createNavigoMeasurementDefinition } from "@/modules/navigo-app";
 import { verifyNavigoFaceIdentity } from "@/modules/navigo-app/face-verification-client";
@@ -41,7 +42,7 @@ function renderCapture(overrides: Partial<Parameters<typeof NavigoActivityCaptur
   return render(
     <NavigoActivityCapture
       activityId="activity-t2"
-      existingResponses={{}}
+      existingResponses={buildCompleteExistingResponses()}
       fragranceCodes={{ left: "CODIGO-A", right: "CODIGO-B" }}
       questions={questions}
       registeredSelfie={null}
@@ -92,6 +93,13 @@ beforeEach(() => {
   });
   vi.mocked(confirmNavigoT0IdentityAction).mockResolvedValue({
     data: { identityStatus: "CONFIRMED" },
+    ok: true
+  });
+  vi.mocked(submitNavigoActivityResponsesAction).mockResolvedValue({
+    data: {
+      completedAt: "2026-06-27T12:00:00.000Z",
+      message: "Evaluación guardada correctamente."
+    },
     ok: true
   });
   uploadToSignedUrl.mockResolvedValue({ data: null, error: null });
@@ -170,6 +178,7 @@ describe("NavigoActivityCapture", () => {
   it("keeps T0 on identity confirmation and only shows AP1 to AP7 after identity YES", async () => {
     renderCapture({
       activityId: "activity-t0",
+      existingResponses: {},
       registeredSelfie: { signedUrl: "https://example.test/selfie.jpg" },
       requiresSelfie: false
     });
@@ -191,6 +200,7 @@ describe("NavigoActivityCapture", () => {
     });
     renderCapture({
       activityId: "activity-t0",
+      existingResponses: {},
       registeredSelfie: { signedUrl: "https://example.test/selfie.jpg" },
       requiresSelfie: false
     });
@@ -232,6 +242,63 @@ describe("NavigoActivityCapture", () => {
       expect.objectContaining({ upsert: false })
     );
     expect(await screen.findByText("Preguntas AP1 a AP7")).toBeInTheDocument();
+  });
+
+  it("shows saving feedback and prevents double submit while saving an evaluation", async () => {
+    const deferred = createDeferred<Awaited<ReturnType<typeof submitNavigoActivityResponsesAction>>>();
+    vi.mocked(submitNavigoActivityResponsesAction).mockReturnValueOnce(deferred.promise);
+    renderCapture({ selfieCount: 1, selfieReviewStatus: "APPROVED" });
+
+    const button = screen.getByRole("button", { name: "Guardar evaluación" });
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(await screen.findByRole("button", { name: "Guardando evaluación..." })).toBeDisabled();
+    expect(submitNavigoActivityResponsesAction).toHaveBeenCalledTimes(1);
+
+    deferred.resolve({
+      data: {
+        completedAt: "2026-06-27T12:00:00.000Z",
+        message: "Evaluación guardada correctamente."
+      },
+      ok: true
+    });
+
+    expect(await screen.findByText("Evaluación guardada correctamente.")).toBeInTheDocument();
+  });
+
+  it("reactivates the button and keeps answers when saving fails", async () => {
+    vi.mocked(submitNavigoActivityResponsesAction).mockResolvedValueOnce({
+      message: "No fue posible guardar la evaluación. Intenta de nuevo.",
+      ok: false
+    });
+    renderCapture({ selfieCount: 1, selfieReviewStatus: "APPROVED" });
+
+    const selected = screen.getAllByDisplayValue("AMBAS")[0] as HTMLInputElement;
+    expect(selected.checked).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Guardar evaluación" }));
+
+    expect(await screen.findByText("No fue posible guardar la evaluación. Intenta de nuevo.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Guardar evaluación" })).toBeEnabled());
+    expect((screen.getAllByDisplayValue("AMBAS")[0] as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("saves T0 and shows visible success feedback", async () => {
+    renderCapture({
+      activityId: "activity-t0",
+      registeredSelfie: { signedUrl: "https://example.test/selfie.jpg" },
+      requiresSelfie: false
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Guardar evaluación" }));
+
+    expect(await screen.findByText("Evaluación guardada correctamente.")).toBeInTheDocument();
+    expect(submitNavigoActivityResponsesAction).toHaveBeenCalledWith(
+      "participant-token",
+      "activity-t0",
+      expect.any(FormData)
+    );
   });
 
   it("rejects an automatic NO_MATCH result and keeps AP1 to AP7 hidden", async () => {
@@ -382,4 +449,28 @@ async function uploadSelfie({ waitForConfirmation = true }: { waitForConfirmatio
 async function waitForVideoElement(container: HTMLElement) {
   await waitFor(() => expect(container.querySelector("video")).not.toBeNull());
   return container.querySelector("video") as HTMLVideoElement;
+}
+
+function buildCompleteExistingResponses() {
+  return {
+    AP1_PREFERENCIA_GENERAL: { value: "AMBAS" },
+    AP2_PREFERENCIA_INTENSIDAD: { value: "PRIMERA" },
+    AP3_INTENSIDAD_PRIMERA: { value: 5 },
+    AP4_INTENSIDAD_SEGUNDA: { value: 5 },
+    AP5_CALIFICACION_PRIMERA: { value: 8 },
+    AP6_CALIFICACION_SEGUNDA: { value: 8 },
+    AP7_MAYOR_DURACION: { value: "AMBAS" },
+    T0_IDENTITY_CONFIRMED: { value: "YES" }
+  };
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+
+  return { promise, reject, resolve };
 }

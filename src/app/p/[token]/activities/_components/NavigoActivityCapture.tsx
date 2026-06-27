@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { NAVIGO_T0_IDENTITY_QUESTION_ID } from "@/modules/navigo-app/definition";
 import {
   confirmNavigoT0IdentityAction,
@@ -71,10 +71,13 @@ export function NavigoActivityCapture({
   const [message, setMessage] = useState<string | null>(null);
   const [identityReviewStatus, setIdentityReviewStatus] = useState<"APPROVED" | "PENDING" | "REJECTED" | null>(selfieReviewStatus);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [evaluationError, setEvaluationError] = useState<string | null>(error ?? null);
+  const [evaluationSuccess, setEvaluationSuccess] = useState<string | null>(null);
   const [cameraState, setCameraState] = useState<"idle" | "opening" | "ready">("idle");
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selfieProcessingLabel, setSelfieProcessingLabel] = useState("Subiendo selfie...");
+  const [isSavingEvaluation, setIsSavingEvaluation] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [identityError, setIdentityError] = useState<string | null>(null);
   const [activeStream, setActiveStream] = useState<MediaStream | null>(null);
@@ -89,6 +92,7 @@ export function NavigoActivityCapture({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewUrlRef = useRef<string | null>(null);
+  const evaluationSubmitRef = useRef(false);
 
   const stopCameraTracks = useCallback((updateState = true) => {
     const stream = streamRef.current;
@@ -322,7 +326,7 @@ export function NavigoActivityCapture({
     setCapturedFile(null);
   }
 
-  const busy = isUploading || isPending;
+  const busy = isUploading || isPending || isSavingEvaluation;
   const hasApprovedIdentitySelfie = !requiresSelfie || (selfies >= 1 && identityReviewStatus === "APPROVED");
   const showQuestions = requiresSelfie ? hasApprovedIdentitySelfie : identityStep === "questions";
 
@@ -440,13 +444,20 @@ export function NavigoActivityCapture({
           <p className="mt-1 font-mono">Brazo izquierdo: {fragranceCodes.left}</p>
           <p className="font-mono">Brazo derecho: {fragranceCodes.right}</p>
         </div>
-        {error ? <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}</p> : null}
+        {evaluationSuccess ? (
+          <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            {evaluationSuccess}
+          </p>
+        ) : null}
+        {evaluationError ? (
+          <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{evaluationError}</p>
+        ) : null}
         {requiresSelfie && selfies === 0 ? (
           <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             Toma y guarda la selfie antes de enviar las respuestas.
           </p>
         ) : null}
-        <form action={submitNavigoActivityResponsesAction.bind(null, token, activityId)} className="mt-5 space-y-6">
+        <form className="mt-5 space-y-6" onSubmit={handleEvaluationSubmit}>
           {questions.map((question, index) => (
             <QuestionControl
               answer={existingResponses[question.id]}
@@ -473,8 +484,12 @@ export function NavigoActivityCapture({
               No se puede continuar. Contacta al supervisor para revisar la identidad del participante.
             </p>
           ) : null}
-          <button className={primaryButtonClass} disabled={(requiresSelfie && selfies === 0) || (!requiresSelfie && !identityConfirmed)} type="submit">
-            Guardar evaluación
+          <button
+            className={primaryButtonClass}
+            disabled={busy || (requiresSelfie && selfies === 0) || (!requiresSelfie && !identityConfirmed)}
+            type="submit"
+          >
+            {isSavingEvaluation ? "Guardando evaluación..." : "Guardar evaluación"}
           </button>
         </form>
       </section>
@@ -502,6 +517,39 @@ export function NavigoActivityCapture({
         return;
       }
       setIdentityStep("questions");
+    });
+  }
+
+  function handleEvaluationSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (evaluationSubmitRef.current) {
+      return;
+    }
+
+    evaluationSubmitRef.current = true;
+    setIsSavingEvaluation(true);
+    setEvaluationError(null);
+    setEvaluationSuccess(null);
+
+    const formData = new FormData(event.currentTarget);
+
+    startTransition(async () => {
+      try {
+        const result = await submitNavigoActivityResponsesAction(token, activityId, formData);
+
+        if (!result.ok) {
+          setEvaluationError(result.message);
+          return;
+        }
+
+        setEvaluationSuccess(result.data.message);
+      } catch {
+        setEvaluationError("No fue posible guardar la evaluación. Intenta de nuevo.");
+      } finally {
+        evaluationSubmitRef.current = false;
+        setIsSavingEvaluation(false);
+      }
     });
   }
 }
