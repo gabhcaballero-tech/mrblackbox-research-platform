@@ -13,6 +13,7 @@ import {
   deleteParticipantEvidenceTestRecordAction,
   regenerateParticipantReferenceCodesAction,
   rejectParticipantEvidenceAction,
+  reopenParticipantEvidenceReviewAction,
   updateParticipantEvidenceParticipantAction
 } from "@/modules/participant-portal/evidence-review-actions";
 import { EvidenceReplacementForm } from "./EvidenceReplacementForm";
@@ -435,8 +436,16 @@ export function EvidenceReviewPanel({
             Revisa la selfie capturada al inicio, las fotos de perfumes capturadas en F6 y las marcas declaradas antes de aprobar.
           </p>
         </div>
-        <StatusBadge status={detail.review?.status === "APPROVED" ? "ready" : detail.review?.status === "REJECTED" ? "blocked" : "planned"}>
-          {reviewStatusLabel(detail.review?.status)}
+        <StatusBadge
+          status={
+            detail.reviewState.reviewStatus === "APPROVED"
+              ? "ready"
+              : detail.reviewState.reviewStatus === "REJECTED"
+                ? "blocked"
+                : "planned"
+          }
+        >
+          {reviewStatusLabel(detail.reviewState.reviewStatus)}
         </StatusBadge>
       </div>
 
@@ -448,6 +457,37 @@ export function EvidenceReviewPanel({
         <SummaryItem label="Referencia externa" value={detail.participant.externalReference ?? "Sin referencia"} />
         <SummaryItem label="Intento" value={detail.attemptId} mono />
       </dl>
+
+      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StateCard label="Estado del intento" value={cleanupAttemptStatusLabel(detail.attemptStatus)} />
+        <StateCard label="Estado de la revisión" value={reviewStatusLabel(detail.reviewState.reviewStatus)} />
+        <StateCard label="Selfie" value={summarizeEvidenceType(detail.reviewState.evidenceStatuses, "SELFIE_IDENTIFICATION")} />
+        <StateCard label="Fotos de perfume" value={summarizeEvidenceType(detail.reviewState.evidenceStatuses, "PERFUME_PHOTO")} />
+      </div>
+
+      {detail.reviewState.hasInconsistency ? (
+        <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-semibold">Inconsistencia de revisión</p>
+          <p className="mt-1">{detail.reviewState.inconsistencyMessage}</p>
+        </div>
+      ) : null}
+
+      <div className="mt-5 rounded-md border border-zinc-200 bg-zinc-50 p-4">
+        <h3 className="text-sm font-semibold text-zinc-800">Estado por evidencia</h3>
+        <ul className="mt-3 space-y-2 text-sm text-zinc-700">
+          {detail.reviewState.evidenceStatuses.map((item) => (
+            <li className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-zinc-200 bg-white px-3 py-2" key={item.id}>
+              <div className="min-w-0">
+                <p className="font-medium text-zinc-900">{evidenceTypeLabel(item.type)}</p>
+                <p className="truncate text-xs text-zinc-500" title={item.filename}>
+                  {item.filename}
+                </p>
+              </div>
+              <StatusBadge status={badgeToneForReviewStatus(item.status)}>{reviewStatusLabel(item.status)}</StatusBadge>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       <div id="datos-participante" className="scroll-mt-24">
         {focus === "datos-participante" ? <ActionFeedback error={error} message={message} /> : null}
@@ -476,18 +516,30 @@ export function EvidenceReviewPanel({
               </StatusBadge>
             </div>
             {item.signedUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                alt={item.type === "SELFIE_IDENTIFICATION" ? "Selfie de identificación" : "Foto de perfume"}
-                className="mt-3 h-56 w-full rounded-md border border-zinc-200 object-cover"
-                src={item.signedUrl}
-              />
+              <div className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  alt={item.type === "SELFIE_IDENTIFICATION" ? "Selfie de identificación" : "Foto de perfume"}
+                  className="max-h-[28rem] w-full rounded-md object-contain"
+                  src={item.signedUrl}
+                />
+              </div>
             ) : (
               <p className="mt-3 text-sm text-zinc-600">No fue posible generar vista temporal.</p>
             )}
             <p className="mt-2 text-xs text-zinc-500">
               {item.mimeType} · {Math.round(item.sizeBytes / 1024)} KB
             </p>
+            {item.signedUrl ? (
+              <Link
+                className="mt-3 inline-flex w-fit text-sm font-semibold text-teal-700 transition hover:text-teal-800"
+                href={item.signedUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Ver imagen completa
+              </Link>
+            ) : null}
             <EvidenceReplacementForm
               attemptId={detail.attemptId}
               evidenceId={item.id}
@@ -506,7 +558,31 @@ export function EvidenceReviewPanel({
         />
       </div>
 
-      {detail.review?.status === "PENDING" ? (
+      {detail.reviewState.canReopen ? (
+        <form
+          action={reopenParticipantEvidenceReviewAction.bind(null, detail.attemptId)}
+          className="mt-5 rounded-md border border-amber-200 bg-amber-50 p-4"
+        >
+          <h3 className="font-semibold text-amber-950">Reabrir revisión</h3>
+          <p className="mt-2 text-sm leading-6 text-amber-900">
+            Usa esta acción cuando existan evidencias pendientes pero la revisión global no esté pendiente.
+          </p>
+          {detail.confirmation ? (
+            <p className="mt-2 text-sm leading-6 text-amber-900">
+              El folio y los códigos existentes se conservarán. Al aprobar de nuevo no se duplicarán.
+            </p>
+          ) : null}
+          <label className={`${labelClass} mt-4`}>
+            Escribe REABRIR REVISIÓN para confirmar
+            <input className={inputClass} name="confirmationText" />
+          </label>
+          <button className={`${secondaryButtonClass} mt-4`} type="submit">
+            Reabrir revisión
+          </button>
+        </form>
+      ) : null}
+
+      {detail.reviewState.reviewStatus === "PENDING" ? (
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           <form action={approveParticipantEvidenceAction.bind(null, detail.attemptId)} className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
             <h3 className="font-semibold text-emerald-950">Aprobar evidencia</h3>
@@ -799,6 +875,59 @@ function reviewStatusLabel(status: string | undefined): string {
     default:
       return "Sin revisión";
   }
+}
+
+function badgeToneForReviewStatus(status: string): "blocked" | "planned" | "ready" {
+  if (status === "APPROVED") {
+    return "ready";
+  }
+
+  if (status === "REJECTED") {
+    return "blocked";
+  }
+
+  return "planned";
+}
+
+function evidenceTypeLabel(type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION"): string {
+  return type === "SELFIE_IDENTIFICATION" ? "Selfie" : "Foto de perfume";
+}
+
+function summarizeEvidenceType(
+  evidence: Array<{ status: "APPROVED" | "PENDING" | "REJECTED"; type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION" }>,
+  type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION"
+): string {
+  const items = evidence.filter((item) => item.type === type);
+
+  if (items.length === 0) {
+    return type === "SELFIE_IDENTIFICATION" ? "Sin selfie" : "Sin fotos registradas";
+  }
+
+  if (items.length === 1) {
+    return reviewStatusLabel(items[0]?.status);
+  }
+
+  const counts = {
+    approved: items.filter((item) => item.status === "APPROVED").length,
+    pending: items.filter((item) => item.status === "PENDING").length,
+    rejected: items.filter((item) => item.status === "REJECTED").length
+  };
+  const parts = [
+    counts.pending > 0 ? `${counts.pending} pendiente${counts.pending === 1 ? "" : "s"}` : null,
+    counts.approved > 0 ? `${counts.approved} aprobada${counts.approved === 1 ? "" : "s"}` : null,
+    counts.rejected > 0 ? `${counts.rejected} rechazada${counts.rejected === 1 ? "" : "s"}` : null
+  ].filter(Boolean);
+
+  return parts.join(" · ");
+}
+
+function StateCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-zinc-200 bg-white p-4">
+      <p className="text-sm font-medium text-zinc-500">{label}</p>
+      <p className="mt-2 text-base font-semibold text-zinc-950">{value}</p>
+    </div>
+  );
 }
 
 const labelClass = "flex flex-col gap-1 text-sm font-medium text-zinc-700";

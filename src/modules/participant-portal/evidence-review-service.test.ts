@@ -14,6 +14,7 @@ import {
   deleteParticipantEvidenceTestRecord,
   generateReferenceCode,
   getParticipantEvidenceReviewDetail,
+  reopenParticipantEvidenceReview,
   regenerateParticipantReferenceCodes,
   rejectParticipantEvidenceReview,
   requestParticipantEvidenceReplacementUpload,
@@ -117,6 +118,10 @@ function repository(currentAttempt = attempt()) {
     getAttemptReview: vi.fn(async () => currentAttempt),
     markManualMessageSent: vi.fn(async () => undefined),
     rejectEvidence: vi.fn(async () => undefined),
+    reopenEvidenceReview: vi.fn(async () => ({
+      ok: true as const,
+      preservedConfirmation: false
+    })),
     regenerateReferenceCodes: vi.fn(async () => ({
       confirmation: {
         folio: "NAV-001",
@@ -159,6 +164,41 @@ describe("participant evidence review service", () => {
 
     expect(result.ok ? result.data.evidence[0]?.signedUrl : null).toBe("https://signed.example/evidence");
     expect(result.ok ? result.data.f6DeclaredBrands : "").toBe("Navigo y otra fragancia");
+    expect(result.ok ? result.data.reviewState.reviewStatus : null).toBe("PENDING");
+    expect(result.ok ? result.data.reviewState.hasInconsistency : null).toBe(false);
+  });
+
+  it("detects inconsistent evidence review state when evidence is pending but global review is not pending", async () => {
+    const result = await getParticipantEvidenceReviewDetail({
+      actor: admin,
+      attemptId: "attempt-1",
+      repository: repository(
+        attempt({
+          participantEvidence: [
+            {
+              ...attempt().participantEvidence[0],
+              reviewStatus: "PENDING"
+            }
+          ],
+          participantScreeningReview: {
+            id: "review-1",
+            internalNote: null,
+            rejectionReason: null,
+            status: "REJECTED"
+          }
+        })
+      ),
+      storage: {
+        createSignedReadUrl: vi.fn(async () => "https://signed.example/evidence"),
+        createSignedUploadUrl: vi.fn()
+      }
+    });
+
+    expect(result.ok ? result.data.reviewState.hasInconsistency : null).toBe(true);
+    expect(result.ok ? result.data.reviewState.inconsistencyMessage : null).toBe(
+      "Hay una inconsistencia: existen evidencias pendientes pero la revisión global no está pendiente."
+    );
+    expect(result.ok ? result.data.reviewState.canReopen : null).toBe(true);
   });
 
   it("detects multiple screening attempts for participant cleanup summary", async () => {
@@ -242,6 +282,23 @@ describe("participant evidence review service", () => {
     const approveInput = vi.mocked(repo.approveEvidence).mock.calls[0]?.[0];
     expect(approveInput?.codeGenerator()).toMatch(PARTICIPANT_REFERENCE_CODE_PATTERN);
     expect(repo.rejectEvidence).toHaveBeenCalledWith(expect.objectContaining({ rejectionReason: "Selfie borrosa" }));
+  });
+
+  it("reopens evidence review through repository for ADMIN", async () => {
+    const repo = repository();
+    const result = await reopenParticipantEvidenceReview({
+      actor: admin,
+      attemptId: "attempt-1",
+      repository: repo
+    });
+
+    expect(result.ok).toBe(true);
+    expect(repo.reopenEvidenceReview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attemptId: "attempt-1",
+        reopenedByUserId: "admin-1"
+      })
+    );
   });
 
   it("generates exactly four safe alphanumeric characters for new reference codes", () => {

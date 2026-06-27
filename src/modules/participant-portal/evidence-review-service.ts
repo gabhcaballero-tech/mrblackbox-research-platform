@@ -30,10 +30,25 @@ export type EvidenceReviewImage = {
   id: string;
   filename: string;
   mimeType: string;
-  reviewStatus: string;
+  reviewStatus: "APPROVED" | "PENDING" | "REJECTED";
   signedUrl: string | null;
   sizeBytes: number;
   type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION";
+};
+
+export type ParticipantEvidenceReviewState = {
+  canReopen: boolean;
+  evidenceStatuses: Array<{
+    filename: string;
+    id: string;
+    status: "APPROVED" | "PENDING" | "REJECTED";
+    type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION";
+  }>;
+  hasInconsistency: boolean;
+  hasPendingEvidence: boolean;
+  inconsistencyMessage: string | null;
+  pendingEvidenceCount: number;
+  reviewStatus: "APPROVED" | "NONE" | "PENDING" | "REJECTED";
 };
 
 export type EvidenceReplacementSignedUpload = {
@@ -78,6 +93,7 @@ export type ParticipantEvidenceReviewDetail = {
     rejectionReason: string | null;
     status: "APPROVED" | "PENDING" | "REJECTED";
   } | null;
+  reviewState: ParticipantEvidenceReviewState;
   study: {
     code: string;
     id: string;
@@ -168,6 +184,39 @@ export async function approveParticipantEvidenceReview({
   return {
     data: {
       created: result.created
+    },
+    ok: true
+  };
+}
+
+export async function reopenParticipantEvidenceReview({
+  actor,
+  attemptId,
+  repository
+}: {
+  actor: EvidenceReviewActor | null;
+  attemptId: string;
+  repository: EvidenceReviewRepository;
+}): Promise<EvidenceReviewResult<{ preservedConfirmation: boolean }>> {
+  if (!canReviewParticipantEvidence(actor)) {
+    return {
+      message: "No tienes permiso para reabrir revisiones.",
+      ok: false
+    };
+  }
+
+  const result = await repository.reopenEvidenceReview({
+    attemptId,
+    reopenedByUserId: actor.id
+  });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  return {
+    data: {
+      preservedConfirmation: result.preservedConfirmation
     },
     ok: true
   };
@@ -704,6 +753,25 @@ async function toReviewDetail(
         })
       }
     : null;
+  const evidence = await Promise.all(
+    attempt.participantEvidence.map(async (item) => ({
+      filename: item.originalFilename ?? "Evidencia",
+      id: item.id,
+      mimeType: item.mimeType,
+      reviewStatus: item.reviewStatus,
+      signedUrl: await storage.createSignedReadUrl({
+        bucket: item.storageBucket,
+        expiresInSeconds: 300,
+        privateStorageKey: item.privateStorageKey
+      }),
+      sizeBytes: item.sizeBytes,
+      type: item.type
+    }))
+  );
+  const reviewState = buildReviewState({
+    evidence,
+    reviewStatus: attempt.participantScreeningReview?.status ?? null
+  });
 
   return {
     attemptId: attempt.id,
@@ -720,21 +788,7 @@ async function toReviewDetail(
       evidenceCount: cleanupAttempts.reduce((total, item) => total + item.participantEvidence.length, 0)
     },
     confirmation,
-    evidence: await Promise.all(
-      attempt.participantEvidence.map(async (item) => ({
-        filename: item.originalFilename ?? "Evidencia",
-        id: item.id,
-        mimeType: item.mimeType,
-        reviewStatus: item.reviewStatus,
-        signedUrl: await storage.createSignedReadUrl({
-          bucket: item.storageBucket,
-          expiresInSeconds: 300,
-          privateStorageKey: item.privateStorageKey
-        }),
-        sizeBytes: item.sizeBytes,
-        type: item.type
-      }))
-    ),
+    evidence,
     f6DeclaredBrands: formatF6Answer(attempt.answers.find((answer) => answer.questionId === F6_PERFUME_EVIDENCE_QUESTION_ID)?.answerJson),
     participant: {
       email: participant.email,
@@ -744,6 +798,7 @@ async function toReviewDetail(
       phone: participant.phone
     },
     review: attempt.participantScreeningReview,
+    reviewState,
     study: {
       code: study.code,
       id: study.id,
@@ -847,6 +902,36 @@ function formatF6Answer(answer: unknown): string {
   }
 
   return "Sin respuesta registrada.";
+}
+
+function buildReviewState({
+  evidence,
+  reviewStatus
+}: {
+  evidence: EvidenceReviewImage[];
+  reviewStatus: "APPROVED" | "PENDING" | "REJECTED" | null;
+}): ParticipantEvidenceReviewState {
+  const pendingEvidenceCount = evidence.filter((item) => item.reviewStatus === "PENDING").length;
+  const hasPendingEvidence = pendingEvidenceCount > 0;
+  const normalizedReviewStatus = reviewStatus ?? "NONE";
+  const hasInconsistency = hasPendingEvidence && normalizedReviewStatus !== "PENDING";
+
+  return {
+    canReopen: normalizedReviewStatus !== "PENDING" && (hasPendingEvidence || normalizedReviewStatus === "REJECTED"),
+    evidenceStatuses: evidence.map((item) => ({
+      filename: item.filename,
+      id: item.id,
+      status: item.reviewStatus,
+      type: item.type
+    })),
+    hasInconsistency,
+    hasPendingEvidence,
+    inconsistencyMessage: hasInconsistency
+      ? "Hay una inconsistencia: existen evidencias pendientes pero la revisión global no está pendiente."
+      : null,
+    pendingEvidenceCount,
+    reviewStatus: normalizedReviewStatus
+  };
 }
 
 async function deleteEvidenceObjects({

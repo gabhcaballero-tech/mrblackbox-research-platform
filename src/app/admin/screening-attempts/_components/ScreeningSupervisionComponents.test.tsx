@@ -282,6 +282,95 @@ describe("ScreeningSupervisionComponents", () => {
     expect(screen.queryByText("Pendiente de revisión")).not.toBeInTheDocument();
   });
 
+  it("renders full evidence previews, signed links and inconsistency alert", () => {
+    render(
+      <EvidenceReviewPanel
+        detail={{
+          attemptId: "attempt-1",
+          attemptStatus: "PASSED",
+          cleanupSummary: {
+            attemptCount: 1,
+            attempts: [],
+            evidenceCount: 2
+          },
+          confirmation: null,
+          evidence: [
+            {
+              filename: "selfie.jpg",
+              id: "evidence-1",
+              mimeType: "image/jpeg",
+              reviewStatus: "PENDING",
+              signedUrl: "https://signed.example/selfie",
+              sizeBytes: 100,
+              type: "SELFIE_IDENTIFICATION"
+            },
+            {
+              filename: "perfume.jpg",
+              id: "evidence-2",
+              mimeType: "image/jpeg",
+              reviewStatus: "PENDING",
+              signedUrl: "https://signed.example/perfume",
+              sizeBytes: 100,
+              type: "PERFUME_PHOTO"
+            }
+          ],
+          f6DeclaredBrands: "Navigo",
+          participant: {
+            email: "persona@example.com",
+            externalReference: "REF-1",
+            id: "profile-1",
+            name: "GABRIELA",
+            phone: "+525512345678"
+          },
+          review: {
+            internalNote: null,
+            rejectionReason: "Revisión cerrada antes de tiempo",
+            status: "REJECTED"
+          },
+          reviewState: {
+            canReopen: true,
+            evidenceStatuses: [
+              {
+                filename: "selfie.jpg",
+                id: "evidence-1",
+                status: "PENDING",
+                type: "SELFIE_IDENTIFICATION"
+              },
+              {
+                filename: "perfume.jpg",
+                id: "evidence-2",
+                status: "PENDING",
+                type: "PERFUME_PHOTO"
+              }
+            ],
+            hasInconsistency: true,
+            hasPendingEvidence: true,
+            inconsistencyMessage:
+              "Hay una inconsistencia: existen evidencias pendientes pero la revisión global no está pendiente.",
+            pendingEvidenceCount: 2,
+            reviewStatus: "REJECTED"
+          },
+          study: {
+            code: study.code,
+            id: study.id,
+            name: study.name
+          }
+        }}
+      />
+    );
+
+    const preview = screen.getByAltText("Selfie de identificación");
+    expect(preview.className).toContain("object-contain");
+    expect(screen.getAllByRole("link", { name: "Ver imagen completa" })[0]).toHaveAttribute(
+      "href",
+      "https://signed.example/selfie"
+    );
+    expect(screen.getByText("Estado de la revisión")).toBeInTheDocument();
+    expect(screen.getByText("Inconsistencia de revisión")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reabrir revisión" })).toBeInTheDocument();
+    expect(screen.queryByText("private/selfie.jpg")).not.toBeInTheDocument();
+  });
+
   it("renders participant edit, confirmation codes and dangerous delete action for ADMIN", () => {
     render(
       <EvidenceReviewPanel
@@ -330,6 +419,15 @@ describe("ScreeningSupervisionComponents", () => {
             internalNote: null,
             rejectionReason: null,
             status: "APPROVED"
+          },
+          reviewState: {
+            canReopen: false,
+            evidenceStatuses: [],
+            hasInconsistency: false,
+            hasPendingEvidence: false,
+            inconsistencyMessage: null,
+            pendingEvidenceCount: 0,
+            reviewStatus: "APPROVED"
           },
           study: {
             code: study.code,
@@ -402,6 +500,15 @@ describe("ScreeningSupervisionComponents", () => {
             rejectionReason: null,
             status: "APPROVED"
           },
+          reviewState: {
+            canReopen: false,
+            evidenceStatuses: [],
+            hasInconsistency: false,
+            hasPendingEvidence: false,
+            inconsistencyMessage: null,
+            pendingEvidenceCount: 0,
+            reviewStatus: "APPROVED"
+          },
           study: {
             code: study.code,
             id: study.id,
@@ -453,6 +560,15 @@ describe("ScreeningSupervisionComponents", () => {
             phone: "+525512345678"
           },
           review: null,
+          reviewState: {
+            canReopen: false,
+            evidenceStatuses: [],
+            hasInconsistency: false,
+            hasPendingEvidence: false,
+            inconsistencyMessage: null,
+            pendingEvidenceCount: 0,
+            reviewStatus: "NONE"
+          },
           study: {
             code: study.code,
             id: study.id,

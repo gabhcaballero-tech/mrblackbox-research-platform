@@ -187,6 +187,210 @@ function createRepositoryWithContext(context: ReturnType<typeof createDeleteCont
 }
 
 describe("participant evidence review repository cleanup", () => {
+  it("approves pending evidence for a FIELD/Navigo attempt without duplicating portal restrictions", async () => {
+    const context = createDeleteContext({
+      folioSequences: []
+    });
+    context.participantConfirmation.create = vi.fn(async () => ({
+      id: "confirmation-1",
+      folio: "NAV-001",
+      folioSequence: 1,
+      manualMessageMarkedSentAt: null,
+      manualMessageStatus: "NOT_SENT",
+      referenceCodes: [
+        { code: "A7K4", slot: 1 },
+        { code: "M3P9", slot: 2 },
+        { code: "T8R2", slot: 3 }
+      ]
+    }));
+    context.screeningAttempt.findUnique = vi.fn(async () =>
+      buildAttempt({
+        participantConfirmation: null,
+        participantEvidence: [
+          {
+            ...buildAttempt().participantEvidence[0],
+            reviewStatus: "PENDING"
+          },
+          {
+            ...buildAttempt().participantEvidence[0],
+            id: "evidence-2",
+            privateStorageKey:
+              "studies/study-1/participants/profile-1/screening-attempts/attempt-1/perfume_photo/perfume.jpg",
+            relatedQuestionId: "F6_MARCAS_UTILIZA",
+            reviewStatus: "PENDING",
+            type: "PERFUME_PHOTO"
+          }
+        ],
+        participantScreeningReview: {
+          id: "review-1",
+          internalNote: null,
+          rejectionReason: null,
+          status: "PENDING"
+        },
+        source: "FIELD",
+        status: "PASSED"
+      })
+    );
+    const repository = createRepositoryWithContext(context);
+    const generatedCodes = ["A7K4", "M3P9", "T8R2"];
+
+    const result = await repository.approveEvidence({
+      approvedByUserId: "supervisor-1",
+      attemptId: "attempt-1",
+      codeGenerator: () => generatedCodes.shift() ?? "Z9X8"
+    });
+
+    expect(result).toMatchObject({
+      created: true,
+      ok: true
+    });
+    expect(context.participantConfirmation.create).toHaveBeenCalled();
+    expect(context.participantScreeningReview.update).toHaveBeenCalled();
+    expect(context.participantEvidence.updateMany).toHaveBeenCalled();
+  });
+
+  it("reuses the existing folio and codes when the attempt already has confirmation", async () => {
+    const context = createDeleteContext();
+    const repository = createRepositoryWithContext(context);
+
+    const result = await repository.approveEvidence({
+      approvedByUserId: "supervisor-1",
+      attemptId: "attempt-1",
+      codeGenerator: () => "A7K4"
+    });
+
+    expect(result).toMatchObject({
+      created: false,
+      ok: true
+    });
+    expect(context.participantConfirmation.create).not.toHaveBeenCalled();
+  });
+
+  it("returns a clear message when pending evidence exists but the global review is not pending", async () => {
+    const context = createDeleteContext();
+    context.screeningAttempt.findUnique = vi.fn(async () =>
+      buildAttempt({
+        participantConfirmation: null,
+        participantEvidence: [
+          {
+            ...buildAttempt().participantEvidence[0],
+            reviewStatus: "PENDING"
+          }
+        ],
+        participantScreeningReview: {
+          id: "review-1",
+          internalNote: null,
+          rejectionReason: "Falta validar identidad",
+          status: "REJECTED"
+        },
+        status: "PASSED"
+      })
+    );
+    const repository = createRepositoryWithContext(context);
+
+    const result = await repository.approveEvidence({
+      approvedByUserId: "supervisor-1",
+      attemptId: "attempt-1",
+      codeGenerator: () => "A7K4"
+    });
+
+    expect(result).toEqual({
+      message: "Hay evidencias pendientes pero la revisión global no está pendiente.",
+      ok: false
+    });
+  });
+
+  it("reopens the review and preserves existing folio/codes", async () => {
+    const context = createDeleteContext();
+    context.screeningAttempt.findUnique = vi.fn(async () =>
+      buildAttempt({
+        participantEvidence: [
+          {
+            ...buildAttempt().participantEvidence[0],
+            reviewStatus: "PENDING"
+          }
+        ],
+        participantScreeningReview: {
+          id: "review-1",
+          internalNote: "Reemplazo manual",
+          rejectionReason: "Imagen borrosa",
+          status: "REJECTED"
+        },
+        status: "TERMINATED"
+      })
+    );
+    const repository = createRepositoryWithContext(context);
+
+    const result = await repository.reopenEvidenceReview({
+      attemptId: "attempt-1",
+      reopenedByUserId: "supervisor-1"
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      preservedConfirmation: true
+    });
+    expect(context.participantScreeningReview.upsert).toHaveBeenCalled();
+    expect(context.participantEvidence.updateMany).toHaveBeenCalledWith({
+      data: {
+        reviewStatus: "PENDING",
+        reviewedAt: null,
+        reviewedByUserId: null
+      },
+      where: {
+        screeningAttemptId: "attempt-1"
+      }
+    });
+    expect(context.screeningAttempt.update).toHaveBeenCalledWith({
+      data: {
+        completedAt: null,
+        status: "PENDING_REVIEW"
+      },
+      where: {
+        id: "attempt-1"
+      }
+    });
+  });
+
+  it("keeps replacement evidence pending when the global review had already been approved", async () => {
+    const context = createDeleteContext();
+    context.screeningAttempt.findUnique = vi.fn(async () => buildAttempt());
+    const repository = createRepositoryWithContext(context);
+
+    const result = await repository.replaceEvidence({
+      attemptId: "attempt-1",
+      evidenceId: "evidence-1",
+      evidenceType: "SELFIE_IDENTIFICATION",
+      extension: "jpg",
+      mimeType: "image/jpeg",
+      originalFilename: "selfie-nueva.jpg",
+      privateStorageKey:
+        "studies/study-1/participants/profile-1/screening-attempts/attempt-1/selfie_identification/selfie-nueva.jpg",
+      replacementReason: "Nueva selfie más clara",
+      reviewedByUserId: "supervisor-1",
+      sizeBytes: 120,
+      storageBucket: "participant-evidence"
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(context.participantEvidence.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reviewStatus: "PENDING",
+          reviewedAt: null,
+          reviewedByUserId: null
+        })
+      })
+    );
+    expect(context.participantScreeningReview.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: {
+          internalNote: expect.stringContaining("Corrección manual")
+        }
+      })
+    );
+  });
+
   it("deletes an approved participant-portal test record with folio, codes and WhatsApp marked sent", async () => {
     const context = createDeleteContext({
       folioSequences: []

@@ -9,6 +9,7 @@ import {
   deleteParticipantEvidenceStudyParticipantTestRecords,
   deleteParticipantEvidenceTestRecord,
   markParticipantManualMessageSent,
+  reopenParticipantEvidenceReview,
   confirmParticipantEvidenceReplacement,
   regenerateParticipantReferenceCodes,
   rejectParticipantEvidenceReview,
@@ -46,6 +47,34 @@ export async function approveParticipantEvidenceAction(attemptId: string): Promi
   }
 
   redirect(reviewPath(attemptId, "evidenceMessage", "Evidencia aprobada correctamente.", "confirmacion-final"));
+}
+
+export async function reopenParticipantEvidenceReviewAction(
+  attemptId: string,
+  formData: FormData
+): Promise<void> {
+  if (String(formData.get("confirmationText") ?? "").trim() !== "REABRIR REVISIÓN") {
+    redirect(reviewPath(attemptId, "evidenceError", "Escribe REABRIR REVISIÓN para confirmar esta acción.", "evidencias"));
+  }
+
+  const actor = await requireCapability("screening:review");
+  const result = await reopenParticipantEvidenceReview({
+    actor,
+    attemptId,
+    repository: createEvidenceReviewRepository()
+  });
+
+  revalidatePath(`/admin/screening-attempts/${attemptId}`);
+
+  if (!result.ok) {
+    redirect(reviewPath(attemptId, "evidenceError", result.message, "evidencias"));
+  }
+
+  const message = result.data.preservedConfirmation
+    ? "Revisión reabierta. El folio y los códigos existentes se conservaron."
+    : "Revisión reabierta correctamente.";
+
+  redirect(reviewPath(attemptId, "evidenceMessage", message, "evidencias"));
 }
 
 export async function regenerateParticipantReferenceCodesAction(attemptId: string): Promise<void> {

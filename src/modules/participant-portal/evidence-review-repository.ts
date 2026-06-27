@@ -83,6 +83,11 @@ export type EvidenceReviewRepository = {
     codeGenerator: () => string;
     now?: Date;
   }) => Promise<EvidenceReviewApprovalResult>;
+  reopenEvidenceReview: (input: {
+    attemptId: string;
+    now?: Date;
+    reopenedByUserId: string;
+  }) => Promise<EvidenceReviewReopenResult>;
   getAttemptReview: (attemptId: string) => Promise<EvidenceReviewAttemptRecord | null>;
   markManualMessageSent: (input: {
     attemptId: string;
@@ -127,6 +132,16 @@ export type EvidenceReviewApprovalResult =
       confirmation: EvidenceReviewConfirmationRecord;
       created: boolean;
       ok: true;
+    }
+  | {
+      message: string;
+      ok: false;
+    };
+
+export type EvidenceReviewReopenResult =
+  | {
+      ok: true;
+      preservedConfirmation: boolean;
     }
   | {
       message: string;
@@ -399,8 +414,8 @@ export function createEvidenceReviewRepository(
     async approveEvidence(input) {
       const prisma = await getPrisma();
 
-        return prisma.$transaction(async (tx) => {
-          const attempt = await getAttemptReviewWithClient(tx, input.attemptId);
+      return prisma.$transaction(async (tx) => {
+        const attempt = await getAttemptReviewWithClient(tx, input.attemptId);
 
         if (!attempt) {
           return { message: "El intento no existe.", ok: false };
@@ -464,12 +479,26 @@ export function createEvidenceReviewRepository(
           };
         }
 
-        if (
-          attempt.source !== "PARTICIPANT_PORTAL" ||
-          attempt.status !== "PENDING_REVIEW" ||
-          attempt.participantScreeningReview?.status !== "PENDING"
-        ) {
-          return { message: "La revisión no está pendiente de aprobación.", ok: false };
+        const reviewStatus = attempt.participantScreeningReview?.status ?? null;
+        const hasPendingEvidence = attempt.participantEvidence.some((item) => item.reviewStatus === "PENDING");
+
+        if (hasPendingEvidence && reviewStatus !== "PENDING") {
+          return {
+            message: "Hay evidencias pendientes pero la revisión global no está pendiente.",
+            ok: false
+          };
+        }
+
+        if (reviewStatus === "APPROVED") {
+          return { message: "La revisión ya fue aprobada.", ok: false };
+        }
+
+        if (reviewStatus === "REJECTED") {
+          return { message: "La revisión fue rechazada. Usa Reabrir revisión si necesitas corregirla.", ok: false };
+        }
+
+        if (reviewStatus !== "PENDING" || (attempt.status !== "PENDING_REVIEW" && attempt.status !== "PASSED")) {
+          return { message: "El intento no tiene revisión pendiente.", ok: false };
         }
 
         const config = attempt.questionnaireVersion.study.participantPortalConfig;
@@ -575,6 +604,75 @@ export function createEvidenceReviewRepository(
           confirmation,
           created: true,
           ok: true
+        };
+      });
+    },
+    async reopenEvidenceReview(input) {
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const attempt = await getAttemptReviewWithClient(tx, input.attemptId);
+
+        if (!attempt) {
+          return { message: "El intento no existe.", ok: false };
+        }
+
+        const currentStatus = attempt.participantScreeningReview?.status ?? null;
+        const hasPendingEvidence = attempt.participantEvidence.some((item) => item.reviewStatus === "PENDING");
+
+        if (currentStatus === "PENDING") {
+          return { message: "La revisión ya está pendiente.", ok: false };
+        }
+
+        if (!hasPendingEvidence && currentStatus === null) {
+          return { message: "El intento no tiene revisión pendiente.", ok: false };
+        }
+
+        await tx.participantScreeningReview.upsert({
+          create: {
+            reviewedAt: null,
+            reviewedByUserId: null,
+            screeningAttemptId: attempt.id,
+            status: "PENDING",
+            studyParticipantId: attempt.studyParticipantId
+          },
+          update: {
+            rejectionReason: null,
+            reviewedAt: null,
+            reviewedByUserId: null,
+            status: "PENDING"
+          },
+          where: {
+            screeningAttemptId: attempt.id
+          }
+        });
+
+        await tx.participantEvidence.updateMany({
+          data: {
+            reviewStatus: "PENDING",
+            reviewedAt: null,
+            reviewedByUserId: null
+          },
+          where: {
+            screeningAttemptId: attempt.id
+          }
+        });
+
+        if (attempt.status === "PASSED" || attempt.status === "TERMINATED") {
+          await tx.screeningAttempt.update({
+            data: {
+              completedAt: null,
+              status: "PENDING_REVIEW"
+            },
+            where: {
+              id: attempt.id
+            }
+          });
+        }
+
+        return {
+          ok: true,
+          preservedConfirmation: Boolean(attempt.participantConfirmation)
         };
       });
     },
@@ -1035,8 +1133,7 @@ export function createEvidenceReviewRepository(
           }
         }
 
-        const now = input.now ?? new Date();
-        const reviewAlreadyApproved = attempt.participantScreeningReview?.status === "APPROVED";
+        const reviewStatus = attempt.participantScreeningReview?.status ?? null;
         const correctionNote = buildEvidenceReplacementNote({
           evidenceType: input.evidenceType,
           reason,
@@ -1049,9 +1146,9 @@ export function createEvidenceReviewRepository(
           originalFilename: input.originalFilename,
           privateStorageKey: input.privateStorageKey,
           rejectionReason: null,
-          reviewStatus: reviewAlreadyApproved ? "APPROVED" : "PENDING",
-          reviewedAt: reviewAlreadyApproved ? now : null,
-          reviewedByUserId: reviewAlreadyApproved ? input.reviewedByUserId : null,
+          reviewStatus: "PENDING",
+          reviewedAt: null,
+          reviewedByUserId: null,
           sizeBytes: input.sizeBytes,
           storageBucket: input.storageBucket
         };
@@ -1084,17 +1181,18 @@ export function createEvidenceReviewRepository(
             status: "PENDING",
             studyParticipantId: attempt.studyParticipantId
           },
-          update: reviewAlreadyApproved
-            ? {
-                internalNote: appendInternalNote(attempt.participantScreeningReview?.internalNote, correctionNote)
-              }
-            : {
-                internalNote: appendInternalNote(attempt.participantScreeningReview?.internalNote, correctionNote),
-                rejectionReason: null,
-                reviewedAt: null,
-                reviewedByUserId: null,
-                status: "PENDING"
-              },
+          update:
+            reviewStatus === "PENDING"
+              ? {
+                  internalNote: appendInternalNote(attempt.participantScreeningReview?.internalNote, correctionNote),
+                  rejectionReason: null,
+                  reviewedAt: null,
+                  reviewedByUserId: null,
+                  status: "PENDING"
+                }
+              : {
+                  internalNote: appendInternalNote(attempt.participantScreeningReview?.internalNote, correctionNote)
+                },
           where: {
             screeningAttemptId: attempt.id
           }
