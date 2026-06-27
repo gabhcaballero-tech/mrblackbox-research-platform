@@ -97,6 +97,7 @@ export type NavigoActivityAvailability =
         | "PREVIOUS_REQUIRED"
         | "T0_SLOT"
         | "IDENTITY_REVIEW_REQUIRED";
+      blockedByCode?: NavigoActivityCode;
     }
   | {
       canCapture: true;
@@ -669,6 +670,7 @@ function getNavigoActivityAvailability({
 
   if (previousMeasurement && previousMeasurement.status !== "COMPLETED") {
     return {
+      blockedByCode: previousMeasurement.code ?? "T0_SALON",
       canCapture: false,
       label: "Pendiente",
       reason: "PREVIOUS_REQUIRED"

@@ -116,7 +116,7 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
                     <p className="mt-2 text-sm text-zinc-600">
                       {activity.code === "T0_SALON" && activity.availability.canCapture
                         ? "Esta evaluación debe completarse en el salón con apoyo del encuestador."
-                        : availabilityMessage(activity.availability.reason)}
+                        : availabilityMessage(activity.availability)}
                     </p>
                   </div>
                   <StatusBadge status={activity.availability.canCapture ? "ready" : "planned"}>
@@ -176,8 +176,8 @@ function readTestModeParams(query: { navigoTestMode?: string; navigoTestSignatur
   };
 }
 
-function availabilityMessage(reason: string): string {
-  switch (reason) {
+function availabilityMessage(availability: { blockedByCode?: string; reason: string }): string {
+  switch (availability.reason) {
     case "AVAILABLE":
     case "DUE_SOON":
       return "Ya puedes realizar esta evaluación. Hazla lo antes posible.";
@@ -190,10 +190,22 @@ function availabilityMessage(reason: string): string {
     case "IDENTITY_REVIEW_REQUIRED":
       return "Tu participación requiere revisión de identidad. Contacta a tu reclutador.";
     case "PREVIOUS_REQUIRED":
-      return "La evaluación 0 en salón aún no está completa.";
+      return previousActivityRequiredMessage(availability.blockedByCode);
     default:
       return "Completa primero la evaluación anterior.";
   }
+}
+
+function previousActivityRequiredMessage(blockedByCode?: string): string {
+  if (blockedByCode === "T2_HORAS") {
+    return "Completa primero la evaluación de 2 horas.";
+  }
+
+  if (blockedByCode === "T4_HORAS") {
+    return "Completa primero la evaluación de 4 horas.";
+  }
+
+  return "La evaluación 0 en salón aún no está completa.";
 }
 
 function t0ParticipantLabel(activity: { identityStatus?: string; responseCount?: number; status: string }): string {

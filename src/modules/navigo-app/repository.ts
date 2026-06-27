@@ -400,6 +400,7 @@ const activitySelect = {
     select: {
       id: true,
       internalNote: true,
+      participantActivityId: true,
       privateStorageKey: true,
       rejectionReason: true,
       reviewStatus: true,
@@ -553,6 +554,7 @@ type ActivityRecord = NavigoActivityRecord & {
   participantActivityEvidence: Array<{
     id: string;
     internalNote: string | null;
+    participantActivityId: string;
     privateStorageKey: string;
     rejectionReason: string | null;
     reviewStatus: "APPROVED" | "PENDING" | "REJECTED";
@@ -1405,12 +1407,12 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
 
       if (!timelineActivity || !timelineActivity.availability.canCapture) {
         return {
-          message: availabilityMessage(timelineActivity?.availability.reason ?? "PREVIOUS_REQUIRED"),
+          message: availabilityMessage(timelineActivity?.availability),
           ok: false
         };
       }
 
-      const activitySelfie = activity.participantActivityEvidence.find((evidence) => evidence.type === "SELFIE_IDENTIFICATION") ?? null;
+      const activitySelfie = getActivitySelfie(activity);
 
       return {
         data: {
@@ -1425,7 +1427,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
             storage: input.storage ?? createSupabaseEvidenceStorageClient()
           }),
           selfieReviewStatus: activitySelfie?.reviewStatus ?? null,
-          selfieCount: activity.participantActivityEvidence.filter((evidence) => evidence.type === "SELFIE_IDENTIFICATION").length,
+          selfieCount: getActivitySelfieCount(activity),
           study: participant.study,
           testMode: Boolean(input.testMode),
           timeZoneIana: resolveNavigoTimeZone(participant.study.timeZoneIana)
@@ -1502,7 +1504,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         return { message: "T0 no requiere selfie nueva. Confirma la identidad contra la foto registrada.", ok: false };
       }
 
-      if (activity.participantActivityEvidence.some((evidence) => evidence.type === "SELFIE_IDENTIFICATION")) {
+      if (getActivitySelfieCount(activity) > 0) {
         return { message: "Ya existe una selfie registrada para esta evaluacion.", ok: false };
       }
 
@@ -1613,7 +1615,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         return { message: "Esta evaluacion solo permite selfie de identificacion.", ok: false };
       }
 
-      if (activity.participantActivityEvidence.some((evidence) => evidence.type === "SELFIE_IDENTIFICATION")) {
+      if (getActivitySelfieCount(activity) > 0) {
         return { message: "Ya existe una selfie registrada para esta evaluacion.", ok: false };
       }
 
@@ -1747,7 +1749,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
 
         if (!timelineActivity?.availability.canCapture) {
           return {
-            message: availabilityMessage(timelineActivity?.availability.reason ?? "PREVIOUS_REQUIRED"),
+            message: availabilityMessage(timelineActivity?.availability),
             ok: false
           };
         }
@@ -1773,8 +1775,8 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           };
         }
 
-        if (!activity.participantActivityEvidence.some((evidence) => evidence.type === "SELFIE_IDENTIFICATION")) {
-          return { message: "Toma una selfie antes de guardar la evaluacion.", ok: false };
+        if (!hasApprovedActivitySelfie(activity)) {
+          return { message: "Toma una selfie aprobada de esta evaluacion antes de guardar las respuestas.", ok: false };
         }
 
         const validation = validateNavigoMeasurementAnswers({ input: input.answers });
@@ -2958,7 +2960,7 @@ function buildParticipantRotationSummary(participant: ParticipantRecord): Navigo
 
 async function toActivityListItem(activity: ActivityRecord, storage: EvidenceStorageClient): Promise<NavigoActivityListItem> {
   const record = toNavigoActivityRecord(activity);
-  const activitySelfie = activity.participantActivityEvidence.find((evidence) => evidence.type === "SELFIE_IDENTIFICATION") ?? null;
+  const activitySelfie = getActivitySelfie(activity);
   return {
     ...record,
     activitySelfie: activitySelfie
@@ -2976,7 +2978,7 @@ async function toActivityListItem(activity: ActivityRecord, storage: EvidenceSto
         }
       : null,
     code: activity.activitySchedule.code,
-    evidenceCount: activity.participantActivityEvidence.length,
+    evidenceCount: getActivitySelfieCount(activity),
     existingResponses: Object.fromEntries(activity.responses.map((response) => [response.questionId, response.answerJson])),
     readableResponses: createReadableNavigoResponses(activity.responses),
     responseCount: countNavigoMeasurementResponses(activity.responses)
@@ -3001,11 +3003,11 @@ function toNavigoActivityRecord(activity: ActivityRecord): NavigoActivityRecord 
     code: activity.activitySchedule.code,
     id: activity.id,
     identityStatus: activity.activitySchedule.code === "T0_SALON" ? identityStatus : undefined,
-    identityReviewStatus: activity.participantActivityEvidence.find((evidence) => evidence.type === "SELFIE_IDENTIFICATION")?.reviewStatus,
+    identityReviewStatus: getActivitySelfie(activity)?.reviewStatus,
     occurrenceKey: activity.occurrenceKey,
     responseCount,
     scheduledAt: activity.scheduledAt,
-    selfieCount: activity.participantActivityEvidence.filter((evidence) => evidence.type === "SELFIE_IDENTIFICATION").length,
+    selfieCount: getActivitySelfieCount(activity),
     status: isIncompleteT0 ? "STARTED" : activity.status
   };
 }
@@ -3186,7 +3188,29 @@ function getAssignedArm(participant: ParticipantRecord, code: "LEFT" | "RIGHT", 
   );
 }
 
-function availabilityMessage(reason: string): string {
+function getActivitySelfie(activity: Pick<ActivityRecord, "id" | "participantActivityEvidence">) {
+  return activity.participantActivityEvidence.find(
+    (evidence) => evidence.participantActivityId === activity.id && evidence.type === "SELFIE_IDENTIFICATION"
+  ) ?? null;
+}
+
+function getActivitySelfieCount(activity: Pick<ActivityRecord, "id" | "participantActivityEvidence">): number {
+  return activity.participantActivityEvidence.filter(
+    (evidence) => evidence.participantActivityId === activity.id && evidence.type === "SELFIE_IDENTIFICATION"
+  ).length;
+}
+
+function hasApprovedActivitySelfie(activity: Pick<ActivityRecord, "id" | "participantActivityEvidence">): boolean {
+  return activity.participantActivityEvidence.some(
+    (evidence) =>
+      evidence.participantActivityId === activity.id &&
+      evidence.reviewStatus === "APPROVED" &&
+      evidence.type === "SELFIE_IDENTIFICATION"
+  );
+}
+
+function availabilityMessage(availability: ReturnType<typeof buildNavigoActivityTimeline>[number]["availability"] | null | undefined): string {
+  const reason = availability?.reason ?? "PREVIOUS_REQUIRED";
   if (reason === "BEFORE_WINDOW") {
     return "Aun no es momento de realizar esta evaluacion.";
   }
@@ -3203,7 +3227,23 @@ function availabilityMessage(reason: string): string {
     return "Tu participación requiere revisión de identidad. Contacta a tu reclutador.";
   }
 
+  if (reason === "PREVIOUS_REQUIRED") {
+    return previousActivityRequiredMessage(availability && "blockedByCode" in availability ? availability.blockedByCode : undefined);
+  }
+
   return "Debes completar la evaluacion anterior antes de continuar.";
+}
+
+function previousActivityRequiredMessage(blockedByCode: NavigoActivityCode | undefined): string {
+  if (blockedByCode === "T2_HORAS") {
+    return "Completa primero la evaluacion de 2 horas.";
+  }
+
+  if (blockedByCode === "T4_HORAS") {
+    return "Completa primero la evaluacion de 4 horas.";
+  }
+
+  return "La evaluacion 0 en salon aun no esta completa.";
 }
 
 function buildActivityEvidenceStorageKey({
