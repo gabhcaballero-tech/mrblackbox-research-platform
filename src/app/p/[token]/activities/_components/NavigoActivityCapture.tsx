@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { NAVIGO_T0_IDENTITY_QUESTION_ID } from "@/modules/navigo-app/definition";
 import {
@@ -9,7 +10,7 @@ import {
   submitNavigoActivityResponsesAction
 } from "@/modules/navigo-app/actions";
 import type { QuestionnaireQuestion } from "@/modules/questionnaire-engine";
-import type { NavigoTestModeParams } from "@/modules/navigo-app/test-mode";
+import { appendNavigoTestModeParams, type NavigoTestModeParams } from "@/modules/navigo-app/test-mode";
 import { verifyNavigoFaceIdentity } from "@/modules/navigo-app/face-verification-client";
 import type { NavigoFaceVerificationClientResult } from "@/modules/navigo-app/face-verification-contract";
 import { createBrowserSupabaseClient } from "@/shared/auth/supabase/browser";
@@ -49,6 +50,7 @@ export function NavigoActivityCapture({
   testModeParams,
   token
 }: NavigoActivityCaptureProps) {
+  const router = useRouter();
   const [selfies, setSelfies] = useState(selfieCount);
   const [identityConfirmed, setIdentityConfirmed] = useState(
     readAnswerValue(existingResponses[NAVIGO_T0_IDENTITY_QUESTION_ID]) === "YES"
@@ -72,7 +74,6 @@ export function NavigoActivityCapture({
   const [identityReviewStatus, setIdentityReviewStatus] = useState<"APPROVED" | "PENDING" | "REJECTED" | null>(selfieReviewStatus);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [evaluationError, setEvaluationError] = useState<string | null>(error ?? null);
-  const [evaluationSuccess, setEvaluationSuccess] = useState<string | null>(null);
   const [cameraState, setCameraState] = useState<"idle" | "opening" | "ready">("idle");
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -444,11 +445,6 @@ export function NavigoActivityCapture({
           <p className="mt-1 font-mono">Brazo izquierdo: {fragranceCodes.left}</p>
           <p className="font-mono">Brazo derecho: {fragranceCodes.right}</p>
         </div>
-        {evaluationSuccess ? (
-          <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-            {evaluationSuccess}
-          </p>
-        ) : null}
         {evaluationError ? (
           <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{evaluationError}</p>
         ) : null}
@@ -530,7 +526,6 @@ export function NavigoActivityCapture({
     evaluationSubmitRef.current = true;
     setIsSavingEvaluation(true);
     setEvaluationError(null);
-    setEvaluationSuccess(null);
 
     const formData = new FormData(event.currentTarget);
 
@@ -543,7 +538,7 @@ export function NavigoActivityCapture({
           return;
         }
 
-        setEvaluationSuccess(result.data.message);
+        router.replace(buildActivitiesSuccessHref(token, "Evaluación registrada correctamente.", testModeParams));
       } catch {
         setEvaluationError("No fue posible guardar la evaluación. Intenta de nuevo.");
       } finally {
@@ -709,7 +704,7 @@ function QuestionControl({
               </label>
             ))}
           </div>
-          {question.minLabel || question.maxLabel ? (
+          {shouldRenderScaleExtremes(question.id) && (question.minLabel || question.maxLabel) ? (
             <div className="mt-2 flex justify-between gap-4 text-xs text-zinc-500">
               <span>{question.minLabel}</span>
               <span className="text-right">{question.maxLabel}</span>
@@ -744,6 +739,15 @@ function scaleOptionLabel(questionId: string, value: number): string {
   }
 
   return "";
+}
+
+function shouldRenderScaleExtremes(questionId: string): boolean {
+  return questionId !== "AP3_INTENSIDAD_PRIMERA" && questionId !== "AP4_INTENSIDAD_SEGUNDA";
+}
+
+function buildActivitiesSuccessHref(token: string, message: string, testModeParams: NavigoTestModeParams | null) {
+  const params = new URLSearchParams({ message });
+  return appendNavigoTestModeParams(`/p/${encodeURIComponent(token)}/activities?${params.toString()}`, testModeParams);
 }
 
 function readAnswerValue(answer: unknown): string | number | null {

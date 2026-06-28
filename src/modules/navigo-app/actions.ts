@@ -17,11 +17,14 @@ import {
 import type { NavigoFaceVerificationClientResult } from "./face-verification-contract";
 import {
   parseNavigoDateTimeLocal,
+  parseNavigoParticipantImportText,
   parseNavigoRotationImportText,
   type NavigoAnswerInput,
+  type NavigoParticipantImportRowInput,
   type NavigoRotationImportRowInput
 } from "./service";
 import type { NavigoRotationImportActionState } from "./rotation-import-state";
+import type { NavigoParticipantImportActionState } from "./participant-import-state";
 import type { EvidenceUploadMetadata } from "@/modules/participant-portal/evidence-storage";
 
 export async function startNavigoT0Action(studyId: string, studyParticipantId: string, formData: FormData) {
@@ -73,6 +76,53 @@ export async function generateNavigoParticipantLinkAction(
 
   revalidatePath(`/admin/studies/${studyId}/navigo-app`);
   redirectWithNavigoMessage(studyId, { message: result.message });
+}
+
+export async function registerNavigoDirectParticipantAction(studyId: string, formData: FormData) {
+  const actor = await requireCapability("screening:review");
+  const result = await createNavigoAppRepository().registerDirectParticipant({
+    actorUserId: actor.id,
+    celular: String(formData.get("celular") ?? ""),
+    correo: String(formData.get("correo") ?? ""),
+    folio: String(formData.get("folio") ?? ""),
+    generateLink: formData.get("generateLink") === "on",
+    nombre: String(formData.get("nombre") ?? ""),
+    observaciones: String(formData.get("observaciones") ?? ""),
+    primeraFragancia: String(formData.get("primeraFragancia") ?? ""),
+    reclutador: String(formData.get("reclutador") ?? ""),
+    segundaFragancia: String(formData.get("segundaFragancia") ?? ""),
+    studyId
+  });
+
+  if (!result.ok) {
+    redirectWithNavigoMessage(studyId, { error: result.message });
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+  redirectWithNavigoMessage(studyId, {
+    message: result.data.linkToken
+      ? "Participante registrado y link generado correctamente."
+      : "Participante registrado correctamente.",
+    participant: result.data.studyParticipantId
+  });
+}
+
+export async function generateNavigoParticipantLinksForStudyAction(studyId: string, formData: FormData) {
+  const actor = await requireCapability("screening:review");
+  const result = await createNavigoAppRepository().generateParticipantLinksForStudy({
+    actorUserId: actor.id,
+    forceRegenerate: formData.get("forceRegenerate") === "on",
+    studyId
+  });
+
+  if (!result.ok) {
+    redirectWithNavigoMessage(studyId, { error: result.message });
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+  redirectWithNavigoMessage(studyId, {
+    message: `Enlaces listos. Existentes: ${result.data.existing}. Creados: ${result.data.created}. Regenerados: ${result.data.regenerated}. Errores: ${result.data.errors}.`
+  });
 }
 
 export async function resetNavigoParticipantAppAction(studyId: string, studyParticipantId: string, formData: FormData) {
@@ -336,6 +386,116 @@ export async function applyNavigoRotationImportRowsAction(
     rows,
     status: "success"
   };
+}
+
+export async function previewNavigoParticipantImportTextAction(
+  studyId: string,
+  filename: string,
+  text: string
+): Promise<NavigoParticipantImportActionState> {
+  await requireCapability("screening:review");
+
+  const parsed = parseNavigoParticipantImportText({ filename, text });
+  if (!parsed.ok) {
+    return {
+      message: parsed.message,
+      preview: null,
+      rows: [],
+      status: "error"
+    };
+  }
+
+  try {
+    const result = await createNavigoAppRepository().previewParticipantImport({
+      rows: parsed.rows,
+      studyId
+    });
+
+    if (!result.ok) {
+      return {
+        message: result.message,
+        preview: null,
+        rows: parsed.rows,
+        status: "error"
+      };
+    }
+
+    return {
+      message: "Previsualizacion de participantes lista.",
+      preview: result.data,
+      rows: parsed.rows,
+      status: result.data.summary.rowsWithError > 0 ? "error" : "success"
+    };
+  } catch (error) {
+    logNavigoRotationImportError({
+      error,
+      step: "preview",
+      studyId
+    });
+
+    return {
+      message: "No fue posible previsualizar participantes. Revisa el archivo e intenta de nuevo.",
+      preview: null,
+      rows: parsed.rows,
+      status: "error"
+    };
+  }
+}
+
+export async function applyNavigoParticipantImportRowsAction(
+  studyId: string,
+  rows: NavigoParticipantImportRowInput[],
+  generateLinks: boolean
+): Promise<NavigoParticipantImportActionState> {
+  const actor = await requireCapability("screening:review");
+
+  if (rows.length === 0) {
+    return {
+      message: "Primero previsualiza un archivo valido.",
+      preview: null,
+      rows: [],
+      status: "error"
+    };
+  }
+
+  try {
+    const result = await createNavigoAppRepository().applyParticipantImport({
+      actorUserId: actor.id,
+      generateLinks,
+      rows,
+      studyId
+    });
+
+    if (!result.ok) {
+      return {
+        message: result.message,
+        preview: result.data?.preview ?? null,
+        rows,
+        status: "error"
+      };
+    }
+
+    revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+    return {
+      message: `Participantes importados correctamente. Creados: ${result.data.created}. Actualizados: ${result.data.updated}. Omitidos: ${result.data.omitted}. Con error: ${result.data.errors}. Links creados: ${result.data.linksCreated}.`,
+      preview: result.data.preview,
+      rows,
+      status: "success"
+    };
+  } catch (error) {
+    logNavigoRotationImportError({
+      error,
+      step: "apply",
+      studyId
+    });
+
+    return {
+      message: error instanceof Error ? error.message : "No fue posible importar participantes.",
+      preview: null,
+      rows,
+      status: "error"
+    };
+  }
 }
 
 function logNavigoRotationImportError({

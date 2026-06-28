@@ -21,15 +21,24 @@ import {
   buildNavigoActivityTimeline,
   buildNavigoRotationChecklist,
   buildNavigoStartT0PendingMessage,
+  buildNavigoTsv,
   countNavigoMeasurementResponses,
   createNavigoRotationPlanCode,
   isNavigoT0Complete,
+  isNavigoEmail,
+  isNavigoPhone,
+  navigoActivityLabel,
+  normalizeNavigoEmail,
+  normalizeNavigoFolio,
+  normalizeNavigoParticipantName,
+  normalizeNavigoPhone,
   normalizeNavigoRotationCode,
   prepareNavigoParticipantActivities,
   readNavigoIdentityStatusFromResponses,
   validateNavigoMeasurementAnswers,
   type NavigoActivityRecord,
   type NavigoAnswerInput,
+  type NavigoParticipantImportRowInput,
   type NavigoRotationChecklist,
   type NavigoRotationImportRowInput,
   type NavigoScheduleRecord
@@ -38,6 +47,7 @@ import {
   normalizeNavigoFaceVerificationForStorage,
   type NavigoFaceVerificationClientResult
 } from "./face-verification-contract";
+import { generateParticipantReferenceCode, generateReferenceCodes } from "@/modules/participant-portal/review";
 
 export type NavigoInternalActor = {
   id: string;
@@ -60,6 +70,7 @@ export type NavigoParticipantListItem = {
   confirmation: {
     folio: string;
     referenceCodes: Array<{ code: string; slot: number }>;
+    screeningAttempt?: { evaluationJson: unknown } | null;
   } | null;
   hasRecoverableToken: boolean;
   participantLinkToken: string | null;
@@ -175,6 +186,66 @@ export type NavigoRotationImportPreview = {
   };
 };
 
+export type NavigoParticipantRegistrationInput = {
+  actorUserId: string;
+  celular: string;
+  correo?: string | null;
+  folio: string;
+  generateLink?: boolean;
+  nombre: string;
+  observaciones?: string | null;
+  primeraFragancia: string;
+  reclutador?: string | null;
+  segundaFragancia: string;
+  studyId: string;
+};
+
+export type NavigoParticipantImportPreviewRow = NavigoParticipantImportRowInput & {
+  celularDuplicado: boolean;
+  errors: string[];
+  existingFolio: boolean;
+  existingParticipant: boolean;
+  folioNuevo: boolean;
+  rowNumber: number;
+  rotationComplete: boolean;
+  updatable: boolean;
+};
+
+export type NavigoParticipantImportPreview = {
+  rows: NavigoParticipantImportPreviewRow[];
+  summary: {
+    duplicatePhones: number;
+    existingFolios: number;
+    newFolios: number;
+    phoneDuplicates: number;
+    rotationComplete: number;
+    rowsWithError: number;
+    totalRows: number;
+    validRows: number;
+  };
+};
+
+export type NavigoParticipantImportResult = {
+  created: number;
+  errors: number;
+  linksCreated: number;
+  omitted: number;
+  preview: NavigoParticipantImportPreview;
+  updated: number;
+};
+
+export type NavigoBulkLinkResult = {
+  created: number;
+  errors: number;
+  existing: number;
+  regenerated: number;
+};
+
+export type NavigoLinksExportResult = {
+  body: string;
+  filename: string;
+};
+
 export type NavigoParticipantActivitiesView =
   | {
       message: string;
@@ -244,6 +315,12 @@ export type NavigoActionResult<T = unknown> =
     };
 
 export type NavigoAppRepository = {
+  applyParticipantImport: (input: {
+    actorUserId: string;
+    generateLinks?: boolean;
+    rows: NavigoParticipantImportRowInput[];
+    studyId: string;
+  }) => Promise<NavigoActionResult<NavigoParticipantImportResult>>;
   configureParticipantRotation: (input: NavigoConfigureRotationInput) => Promise<NavigoActionResult<{
     rotationCode: string;
     leftFragranceCode: string;
@@ -283,10 +360,29 @@ export type NavigoAppRepository = {
     now?: Date;
     studyParticipantId: string;
   }) => Promise<NavigoParticipantLinkResult>;
+  generateParticipantLinksForStudy: (input: {
+    actorUserId: string;
+    forceRegenerate?: boolean;
+    now?: Date;
+    studyId: string;
+  }) => Promise<NavigoActionResult<NavigoBulkLinkResult>>;
+  exportLinksAndRotation: (input: {
+    now?: Date;
+    requestOrigin: string;
+    studyId: string;
+  }) => Promise<NavigoActionResult<NavigoLinksExportResult>>;
+  previewParticipantImport: (input: {
+    rows: NavigoParticipantImportRowInput[];
+    studyId: string;
+  }) => Promise<NavigoActionResult<NavigoParticipantImportPreview>>;
   previewRotationImport: (input: {
     rows: NavigoRotationImportRowInput[];
     studyId: string;
   }) => Promise<NavigoActionResult<NavigoRotationImportPreview>>;
+  registerDirectParticipant: (input: NavigoParticipantRegistrationInput) => Promise<NavigoActionResult<{
+    linkToken: string | null;
+    studyParticipantId: string;
+  }>>;
   applyRotationImport: (input: {
     actorUserId: string;
     rows: NavigoRotationImportRowInput[];
@@ -353,10 +449,14 @@ type NavigoPrismaClient = PrismaClientLike & {
   participantActivityEvidence: Delegate;
   participantArmAssignment: Delegate;
   participantConfirmation: Delegate;
+  participantProfile: Delegate;
+  participantReferenceCode: Delegate;
   participantRotationAssignment: Delegate;
+  questionnaireVersion: Delegate;
   researchResponse: Delegate;
   rotationPlan: Delegate;
   rotationPlanArm: Delegate;
+  screeningAttempt: Delegate;
   studyArm: Delegate;
   study: Delegate;
   studyParticipant: Delegate;
@@ -426,6 +526,11 @@ const participantSelect = {
   participantConfirmation: {
     select: {
       folio: true,
+      screeningAttempt: {
+        select: {
+          evaluationJson: true
+        }
+      },
       referenceCodes: {
         orderBy: { slot: "asc" },
         select: {
@@ -527,7 +632,11 @@ type ParticipantRecord = {
   activities?: ActivityRecord[];
   applicationStartedAt: Date | null;
   id: string;
-  participantConfirmation: { folio: string; referenceCodes: Array<{ code: string; slot: number }> } | null;
+  participantConfirmation: {
+    folio: string;
+    referenceCodes: Array<{ code: string; slot: number }>;
+    screeningAttempt?: { evaluationJson: unknown } | null;
+  } | null;
   participantEvidence: Array<{
     id: string;
     privateStorageKey: string;
@@ -723,6 +832,55 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
   }
 
   return {
+    async registerDirectParticipant(input) {
+      const normalized = normalizeNavigoParticipantRegistrationInput(input);
+
+      if (!normalized.ok) {
+        return {
+          message: normalized.message,
+          ok: false
+        };
+      }
+
+      const prisma = await getPrisma();
+      const now = new Date();
+
+      try {
+        return await prisma.$transaction(async (tx) => {
+          const study = (await tx.study.findUnique?.({
+            select: studySelect,
+            where: { id: input.studyId }
+          })) as StudyRecord | null;
+
+          if (!study || study.code !== NAVIGO_STUDY_CODE) {
+            return { message: "Solo el estudio Navigo permite registrar participantes directos.", ok: false };
+          }
+
+          const registered = await upsertNavigoDirectParticipant({
+            actorUserId: input.actorUserId,
+            generateLink: Boolean(input.generateLink),
+            now,
+            prisma: tx,
+            row: normalized.data,
+            study
+          });
+
+          return {
+            data: {
+              linkToken: registered.linkToken,
+              studyParticipantId: registered.participant.id
+            },
+            ok: true
+          };
+        });
+      } catch (error) {
+        return {
+          message: error instanceof Error ? error.message : "No fue posible registrar el participante.",
+          ok: false
+        };
+      }
+    },
+
     async configureParticipantRotation(input) {
       const leftFragranceCode = normalizeNavigoRotationCode(input.leftFragranceCode);
       const rightFragranceCode = normalizeNavigoRotationCode(input.rightFragranceCode);
@@ -1141,6 +1299,104 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
       }
     },
 
+    async previewParticipantImport(input) {
+      const prisma = await getPrisma();
+      const study = (await prisma.study.findUnique?.({
+        select: studySelect,
+        where: { id: input.studyId }
+      })) as StudyRecord | null;
+
+      if (!study || study.code !== NAVIGO_STUDY_CODE) {
+        return { message: "Solo el estudio Navigo permite importar participantes.", ok: false };
+      }
+
+      const preview = await buildParticipantImportPreview({
+        prisma,
+        rows: input.rows,
+        studyId: input.studyId
+      });
+
+      return { data: preview, ok: true };
+    },
+
+    async applyParticipantImport(input) {
+      const prisma = await getPrisma();
+      const now = new Date();
+
+      return prisma.$transaction(async (tx) => {
+        const study = (await tx.study.findUnique?.({
+          select: studySelect,
+          where: { id: input.studyId }
+        })) as StudyRecord | null;
+
+        if (!study || study.code !== NAVIGO_STUDY_CODE) {
+          return { message: "Solo el estudio Navigo permite importar participantes.", ok: false };
+        }
+
+        const preview = await buildParticipantImportPreview({
+          prisma: tx,
+          rows: input.rows,
+          studyId: input.studyId
+        });
+
+        if (preview.summary.rowsWithError > 0) {
+          return {
+            data: {
+              created: 0,
+              errors: preview.summary.rowsWithError,
+              linksCreated: 0,
+              omitted: preview.summary.rowsWithError,
+              preview,
+              updated: 0
+            },
+            message: "Corrige los errores de la previsualizacion antes de aplicar la importacion.",
+            ok: false
+          };
+        }
+
+        let created = 0;
+        let linksCreated = 0;
+        let updated = 0;
+
+        for (const row of preview.rows) {
+          const result = await upsertNavigoDirectParticipant({
+            actorUserId: input.actorUserId,
+            generateLink: Boolean(input.generateLinks),
+            now,
+            prisma: tx,
+            row,
+            study
+          });
+          if (result.createdProfile || result.createdStudyParticipant || result.createdConfirmation) {
+            created += 1;
+          } else {
+            updated += 1;
+          }
+          if (result.linkToken) {
+            linksCreated += 1;
+          }
+        }
+
+        const nextPreview = await buildParticipantImportPreview({
+          prisma: tx,
+          rows: input.rows,
+          studyId: input.studyId
+        });
+
+        return {
+          data: {
+            created,
+            errors: 0,
+            linksCreated,
+            omitted: 0,
+            preview: nextPreview,
+            updated
+          },
+          ok: true
+        };
+      });
+    },
+
     async startT0(input) {
       const prisma = await getPrisma();
       const now = input.now ?? new Date();
@@ -1480,6 +1736,117 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           ok: true
         };
       });
+    },
+
+    async generateParticipantLinksForStudy(input) {
+      const prisma = await getPrisma();
+      const now = input.now ?? new Date();
+
+      return prisma.$transaction(async (tx) => {
+        const study = (await tx.study.findUnique?.({
+          select: studySelect,
+          where: { id: input.studyId }
+        })) as StudyRecord | null;
+
+        if (!study || study.code !== NAVIGO_STUDY_CODE) {
+          return { message: "Solo el estudio Navigo permite generar enlaces masivos.", ok: false };
+        }
+
+        const participants = (await tx.studyParticipant.findMany?.({
+          orderBy: {
+            participantConfirmation: {
+              folioSequence: "asc"
+            }
+          },
+          select: participantWithActivitiesSelect,
+          where: {
+            participantConfirmation: { isNot: null },
+            studyId: input.studyId
+          }
+        })) as ParticipantRecord[];
+
+        let created = 0;
+        let existing = 0;
+        let regenerated = 0;
+        let errors = 0;
+
+        for (const participant of participants) {
+          const guard = validateParticipantForT0(participant);
+          if (!guard.ok) {
+            errors += 1;
+            continue;
+          }
+
+          const hadActive = Boolean(participant.accessTokens?.[0]);
+          await ensureNavigoT0Activity({ now, participant, prisma: tx });
+          await ensureParticipantAccessToken({
+            actorUserId: input.actorUserId,
+            forceRegenerate: Boolean(input.forceRegenerate),
+            now,
+            participant,
+            prisma: tx
+          });
+
+          if (hadActive && input.forceRegenerate) {
+            regenerated += 1;
+          } else if (hadActive) {
+            existing += 1;
+          } else {
+            created += 1;
+          }
+        }
+
+        return {
+          data: { created, errors, existing, regenerated },
+          ok: true
+        };
+      });
+    },
+
+    async exportLinksAndRotation(input) {
+      const prisma = await getPrisma();
+      const study = (await prisma.study.findUnique?.({
+        select: studySelect,
+        where: { id: input.studyId }
+      })) as StudyRecord | null;
+
+      if (!study || study.code !== NAVIGO_STUDY_CODE) {
+        return { message: "Solo el estudio Navigo permite exportar enlaces y rotacion.", ok: false };
+      }
+
+      const participants = (await prisma.studyParticipant.findMany?.({
+        orderBy: {
+          participantConfirmation: {
+            folioSequence: "asc"
+          }
+        },
+        select: participantWithActivitiesSelect,
+        where: {
+          participantConfirmation: { isNot: null },
+          studyId: input.studyId
+        }
+      })) as ParticipantRecord[];
+      const dashboard = {
+        participants: await Promise.all(
+          participants.map((participant) =>
+            toDashboardParticipant(participant, input.now ?? new Date(), createSupabaseEvidenceStorageClient())
+          )
+        ),
+        study,
+        timeZoneIana: resolveNavigoTimeZone(study.timeZoneIana)
+      };
+
+      return {
+        data: {
+          body: buildNavigoLinksRotationTsv({
+            dashboard,
+            now: input.now ?? new Date(),
+            requestOrigin: input.requestOrigin
+          }),
+          filename: `${dashboard.study.code}_links_rotacion_${formatDateForFilename(input.now ?? new Date(), dashboard.timeZoneIana)}.tsv`
+        },
+        ok: true
+      };
     },
 
     async requestActivitySelfieUpload(input) {
@@ -2335,6 +2702,89 @@ async function toDashboardParticipant(
   };
 }
 
+async function buildParticipantImportPreview({
+  prisma,
+  rows,
+  studyId
+}: {
+  prisma: NavigoPrismaClient | NavigoTransactionClient;
+  rows: NavigoParticipantImportRowInput[];
+  studyId: string;
+}): Promise<NavigoParticipantImportPreview> {
+  const folios = [...new Set(rows.map((row) => row.folio).filter(Boolean))];
+  const phones = [...new Set(rows.map((row) => row.celular).filter(Boolean))];
+  const existingByFolio = await findNavigoParticipantsByFolio({ folios, prisma, studyId });
+  const existingByPhone = await findNavigoParticipantsByPhone({ phones, prisma, studyId });
+  const duplicatedFolios = duplicates(rows.map((row) => row.folio).filter(Boolean));
+  const duplicatedPhones = duplicates(rows.map((row) => row.celular).filter(Boolean));
+
+  const previewRows = rows.map((row, index): NavigoParticipantImportPreviewRow => {
+    const errors: string[] = [];
+    const folioParticipant = row.folio ? existingByFolio.get(row.folio) ?? null : null;
+    const phoneParticipant = row.celular ? existingByPhone.get(row.celular) ?? null : null;
+
+    if (!row.folio) {
+      errors.push("folio vacio");
+    } else if (duplicatedFolios.has(row.folio)) {
+      errors.push("folio duplicado en archivo");
+    }
+    if (!row.nombre) {
+      errors.push("nombre vacio");
+    }
+    if (!row.celular) {
+      errors.push("celular vacio");
+    } else if (!isNavigoPhone(row.celular)) {
+      errors.push("formato de celular invalido");
+    } else if (duplicatedPhones.has(row.celular)) {
+      errors.push("celular duplicado en archivo");
+    }
+    if (row.correo && !isNavigoEmail(row.correo)) {
+      errors.push("formato de correo invalido");
+    }
+    if (!row.primeraFragancia) {
+      errors.push("primera fragancia vacia");
+    }
+    if (!row.segundaFragancia) {
+      errors.push("segunda fragancia vacia");
+    }
+    if (row.primeraFragancia && row.primeraFragancia === row.segundaFragancia) {
+      errors.push("primera y segunda fragancia deben ser distintas");
+    }
+    if (folioParticipant && phoneParticipant && folioParticipant.id !== phoneParticipant.id) {
+      errors.push("folio ya existe con otro celular");
+    }
+    if (phoneParticipant && !folioParticipant && phoneParticipant.participantConfirmation?.folio) {
+      errors.push("celular ya existe con otro folio");
+    }
+
+    return {
+      ...row,
+      celularDuplicado: Boolean(phoneParticipant),
+      errors,
+      existingFolio: Boolean(folioParticipant),
+      existingParticipant: Boolean(phoneParticipant),
+      folioNuevo: !folioParticipant,
+      rotationComplete: Boolean(row.primeraFragancia && row.segundaFragancia && row.primeraFragancia !== row.segundaFragancia),
+      rowNumber: index + 2,
+      updatable: errors.length === 0
+    };
+  });
+
+  return {
+    rows: previewRows,
+    summary: {
+      duplicatePhones: duplicatedPhones.size,
+      existingFolios: previewRows.filter((row) => row.existingFolio).length,
+      newFolios: previewRows.filter((row) => row.folioNuevo && row.folio).length,
+      phoneDuplicates: previewRows.filter((row) => row.celularDuplicado).length,
+      rotationComplete: previewRows.filter((row) => row.rotationComplete).length,
+      rowsWithError: previewRows.filter((row) => row.errors.length > 0).length,
+      totalRows: previewRows.length,
+      validRows: previewRows.filter((row) => row.errors.length === 0).length
+    }
+  };
+}
+
 async function buildRotationImportPreview({
   prisma,
   rows,
@@ -2445,6 +2895,289 @@ async function findConfirmationsByFolio({
   })) as ConfirmationWithParticipant[];
 
   return new Map(confirmations.map((confirmation) => [confirmation.folio, confirmation]));
+}
+
+async function findNavigoParticipantsByFolio({
+  folios,
+  prisma,
+  studyId
+}: {
+  folios: string[];
+  prisma: NavigoPrismaClient | NavigoTransactionClient;
+  studyId: string;
+}): Promise<Map<string, ParticipantRecord>> {
+  if (folios.length === 0) {
+    return new Map();
+  }
+
+  const confirmations = (await prisma.participantConfirmation.findMany?.({
+    select: {
+      folio: true,
+      studyParticipant: {
+        select: participantWithActivitiesSelect
+      }
+    },
+    where: {
+      folio: { in: folios },
+      studyId
+    }
+  })) as Array<{ folio: string; studyParticipant: ParticipantRecord }>;
+
+  return new Map(confirmations.map((confirmation) => [confirmation.folio, confirmation.studyParticipant]));
+}
+
+async function findNavigoParticipantsByPhone({
+  phones,
+  prisma,
+  studyId
+}: {
+  phones: string[];
+  prisma: NavigoPrismaClient | NavigoTransactionClient;
+  studyId: string;
+}): Promise<Map<string, ParticipantRecord>> {
+  if (phones.length === 0) {
+    return new Map();
+  }
+
+  const participants = (await prisma.studyParticipant.findMany?.({
+    select: participantWithActivitiesSelect,
+    where: {
+      participantProfile: {
+        phone: { in: phones }
+      },
+      studyId
+    }
+  })) as ParticipantRecord[];
+
+  const entries = participants
+    .map((participant): [string, ParticipantRecord] | null =>
+      participant.participantProfile.phone ? [participant.participantProfile.phone, participant] : null
+    )
+    .filter((entry): entry is [string, ParticipantRecord] => entry !== null);
+
+  return new Map(entries);
+}
+
+function duplicates(values: string[]): Set<string> {
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
+
+  for (const value of values) {
+    if (seen.has(value)) {
+      repeated.add(value);
+    }
+    seen.add(value);
+  }
+
+  return repeated;
+}
+
+function normalizeNavigoParticipantRegistrationInput(
+  input: NavigoParticipantRegistrationInput
+): NavigoActionResult<NavigoParticipantImportRowInput> {
+  const data: NavigoParticipantImportRowInput = {
+    celular: normalizeNavigoPhone(input.celular),
+    correo: normalizeNavigoEmail(input.correo ?? ""),
+    folio: normalizeNavigoFolio(input.folio),
+    nombre: normalizeNavigoParticipantName(input.nombre),
+    observaciones: input.observaciones ? normalizeNavigoParticipantName(input.observaciones) : null,
+    primeraFragancia: normalizeNavigoRotationCode(input.primeraFragancia),
+    reclutador: input.reclutador ? normalizeNavigoParticipantName(input.reclutador) : null,
+    segundaFragancia: normalizeNavigoRotationCode(input.segundaFragancia)
+  };
+  const errors: string[] = [];
+
+  if (!data.folio) errors.push("Captura el folio.");
+  if (!data.nombre) errors.push("Captura el nombre.");
+  if (!data.celular) errors.push("Captura el celular.");
+  if (data.celular && !isNavigoPhone(data.celular)) errors.push("Captura un celular valido a 10 digitos o con clave +52.");
+  if (data.correo && !isNavigoEmail(data.correo)) errors.push("Captura un correo valido.");
+  if (!data.primeraFragancia || !data.segundaFragancia) errors.push("Captura primera y segunda fragancia.");
+  if (data.primeraFragancia && data.primeraFragancia === data.segundaFragancia) {
+    errors.push("Los codigos de primera y segunda fragancia deben ser distintos.");
+  }
+
+  if (errors.length > 0) {
+    return { message: errors.join(" "), ok: false };
+  }
+
+  return { data, ok: true };
+}
+
+async function upsertNavigoDirectParticipant({
+  actorUserId,
+  generateLink,
+  now,
+  prisma,
+  row,
+  study
+}: {
+  actorUserId: string;
+  generateLink: boolean;
+  now: Date;
+  prisma: NavigoTransactionClient;
+  row: NavigoParticipantImportRowInput;
+  study: StudyRecord;
+}): Promise<{
+  createdConfirmation: boolean;
+  createdProfile: boolean;
+  createdStudyParticipant: boolean;
+  linkToken: string | null;
+  participant: ParticipantRecord;
+}> {
+  const byFolio = (await findNavigoParticipantsByFolio({ folios: [row.folio], prisma, studyId: study.id })).get(row.folio) ?? null;
+  const byPhone = (await findNavigoParticipantsByPhone({ phones: [row.celular], prisma, studyId: study.id })).get(row.celular) ?? null;
+
+  if (byFolio && byPhone && byFolio.id !== byPhone.id) {
+    throw new Error("El folio ya existe con otro celular.");
+  }
+  if (byPhone?.participantConfirmation?.folio && byPhone.participantConfirmation.folio !== row.folio) {
+    throw new Error("El celular ya existe con otro folio.");
+  }
+
+  let profile = byPhone?.participantProfile ?? byFolio?.participantProfile ?? null;
+  const createdProfile = !profile;
+
+  if (!profile) {
+    profile = (await prisma.participantProfile.create?.({
+      data: {
+        createdByUserId: actorUserId,
+        email: row.correo,
+        name: row.nombre,
+        phone: row.celular,
+        status: "ACTIVE"
+      },
+      select: { email: true, id: true, name: true, phone: true }
+    })) as { email: string | null; id: string; name: string; phone: string | null };
+  } else {
+    await prisma.participantProfile.update?.({
+      data: {
+        email: row.correo,
+        name: row.nombre,
+        phone: row.celular
+      },
+      where: { id: profile.id }
+    });
+  }
+
+  let participant = byPhone ?? byFolio ?? null;
+  const createdStudyParticipant = !participant;
+
+  if (!participant) {
+    await prisma.studyParticipant.create?.({
+      data: {
+        createdByUserId: actorUserId,
+        operationalStatus: "ASSIGNED",
+        participantProfileId: profile.id,
+        screeningStatus: "PASSED",
+        studyId: study.id
+      }
+    });
+  } else {
+    await prisma.studyParticipant.update?.({
+      data: {
+        operationalStatus: "ASSIGNED",
+        screeningStatus: "PASSED"
+      },
+      where: { id: participant.id }
+    });
+  }
+
+  participant = (await prisma.studyParticipant.findUnique?.({
+    select: participantWithActivitiesSelect,
+    where: {
+      participantProfileId_studyId: {
+        participantProfileId: profile.id,
+        studyId: study.id
+      }
+    }
+  })) as ParticipantRecord | null;
+
+  if (!participant) {
+    throw new Error("No fue posible preparar el participante.");
+  }
+
+  const createdConfirmation = !participant.participantConfirmation;
+  if (!participant.participantConfirmation) {
+    const questionnaireVersionId = await resolveActiveScreenerVersionId({ prisma, studyId: study.id });
+    if (!questionnaireVersionId) {
+      throw new Error("El estudio no tiene una version activa de screener para trazabilidad.");
+    }
+
+    const attempt = (await prisma.screeningAttempt.create?.({
+      data: {
+        completedAt: now,
+        evaluationJson: {
+          directSource: "APP_NAVIGO_DIRECT",
+          observaciones: row.observaciones,
+          reclutador: row.reclutador
+        },
+        fieldUserId: actorUserId,
+        questionnaireVersionId,
+        source: "FIELD",
+        status: "PASSED",
+        studyParticipantId: participant.id
+      },
+      select: { id: true }
+    })) as { id: string };
+    const confirmation = (await prisma.participantConfirmation.create?.({
+      data: {
+        approvedAt: now,
+        approvedByUserId: actorUserId,
+        folio: row.folio,
+        folioSequence: parseFolioSequence(row.folio),
+        manualMessageStatus: "NOT_SENT",
+        screeningAttemptId: attempt.id,
+        studyId: study.id,
+        studyParticipantId: participant.id
+      },
+      select: { id: true }
+    })) as { id: string };
+    const referenceCodes = generateReferenceCodes({
+      codeGenerator: generateParticipantReferenceCode,
+      existingReferenceCodes: await listExistingReferenceCodes(prisma)
+    });
+
+    await prisma.participantReferenceCode.createMany?.({
+      data: referenceCodes.map((code) => ({
+        code: code.code,
+        confirmationId: confirmation.id,
+        slot: code.slot
+      }))
+    });
+  }
+
+  participant = (await prisma.studyParticipant.findUnique?.({
+    select: participantWithActivitiesSelect,
+    where: { id: participant.id }
+  })) as ParticipantRecord;
+
+  await upsertParticipantRotationForCodes({
+    actorUserId,
+    leftFragranceCode: row.primeraFragancia,
+    participant,
+    prisma,
+    rightFragranceCode: row.segundaFragancia
+  });
+
+  participant = (await prisma.studyParticipant.findUnique?.({
+    select: participantWithActivitiesSelect,
+    where: { id: participant.id }
+  })) as ParticipantRecord;
+
+  let linkToken: string | null = null;
+  if (generateLink) {
+    await ensureNavigoT0Activity({ now, participant, prisma });
+    linkToken = await ensureParticipantAccessToken({ actorUserId, now, participant, prisma });
+  }
+
+  return {
+    createdConfirmation,
+    createdProfile,
+    createdStudyParticipant,
+    linkToken,
+    participant
+  };
 }
 
 async function upsertParticipantRotationForCodes({
@@ -2684,6 +3417,159 @@ async function upsertParticipantRotationForCodes({
   return {
     rotationCode
   };
+}
+
+async function resolveActiveScreenerVersionId({
+  prisma,
+  studyId
+}: {
+  prisma: NavigoPrismaClient | NavigoTransactionClient;
+  studyId: string;
+}): Promise<string | null> {
+  const version = (await prisma.questionnaireVersion.findFirst?.({
+    orderBy: { versionNumber: "desc" },
+    select: { id: true },
+    where: {
+      status: "ACTIVE",
+      studyId
+    }
+  })) as { id: string } | null;
+
+  return version?.id ?? null;
+}
+
+async function listExistingReferenceCodes(prisma: NavigoPrismaClient | NavigoTransactionClient): Promise<string[]> {
+  const codes = (await prisma.participantReferenceCode.findMany?.({
+    select: { code: true }
+  })) as Array<{ code: string }>;
+
+  return codes.map((code) => code.code);
+}
+
+function parseFolioSequence(folio: string): number {
+  const match = /(\d+)$/.exec(folio);
+  const sequence = match ? Number(match[1]) : Number.NaN;
+
+  if (!Number.isInteger(sequence) || sequence < 1) {
+    throw new Error("El folio debe terminar con una secuencia numerica.");
+  }
+
+  return sequence;
+}
+
+function buildNavigoLinksRotationTsv({
+  dashboard,
+  now,
+  requestOrigin
+}: {
+  dashboard: NavigoAdminDashboard;
+  now: Date;
+  requestOrigin: string;
+}): string {
+  const header = [
+    "Folio",
+    "Nombre",
+    "Celular",
+    "Correo",
+    "Reclutador",
+    "Link participante",
+    "Primera fragancia / brazo izquierdo",
+    "Segunda fragancia / brazo derecho",
+    "Estado participante",
+    "Estado App",
+    "T0 estado",
+    "T0 hora",
+    "T2 estado",
+    "T2 hora ideal",
+    "T2 hora real",
+    "T4 estado",
+    "T4 hora ideal",
+    "T4 hora real",
+    "T8 estado",
+    "T8 hora ideal",
+    "T8 hora real",
+    "Ultima actualizacion",
+    "Incidencias"
+  ];
+  const rows = dashboard.participants.map((participant) => {
+    const activities = new Map(participant.activities.map((activity) => [activity.code, activity]));
+    const t0 = activities.get("T0_SALON");
+    const t2 = activities.get("T2_HORAS");
+    const t4 = activities.get("T4_HORAS");
+    const t8 = activities.get("T8_HORAS");
+    const link = participant.participantLinkToken
+      ? new URL(`/p/${encodeURIComponent(participant.participantLinkToken)}/activities`, requestOrigin).toString()
+      : "";
+
+    return [
+      participant.confirmation?.folio ?? "",
+      participant.participant.name,
+      participant.participant.phone,
+      participant.participant.email,
+      readDirectMetadata(participant)?.reclutador ?? "",
+      link,
+      participant.rotation.leftCode,
+      participant.rotation.rightCode,
+      participant.status,
+      participant.alert,
+      exportActivityStatus(t0),
+      exportActivityTime(t0?.actualCompletedAt ?? t0?.actualStartedAt ?? null, dashboard.timeZoneIana),
+      exportActivityStatus(t2),
+      exportActivityTime(t2?.scheduledAt ?? null, dashboard.timeZoneIana),
+      exportActivityTime(t2?.actualCompletedAt ?? t2?.actualStartedAt ?? null, dashboard.timeZoneIana),
+      exportActivityStatus(t4),
+      exportActivityTime(t4?.scheduledAt ?? null, dashboard.timeZoneIana),
+      exportActivityTime(t4?.actualCompletedAt ?? t4?.actualStartedAt ?? null, dashboard.timeZoneIana),
+      exportActivityStatus(t8),
+      exportActivityTime(t8?.scheduledAt ?? null, dashboard.timeZoneIana),
+      exportActivityTime(t8?.actualCompletedAt ?? t8?.actualStartedAt ?? null, dashboard.timeZoneIana),
+      exportActivityTime(now, dashboard.timeZoneIana),
+      [readDirectMetadata(participant)?.observaciones, participant.alert].filter(Boolean).join(" | ")
+    ];
+  });
+
+  return buildNavigoTsv([header, ...rows]);
+}
+
+function readDirectMetadata(participant: NavigoParticipantListItem): { observaciones?: string | null; reclutador?: string | null } | null {
+  const metadata = participant.confirmation?.screeningAttempt?.evaluationJson;
+  if (typeof metadata === "object" && metadata !== null && "directSource" in metadata) {
+    return metadata as { observaciones?: string | null; reclutador?: string | null };
+  }
+
+  return null;
+}
+
+function exportActivityStatus(activity: NavigoActivityListItem | undefined): string {
+  if (!activity) {
+    return "Pendiente";
+  }
+
+  return navigoActivityLabel(activity.code) && activity.status ? activity.status : "Pendiente";
+}
+
+function exportActivityTime(value: Date | null, timeZoneIana: string): string {
+  if (!value) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: resolveNavigoTimeZone(timeZoneIana)
+  }).format(value);
+}
+
+function formatDateForFilename(value: Date, timeZoneIana: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: resolveNavigoTimeZone(timeZoneIana),
+    year: "numeric"
+  }).formatToParts(value);
+  const read = (type: string) => parts.find((part) => part.type === type)?.value ?? "00";
+
+  return `${read("year")}-${read("month")}-${read("day")}`;
 }
 
 async function resolveNavigoStudyArm({

@@ -4,8 +4,10 @@ import { describe, expect, it } from "vitest";
 import {
   createNavigoFoundationRepository,
   createNavigoMeasurementDefinition,
+  createNavigoParticipantImportTemplateTsv,
   createNavigoRotationTemplateTsv,
   createNavigoScheduleSeeds,
+  buildNavigoTsv,
   buildNavigoActivityTimeline,
   buildNavigoStartT0PendingMessage,
   formatNavigoDateTimeLocal,
@@ -15,8 +17,11 @@ import {
   NAVIGO_APP_DEFAULT_TIME_ZONE,
   navigoActivityLabel,
   nowInStudyTimezoneForDateTimeLocal,
+  normalizeNavigoParticipantName,
+  normalizeNavigoPhone,
   normalizeNavigoRotationCode,
   parseNavigoDateTimeLocal,
+  parseNavigoParticipantImportText,
   parseNavigoRotationImportText,
   prepareNavigoParticipantActivities,
   createNavigoAppRepository,
@@ -828,6 +833,76 @@ describe("navigo app MVP rules", () => {
     expect(missing.ok).toBe(false);
     expect(missing.ok ? "" : missing.message).toContain("columna primera_fragancia faltante");
     expect(missing.ok ? "" : missing.message).toContain("columna segunda_fragancia faltante");
+  });
+
+  it("creates and parses the participant import template for TSV or CSV", () => {
+    expect(createNavigoParticipantImportTemplateTsv()).toContain(
+      "folio\tnombre\tcelular\tcorreo\tprimera_fragancia\tsegunda_fragancia\treclutador\tobservaciones"
+    );
+
+    const tsv = parseNavigoParticipantImportText({
+      filename: "participantes.tsv",
+      text: "\uFEFFFolio\tParticipante\tTeléfono\tBrazo izquierdo\tBrazo derecho\tReclutador\nNAV-001\tAna Pérez\t55 1234 5678\t cod-a \t cod-b \t reclutadora"
+    });
+    const csv = parseNavigoParticipantImportText({
+      filename: "participantes.csv",
+      text: "FOLIO,Nombre,Celular,Primera fragancia,Segunda fragancia\nNAV-002,Juan Ñunez,5511112222,COD-C,COD-D"
+    });
+
+    expect(tsv.ok ? tsv.rows[0] : null).toMatchObject({
+      celular: "+525512345678",
+      folio: "NAV-001",
+      nombre: "ANA PÉREZ",
+      primeraFragancia: "COD-A",
+      reclutador: "RECLUTADORA",
+      segundaFragancia: "COD-B"
+    });
+    expect(csv.ok ? csv.rows[0] : null).toMatchObject({
+      celular: "+525511112222",
+      folio: "NAV-002",
+      nombre: "JUAN ÑUNEZ"
+    });
+  });
+
+  it("normalizes direct participant names and phones without losing accents or spaces", () => {
+    expect(normalizeNavigoParticipantName("  ana   pérez ñuñez 😊 ")).toBe("ANA PÉREZ ÑUÑEZ");
+    expect(normalizeNavigoPhone("55 1234 5678")).toBe("+525512345678");
+  });
+
+  it("builds TSV compatible with Excel and cleans tabs or line breaks inside cells", () => {
+    const tsv = buildNavigoTsv([
+      ["Folio", "Observaciones"],
+      ["NAV-001", "Texto con\t tab y\nsalto; conserva comas, acentos y Ñ"]
+    ]);
+
+    expect(tsv.startsWith("\uFEFF")).toBe(true);
+    expect(tsv).toContain("NAV-001\tTexto con tab y salto; conserva comas, acentos y Ñ");
+    expect(tsv).not.toContain("Texto con\t tab");
+    expect(tsv).not.toContain("salto\n");
+  });
+
+  it("wires participant bulk operations into the Navigo admin UI without touching rotation import", () => {
+    const adminPage = readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "page.tsx");
+    const operationsPanel = readWorkspaceFile(
+      "src",
+      "app",
+      "admin",
+      "studies",
+      "[studyId]",
+      "navigo-app",
+      "_components",
+      "NavigoParticipantOperationsPanel.tsx"
+    );
+    const actions = readWorkspaceFile("src", "modules", "navigo-app", "actions.ts");
+
+    expect(adminPage).toContain("Registrar participante");
+    expect(adminPage).toContain("Generar enlaces para todos");
+    expect(operationsPanel).toContain("Importar participantes");
+    expect(operationsPanel).toContain("Descargar plantilla de participantes");
+    expect(operationsPanel).toContain("Exportar enlaces y rotacion");
+    expect(actions).toContain("previewNavigoParticipantImportTextAction");
+    expect(actions).toContain("applyNavigoParticipantImportRowsAction");
+    expect(actions).toContain("generateNavigoParticipantLinksForStudyAction");
   });
 
   it("keeps the rotation import panel from depending on multipart server action upload", () => {

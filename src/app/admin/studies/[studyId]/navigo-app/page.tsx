@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import {
   configureNavigoRotationAction,
   deleteNavigoParticipantStagesAction,
+  generateNavigoParticipantLinksForStudyAction,
   generateNavigoParticipantLinkAction,
+  registerNavigoDirectParticipantAction,
   resetNavigoParticipantAppAction,
   reviewNavigoActivityIdentityAction,
   startNavigoT0Action
@@ -34,6 +36,7 @@ import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { resolveRequestOrigin } from "@/shared/utils/request-origin";
 import { ParticipantLinkPanel } from "./_components/ParticipantLinkPanel";
 import { NavigoRotationImportPanel } from "./_components/NavigoRotationImportPanel";
+import { NavigoParticipantOperationsPanel } from "./_components/NavigoParticipantOperationsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +103,9 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
           <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
             Antes de usar verificación facial automática en producción, confirma que el aviso de privacidad y consentimiento cubren verificación biométrica automatizada.
           </p>
+          <NavigoParticipantOperationsPanel studyId={studyId} />
+          <DirectParticipantRegistration studyId={studyId} />
+          <BulkLinkGeneration studyId={studyId} />
           <NavigoRotationImportPanel studyId={studyId} />
 
           {result.participants.length === 0 ? (
@@ -132,6 +138,73 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
         </div>
       )}
     </AppShell>
+  );
+}
+
+function DirectParticipantRegistration({ studyId }: { studyId: string }) {
+  return (
+    <details className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+      <summary className="cursor-pointer text-lg font-semibold text-zinc-950">Registrar participante</summary>
+      <form action={registerNavigoDirectParticipantAction.bind(null, studyId)} className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <label className={labelClass}>
+          Folio
+          <input className={inputClass} name="folio" placeholder="NAV-001" required />
+        </label>
+        <label className={labelClass}>
+          Nombre
+          <input className={inputClass} name="nombre" required />
+        </label>
+        <label className={labelClass}>
+          Celular
+          <input className={inputClass} name="celular" required />
+        </label>
+        <label className={labelClass}>
+          Correo opcional
+          <input className={inputClass} name="correo" type="email" />
+        </label>
+        <label className={labelClass}>
+          Primera fragancia / brazo izquierdo
+          <input className={inputClass} name="primeraFragancia" required />
+        </label>
+        <label className={labelClass}>
+          Segunda fragancia / brazo derecho
+          <input className={inputClass} name="segundaFragancia" required />
+        </label>
+        <label className={labelClass}>
+          Reclutador
+          <input className={inputClass} name="reclutador" />
+        </label>
+        <label className={`${labelClass} md:col-span-2`}>
+          Observaciones
+          <textarea className={inputClass} name="observaciones" rows={2} />
+        </label>
+        <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+          <input defaultChecked name="generateLink" type="checkbox" />
+          Generar link al registrar
+        </label>
+        <div className="flex items-end">
+          <SubmitButton pendingLabel="Registrando participante...">Registrar participante</SubmitButton>
+        </div>
+      </form>
+    </details>
+  );
+}
+
+function BulkLinkGeneration({ studyId }: { studyId: string }) {
+  return (
+    <details className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+      <summary className="cursor-pointer text-lg font-semibold text-zinc-950">Generar enlaces</summary>
+      <form action={generateNavigoParticipantLinksForStudyAction.bind(null, studyId)} className="mt-4 space-y-4">
+        <p className="text-sm leading-6 text-zinc-600">
+          Genera enlaces para todos los participantes confirmados. Si ya existe un enlace activo se reutiliza.
+        </p>
+        <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+          <input name="forceRegenerate" type="checkbox" />
+          Regenerar enlaces existentes
+        </label>
+        <SubmitButton pendingLabel="Generando enlaces...">Generar enlaces para todos</SubmitButton>
+      </form>
+    </details>
   );
 }
 

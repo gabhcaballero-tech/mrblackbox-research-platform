@@ -11,6 +11,14 @@ import { verifyNavigoFaceIdentity } from "@/modules/navigo-app/face-verification
 import { createBrowserSupabaseClient } from "@/shared/auth/supabase/browser";
 import { NavigoActivityCapture, shouldMirrorCameraPreview } from "./NavigoActivityCapture";
 
+const replaceMock = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    replace: replaceMock
+  })
+}));
+
 vi.mock("@/modules/navigo-app/actions", () => ({
   confirmNavigoActivitySelfieUploadAction: vi.fn(),
   confirmNavigoT0IdentityAction: vi.fn(),
@@ -264,7 +272,11 @@ describe("NavigoActivityCapture", () => {
       ok: true
     });
 
-    expect(await screen.findByText("Evaluación guardada correctamente.")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(replaceMock).toHaveBeenCalledWith(
+        "/p/participant-token/activities?message=Evaluaci%C3%B3n+registrada+correctamente."
+      )
+    );
   });
 
   it("reactivates the button and keeps answers when saving fails", async () => {
@@ -284,7 +296,7 @@ describe("NavigoActivityCapture", () => {
     expect((screen.getAllByDisplayValue("AMBAS")[0] as HTMLInputElement).checked).toBe(true);
   });
 
-  it("saves T0 and shows visible success feedback", async () => {
+  it("redirects to the activities list after saving T0 successfully", async () => {
     renderCapture({
       activityId: "activity-t0",
       registeredSelfie: { signedUrl: "https://example.test/selfie.jpg" },
@@ -293,12 +305,42 @@ describe("NavigoActivityCapture", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Guardar evaluación" }));
 
-    expect(await screen.findByText("Evaluación guardada correctamente.")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(replaceMock).toHaveBeenCalledWith(
+        "/p/participant-token/activities?message=Evaluaci%C3%B3n+registrada+correctamente."
+      )
+    );
     expect(submitNavigoActivityResponsesAction).toHaveBeenCalledWith(
       "participant-token",
       "activity-t0",
       expect.any(FormData)
     );
+  });
+
+  it("preserves test mode params when redirecting after save", async () => {
+    renderCapture({
+      selfieCount: 1,
+      selfieReviewStatus: "APPROVED",
+      testModeParams: {
+        navigoTestMode: "mode-token",
+        navigoTestSignature: "signature-token"
+      }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Guardar evaluación" }));
+
+    await waitFor(() =>
+      expect(replaceMock).toHaveBeenCalledWith(
+        "/p/participant-token/activities?message=Evaluaci%C3%B3n+registrada+correctamente.&navigoTestMode=mode-token&navigoTestSignature=signature-token"
+      )
+    );
+  });
+
+  it("does not render floating extreme labels for AP3 and AP4", () => {
+    renderCapture({ selfieCount: 1, selfieReviewStatus: "APPROVED" });
+
+    expect(screen.getAllByText(/Extremadamente d/i)).toHaveLength(2);
+    expect(screen.getAllByText(/Extremadamente fuerte/i)).toHaveLength(2);
   });
 
   it("rejects an automatic NO_MATCH result and keeps AP1 to AP7 hidden", async () => {

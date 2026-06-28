@@ -132,10 +132,31 @@ export type NavigoRotationImportRowInput = {
   segundaFragancia: string;
 };
 
+export type NavigoParticipantImportRowInput = {
+  celular: string;
+  correo: string | null;
+  folio: string;
+  nombre: string;
+  observaciones: string | null;
+  primeraFragancia: string;
+  reclutador: string | null;
+  segundaFragancia: string;
+};
+
 export type NavigoRotationImportParseResult =
   | {
       ok: true;
       rows: NavigoRotationImportRowInput[];
+    }
+  | {
+      message: string;
+      ok: false;
+    };
+
+export type NavigoParticipantImportParseResult =
+  | {
+      ok: true;
+      rows: NavigoParticipantImportRowInput[];
     }
   | {
       message: string;
@@ -532,6 +553,138 @@ export function createNavigoRotationTemplateTsv(): string {
   ].join("\n");
 }
 
+export function parseNavigoParticipantImportText({
+  filename,
+  text
+}: {
+  filename: string;
+  text: string;
+}): NavigoParticipantImportParseResult {
+  if (!isSupportedRotationImportFilename(filename)) {
+    return {
+      message: "Usa un archivo CSV o TSV compatible con Excel. No se procesa XLSX directamente.",
+      ok: false
+    };
+  }
+
+  const rows = text
+    .replace(/^\uFEFF/, "")
+    .split(/\r\n|\n|\r/)
+    .filter((line) => line.trim().length > 0);
+
+  if (rows.length < 2) {
+    return {
+      message: "El archivo debe incluir encabezados y al menos una fila de participante.",
+      ok: false
+    };
+  }
+
+  const delimiter = detectDelimiter(rows[0] ?? "");
+  const headers = splitDelimitedLine(rows[0] ?? "", delimiter).map(normalizeParticipantImportHeader);
+  const indexes = {
+    celular: findHeaderIndex(headers, ["celular", "telefono", "phone"]),
+    correo: findHeaderIndex(headers, ["correo", "email", "mail"]),
+    folio: findHeaderIndex(headers, ["folio"]),
+    nombre: findHeaderIndex(headers, ["nombre", "participante", "panelista"]),
+    observaciones: findHeaderIndex(headers, ["observaciones", "observacion", "nota", "notas"]),
+    primeraFragancia: findHeaderIndex(headers, ["primera_fragancia", "1a_fragancia", "brazo_izquierdo", "izquierdo", "left"]),
+    reclutador: findHeaderIndex(headers, ["reclutador", "reclutadora"]),
+    segundaFragancia: findHeaderIndex(headers, ["segunda_fragancia", "2a_fragancia", "brazo_derecho", "derecho", "right"])
+  };
+
+  const missing = [
+    indexes.folio < 0 ? "folio" : null,
+    indexes.nombre < 0 ? "nombre" : null,
+    indexes.celular < 0 ? "celular" : null,
+    indexes.primeraFragancia < 0 ? "primera_fragancia" : null,
+    indexes.segundaFragancia < 0 ? "segunda_fragancia" : null
+  ].filter(Boolean);
+
+  if (missing.length > 0) {
+    return {
+      message: `El archivo tiene columnas requeridas faltantes: ${missing.join(", ")}.`,
+      ok: false
+    };
+  }
+
+  return {
+    ok: true,
+    rows: rows.slice(1).map((line) => {
+      const cells = splitDelimitedLine(line, delimiter);
+
+      return {
+        celular: normalizeNavigoPhone(cells[indexes.celular] ?? ""),
+        correo: indexes.correo >= 0 ? normalizeNavigoEmail(cells[indexes.correo] ?? "") : null,
+        folio: normalizeNavigoFolio(cells[indexes.folio] ?? ""),
+        nombre: normalizeNavigoParticipantName(cells[indexes.nombre] ?? ""),
+        observaciones: indexes.observaciones >= 0 ? normalizeNullableNavigoText(cells[indexes.observaciones] ?? "") : null,
+        primeraFragancia: normalizeNavigoRotationCode(cells[indexes.primeraFragancia] ?? ""),
+        reclutador: indexes.reclutador >= 0 ? normalizeNullableNavigoText(cells[indexes.reclutador] ?? "") : null,
+        segundaFragancia: normalizeNavigoRotationCode(cells[indexes.segundaFragancia] ?? "")
+      };
+    })
+  };
+}
+
+export function createNavigoParticipantImportTemplateTsv(): string {
+  return [
+    "folio\tnombre\tcelular\tcorreo\tprimera_fragancia\tsegunda_fragancia\treclutador\tobservaciones",
+    "NAV-001\tNOMBRE PARTICIPANTE\t5512345678\tparticipante@example.com\tCODIGO-A\tCODIGO-B\tRECLUTADOR\tOBSERVACIONES"
+  ].join("\n");
+}
+
+export function normalizeNavigoParticipantName(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFC")
+    .replace(/[\p{Extended_Pictographic}\p{Control}\p{Cf}]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleUpperCase("es-MX");
+}
+
+export function normalizeNavigoFolio(value: unknown): string {
+  return String(value ?? "").trim().replace(/\s+/g, "").toUpperCase();
+}
+
+export function normalizeNavigoPhone(value: unknown): string {
+  const compact = String(value ?? "").replace(/[\s().-]/g, "");
+
+  if (/^\d{10}$/.test(compact)) {
+    return `+52${compact}`;
+  }
+
+  return compact;
+}
+
+export function isNavigoPhone(value: string): boolean {
+  return /^\+52\d{10}$/.test(value);
+}
+
+export function normalizeNavigoEmail(value: unknown): string | null {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized.length > 0 ? normalized : null;
+}
+
+export function isNavigoEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+export function navigoTsvCell(value: string | number | Date | null | undefined): string {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  return String(value)
+    .replace(/\t/g, " ")
+    .replace(/\r\n|\r|\n/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+export function buildNavigoTsv(rows: Array<Array<string | number | Date | null | undefined>>): string {
+  return `\uFEFF${rows.map((row) => row.map(navigoTsvCell).join("\t")).join("\n")}`;
+}
+
 export function isSupportedRotationImportFilename(filename: string): boolean {
   const normalized = filename.trim().toLowerCase();
 
@@ -621,6 +774,26 @@ function normalizeRotationHeader(value: string): string {
   }
 
   return normalized;
+}
+
+function normalizeParticipantImportHeader(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+function findHeaderIndex(headers: string[], aliases: string[]): number {
+  const normalizedAliases = aliases.map(normalizeParticipantImportHeader);
+  return headers.findIndex((header) => normalizedAliases.includes(header));
+}
+
+function normalizeNullableNavigoText(value: string): string | null {
+  const normalized = normalizeNavigoParticipantName(value);
+  return normalized.length > 0 ? normalized : null;
 }
 
 function getNavigoActivityAvailability({
