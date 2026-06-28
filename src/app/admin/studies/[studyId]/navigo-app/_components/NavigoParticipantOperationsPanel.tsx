@@ -73,7 +73,7 @@ function ParticipantImportPanel({ studyId }: { studyId: string }) {
       setState(await previewNavigoParticipantImportTextAction(studyId, file.name, await file.text()));
     } catch {
       setState({
-        message: "No fue posible previsualizar participantes. Revisa el archivo e intenta de nuevo.",
+        message: "No fue posible previsualizar participantes por un error tecnico. Revisa logs.",
         preview: null,
         rows: [],
         status: "error"
@@ -182,7 +182,7 @@ function ParticipantImportPreview({ state }: { state: NavigoParticipantImportAct
     <div className="mt-5 rounded-lg border border-zinc-200 bg-white p-4">
       <h3 className="text-base font-semibold text-zinc-950">Previsualizacion</h3>
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-        <Metric label="Total filas" value={preview.summary.totalRows} />
+        <Metric label="Filas leidas" value={preview.summary.totalRows} />
         <Metric label="Validas" value={preview.summary.validRows} />
         <Metric label="Con error" value={preview.summary.rowsWithError} />
         <Metric label="Folios nuevos" value={preview.summary.newFolios} />
@@ -198,7 +198,9 @@ function ParticipantImportPreview({ state }: { state: NavigoParticipantImportAct
               <th className="px-2 py-2">Folio</th>
               <th className="px-2 py-2">Nombre</th>
               <th className="px-2 py-2">Celular</th>
-              <th className="px-2 py-2">Rotacion</th>
+              <th className="px-2 py-2">1a fragancia</th>
+              <th className="px-2 py-2">2a fragancia</th>
+              <th className="px-2 py-2">Estado</th>
               <th className="px-2 py-2">Errores</th>
             </tr>
           </thead>
@@ -209,8 +211,16 @@ function ParticipantImportPreview({ state }: { state: NavigoParticipantImportAct
                 <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.folio || "-"}</td>
                 <td className="px-2 py-2 text-zinc-900">{row.nombre || "-"}</td>
                 <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.celular || "-"}</td>
-                <td className="px-2 py-2 font-mono text-xs text-zinc-900">
-                  {row.primeraFragancia || "-"} / {row.segundaFragancia || "-"}
+                <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.primeraFragancia || "-"}</td>
+                <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.segundaFragancia || "-"}</td>
+                <td className="px-2 py-2">
+                  {row.errors.length > 0 ? (
+                    <span className="text-xs font-semibold text-rose-700">Requiere correccion</span>
+                  ) : row.existingParticipant || row.existingFolio ? (
+                    <span className="text-xs font-semibold text-amber-700">Actualizara participante existente</span>
+                  ) : (
+                    <span className="text-xs font-semibold text-emerald-700">Lista para importar</span>
+                  )}
                 </td>
                 <td className="px-2 py-2">
                   {row.errors.length > 0 ? (

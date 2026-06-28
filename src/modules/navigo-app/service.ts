@@ -582,14 +582,32 @@ export function parseNavigoParticipantImportText({
   const delimiter = detectDelimiter(rows[0] ?? "");
   const headers = splitDelimitedLine(rows[0] ?? "", delimiter).map(normalizeParticipantImportHeader);
   const indexes = {
-    celular: findHeaderIndex(headers, ["celular", "telefono", "phone"]),
+    celular: findHeaderIndex(headers, ["celular", "telefono", "teléfono", "phone"]),
     correo: findHeaderIndex(headers, ["correo", "email", "mail"]),
     folio: findHeaderIndex(headers, ["folio"]),
-    nombre: findHeaderIndex(headers, ["nombre", "participante", "panelista"]),
+    nombre: findHeaderIndex(headers, ["nombre", "participante", "panelista", "nombre del participante"]),
     observaciones: findHeaderIndex(headers, ["observaciones", "observacion", "nota", "notas"]),
-    primeraFragancia: findHeaderIndex(headers, ["primera_fragancia", "1a_fragancia", "brazo_izquierdo", "izquierdo", "left"]),
+    primeraFragancia: findHeaderIndex(headers, [
+      "primera_fragancia",
+      "primera fragancia",
+      "1a_fragancia",
+      "1a fragancia",
+      "brazo_izquierdo",
+      "brazo izquierdo",
+      "izquierdo",
+      "left"
+    ]),
     reclutador: findHeaderIndex(headers, ["reclutador", "reclutadora"]),
-    segundaFragancia: findHeaderIndex(headers, ["segunda_fragancia", "2a_fragancia", "brazo_derecho", "derecho", "right"])
+    segundaFragancia: findHeaderIndex(headers, [
+      "segunda_fragancia",
+      "segunda fragancia",
+      "2a_fragancia",
+      "2a fragancia",
+      "brazo_derecho",
+      "brazo derecho",
+      "derecho",
+      "right"
+    ])
   };
 
   const missing = [
@@ -602,7 +620,7 @@ export function parseNavigoParticipantImportText({
 
   if (missing.length > 0) {
     return {
-      message: `El archivo tiene columnas requeridas faltantes: ${missing.join(", ")}.`,
+      message: `Faltan columnas requeridas: ${missing.join(", ")}.`,
       ok: false
     };
   }

@@ -427,14 +427,14 @@ export async function previewNavigoParticipantImportTextAction(
       status: result.data.summary.rowsWithError > 0 ? "error" : "success"
     };
   } catch (error) {
-    logNavigoRotationImportError({
+    logNavigoParticipantImportError({
       error,
       step: "preview",
       studyId
     });
 
     return {
-      message: "No fue posible previsualizar participantes. Revisa el archivo e intenta de nuevo.",
+      message: "No fue posible previsualizar participantes por un error tecnico. Revisa logs.",
       preview: null,
       rows: parsed.rows,
       status: "error"
@@ -483,7 +483,7 @@ export async function applyNavigoParticipantImportRowsAction(
       status: "success"
     };
   } catch (error) {
-    logNavigoRotationImportError({
+    logNavigoParticipantImportError({
       error,
       step: "apply",
       studyId
@@ -509,6 +509,19 @@ function logNavigoRotationImportError({
 }) {
   const message = error instanceof Error ? error.message : "unknown";
   console.error(`navigo rotation import failed: step=${step} studyId=${studyId} message=${message}`);
+}
+
+function logNavigoParticipantImportError({
+  error,
+  step,
+  studyId
+}: {
+  error: unknown;
+  step: "apply" | "preview";
+  studyId: string;
+}) {
+  const message = error instanceof Error ? error.message : "unknown";
+  console.error(`navigo participant import failed: step=${step} studyId=${studyId} message=${message}`);
 }
 
 export async function requestNavigoActivitySelfieUploadAction(

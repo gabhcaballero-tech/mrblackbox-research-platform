@@ -626,7 +626,36 @@ const participantWithActivitiesSelect = {
   }
 } as const;
 
+const participantImportLookupSelect = {
+  id: true,
+  participantConfirmation: {
+    select: {
+      folio: true
+    }
+  },
+  participantProfile: {
+    select: {
+      email: true,
+      id: true,
+      name: true,
+      phone: true
+    }
+  }
+} as const;
+
 type StudyRecord = NavigoStudySummary;
+type ParticipantImportLookupRecord = {
+  id: string;
+  participantConfirmation: {
+    folio: string;
+  } | null;
+  participantProfile: {
+    email: string | null;
+    id: string;
+    name: string;
+    phone: string | null;
+  };
+};
 type ParticipantRecord = {
   accessTokens?: Array<{ expiresAt: Date; id: string; status: string; tokenHash: string }>;
   activities?: ActivityRecord[];
@@ -1310,11 +1339,25 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         return { message: "Solo el estudio Navigo permite importar participantes.", ok: false };
       }
 
-      const preview = await buildParticipantImportPreview({
-        prisma,
-        rows: input.rows,
-        studyId: input.studyId
-      });
+      let preview: NavigoParticipantImportPreview;
+
+      try {
+        preview = await buildParticipantImportPreview({
+          prisma,
+          rows: input.rows,
+          studyId: input.studyId
+        });
+      } catch (error) {
+        logNavigoParticipantImportRepositoryError({
+          error,
+          step: "preview",
+          studyId: input.studyId
+        });
+        return {
+          message: "No fue posible validar participantes existentes. Intenta nuevamente.",
+          ok: false
+        };
+      }
 
       return { data: preview, ok: true };
     },
@@ -1333,11 +1376,25 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           return { message: "Solo el estudio Navigo permite importar participantes.", ok: false };
         }
 
-        const preview = await buildParticipantImportPreview({
-          prisma: tx,
-          rows: input.rows,
-          studyId: input.studyId
-        });
+          let preview: NavigoParticipantImportPreview;
+
+          try {
+            preview = await buildParticipantImportPreview({
+              prisma: tx,
+              rows: input.rows,
+              studyId: input.studyId
+            });
+          } catch (error) {
+            logNavigoParticipantImportRepositoryError({
+              error,
+              step: "preview-before-apply",
+              studyId: input.studyId
+            });
+            return {
+              message: "No fue posible validar participantes existentes. Intenta nuevamente.",
+              ok: false
+            };
+          }
 
         if (preview.summary.rowsWithError > 0) {
           return {
@@ -2905,7 +2962,7 @@ async function findNavigoParticipantsByFolio({
   folios: string[];
   prisma: NavigoPrismaClient | NavigoTransactionClient;
   studyId: string;
-}): Promise<Map<string, ParticipantRecord>> {
+}): Promise<Map<string, ParticipantImportLookupRecord>> {
   if (folios.length === 0) {
     return new Map();
   }
@@ -2914,14 +2971,14 @@ async function findNavigoParticipantsByFolio({
     select: {
       folio: true,
       studyParticipant: {
-        select: participantWithActivitiesSelect
+        select: participantImportLookupSelect
       }
     },
     where: {
       folio: { in: folios },
       studyId
     }
-  })) as Array<{ folio: string; studyParticipant: ParticipantRecord }>;
+  })) as Array<{ folio: string; studyParticipant: ParticipantImportLookupRecord }>;
 
   return new Map(confirmations.map((confirmation) => [confirmation.folio, confirmation.studyParticipant]));
 }
@@ -2934,26 +2991,28 @@ async function findNavigoParticipantsByPhone({
   phones: string[];
   prisma: NavigoPrismaClient | NavigoTransactionClient;
   studyId: string;
-}): Promise<Map<string, ParticipantRecord>> {
+}): Promise<Map<string, ParticipantImportLookupRecord>> {
   if (phones.length === 0) {
     return new Map();
   }
 
   const participants = (await prisma.studyParticipant.findMany?.({
-    select: participantWithActivitiesSelect,
+    select: participantImportLookupSelect,
     where: {
       participantProfile: {
-        phone: { in: phones }
+        is: {
+          phone: { in: phones }
+        }
       },
       studyId
     }
-  })) as ParticipantRecord[];
+  })) as ParticipantImportLookupRecord[];
 
   const entries = participants
-    .map((participant): [string, ParticipantRecord] | null =>
+    .map((participant): [string, ParticipantImportLookupRecord] | null =>
       participant.participantProfile.phone ? [participant.participantProfile.phone, participant] : null
     )
-    .filter((entry): entry is [string, ParticipantRecord] => entry !== null);
+    .filter((entry): entry is [string, ParticipantImportLookupRecord] => entry !== null);
 
   return new Map(entries);
 }
@@ -3060,10 +3119,10 @@ async function upsertNavigoDirectParticipant({
     });
   }
 
-  let participant = byPhone ?? byFolio ?? null;
-  const createdStudyParticipant = !participant;
+  const existingParticipant = byPhone ?? byFolio ?? null;
+  const createdStudyParticipant = !existingParticipant;
 
-  if (!participant) {
+  if (!existingParticipant) {
     await prisma.studyParticipant.create?.({
       data: {
         createdByUserId: actorUserId,
@@ -3079,11 +3138,11 @@ async function upsertNavigoDirectParticipant({
         operationalStatus: "ASSIGNED",
         screeningStatus: "PASSED"
       },
-      where: { id: participant.id }
+      where: { id: existingParticipant.id }
     });
   }
 
-  participant = (await prisma.studyParticipant.findUnique?.({
+  let participant = (await prisma.studyParticipant.findUnique?.({
     select: participantWithActivitiesSelect,
     where: {
       participantProfileId_studyId: {
@@ -3178,6 +3237,19 @@ async function upsertNavigoDirectParticipant({
     linkToken,
     participant
   };
+}
+
+function logNavigoParticipantImportRepositoryError({
+  error,
+  step,
+  studyId
+}: {
+  error: unknown;
+  step: "preview" | "preview-before-apply";
+  studyId: string;
+}) {
+  const message = error instanceof Error ? error.message : "unknown";
+  console.error(`navigo participant import failed: step=${step} studyId=${studyId} message=${message}`);
 }
 
 async function upsertParticipantRotationForCodes({

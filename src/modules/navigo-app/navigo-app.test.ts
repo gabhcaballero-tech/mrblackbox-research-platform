@@ -864,6 +864,33 @@ describe("navigo app MVP rules", () => {
     });
   });
 
+  it("parses the exact participant TSV sample with CRLF and empty optional email", () => {
+    const sample = parseNavigoParticipantImportText({
+      filename: "navigo_participantes_template.tsv",
+      text: [
+        "folio\tnombre\tcelular\tcorreo\tprimera_fragancia\tsegunda_fragancia\treclutador\tobservaciones",
+        "NAV-010\tPRUEBA UNO\t5512345678\t\tAAA\tBBB\tGABY\tPRUEBA",
+        "NAV-011\tPRUEBA DOS\t5598765432\t\tBBB\tAAA\tGABY\tPRUEBA",
+        "NAV-012\tPRUEBA TRES\t5685185186\t\tAAA\tBBB\tGABY\tPRUEBA",
+        "NAV-013\tPRUEBA CUATRO\t5771604940\t\tBBB\tAAA\tGABY\tPRUEBA",
+        "NAV-014\tPRUEBA CINCO\t5858024694\t\tAAA\tBBB\tGABY\tPRUEBA",
+        "NAV-015\tPRUEBA SEIS\t5944444448\t\tAAA\tBBB\tGABY\tPRUEBA"
+      ].join("\r\n")
+    });
+
+    expect(sample.ok).toBe(true);
+    expect(sample.ok ? sample.rows : []).toHaveLength(6);
+    expect(sample.ok ? sample.rows[0] : null).toMatchObject({
+      celular: "+525512345678",
+      correo: null,
+      folio: "NAV-010",
+      nombre: "PRUEBA UNO",
+      primeraFragancia: "AAA",
+      reclutador: "GABY",
+      segundaFragancia: "BBB"
+    });
+  });
+
   it("normalizes direct participant names and phones without losing accents or spaces", () => {
     expect(normalizeNavigoParticipantName("  ana   pérez ñuñez 😊 ")).toBe("ANA PÉREZ ÑUÑEZ");
     expect(normalizeNavigoPhone("55 1234 5678")).toBe("+525512345678");
@@ -900,9 +927,65 @@ describe("navigo app MVP rules", () => {
     expect(operationsPanel).toContain("Importar participantes");
     expect(operationsPanel).toContain("Descargar plantilla de participantes");
     expect(operationsPanel).toContain("Exportar enlaces y rotacion");
+    expect(operationsPanel).toContain("Previsualizar participantes");
+    expect(operationsPanel).toContain("file.text()");
+    expect(operationsPanel).toContain("No fue posible previsualizar participantes por un error tecnico. Revisa logs.");
     expect(actions).toContain("previewNavigoParticipantImportTextAction");
     expect(actions).toContain("applyNavigoParticipantImportRowsAction");
     expect(actions).toContain("generateNavigoParticipantLinksForStudyAction");
+  });
+
+  it("previews the sample participant TSV with six valid rows", async () => {
+    const state = createNavigoParticipantImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const parsed = parseNavigoParticipantImportText({
+      filename: "participantes.tsv",
+      text: [
+        "folio\tnombre\tcelular\tcorreo\tprimera_fragancia\tsegunda_fragancia\treclutador\tobservaciones",
+        "NAV-010\tPRUEBA UNO\t5512345678\t\tAAA\tBBB\tGABY\tPRUEBA",
+        "NAV-011\tPRUEBA DOS\t5598765432\t\tBBB\tAAA\tGABY\tPRUEBA",
+        "NAV-012\tPRUEBA TRES\t5685185186\t\tAAA\tBBB\tGABY\tPRUEBA",
+        "NAV-013\tPRUEBA CUATRO\t5771604940\t\tBBB\tAAA\tGABY\tPRUEBA",
+        "NAV-014\tPRUEBA CINCO\t5858024694\t\tAAA\tBBB\tGABY\tPRUEBA",
+        "NAV-015\tPRUEBA SEIS\t5944444448\t\tAAA\tBBB\tGABY\tPRUEBA"
+      ].join("\r\n")
+    });
+
+    expect(parsed.ok).toBe(true);
+
+    const result = await repository.previewParticipantImport({
+      rows: parsed.ok ? parsed.rows : [],
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.summary.totalRows : -1).toBe(6);
+    expect(result.ok ? result.data.summary.validRows : -1).toBe(6);
+    expect(result.ok ? result.data.summary.rowsWithError : -1).toBe(0);
+  });
+
+  it("returns a clear database validation error for participant preview", async () => {
+    const state = createNavigoParticipantImportState({ failExistingLookup: true });
+    const repository = createNavigoAppRepository(state.prisma as never);
+
+    const result = await repository.previewParticipantImport({
+      rows: [
+        {
+          celular: "+525512345678",
+          correo: null,
+          folio: "NAV-010",
+          nombre: "PRUEBA UNO",
+          observaciones: null,
+          primeraFragancia: "AAA",
+          reclutador: "GABY",
+          segundaFragancia: "BBB"
+        }
+      ],
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.message).toBe("No fue posible validar participantes existentes. Intenta nuevamente.");
   });
 
   it("keeps the rotation import panel from depending on multipart server action upload", () => {
@@ -1646,6 +1729,49 @@ function createNavigoFoundationState() {
     schedules,
     studies,
     versions
+  };
+}
+
+function createNavigoParticipantImportState(
+  { failExistingLookup = false }: { failExistingLookup?: boolean } = {}
+) {
+  const study = {
+    code: NAVIGO_STUDY_CODE,
+    id: "study-navigo",
+    name: "Fragancia Masculina",
+    status: "ACTIVE" as const,
+    timeZoneIana: "America/Mexico_City"
+  };
+
+  const prisma = {
+    participantConfirmation: {
+      async findMany() {
+        if (failExistingLookup) {
+          throw new Error("participant confirmation lookup failed");
+        }
+
+        return [];
+      }
+    },
+    study: {
+      async findUnique(args: { where: { id: string } }) {
+        return args.where.id === study.id ? study : null;
+      }
+    },
+    studyParticipant: {
+      async findMany() {
+        if (failExistingLookup) {
+          throw new Error("study participant lookup failed");
+        }
+
+        return [];
+      }
+    }
+  };
+
+  return {
+    prisma,
+    study
   };
 }
 
