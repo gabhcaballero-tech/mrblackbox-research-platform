@@ -185,8 +185,10 @@ function ParticipantImportPreview({ state }: { state: NavigoParticipantImportAct
         <Metric label="Filas leidas" value={preview.summary.totalRows} />
         <Metric label="Validas" value={preview.summary.validRows} />
         <Metric label="Con error" value={preview.summary.rowsWithError} />
-        <Metric label="Folios nuevos" value={preview.summary.newFolios} />
-        <Metric label="Folios existentes" value={preview.summary.existingFolios} />
+        <Metric label="Participantes nuevos" value={preview.summary.newParticipants} />
+        <Metric label="Participantes existentes" value={preview.summary.existingParticipants} />
+        <Metric label="Actualizables" value={preview.summary.updatable} />
+        <Metric label="Omitidos" value={preview.summary.omitted} />
         <Metric label="Celulares duplicados" value={preview.summary.phoneDuplicates} />
         <Metric label="Rotaciones completas" value={preview.summary.rotationComplete} />
       </dl>
@@ -198,8 +200,10 @@ function ParticipantImportPreview({ state }: { state: NavigoParticipantImportAct
               <th className="px-2 py-2">Folio</th>
               <th className="px-2 py-2">Nombre</th>
               <th className="px-2 py-2">Celular</th>
+              <th className="px-2 py-2">Correo</th>
               <th className="px-2 py-2">1a fragancia</th>
               <th className="px-2 py-2">2a fragancia</th>
+              <th className="px-2 py-2">Reclutador</th>
               <th className="px-2 py-2">Estado</th>
               <th className="px-2 py-2">Errores</th>
             </tr>
@@ -211,15 +215,19 @@ function ParticipantImportPreview({ state }: { state: NavigoParticipantImportAct
                 <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.folio || "-"}</td>
                 <td className="px-2 py-2 text-zinc-900">{row.nombre || "-"}</td>
                 <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.celular || "-"}</td>
+                <td className="px-2 py-2 text-zinc-900">{row.correo || "-"}</td>
                 <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.primeraFragancia || "-"}</td>
                 <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.segundaFragancia || "-"}</td>
+                <td className="px-2 py-2 text-zinc-900">{row.reclutador || "-"}</td>
                 <td className="px-2 py-2">
                   {row.errors.length > 0 ? (
-                    <span className="text-xs font-semibold text-rose-700">Requiere correccion</span>
-                  ) : row.existingParticipant || row.existingFolio ? (
-                    <span className="text-xs font-semibold text-amber-700">Actualizara participante existente</span>
+                    <span className="text-xs font-semibold text-rose-700">Error</span>
+                  ) : row.unchanged ? (
+                    <span className="text-xs font-semibold text-zinc-700">Sin cambios</span>
+                  ) : row.existingParticipant ? (
+                    <span className="text-xs font-semibold text-amber-700">Actualizable</span>
                   ) : (
-                    <span className="text-xs font-semibold text-emerald-700">Lista para importar</span>
+                    <span className="text-xs font-semibold text-emerald-700">Nuevo participante</span>
                   )}
                 </td>
                 <td className="px-2 py-2">

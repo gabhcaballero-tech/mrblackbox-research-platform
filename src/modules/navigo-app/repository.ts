@@ -206,6 +206,7 @@ export type NavigoParticipantImportPreviewRow = NavigoParticipantImportRowInput 
   existingFolio: boolean;
   existingParticipant: boolean;
   folioNuevo: boolean;
+  unchanged: boolean;
   rowNumber: number;
   rotationComplete: boolean;
   updatable: boolean;
@@ -215,12 +216,14 @@ export type NavigoParticipantImportPreview = {
   rows: NavigoParticipantImportPreviewRow[];
   summary: {
     duplicatePhones: number;
-    existingFolios: number;
-    newFolios: number;
+    existingParticipants: number;
+    newParticipants: number;
+    omitted: number;
     phoneDuplicates: number;
     rotationComplete: number;
     rowsWithError: number;
     totalRows: number;
+    updatable: number;
     validRows: number;
   };
 };
@@ -630,7 +633,12 @@ const participantImportLookupSelect = {
   id: true,
   participantConfirmation: {
     select: {
-      folio: true
+      folio: true,
+      screeningAttempt: {
+        select: {
+          evaluationJson: true
+        }
+      }
     }
   },
   participantProfile: {
@@ -640,6 +648,26 @@ const participantImportLookupSelect = {
       name: true,
       phone: true
     }
+  },
+  rotationAssignment: {
+    select: {
+      arms: {
+        orderBy: { applicationOrder: "asc" },
+        select: {
+          applicationOrder: true,
+          studyArm: {
+            select: {
+              code: true
+            }
+          },
+          studyProduct: {
+            select: {
+              internalCode: true
+            }
+          }
+        }
+      }
+    }
   }
 } as const;
 
@@ -648,6 +676,7 @@ type ParticipantImportLookupRecord = {
   id: string;
   participantConfirmation: {
     folio: string;
+    screeningAttempt?: { evaluationJson: unknown } | null;
   } | null;
   participantProfile: {
     email: string | null;
@@ -655,6 +684,13 @@ type ParticipantImportLookupRecord = {
     name: string;
     phone: string | null;
   };
+  rotationAssignment: {
+    arms: Array<{
+      applicationOrder: number;
+      studyArm: { code: string };
+      studyProduct: { internalCode: string };
+    }>;
+  } | null;
 };
 type ParticipantRecord = {
   accessTokens?: Array<{ expiresAt: Date; id: string; status: string; tokenHash: string }>;
@@ -2779,6 +2815,7 @@ async function buildParticipantImportPreview({
     const errors: string[] = [];
     const folioParticipant = row.folio ? existingByFolio.get(row.folio) ?? null : null;
     const phoneParticipant = row.celular ? existingByPhone.get(row.celular) ?? null : null;
+    const matchedParticipant = phoneParticipant ?? folioParticipant;
 
     if (!row.folio) {
       errors.push("folio vacio");
@@ -2814,16 +2851,19 @@ async function buildParticipantImportPreview({
       errors.push("celular ya existe con otro folio");
     }
 
+    const unchanged = matchedParticipant ? isSameNavigoParticipantImportRow(matchedParticipant, row) : false;
+
     return {
       ...row,
       celularDuplicado: Boolean(phoneParticipant),
       errors,
       existingFolio: Boolean(folioParticipant),
-      existingParticipant: Boolean(phoneParticipant),
+      existingParticipant: Boolean(matchedParticipant),
       folioNuevo: !folioParticipant,
+      unchanged,
       rotationComplete: Boolean(row.primeraFragancia && row.segundaFragancia && row.primeraFragancia !== row.segundaFragancia),
       rowNumber: index + 2,
-      updatable: errors.length === 0
+      updatable: errors.length === 0 && Boolean(matchedParticipant) && !unchanged
     };
   });
 
@@ -2831,12 +2871,14 @@ async function buildParticipantImportPreview({
     rows: previewRows,
     summary: {
       duplicatePhones: duplicatedPhones.size,
-      existingFolios: previewRows.filter((row) => row.existingFolio).length,
-      newFolios: previewRows.filter((row) => row.folioNuevo && row.folio).length,
+      existingParticipants: previewRows.filter((row) => row.existingParticipant).length,
+      newParticipants: previewRows.filter((row) => !row.existingParticipant && row.folio && row.celular).length,
+      omitted: previewRows.filter((row) => row.errors.length > 0).length,
       phoneDuplicates: previewRows.filter((row) => row.celularDuplicado).length,
       rotationComplete: previewRows.filter((row) => row.rotationComplete).length,
       rowsWithError: previewRows.filter((row) => row.errors.length > 0).length,
       totalRows: previewRows.length,
+      updatable: previewRows.filter((row) => row.updatable).length,
       validRows: previewRows.filter((row) => row.errors.length === 0).length
     }
   };
@@ -3029,6 +3071,42 @@ function duplicates(values: string[]): Set<string> {
   }
 
   return repeated;
+}
+
+function isSameNavigoParticipantImportRow(
+  participant: ParticipantImportLookupRecord,
+  row: NavigoParticipantImportRowInput
+): boolean {
+  const directMetadata = readNavigoDirectImportMetadata(participant);
+  const leftArm = participant.rotationAssignment?.arms.find(
+    (arm) => arm.studyArm.code.toUpperCase() === "LEFT" || arm.applicationOrder === 1
+  );
+  const rightArm = participant.rotationAssignment?.arms.find(
+    (arm) => arm.studyArm.code.toUpperCase() === "RIGHT" || arm.applicationOrder === 2
+  );
+
+  return (
+    participant.participantConfirmation?.folio === row.folio &&
+    participant.participantProfile.name === row.nombre &&
+    participant.participantProfile.phone === row.celular &&
+    (participant.participantProfile.email ?? null) === (row.correo ?? null) &&
+    (leftArm?.studyProduct.internalCode ?? null) === row.primeraFragancia &&
+    (rightArm?.studyProduct.internalCode ?? null) === row.segundaFragancia &&
+    (directMetadata.reclutador ?? null) === (row.reclutador ?? null) &&
+    (directMetadata.observaciones ?? null) === (row.observaciones ?? null)
+  );
+}
+
+function readNavigoDirectImportMetadata(
+  participant: ParticipantImportLookupRecord
+): { observaciones?: string | null; reclutador?: string | null } {
+  const metadata = participant.participantConfirmation?.screeningAttempt?.evaluationJson;
+
+  if (typeof metadata === "object" && metadata !== null && "directSource" in metadata) {
+    return metadata as { observaciones?: string | null; reclutador?: string | null };
+  }
+
+  return {};
 }
 
 function normalizeNavigoParticipantRegistrationInput(

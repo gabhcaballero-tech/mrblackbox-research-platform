@@ -929,6 +929,10 @@ describe("navigo app MVP rules", () => {
     expect(operationsPanel).toContain("Exportar enlaces y rotacion");
     expect(operationsPanel).toContain("Previsualizar participantes");
     expect(operationsPanel).toContain("file.text()");
+    expect(operationsPanel).toContain("Participantes nuevos");
+    expect(operationsPanel).toContain("Participantes existentes");
+    expect(operationsPanel).toContain("Correo");
+    expect(operationsPanel).toContain("Reclutador");
     expect(operationsPanel).toContain("No fue posible previsualizar participantes por un error tecnico. Revisa logs.");
     expect(actions).toContain("previewNavigoParticipantImportTextAction");
     expect(actions).toContain("applyNavigoParticipantImportRowsAction");
@@ -962,6 +966,9 @@ describe("navigo app MVP rules", () => {
     expect(result.ok ? result.data.summary.totalRows : -1).toBe(6);
     expect(result.ok ? result.data.summary.validRows : -1).toBe(6);
     expect(result.ok ? result.data.summary.rowsWithError : -1).toBe(0);
+    expect(result.ok ? result.data.summary.newParticipants : -1).toBe(6);
+    expect(result.ok ? result.data.summary.existingParticipants : -1).toBe(0);
+    expect(result.ok ? result.data.summary.updatable : -1).toBe(0);
   });
 
   it("returns a clear database validation error for participant preview", async () => {
@@ -986,6 +993,123 @@ describe("navigo app MVP rules", () => {
 
     expect(result.ok).toBe(false);
     expect(result.ok ? "" : result.message).toBe("No fue posible validar participantes existentes. Intenta nuevamente.");
+  });
+
+  it("applies participant import rows by creating participant, confirmation, rotation and link", async () => {
+    const state = createNavigoParticipantImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+
+    const result = await repository.applyParticipantImport({
+      actorUserId: "admin-1",
+      generateLinks: true,
+      rows: [
+        {
+          celular: "+525512345678",
+          correo: null,
+          folio: "NAV-010",
+          nombre: "PRUEBA UNO",
+          observaciones: "PRUEBA",
+          primeraFragancia: "AAA",
+          reclutador: "GABY",
+          segundaFragancia: "BBB"
+        }
+      ],
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.created : -1).toBe(1);
+    expect(state.participantProfiles).toHaveLength(1);
+    expect(state.studyParticipants).toHaveLength(1);
+    expect(state.confirmations).toHaveLength(1);
+    expect(state.rotationAssignments).toHaveLength(1);
+    expect(state.armAssignments).toHaveLength(2);
+    expect(state.referenceCodes).toHaveLength(3);
+    expect(state.accessTokens).toHaveLength(1);
+    expect(state.activities).toHaveLength(1);
+  });
+
+  it("does not duplicate participant import when the same row is reimported", async () => {
+    const state = createNavigoParticipantImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const input = {
+      actorUserId: "admin-1",
+      generateLinks: false,
+      rows: [
+        {
+          celular: "+525512345678",
+          correo: null,
+          folio: "NAV-010",
+          nombre: "PRUEBA UNO",
+          observaciones: "PRUEBA",
+          primeraFragancia: "AAA",
+          reclutador: "GABY",
+          segundaFragancia: "BBB"
+        }
+      ],
+      studyId: state.study.id
+    };
+
+    const first = await repository.applyParticipantImport(input);
+    const second = await repository.applyParticipantImport(input);
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    expect(second.ok ? second.data.created : -1).toBe(0);
+    expect(second.ok ? second.data.updated : -1).toBe(1);
+    expect(state.participantProfiles).toHaveLength(1);
+    expect(state.studyParticipants).toHaveLength(1);
+    expect(state.confirmations).toHaveLength(1);
+    expect(state.rotationAssignments).toHaveLength(1);
+  });
+
+  it("flags duplicate folios or phones in participant import preview", async () => {
+    const state = createNavigoParticipantImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+
+    const result = await repository.previewParticipantImport({
+      rows: [
+        {
+          celular: "+525512345678",
+          correo: null,
+          folio: "NAV-010",
+          nombre: "PRUEBA UNO",
+          observaciones: null,
+          primeraFragancia: "AAA",
+          reclutador: "GABY",
+          segundaFragancia: "BBB"
+        },
+        {
+          celular: "+525512345678",
+          correo: null,
+          folio: "NAV-010",
+          nombre: "PRUEBA DOS",
+          observaciones: null,
+          primeraFragancia: "BBB",
+          reclutador: "GABY",
+          segundaFragancia: "AAA"
+        }
+      ],
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.summary.rowsWithError : -1).toBe(2);
+    expect(result.ok ? result.data.rows[0]?.errors : []).toContain("folio duplicado en archivo");
+    expect(result.ok ? result.data.rows[0]?.errors : []).toContain("celular duplicado en archivo");
+  });
+
+  it("keeps rotation import requiring an existing folio", async () => {
+    const state = createNavigoRotationImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+
+    const result = await repository.previewRotationImport({
+      rows: [{ folio: "NAV-999", primeraFragancia: "AAA", segundaFragancia: "BBB" }],
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.rows[0]?.errors : []).toContain("folio no encontrado");
   });
 
   it("keeps the rotation import panel from depending on multipart server action upload", () => {
@@ -1742,15 +1866,384 @@ function createNavigoParticipantImportState(
     status: "ACTIVE" as const,
     timeZoneIana: "America/Mexico_City"
   };
+  const schedules = [
+    {
+      code: "T0_SALON" as const,
+      id: "schedule-t0",
+      offsetMinutes: 0,
+      questionnaireVersionId: "questionnaire-active-1",
+      sortOrder: 1,
+      status: "ACTIVE" as const,
+      studyId: study.id,
+      type: "QUESTIONNAIRE_MEASUREMENT" as const,
+      windowEndsMinutes: 20160,
+      windowStartsMinutes: 0
+    }
+  ];
+  const questionnaireVersions = [{ id: "questionnaire-active-1", status: "ACTIVE" as const, studyId: study.id, versionNumber: 1 }];
+  const participantProfiles: Array<{
+    createdByUserId: string | null;
+    email: string | null;
+    id: string;
+    name: string;
+    phone: string | null;
+    status: "ACTIVE";
+  }> = [];
+  const studyParticipants: Array<{
+    applicationStartedAt: Date | null;
+    createdByUserId: string | null;
+    id: string;
+    operationalStatus: "ASSIGNED";
+    participantProfileId: string;
+    screeningStatus: "PASSED";
+    studyId: string;
+  }> = [];
+  const screeningAttempts: Array<{
+    completedAt: Date | null;
+    evaluationJson: unknown;
+    fieldUserId: string | null;
+    id: string;
+    questionnaireVersionId: string;
+    source: "FIELD";
+    status: "PASSED";
+    studyParticipantId: string;
+  }> = [];
+  const confirmations: Array<{
+    approvedAt: Date;
+    approvedByUserId: string | null;
+    folio: string;
+    folioSequence: number;
+    id: string;
+    manualMessageStatus: "NOT_SENT";
+    screeningAttemptId: string;
+    studyId: string;
+    studyParticipantId: string;
+  }> = [];
+  const referenceCodes: Array<{ code: string; confirmationId: string; slot: number }> = [];
+  const accessTokens: Array<{
+    createdByUserId: string | null;
+    expiresAt: Date;
+    id: string;
+    revokedAt?: Date | null;
+    revokedByUserId?: string | null;
+    revocationReason?: string | null;
+    status: "ACTIVE" | "REVOKED";
+    studyParticipantId: string;
+    tokenHash: string;
+  }> = [];
+  const activities: Array<{
+    activityScheduleId: string;
+    actualCompletedAt: Date | null;
+    actualStartedAt: Date | null;
+    availableFrom: Date;
+    availableUntil: Date;
+    id: string;
+    occurrenceKey: string;
+    scheduledAt: Date;
+    status: "AVAILABLE";
+    studyParticipantId: string;
+  }> = [];
+  const arms: Array<{ code: string; id: string; label: string; sortOrder: number; studyId: string }> = [];
+  const products: Array<{
+    displayLabel: string;
+    id: string;
+    internalCode: string;
+    isSensitive: boolean;
+    realName: string;
+    studyId: string;
+  }> = [];
+  const rotationPlans: Array<{ id: string; name: string; rotationCode: string; studyId: string }> = [];
+  const rotationPlanArms: Array<{
+    applicationOrder: number;
+    participantVisibleLabel: string;
+    rotationPlanId: string;
+    studyArmId: string;
+    studyProductId: string;
+  }> = [];
+  const rotationAssignments: Array<{
+    id: string;
+    rotationCode: string;
+    rotationPlanId: string;
+    studyParticipantId: string;
+  }> = [];
+  const armAssignments: Array<{
+    applicationOrder: number;
+    id: string;
+    participantRotationAssignmentId: string;
+    participantVisibleLabel: string;
+    studyArmId: string;
+    studyParticipantId: string;
+    studyProductId: string;
+  }> = [];
 
-  const prisma = {
+  function buildParticipantRecord(studyParticipantId: string) {
+    const participant = studyParticipants.find((item) => item.id === studyParticipantId);
+    if (!participant) {
+      return null;
+    }
+
+    const profile = participantProfiles.find((item) => item.id === participant.participantProfileId);
+    if (!profile) {
+      throw new Error("test fixture missing participant profile");
+    }
+
+    const confirmation = confirmations.find((item) => item.studyParticipantId === participant.id) ?? null;
+    const attempt = confirmation
+      ? screeningAttempts.find((item) => item.id === confirmation.screeningAttemptId) ?? null
+      : null;
+    const assignment = rotationAssignments.find((item) => item.studyParticipantId === participant.id) ?? null;
+
+    return {
+      accessTokens: accessTokens
+        .filter((item) => item.studyParticipantId === participant.id && item.status === "ACTIVE")
+        .sort((left, right) => right.expiresAt.getTime() - left.expiresAt.getTime()),
+      activities: activities
+        .filter((item) => item.studyParticipantId === participant.id)
+        .map((activity) => {
+          const schedule = schedules.find((item) => item.id === activity.activityScheduleId);
+          if (!schedule) {
+            throw new Error("test fixture missing schedule");
+          }
+
+          return {
+            ...activity,
+            activitySchedule: schedule,
+            participantActivityEvidence: [],
+            responses: []
+          };
+        }),
+      applicationStartedAt: participant.applicationStartedAt,
+      id: participant.id,
+      participantConfirmation: confirmation
+        ? {
+            folio: confirmation.folio,
+            referenceCodes: referenceCodes
+              .filter((item) => item.confirmationId === confirmation.id)
+              .sort((left, right) => left.slot - right.slot),
+            screeningAttempt: attempt ? { evaluationJson: attempt.evaluationJson } : null
+          }
+        : null,
+      participantEvidence: [],
+      participantProfile: {
+        email: profile.email,
+        id: profile.id,
+        name: profile.name,
+        phone: profile.phone
+      },
+      participantScreeningReviews: [],
+      rotationAssignment: assignment
+        ? {
+            arms: armAssignments
+              .filter((item) => item.participantRotationAssignmentId === assignment.id)
+              .sort((left, right) => left.applicationOrder - right.applicationOrder)
+              .map((item) => {
+                const arm = arms.find((candidate) => candidate.id === item.studyArmId);
+                const product = products.find((candidate) => candidate.id === item.studyProductId);
+                if (!arm || !product) {
+                  throw new Error("test fixture missing rotation relation");
+                }
+
+                return {
+                  applicationOrder: item.applicationOrder,
+                  participantVisibleLabel: item.participantVisibleLabel,
+                  studyArm: { code: arm.code, label: arm.label, sortOrder: arm.sortOrder },
+                  studyProduct: {
+                    displayLabel: product.displayLabel,
+                    id: product.id,
+                    internalCode: product.internalCode
+                  }
+                };
+              }),
+            rotationCode: assignment.rotationCode
+          }
+        : null,
+      screeningStatus: participant.screeningStatus,
+      study
+    };
+  }
+
+  const tx = {
+    activitySchedule: {
+      async findFirst(args: { where: { code: string; status: string; studyId: string } }) {
+        return (
+          schedules.find(
+            (item) =>
+              item.code === args.where.code && item.status === args.where.status && item.studyId === args.where.studyId
+          ) ?? null
+        );
+      }
+    },
+    participantAccessToken: {
+      async create(args: { data: (typeof accessTokens)[number] }) {
+        accessTokens.push(args.data);
+        return args.data;
+      },
+      async updateMany(args: { data: Partial<(typeof accessTokens)[number]>; where: { status: string; studyParticipantId: string } }) {
+        let count = 0;
+        for (const token of accessTokens) {
+          if (token.studyParticipantId === args.where.studyParticipantId && token.status === args.where.status) {
+            Object.assign(token, args.data);
+            count += 1;
+          }
+        }
+        return { count };
+      }
+    },
+    participantActivity: {
+      async create(args: { data: Omit<(typeof activities)[number], "id">; select: { id: true } }) {
+        const record = { ...args.data, id: `activity-${activities.length + 1}` };
+        activities.push(record);
+        return { id: record.id };
+      }
+    },
+    participantArmAssignment: {
+      async upsert(args: {
+        create: Omit<(typeof armAssignments)[number], "id">;
+        update: Partial<(typeof armAssignments)[number]>;
+        where: { studyParticipantId_studyArmId: { studyArmId: string; studyParticipantId: string } };
+      }) {
+        const target = armAssignments.find(
+          (assignment) =>
+            assignment.studyArmId === args.where.studyParticipantId_studyArmId.studyArmId &&
+            assignment.studyParticipantId === args.where.studyParticipantId_studyArmId.studyParticipantId
+        );
+
+        if (target) {
+          Object.assign(target, args.update);
+          return target;
+        }
+
+        const record = { ...args.create, id: `arm-assignment-${armAssignments.length + 1}` };
+        armAssignments.push(record);
+        return record;
+      }
+    },
     participantConfirmation: {
-      async findMany() {
+      async create(args: { data: Omit<(typeof confirmations)[number], "id">; select: { id: true } }) {
+        const record = { ...args.data, id: `confirmation-${confirmations.length + 1}` };
+        confirmations.push(record);
+        return { id: record.id };
+      },
+      async findMany(args: { where: { folio?: { in: string[] }; studyId: string } }) {
         if (failExistingLookup) {
           throw new Error("participant confirmation lookup failed");
         }
 
-        return [];
+        return confirmations
+          .filter(
+            (item) =>
+              item.studyId === args.where.studyId &&
+              (!args.where.folio || args.where.folio.in.includes(item.folio))
+          )
+          .map((confirmation) => ({
+            folio: confirmation.folio,
+            studyParticipant: buildParticipantRecord(confirmation.studyParticipantId)
+          }));
+      }
+    },
+    participantProfile: {
+      async create(args: {
+        data: Omit<(typeof participantProfiles)[number], "id">;
+        select: { email: true; id: true; name: true; phone: true };
+      }) {
+        const record = { ...args.data, id: `profile-${participantProfiles.length + 1}` };
+        participantProfiles.push(record);
+        return { email: record.email, id: record.id, name: record.name, phone: record.phone };
+      },
+      async update(args: { data: Partial<(typeof participantProfiles)[number]>; where: { id: string } }) {
+        const target = participantProfiles.find((item) => item.id === args.where.id);
+        if (!target) {
+          throw new Error("profile not found");
+        }
+        Object.assign(target, args.data);
+        return target;
+      }
+    },
+    participantReferenceCode: {
+      async createMany(args: { data: Array<{ code: string; confirmationId: string; slot: number }> }) {
+        referenceCodes.push(...args.data);
+        return { count: args.data.length };
+      },
+      async findMany() {
+        return referenceCodes.map((item) => ({ code: item.code }));
+      }
+    },
+    participantRotationAssignment: {
+      async upsert(args: {
+        create: {
+          rotationCode: string;
+          rotationPlanId: string;
+          studyParticipantId: string;
+        };
+        update: {
+          rotationCode: string;
+          rotationPlanId: string;
+        };
+        where: { studyParticipantId: string };
+      }) {
+        const target = rotationAssignments.find((item) => item.studyParticipantId === args.where.studyParticipantId);
+
+        if (target) {
+          Object.assign(target, args.update);
+          return { id: target.id };
+        }
+
+        const record = { ...args.create, id: `rotation-assignment-${rotationAssignments.length + 1}` };
+        rotationAssignments.push(record);
+        return { id: record.id };
+      }
+    },
+    questionnaireVersion: {
+      async findFirst(args: { where: { status: string; studyId: string } }) {
+        return (
+          questionnaireVersions.find(
+            (item) => item.studyId === args.where.studyId && item.status === args.where.status
+          ) ?? null
+        );
+      }
+    },
+    rotationPlan: {
+      async upsert(args: {
+        create: { name: string; rotationCode: string; studyId: string };
+        update: { name: string };
+        where: { studyId_rotationCode: { rotationCode: string; studyId: string } };
+      }) {
+        const target = rotationPlans.find(
+          (item) =>
+            item.rotationCode === args.where.studyId_rotationCode.rotationCode &&
+            item.studyId === args.where.studyId_rotationCode.studyId
+        );
+
+        if (target) {
+          Object.assign(target, args.update);
+          return { id: target.id };
+        }
+
+        const record = { ...args.create, id: `rotation-plan-${rotationPlans.length + 1}` };
+        rotationPlans.push(record);
+        return { id: record.id };
+      }
+    },
+    rotationPlanArm: {
+      async createMany(args: { data: typeof rotationPlanArms }) {
+        rotationPlanArms.push(...args.data);
+        return { count: args.data.length };
+      },
+      async deleteMany(args: { where: { rotationPlanId: string } }) {
+        const retained = rotationPlanArms.filter((item) => item.rotationPlanId !== args.where.rotationPlanId);
+        const count = rotationPlanArms.length - retained.length;
+        rotationPlanArms.splice(0, rotationPlanArms.length, ...retained);
+        return { count };
+      }
+    },
+    screeningAttempt: {
+      async create(args: {
+        data: Omit<(typeof screeningAttempts)[number], "id">;
+        select: { id: true };
+      }) {
+        const record = { ...args.data, id: `attempt-${screeningAttempts.length + 1}` };
+        screeningAttempts.push(record);
+        return { id: record.id };
       }
     },
     study: {
@@ -1758,20 +2251,125 @@ function createNavigoParticipantImportState(
         return args.where.id === study.id ? study : null;
       }
     },
+    studyArm: {
+      async create(args: { data: Omit<(typeof arms)[number], "id">; select: { id: true } }) {
+        const record = { ...args.data, id: `arm-${arms.length + 1}` };
+        arms.push(record);
+        return { id: record.id };
+      },
+      async findFirst(args: { where: { code?: string; sortOrder?: number; studyId: string }; select?: { id: true; sortOrder: true } }) {
+        return (
+          arms.find(
+            (arm) =>
+              arm.studyId === args.where.studyId &&
+              (args.where.code === undefined || arm.code === args.where.code) &&
+              (args.where.sortOrder === undefined || arm.sortOrder === args.where.sortOrder)
+          ) ?? null
+        );
+      },
+      async findMany(args: { where: { studyId: string } }) {
+        return [...arms].filter((arm) => arm.studyId === args.where.studyId).sort((left, right) => right.sortOrder - left.sortOrder);
+      },
+      async update(args: { data: Partial<(typeof arms)[number]>; where: { id: string } }) {
+        const target = arms.find((arm) => arm.id === args.where.id);
+        if (!target) {
+          throw new Error("arm not found");
+        }
+        Object.assign(target, args.data);
+        return { id: target.id };
+      }
+    },
     studyParticipant: {
-      async findMany() {
+      async create(args: { data: Omit<(typeof studyParticipants)[number], "id" | "applicationStartedAt"> }) {
+        const record = { ...args.data, applicationStartedAt: null, id: `study-participant-${studyParticipants.length + 1}` };
+        studyParticipants.push(record);
+        return record;
+      },
+      async findMany(args: { where: { participantProfile: { is: { phone: { in: string[] } } }; studyId: string } }) {
         if (failExistingLookup) {
           throw new Error("study participant lookup failed");
         }
 
-        return [];
+        return studyParticipants
+          .filter((item) => {
+            const profile = participantProfiles.find((candidate) => candidate.id === item.participantProfileId);
+            return (
+              item.studyId === args.where.studyId &&
+              Boolean(profile?.phone && args.where.participantProfile.is.phone.in.includes(profile.phone))
+            );
+          })
+          .map((item) => buildParticipantRecord(item.id));
+      },
+      async findUnique(args: {
+        where: { id?: string; participantProfileId_studyId?: { participantProfileId: string; studyId: string } };
+      }) {
+        const found =
+          args.where.id
+            ? studyParticipants.find((item) => item.id === args.where.id)
+            : studyParticipants.find(
+                (item) =>
+                  item.participantProfileId === args.where.participantProfileId_studyId?.participantProfileId &&
+                  item.studyId === args.where.participantProfileId_studyId?.studyId
+              );
+
+        return found ? buildParticipantRecord(found.id) : null;
+      },
+      async update(args: { data: Partial<(typeof studyParticipants)[number]>; where: { id: string } }) {
+        const target = studyParticipants.find((item) => item.id === args.where.id);
+        if (!target) {
+          throw new Error("study participant not found");
+        }
+        Object.assign(target, args.data);
+        return target;
+      }
+    },
+    studyProduct: {
+      async upsert(args: {
+        create: Omit<(typeof products)[number], "id">;
+        update: Partial<(typeof products)[number]>;
+        where: { studyId_internalCode: { internalCode: string; studyId: string } };
+      }) {
+        const target = products.find(
+          (item) =>
+            item.internalCode === args.where.studyId_internalCode.internalCode &&
+            item.studyId === args.where.studyId_internalCode.studyId
+        );
+
+        if (target) {
+          Object.assign(target, args.update);
+          return { id: target.id };
+        }
+
+        const record = { ...args.create, id: `product-${products.length + 1}` };
+        products.push(record);
+        return { id: record.id };
       }
     }
   };
 
+  const prisma = {
+    ...tx,
+    async $transaction<T>(callback: (transaction: typeof tx) => Promise<T>) {
+      return callback(tx);
+    }
+  };
+
   return {
+    accessTokens,
+    activities,
+    armAssignments,
+    arms,
+    confirmations,
+    participantProfiles,
     prisma,
-    study
+    referenceCodes,
+    rotationAssignments,
+    rotationPlanArms,
+    rotationPlans,
+    schedules,
+    screeningAttempts,
+    study,
+    studyParticipants
   };
 }
 
