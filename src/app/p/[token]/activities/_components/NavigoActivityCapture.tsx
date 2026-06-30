@@ -210,7 +210,7 @@ export function NavigoActivityCapture({
     }
   }
 
-  function captureFromCamera() {
+  async function captureFromCamera() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
@@ -228,17 +228,20 @@ export function NavigoActivityCapture({
     }
 
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        setUploadError("No fue posible capturar la imagen. Intenta nuevamente.");
-        return;
-      }
+    const [originalBlob, displayPreviewBlob] = await Promise.all([
+      canvasToJpegBlob(canvas),
+      createSelfieDisplayPreviewBlob(video)
+    ]);
 
-      const file = new File([blob], `selfie-actividad-${Date.now()}.jpg`, { type: "image/jpeg" });
-      stopCamera();
-      setCapturedFile(file);
-      setPreviewUrlFromFile(file);
-    }, "image/jpeg", 0.92);
+    if (!originalBlob) {
+      setUploadError("No fue posible capturar la imagen. Intenta nuevamente.");
+      return;
+    }
+
+    const file = new File([originalBlob], `selfie-actividad-${Date.now()}.jpg`, { type: "image/jpeg" });
+    stopCamera();
+    setCapturedFile(file);
+    setPreviewUrlFromBlob(displayPreviewBlob ?? originalBlob);
   }
 
   function useCapturedPhoto() {
@@ -309,9 +312,9 @@ export function NavigoActivityCapture({
     });
   }
 
-  function setPreviewUrlFromFile(file: File) {
+  function setPreviewUrlFromBlob(blob: Blob) {
     revokePreview();
-    const nextUrl = URL.createObjectURL(file);
+    const nextUrl = URL.createObjectURL(blob);
     previewUrlRef.current = nextUrl;
     setPreviewUrl(nextUrl);
   }
@@ -600,6 +603,78 @@ function SelfiePrivacyHud({ mode }: { mode: "camera" | "preview" }) {
       </div>
     </div>
   );
+}
+
+function createSelfieDisplayPreviewBlob(video: HTMLVideoElement): Promise<Blob | null> {
+  const frame = getSelfiePreviewFrame(video);
+  const canvas = document.createElement("canvas");
+  canvas.width = frame.width;
+  canvas.height = frame.height;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return Promise.resolve(null);
+  }
+
+  context.fillStyle = "black";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  const drawRect = calculateContainDrawRect(video.videoWidth, video.videoHeight, canvas.width, canvas.height);
+  context.drawImage(
+    video,
+    0,
+    0,
+    video.videoWidth,
+    video.videoHeight,
+    drawRect.x,
+    drawRect.y,
+    drawRect.width,
+    drawRect.height
+  );
+
+  return canvasToJpegBlob(canvas);
+}
+
+function getSelfiePreviewFrame(video: HTMLVideoElement) {
+  const rect = video.getBoundingClientRect();
+  const ratio = typeof window === "undefined" ? 1 : Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
+  const width = rect.width || video.clientWidth || video.videoWidth;
+  const height = rect.height || video.clientHeight || video.videoHeight;
+
+  return {
+    height: Math.max(1, Math.round(height * ratio)),
+    width: Math.max(1, Math.round(width * ratio))
+  };
+}
+
+export function calculateContainDrawRect(sourceWidth: number, sourceHeight: number, frameWidth: number, frameHeight: number) {
+  const sourceRatio = sourceWidth / sourceHeight;
+  const frameRatio = frameWidth / frameHeight;
+
+  if (sourceRatio > frameRatio) {
+    const width = frameWidth;
+    const height = frameWidth / sourceRatio;
+    return {
+      height,
+      width,
+      x: 0,
+      y: (frameHeight - height) / 2
+    };
+  }
+
+  const height = frameHeight;
+  const width = frameHeight * sourceRatio;
+  return {
+    height,
+    width,
+    x: (frameWidth - width) / 2,
+    y: 0
+  };
+}
+
+function canvasToJpegBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.92);
+  });
 }
 
 function IdentityIncidentState({ registeredSelfie }: { registeredSelfie: { signedUrl: string } | null }) {

@@ -9,7 +9,7 @@ import {
 import { createNavigoMeasurementDefinition } from "@/modules/navigo-app";
 import { verifyNavigoFaceIdentity } from "@/modules/navigo-app/face-verification-client";
 import { createBrowserSupabaseClient } from "@/shared/auth/supabase/browser";
-import { NavigoActivityCapture, shouldMirrorCameraPreview } from "./NavigoActivityCapture";
+import { calculateContainDrawRect, NavigoActivityCapture, shouldMirrorCameraPreview } from "./NavigoActivityCapture";
 
 const replaceMock = vi.fn();
 
@@ -130,7 +130,8 @@ beforeEach(() => {
   });
   HTMLVideoElement.prototype.play = vi.fn(async () => undefined);
   HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
-    drawImage: drawImageMock
+    drawImage: drawImageMock,
+    fillRect: vi.fn()
   })) as unknown as typeof HTMLCanvasElement.prototype.getContext;
   HTMLCanvasElement.prototype.toBlob = vi.fn((callback: BlobCallback) => {
     callback(new Blob(["photo"], { type: "image/jpeg" }));
@@ -182,6 +183,8 @@ describe("NavigoActivityCapture", () => {
     expect(drawImageMock).toHaveBeenCalledWith(video, 0, 0, videoSize.width, videoSize.height);
     const preview = await screen.findByAltText("Vista previa de selfie");
     expect(preview).toHaveClass("object-contain", "min-h-64", "max-h-[70vh]");
+    expect(URL.createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    expect(vi.mocked(URL.createObjectURL).mock.calls[0]?.[0]).not.toBeInstanceOf(File);
     expect(screen.getByTestId("navigo-selfie-preview-hud")).toHaveClass("pointer-events-none", "absolute", "inset-0");
     expect(screen.getByTestId("navigo-selfie-preview-lower-mask")).toHaveClass("bg-black/90", "top-[43%]");
   });
@@ -507,6 +510,26 @@ describe("shouldMirrorCameraPreview", () => {
 
   it("does not mirror a rear camera preview", () => {
     expect(shouldMirrorCameraPreview("environment")).toBe(false);
+  });
+});
+
+describe("calculateContainDrawRect", () => {
+  it("centers a tall selfie frame inside the same visual preview area", () => {
+    expect(calculateContainDrawRect(1080, 1920, 640, 480)).toEqual({
+      height: 480,
+      width: 270,
+      x: 185,
+      y: 0
+    });
+  });
+
+  it("centers a wide selfie frame inside the same visual preview area", () => {
+    expect(calculateContainDrawRect(1920, 1080, 640, 480)).toEqual({
+      height: 360,
+      width: 640,
+      x: 0,
+      y: 60
+    });
   });
 });
 
