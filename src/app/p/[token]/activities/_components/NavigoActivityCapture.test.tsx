@@ -168,12 +168,16 @@ describe("NavigoActivityCapture", () => {
     const hud = screen.getByTestId("navigo-selfie-camera-hud");
     expect(hud).toHaveClass("pointer-events-none", "absolute", "inset-0");
     expect(screen.getByText("Coloca tus ojos aquí")).toBeInTheDocument();
-    expect(screen.getByTestId("navigo-selfie-lower-mask")).toHaveClass("bg-zinc-950/60");
+    expect(screen.getByTestId("navigo-selfie-camera-lower-mask")).toHaveClass("bg-black/90", "top-[43%]");
+    expect(screen.getByTestId("navigo-selfie-camera-left-eye-guide")).toHaveClass("left-[35%]");
+    expect(screen.getByTestId("navigo-selfie-camera-right-eye-guide")).toHaveClass("left-[65%]");
 
     fireEvent.click(await screen.findByRole("button", { name: "Tomar foto" }));
 
     expect(drawImageMock).toHaveBeenCalledWith(video, 0, 0, videoSize.width, videoSize.height);
     expect(await screen.findByAltText("Vista previa de selfie")).toBeInTheDocument();
+    expect(screen.getByTestId("navigo-selfie-preview-hud")).toHaveClass("pointer-events-none", "absolute", "inset-0");
+    expect(screen.getByTestId("navigo-selfie-preview-lower-mask")).toHaveClass("bg-black/90", "top-[43%]");
   });
 
   it("does not show AP1 to AP7 for T2/T4/T8 until the activity selfie is saved", () => {

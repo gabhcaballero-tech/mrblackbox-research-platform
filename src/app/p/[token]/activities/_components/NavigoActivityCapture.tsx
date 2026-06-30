@@ -376,7 +376,7 @@ export function NavigoActivityCapture({
                   ref={videoRef}
                   style={shouldMirrorCameraPreview(FRONT_CAMERA_FACING_MODE) ? MIRRORED_SELFIE_PREVIEW_STYLE : undefined}
                 />
-                <SelfieCameraHud />
+                <SelfiePrivacyHud mode="camera" />
               </div>
               <p className="mt-2 text-xs text-zinc-400">
                 La vista de c&aacute;mara se muestra como espejo para facilitar la selfie.
@@ -394,14 +394,17 @@ export function NavigoActivityCapture({
 
           {previewUrl ? (
             <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                alt="Vista previa de selfie"
-                className="max-h-[70vh] w-full rounded-md object-contain"
-                data-mirrored={shouldMirrorCameraPreview(FRONT_CAMERA_FACING_MODE) ? "true" : "false"}
-                src={previewUrl}
-                style={shouldMirrorCameraPreview(FRONT_CAMERA_FACING_MODE) ? MIRRORED_SELFIE_PREVIEW_STYLE : undefined}
-              />
+              <div className="relative overflow-hidden rounded-md">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  alt="Vista previa de selfie"
+                  className="max-h-[70vh] w-full object-contain"
+                  data-mirrored={shouldMirrorCameraPreview(FRONT_CAMERA_FACING_MODE) ? "true" : "false"}
+                  src={previewUrl}
+                  style={shouldMirrorCameraPreview(FRONT_CAMERA_FACING_MODE) ? MIRRORED_SELFIE_PREVIEW_STYLE : undefined}
+                />
+                <SelfiePrivacyHud mode="preview" />
+              </div>
               <div className="mt-3 flex flex-col gap-3 sm:flex-row">
                 <button className={secondaryButtonClass} disabled={busy} onClick={clearCapturedPhoto} type="button">
                   Repetir foto
@@ -558,24 +561,34 @@ export function NavigoActivityCapture({
   }
 }
 
-function SelfieCameraHud() {
+function SelfiePrivacyHud({ mode }: { mode: "camera" | "preview" }) {
+  const showEyeText = mode === "camera";
+
   return (
     <div
       aria-hidden="true"
       className="pointer-events-none absolute inset-0"
-      data-testid="navigo-selfie-camera-hud"
+      data-testid={`navigo-selfie-${mode}-hud`}
     >
-      <div className="absolute inset-x-0 bottom-0 top-[48%] bg-zinc-950/60" data-testid="navigo-selfie-lower-mask" />
-      <div className="absolute left-1/2 top-[31%] flex w-full -translate-x-1/2 -translate-y-1/2 flex-col items-center px-6">
-        <p className="rounded-full bg-zinc-950/55 px-3 py-1 text-xs font-semibold text-white shadow-sm">
+      <div className="absolute inset-x-0 bottom-0 top-[43%] bg-black/90" data-testid={`navigo-selfie-${mode}-lower-mask`} />
+      <div className="absolute left-1/2 top-[29%] flex w-full -translate-x-1/2 -translate-y-1/2 flex-col items-center px-6">
+        {showEyeText ? (
+          <p className="rounded-full bg-zinc-950/60 px-3 py-1 text-xs font-semibold text-white shadow-sm">
           Coloca tus ojos aquí
-        </p>
+          </p>
+        ) : null}
         <div className="relative mt-3 h-14 w-56 max-w-[76vw]">
           <div className="absolute left-0 right-0 top-1/2 h-px bg-white/55" />
-          <div className="absolute left-[26%] top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/85 shadow-[0_0_18px_rgba(255,255,255,0.22)]" />
-          <div className="absolute left-[74%] top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/85 shadow-[0_0_18px_rgba(255,255,255,0.22)]" />
+          <div
+            className="absolute left-[35%] top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/85 shadow-[0_0_18px_rgba(255,255,255,0.22)]"
+            data-testid={`navigo-selfie-${mode}-left-eye-guide`}
+          />
+          <div
+            className="absolute left-[65%] top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/85 shadow-[0_0_18px_rgba(255,255,255,0.22)]"
+            data-testid={`navigo-selfie-${mode}-right-eye-guide`}
+          />
         </div>
-        <div className="mt-8 h-px w-28 bg-white/35" />
+        <div className="mt-6 h-px w-28 bg-white/35" />
       </div>
     </div>
   );
