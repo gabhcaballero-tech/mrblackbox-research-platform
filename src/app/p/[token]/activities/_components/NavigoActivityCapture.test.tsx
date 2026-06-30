@@ -27,6 +27,7 @@ vi.mock("@/modules/navigo-app/actions", () => ({
 }));
 
 const uploadToSignedUrl = vi.fn();
+const drawImageMock = vi.fn();
 
 vi.mock("@/shared/auth/supabase/browser", () => ({
   createBrowserSupabaseClient: vi.fn(() => ({
@@ -129,7 +130,7 @@ beforeEach(() => {
   });
   HTMLVideoElement.prototype.play = vi.fn(async () => undefined);
   HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
-    drawImage: vi.fn()
+    drawImage: drawImageMock
   })) as unknown as typeof HTMLCanvasElement.prototype.getContext;
   HTMLCanvasElement.prototype.toBlob = vi.fn((callback: BlobCallback) => {
     callback(new Blob(["photo"], { type: "image/jpeg" }));
@@ -153,6 +154,26 @@ describe("NavigoActivityCapture", () => {
     expect(video).toHaveAttribute("data-mirrored", "true");
     expect(video).toHaveStyle({ transform: "scaleX(-1)" });
     expect(screen.getByText("La vista de cámara se muestra como espejo para facilitar la selfie.")).toBeInTheDocument();
+  });
+
+  it("shows a visual selfie HUD without including it in the captured image", async () => {
+    const view = renderCapture();
+
+    expect(screen.getByText("Coloca tus ojos dentro de las guías y mira de frente.")).toBeInTheDocument();
+    expect(screen.getByText("La selfie será utilizada para verificar tu identidad durante el estudio.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Tomar selfie" }));
+
+    const video = await waitForVideoElement(view.container);
+    const hud = screen.getByTestId("navigo-selfie-camera-hud");
+    expect(hud).toHaveClass("pointer-events-none", "absolute", "inset-0");
+    expect(screen.getByText("Coloca tus ojos aquí")).toBeInTheDocument();
+    expect(screen.getByTestId("navigo-selfie-lower-mask")).toHaveClass("bg-zinc-950/60");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Tomar foto" }));
+
+    expect(drawImageMock).toHaveBeenCalledWith(video, 0, 0, videoSize.width, videoSize.height);
+    expect(await screen.findByAltText("Vista previa de selfie")).toBeInTheDocument();
   });
 
   it("does not show AP1 to AP7 for T2/T4/T8 until the activity selfie is saved", () => {

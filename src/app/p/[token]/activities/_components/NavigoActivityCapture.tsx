@@ -339,6 +339,12 @@ export function NavigoActivityCapture({
           <p className="mt-2 text-sm leading-6 text-zinc-600">
             Toma una selfie clara para confirmar que eres la misma persona que participa en el estudio.
           </p>
+          <p className="mt-2 text-sm leading-6 text-zinc-600">
+            Coloca tus ojos dentro de las guías y mira de frente.
+          </p>
+          <p className="mt-1 text-sm leading-6 text-zinc-500">
+            La selfie será utilizada para verificar tu identidad durante el estudio.
+          </p>
           <p className="mt-2 text-sm text-zinc-500">Selfie registrada: {selfies}/1</p>
 
           {message && identityReviewStatus === "APPROVED" ? (
@@ -360,15 +366,18 @@ export function NavigoActivityCapture({
 
           {cameraState !== "idle" ? (
             <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-950 p-3">
-              <video
-                autoPlay
-                className="max-h-[70vh] min-h-64 w-full rounded-md object-cover"
-                data-mirrored={shouldMirrorCameraPreview(FRONT_CAMERA_FACING_MODE) ? "true" : "false"}
-                muted
-                playsInline
-                ref={videoRef}
-                style={shouldMirrorCameraPreview(FRONT_CAMERA_FACING_MODE) ? MIRRORED_SELFIE_PREVIEW_STYLE : undefined}
-              />
+              <div className="relative overflow-hidden rounded-md">
+                <video
+                  autoPlay
+                  className="max-h-[70vh] min-h-64 w-full object-cover"
+                  data-mirrored={shouldMirrorCameraPreview(FRONT_CAMERA_FACING_MODE) ? "true" : "false"}
+                  muted
+                  playsInline
+                  ref={videoRef}
+                  style={shouldMirrorCameraPreview(FRONT_CAMERA_FACING_MODE) ? MIRRORED_SELFIE_PREVIEW_STYLE : undefined}
+                />
+                <SelfieCameraHud />
+              </div>
               <p className="mt-2 text-xs text-zinc-400">
                 La vista de c&aacute;mara se muestra como espejo para facilitar la selfie.
               </p>
@@ -547,6 +556,29 @@ export function NavigoActivityCapture({
       }
     });
   }
+}
+
+function SelfieCameraHud() {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0"
+      data-testid="navigo-selfie-camera-hud"
+    >
+      <div className="absolute inset-x-0 bottom-0 top-[48%] bg-zinc-950/60" data-testid="navigo-selfie-lower-mask" />
+      <div className="absolute left-1/2 top-[31%] flex w-full -translate-x-1/2 -translate-y-1/2 flex-col items-center px-6">
+        <p className="rounded-full bg-zinc-950/55 px-3 py-1 text-xs font-semibold text-white shadow-sm">
+          Coloca tus ojos aquí
+        </p>
+        <div className="relative mt-3 h-14 w-56 max-w-[76vw]">
+          <div className="absolute left-0 right-0 top-1/2 h-px bg-white/55" />
+          <div className="absolute left-[26%] top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/85 shadow-[0_0_18px_rgba(255,255,255,0.22)]" />
+          <div className="absolute left-[74%] top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/85 shadow-[0_0_18px_rgba(255,255,255,0.22)]" />
+        </div>
+        <div className="mt-8 h-px w-28 bg-white/35" />
+      </div>
+    </div>
+  );
 }
 
 function IdentityIncidentState({ registeredSelfie }: { registeredSelfie: { signedUrl: string } | null }) {
