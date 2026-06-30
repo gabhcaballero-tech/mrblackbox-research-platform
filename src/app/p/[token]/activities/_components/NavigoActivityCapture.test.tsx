@@ -153,6 +153,7 @@ describe("NavigoActivityCapture", () => {
     const video = await waitForVideoElement(view.container);
     expect(video).toHaveAttribute("data-mirrored", "true");
     expect(video).toHaveStyle({ transform: "scaleX(-1)" });
+    expect(video).toHaveClass("object-contain", "min-h-64", "max-h-[70vh]");
     expect(screen.getByText("La vista de cámara se muestra como espejo para facilitar la selfie.")).toBeInTheDocument();
   });
 
@@ -171,11 +172,16 @@ describe("NavigoActivityCapture", () => {
     expect(screen.getByTestId("navigo-selfie-camera-lower-mask")).toHaveClass("bg-black/90", "top-[43%]");
     expect(screen.getByTestId("navigo-selfie-camera-left-eye-guide")).toHaveClass("left-[35%]");
     expect(screen.getByTestId("navigo-selfie-camera-right-eye-guide")).toHaveClass("left-[65%]");
+    expect(screen.getByTestId("navigo-selfie-camera-left-eye-guide")).not.toHaveClass("rounded-full");
+    expect(screen.getByTestId("navigo-selfie-camera-left-eye-guide")).not.toHaveClass("border-2");
+    expect(screen.getByTestId("navigo-selfie-camera-right-eye-guide")).not.toHaveClass("rounded-full");
+    expect(screen.getByTestId("navigo-selfie-camera-right-eye-guide")).not.toHaveClass("border-2");
 
     fireEvent.click(await screen.findByRole("button", { name: "Tomar foto" }));
 
     expect(drawImageMock).toHaveBeenCalledWith(video, 0, 0, videoSize.width, videoSize.height);
-    expect(await screen.findByAltText("Vista previa de selfie")).toBeInTheDocument();
+    const preview = await screen.findByAltText("Vista previa de selfie");
+    expect(preview).toHaveClass("object-contain", "min-h-64", "max-h-[70vh]");
     expect(screen.getByTestId("navigo-selfie-preview-hud")).toHaveClass("pointer-events-none", "absolute", "inset-0");
     expect(screen.getByTestId("navigo-selfie-preview-lower-mask")).toHaveClass("bg-black/90", "top-[43%]");
   });

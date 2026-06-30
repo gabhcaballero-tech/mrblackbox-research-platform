@@ -36,6 +36,8 @@ type NavigoActivityCaptureProps = {
 
 const FRONT_CAMERA_FACING_MODE = "user";
 const MIRRORED_SELFIE_PREVIEW_STYLE = { transform: "scaleX(-1)" } as const;
+const selfieMediaFrameClass = "relative overflow-hidden rounded-md bg-black";
+const selfieMediaClass = "max-h-[70vh] min-h-64 w-full object-contain";
 
 export function NavigoActivityCapture({
   activityId,
@@ -366,10 +368,10 @@ export function NavigoActivityCapture({
 
           {cameraState !== "idle" ? (
             <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-950 p-3">
-              <div className="relative overflow-hidden rounded-md">
+              <div className={selfieMediaFrameClass}>
                 <video
                   autoPlay
-                  className="max-h-[70vh] min-h-64 w-full object-cover"
+                  className={selfieMediaClass}
                   data-mirrored={shouldMirrorCameraPreview(FRONT_CAMERA_FACING_MODE) ? "true" : "false"}
                   muted
                   playsInline
@@ -394,11 +396,11 @@ export function NavigoActivityCapture({
 
           {previewUrl ? (
             <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-              <div className="relative overflow-hidden rounded-md">
+              <div className={selfieMediaFrameClass}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   alt="Vista previa de selfie"
-                  className="max-h-[70vh] w-full object-contain"
+                  className={selfieMediaClass}
                   data-mirrored={shouldMirrorCameraPreview(FRONT_CAMERA_FACING_MODE) ? "true" : "false"}
                   src={previewUrl}
                   style={shouldMirrorCameraPreview(FRONT_CAMERA_FACING_MODE) ? MIRRORED_SELFIE_PREVIEW_STYLE : undefined}
@@ -573,20 +575,26 @@ function SelfiePrivacyHud({ mode }: { mode: "camera" | "preview" }) {
       <div className="absolute inset-x-0 bottom-0 top-[43%] bg-black/90" data-testid={`navigo-selfie-${mode}-lower-mask`} />
       <div className="absolute left-1/2 top-[29%] flex w-full -translate-x-1/2 -translate-y-1/2 flex-col items-center px-6">
         {showEyeText ? (
-          <p className="rounded-full bg-zinc-950/60 px-3 py-1 text-xs font-semibold text-white shadow-sm">
+          <p className="rounded-md bg-zinc-950/60 px-3 py-1 text-xs font-semibold text-white shadow-sm">
           Coloca tus ojos aquí
           </p>
         ) : null}
         <div className="relative mt-3 h-14 w-56 max-w-[76vw]">
           <div className="absolute left-0 right-0 top-1/2 h-px bg-white/55" />
           <div
-            className="absolute left-[35%] top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/85 shadow-[0_0_18px_rgba(255,255,255,0.22)]"
+            className="absolute left-[35%] top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2"
             data-testid={`navigo-selfie-${mode}-left-eye-guide`}
-          />
+          >
+            <span className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/85" />
+            <span className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-white/85" />
+          </div>
           <div
-            className="absolute left-[65%] top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/85 shadow-[0_0_18px_rgba(255,255,255,0.22)]"
+            className="absolute left-[65%] top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2"
             data-testid={`navigo-selfie-${mode}-right-eye-guide`}
-          />
+          >
+            <span className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/85" />
+            <span className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-white/85" />
+          </div>
         </div>
         <div className="mt-6 h-px w-28 bg-white/35" />
       </div>
