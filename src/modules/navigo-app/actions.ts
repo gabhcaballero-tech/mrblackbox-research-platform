@@ -398,6 +398,7 @@ export async function previewNavigoParticipantImportTextAction(
   const parsed = parseNavigoParticipantImportText({ filename, text });
   if (!parsed.ok) {
     return {
+      applyErrors: [],
       message: parsed.message,
       preview: null,
       rows: [],
@@ -413,6 +414,7 @@ export async function previewNavigoParticipantImportTextAction(
 
     if (!result.ok) {
       return {
+        applyErrors: [],
         message: result.message,
         preview: null,
         rows: parsed.rows,
@@ -421,6 +423,7 @@ export async function previewNavigoParticipantImportTextAction(
     }
 
     return {
+      applyErrors: [],
       message: "Previsualizacion de participantes lista.",
       preview: result.data,
       rows: parsed.rows,
@@ -434,6 +437,7 @@ export async function previewNavigoParticipantImportTextAction(
     });
 
     return {
+      applyErrors: [],
       message: "No fue posible previsualizar participantes por un error tecnico. Revisa logs.",
       preview: null,
       rows: parsed.rows,
@@ -451,6 +455,7 @@ export async function applyNavigoParticipantImportRowsAction(
 
   if (rows.length === 0) {
     return {
+      applyErrors: [],
       message: "Primero previsualiza un archivo valido.",
       preview: null,
       rows: [],
@@ -468,6 +473,7 @@ export async function applyNavigoParticipantImportRowsAction(
 
     if (!result.ok) {
       return {
+        applyErrors: result.data?.applyErrors ?? [],
         message: result.message,
         preview: result.data?.preview ?? null,
         rows,
@@ -477,6 +483,7 @@ export async function applyNavigoParticipantImportRowsAction(
 
     revalidatePath(`/admin/studies/${studyId}/navigo-app`);
     return {
+      applyErrors: [],
       message: `Participantes importados correctamente. Creados: ${result.data.created}. Actualizados: ${result.data.updated}. Omitidos: ${result.data.omitted}. Con error: ${result.data.errors}. Links creados: ${result.data.linksCreated}.`,
       preview: result.data.preview,
       rows,
@@ -490,6 +497,7 @@ export async function applyNavigoParticipantImportRowsAction(
     });
 
     return {
+      applyErrors: [],
       message: error instanceof Error ? error.message : "No fue posible importar participantes.",
       preview: null,
       rows,

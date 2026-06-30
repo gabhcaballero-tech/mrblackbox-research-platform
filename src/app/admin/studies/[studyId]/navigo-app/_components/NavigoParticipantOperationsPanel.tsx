@@ -60,6 +60,7 @@ function ParticipantImportPanel({ studyId }: { studyId: string }) {
 
     if (!file) {
       setState({
+        applyErrors: [],
         message: "Selecciona un archivo CSV o TSV compatible con Excel.",
         preview: null,
         rows: [],
@@ -73,6 +74,7 @@ function ParticipantImportPanel({ studyId }: { studyId: string }) {
       setState(await previewNavigoParticipantImportTextAction(studyId, file.name, await file.text()));
     } catch {
       setState({
+        applyErrors: [],
         message: "No fue posible previsualizar participantes por un error tecnico. Revisa logs.",
         preview: null,
         rows: [],
@@ -98,6 +100,7 @@ function ParticipantImportPanel({ studyId }: { studyId: string }) {
       }
     } catch {
       setState({
+        applyErrors: state.applyErrors,
         message: "No fue posible aplicar la importacion. Revisa la previsualizacion e intenta de nuevo.",
         preview: state.preview,
         rows: state.rows,
@@ -141,6 +144,7 @@ function ParticipantImportPanel({ studyId }: { studyId: string }) {
         Generar link al importar
       </label>
       <StatusMessage state={state} />
+      {state.applyErrors.length > 0 ? <ParticipantApplyErrors state={state} /> : null}
       {state.preview ? <ParticipantImportPreview state={state} /> : null}
       <form className="mt-5" onSubmit={handleApplySubmit}>
         <button className={darkButtonClass} disabled={!canApply || isApplying || isPreviewing} type="submit">
@@ -148,6 +152,10 @@ function ParticipantImportPanel({ studyId }: { studyId: string }) {
         </button>
         {!canApply ? (
           <p className="mt-2 text-xs text-zinc-600">Corrige errores y vuelve a previsualizar antes de aplicar.</p>
+        ) : state.status === "error" && state.preview ? (
+          <p className="mt-2 text-xs text-amber-800">
+            La previsualizacion sigue siendo valida, pero ocurrio un error al aplicar algunas filas.
+          </p>
         ) : null}
       </form>
     </div>
@@ -169,6 +177,24 @@ function StatusMessage({ state }: { state: NavigoParticipantImportActionState })
     >
       {state.message}
     </p>
+  );
+}
+
+function ParticipantApplyErrors({ state }: { state: NavigoParticipantImportActionState }) {
+  return (
+    <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4">
+      <h3 className="text-sm font-semibold text-amber-900">Errores al aplicar</h3>
+      <ul className="mt-3 space-y-2 text-sm text-amber-900">
+        {state.applyErrors.map((item) => (
+          <li key={`${item.rowNumber}-${item.folio}-${item.step}`}>
+            <span className="font-semibold">
+              Fila {item.rowNumber} / {item.folio}
+            </span>
+            : {item.message}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

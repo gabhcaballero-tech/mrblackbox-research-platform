@@ -229,6 +229,12 @@ export type NavigoParticipantImportPreview = {
 };
 
 export type NavigoParticipantImportResult = {
+  applyErrors: Array<{
+    folio: string;
+    message: string;
+    rowNumber: number;
+    step: string;
+  }>;
   created: number;
   errors: number;
   linksCreated: number;
@@ -1401,65 +1407,70 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
     async applyParticipantImport(input) {
       const prisma = await getPrisma();
       const now = new Date();
+      const study = (await prisma.study.findUnique?.({
+        select: studySelect,
+        where: { id: input.studyId }
+      })) as StudyRecord | null;
 
-      return prisma.$transaction(async (tx) => {
-        const study = (await tx.study.findUnique?.({
-          select: studySelect,
-          where: { id: input.studyId }
-        })) as StudyRecord | null;
+      if (!study || study.code !== NAVIGO_STUDY_CODE) {
+        return { message: "Solo el estudio Navigo permite importar participantes.", ok: false };
+      }
 
-        if (!study || study.code !== NAVIGO_STUDY_CODE) {
-          return { message: "Solo el estudio Navigo permite importar participantes.", ok: false };
-        }
+      let preview: NavigoParticipantImportPreview;
 
-          let preview: NavigoParticipantImportPreview;
+      try {
+        preview = await buildParticipantImportPreview({
+          prisma,
+          rows: input.rows,
+          studyId: input.studyId
+        });
+      } catch (error) {
+        logNavigoParticipantImportRepositoryError({
+          error,
+          step: "preview-before-apply",
+          studyId: input.studyId
+        });
+        return {
+          message: "No fue posible validar participantes existentes. Intenta nuevamente.",
+          ok: false
+        };
+      }
 
-          try {
-            preview = await buildParticipantImportPreview({
+      if (preview.summary.rowsWithError > 0) {
+        return {
+          data: {
+            applyErrors: [],
+            created: 0,
+            errors: preview.summary.rowsWithError,
+            linksCreated: 0,
+            omitted: preview.summary.rowsWithError,
+            preview,
+            updated: 0
+          },
+          message: "Corrige los errores de la previsualizacion antes de aplicar la importacion.",
+          ok: false
+        };
+      }
+
+      let created = 0;
+      let linksCreated = 0;
+      let updated = 0;
+      const applyErrors: NavigoParticipantImportResult["applyErrors"] = [];
+
+      for (const row of preview.rows) {
+        try {
+          const result = await prisma.$transaction(async (tx) =>
+            upsertNavigoDirectParticipant({
+              actorUserId: input.actorUserId,
+              generateLink: Boolean(input.generateLinks),
+              now,
               prisma: tx,
-              rows: input.rows,
-              studyId: input.studyId
-            });
-          } catch (error) {
-            logNavigoParticipantImportRepositoryError({
-              error,
-              step: "preview-before-apply",
-              studyId: input.studyId
-            });
-            return {
-              message: "No fue posible validar participantes existentes. Intenta nuevamente.",
-              ok: false
-            };
-          }
+              row,
+              rowNumber: row.rowNumber,
+              study
+            })
+          );
 
-        if (preview.summary.rowsWithError > 0) {
-          return {
-            data: {
-              created: 0,
-              errors: preview.summary.rowsWithError,
-              linksCreated: 0,
-              omitted: preview.summary.rowsWithError,
-              preview,
-              updated: 0
-            },
-            message: "Corrige los errores de la previsualizacion antes de aplicar la importacion.",
-            ok: false
-          };
-        }
-
-        let created = 0;
-        let linksCreated = 0;
-        let updated = 0;
-
-        for (const row of preview.rows) {
-          const result = await upsertNavigoDirectParticipant({
-            actorUserId: input.actorUserId,
-            generateLink: Boolean(input.generateLinks),
-            now,
-            prisma: tx,
-            row,
-            study
-          });
           if (result.createdProfile || result.createdStudyParticipant || result.createdConfirmation) {
             created += 1;
           } else {
@@ -1468,26 +1479,64 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           if (result.linkToken) {
             linksCreated += 1;
           }
+        } catch (error) {
+          const failure = toNavigoParticipantImportApplyFailure(error, {
+            folio: row.folio,
+            rowNumber: row.rowNumber
+          });
+
+          logNavigoParticipantImportApplyFailure({
+            code: failure.code,
+            folio: failure.folio,
+            message: failure.logMessage,
+            rowNumber: failure.rowNumber,
+            step: failure.step,
+            studyId: input.studyId
+          });
+
+          applyErrors.push({
+            folio: failure.folio,
+            message: failure.message,
+            rowNumber: failure.rowNumber,
+            step: failure.step
+          });
         }
+      }
 
-        const nextPreview = await buildParticipantImportPreview({
-          prisma: tx,
-          rows: input.rows,
-          studyId: input.studyId
-        });
+      const nextPreview = await buildParticipantImportPreview({
+        prisma,
+        rows: input.rows,
+        studyId: input.studyId
+      });
 
+      if (applyErrors.length > 0) {
         return {
           data: {
+            applyErrors,
             created,
-            errors: 0,
+            errors: applyErrors.length,
             linksCreated,
-            omitted: 0,
+            omitted: applyErrors.length,
             preview: nextPreview,
             updated
           },
-          ok: true
+          message: "La previsualizacion sigue siendo valida, pero ocurrio un error al aplicar algunas filas.",
+          ok: false
         };
-      });
+      }
+
+      return {
+        data: {
+          applyErrors: [],
+          created,
+          errors: 0,
+          linksCreated,
+          omitted: 0,
+          preview: nextPreview,
+          updated
+        },
+        ok: true
+      };
     },
 
     async startT0(input) {
@@ -3147,6 +3196,7 @@ async function upsertNavigoDirectParticipant({
   now,
   prisma,
   row,
+  rowNumber,
   study
 }: {
   actorUserId: string;
@@ -3154,6 +3204,7 @@ async function upsertNavigoDirectParticipant({
   now: Date;
   prisma: NavigoTransactionClient;
   row: NavigoParticipantImportRowInput;
+  rowNumber?: number;
   study: StudyRecord;
 }): Promise<{
   createdConfirmation: boolean;
@@ -3166,34 +3217,80 @@ async function upsertNavigoDirectParticipant({
   const byPhone = (await findNavigoParticipantsByPhone({ phones: [row.celular], prisma, studyId: study.id })).get(row.celular) ?? null;
 
   if (byFolio && byPhone && byFolio.id !== byPhone.id) {
-    throw new Error("El folio ya existe con otro celular.");
+    throw new NavigoParticipantImportApplyError({
+      folio: row.folio,
+      message: buildNavigoParticipantImportRowMessage({
+        folio: row.folio,
+        message: "el folio ya existe con otro celular.",
+        rowNumber
+      }),
+      rowNumber,
+      step: "participant-folio-conflict"
+    });
   }
   if (byPhone?.participantConfirmation?.folio && byPhone.participantConfirmation.folio !== row.folio) {
-    throw new Error("El celular ya existe con otro folio.");
+    throw new NavigoParticipantImportApplyError({
+      folio: row.folio,
+      message: buildNavigoParticipantImportRowMessage({
+        folio: row.folio,
+        message: "el celular ya existe con otro folio.",
+        rowNumber
+      }),
+      rowNumber,
+      step: "participant-phone-conflict"
+    });
   }
 
   let profile = byPhone?.participantProfile ?? byFolio?.participantProfile ?? null;
   const createdProfile = !profile;
 
   if (!profile) {
-    profile = (await prisma.participantProfile.create?.({
-      data: {
-        createdByUserId: actorUserId,
-        email: row.correo,
-        name: row.nombre,
-        phone: row.celular,
-        status: "ACTIVE"
-      },
-      select: { email: true, id: true, name: true, phone: true }
-    })) as { email: string | null; id: string; name: string; phone: string | null };
+    profile = await runNavigoParticipantImportStep({
+      folio: row.folio,
+      operation: () =>
+        prisma.participantProfile.create?.({
+          data: {
+            createdByUserId: actorUserId,
+            email: row.correo,
+            name: row.nombre,
+            phone: row.celular,
+            status: "ACTIVE"
+          },
+          select: { email: true, id: true, name: true, phone: true }
+        }) as Promise<{ email: string | null; id: string; name: string; phone: string | null }>,
+      rowNumber,
+      step: "participant-profile-create",
+      userMessage: "no se pudo crear ParticipantProfile."
+    });
   } else {
-    await prisma.participantProfile.update?.({
-      data: {
-        email: row.correo,
-        name: row.nombre,
-        phone: row.celular
-      },
-      where: { id: profile.id }
+    const existingProfileId = profile.id;
+    await runNavigoParticipantImportStep({
+      folio: row.folio,
+      operation: () =>
+        prisma.participantProfile.update?.({
+          data: {
+            email: row.correo,
+            name: row.nombre,
+            phone: row.celular
+          },
+          where: { id: existingProfileId }
+        }) as Promise<unknown>,
+      rowNumber,
+      step: "participant-profile-update",
+      userMessage: "no se pudo actualizar ParticipantProfile."
+    });
+  }
+
+  if (!profile) {
+    throw new NavigoParticipantImportApplyError({
+      folio: row.folio,
+      message: buildNavigoParticipantImportRowMessage({
+        folio: row.folio,
+        message: "no se pudo resolver ParticipantProfile.",
+        rowNumber
+      }),
+      rowNumber,
+      step: "participant-profile-resolve"
     });
   }
 
@@ -3201,111 +3298,215 @@ async function upsertNavigoDirectParticipant({
   const createdStudyParticipant = !existingParticipant;
 
   if (!existingParticipant) {
-    await prisma.studyParticipant.create?.({
-      data: {
-        createdByUserId: actorUserId,
-        operationalStatus: "ASSIGNED",
-        participantProfileId: profile.id,
-        screeningStatus: "PASSED",
-        studyId: study.id
-      }
+    await runNavigoParticipantImportStep({
+      folio: row.folio,
+      operation: () =>
+        prisma.studyParticipant.create?.({
+          data: {
+            createdByUserId: actorUserId,
+            operationalStatus: "ASSIGNED",
+            participantProfileId: profile.id,
+            screeningStatus: "PASSED",
+            studyId: study.id
+          }
+        }) as Promise<unknown>,
+      rowNumber,
+      step: "study-participant-create",
+      userMessage: "no se pudo crear StudyParticipant."
     });
   } else {
-    await prisma.studyParticipant.update?.({
-      data: {
-        operationalStatus: "ASSIGNED",
-        screeningStatus: "PASSED"
-      },
-      where: { id: existingParticipant.id }
+    await runNavigoParticipantImportStep({
+      folio: row.folio,
+      operation: () =>
+        prisma.studyParticipant.update?.({
+          data: {
+            operationalStatus: "ASSIGNED",
+            screeningStatus: "PASSED"
+          },
+          where: { id: existingParticipant.id }
+        }) as Promise<unknown>,
+      rowNumber,
+      step: "study-participant-update",
+      userMessage: "no se pudo actualizar StudyParticipant."
     });
   }
 
-  let participant = (await prisma.studyParticipant.findUnique?.({
-    select: participantWithActivitiesSelect,
-    where: {
-      participantProfileId_studyId: {
-        participantProfileId: profile.id,
-        studyId: study.id
-      }
-    }
-  })) as ParticipantRecord | null;
+  let participant = await runNavigoParticipantImportStep({
+    folio: row.folio,
+    operation: () =>
+      prisma.studyParticipant.findUnique?.({
+        select: participantWithActivitiesSelect,
+        where: {
+          participantProfileId_studyId: {
+            participantProfileId: profile.id,
+            studyId: study.id
+          }
+        }
+      }) as Promise<ParticipantRecord | null>,
+    rowNumber,
+    step: "study-participant-load",
+    userMessage: "no se pudo cargar StudyParticipant."
+  });
 
   if (!participant) {
-    throw new Error("No fue posible preparar el participante.");
+    throw new NavigoParticipantImportApplyError({
+      folio: row.folio,
+      message: buildNavigoParticipantImportRowMessage({
+        folio: row.folio,
+        message: "no fue posible preparar el participante.",
+        rowNumber
+      }),
+      rowNumber,
+      step: "study-participant-load"
+    });
   }
 
   const createdConfirmation = !participant.participantConfirmation;
   if (!participant.participantConfirmation) {
     const questionnaireVersionId = await resolveActiveScreenerVersionId({ prisma, studyId: study.id });
     if (!questionnaireVersionId) {
-      throw new Error("El estudio no tiene una version activa de screener para trazabilidad.");
+      throw new NavigoParticipantImportApplyError({
+        folio: row.folio,
+        message: buildNavigoParticipantImportRowMessage({
+          folio: row.folio,
+          message: "el estudio no tiene una version activa de screener para trazabilidad.",
+          rowNumber
+        }),
+        rowNumber,
+        step: "questionnaire-version-active"
+      });
     }
 
-    const attempt = (await prisma.screeningAttempt.create?.({
-      data: {
-        completedAt: now,
-        evaluationJson: {
-          directSource: "APP_NAVIGO_DIRECT",
-          observaciones: row.observaciones,
-          reclutador: row.reclutador
-        },
-        fieldUserId: actorUserId,
-        questionnaireVersionId,
-        source: "FIELD",
-        status: "PASSED",
-        studyParticipantId: participant.id
-      },
-      select: { id: true }
-    })) as { id: string };
-    const confirmation = (await prisma.participantConfirmation.create?.({
-      data: {
-        approvedAt: now,
-        approvedByUserId: actorUserId,
-        folio: row.folio,
-        folioSequence: parseFolioSequence(row.folio),
-        manualMessageStatus: "NOT_SENT",
-        screeningAttemptId: attempt.id,
-        studyId: study.id,
-        studyParticipantId: participant.id
-      },
-      select: { id: true }
-    })) as { id: string };
+    const attempt = await runNavigoParticipantImportStep({
+      folio: row.folio,
+      operation: () =>
+        prisma.screeningAttempt.create?.({
+          data: {
+            completedAt: now,
+            evaluationJson: {
+              directSource: "APP_NAVIGO_DIRECT",
+              observaciones: row.observaciones,
+              reclutador: row.reclutador
+            },
+            fieldUserId: actorUserId,
+            questionnaireVersionId,
+            source: "FIELD",
+            status: "PASSED",
+            studyParticipantId: participant.id
+          },
+          select: { id: true }
+        }) as Promise<{ id: string }>,
+      rowNumber,
+      step: "screening-attempt-create",
+      userMessage: "no se pudo crear ScreeningAttempt."
+    });
+    const confirmation = await runNavigoParticipantImportStep({
+      folio: row.folio,
+      operation: () =>
+        prisma.participantConfirmation.create?.({
+          data: {
+            approvedAt: now,
+            approvedByUserId: actorUserId,
+            folio: row.folio,
+            folioSequence: parseFolioSequence(row.folio),
+            manualMessageStatus: "NOT_SENT",
+            screeningAttemptId: attempt.id,
+            studyId: study.id,
+            studyParticipantId: participant.id
+          },
+          select: { id: true }
+        }) as Promise<{ id: string }>,
+      rowNumber,
+      step: "participant-confirmation-create",
+      userMessage: "no se pudo crear ParticipantConfirmation."
+    });
     const referenceCodes = generateReferenceCodes({
       codeGenerator: generateParticipantReferenceCode,
       existingReferenceCodes: await listExistingReferenceCodes(prisma)
     });
 
-    await prisma.participantReferenceCode.createMany?.({
-      data: referenceCodes.map((code) => ({
-        code: code.code,
-        confirmationId: confirmation.id,
-        slot: code.slot
-      }))
+    await runNavigoParticipantImportStep({
+      folio: row.folio,
+      operation: () =>
+        prisma.participantReferenceCode.createMany?.({
+          data: referenceCodes.map((code) => ({
+            code: code.code,
+            confirmationId: confirmation.id,
+            slot: code.slot
+          }))
+        }) as Promise<unknown>,
+      rowNumber,
+      step: "participant-reference-codes-create",
+      userMessage: "no se pudieron crear los codigos de referencia."
     });
   }
 
-  participant = (await prisma.studyParticipant.findUnique?.({
-    select: participantWithActivitiesSelect,
-    where: { id: participant.id }
-  })) as ParticipantRecord;
-
-  await upsertParticipantRotationForCodes({
-    actorUserId,
-    leftFragranceCode: row.primeraFragancia,
-    participant,
-    prisma,
-    rightFragranceCode: row.segundaFragancia
+  participant = await runNavigoParticipantImportStep({
+    folio: row.folio,
+    operation: () =>
+      prisma.studyParticipant.findUnique?.({
+        select: participantWithActivitiesSelect,
+        where: { id: participant.id }
+      }) as Promise<ParticipantRecord | null>,
+    rowNumber,
+    step: "study-participant-reload-before-rotation",
+    userMessage: "no se pudo recargar StudyParticipant antes de la rotacion."
   });
 
-  participant = (await prisma.studyParticipant.findUnique?.({
-    select: participantWithActivitiesSelect,
-    where: { id: participant.id }
-  })) as ParticipantRecord;
+  try {
+    await upsertParticipantRotationForCodes({
+      actorUserId,
+      leftFragranceCode: row.primeraFragancia,
+      participant,
+      prisma,
+      rightFragranceCode: row.segundaFragancia
+    });
+  } catch (error) {
+    throw toNavigoParticipantImportApplyError(error, {
+      folio: row.folio,
+      rowNumber
+    });
+  }
+
+  participant = await runNavigoParticipantImportStep({
+    folio: row.folio,
+    operation: () =>
+      prisma.studyParticipant.findUnique?.({
+        select: participantWithActivitiesSelect,
+        where: { id: participant.id }
+      }) as Promise<ParticipantRecord | null>,
+    rowNumber,
+    step: "study-participant-reload-after-rotation",
+    userMessage: "no se pudo recargar StudyParticipant despues de la rotacion."
+  });
 
   let linkToken: string | null = null;
   if (generateLink) {
-    await ensureNavigoT0Activity({ now, participant, prisma });
-    linkToken = await ensureParticipantAccessToken({ actorUserId, now, participant, prisma });
+    const t0 = await ensureNavigoT0Activity({ now, participant, prisma });
+    if (!t0.ok) {
+      throw new NavigoParticipantImportApplyError({
+        folio: row.folio,
+        logMessage: t0.message,
+        message: buildNavigoParticipantImportRowMessage({
+          folio: row.folio,
+          message: "no se pudo preparar T0 para generar el enlace.",
+          rowNumber
+        }),
+        rowNumber,
+        step: "participant-t0-prepare"
+      });
+    }
+
+    try {
+      linkToken = await ensureParticipantAccessToken({ actorUserId, now, participant, prisma });
+    } catch (error) {
+      throw toNavigoParticipantImportApplyError(error, {
+        folio: row.folio,
+        rowNumber,
+        stepOverride: "participant-access-token",
+        userMessageOverride: "no se pudo crear o reutilizar ParticipantAccessToken."
+      });
+    }
   }
 
   return {
@@ -3328,6 +3529,55 @@ function logNavigoParticipantImportRepositoryError({
 }) {
   const message = error instanceof Error ? error.message : "unknown";
   console.error(`navigo participant import failed: step=${step} studyId=${studyId} message=${message}`);
+}
+
+async function runNavigoParticipantImportStep<T>({
+  folio,
+  operation,
+  rowNumber,
+  step,
+  userMessage
+}: {
+  folio: string;
+  operation: () => Promise<T | null | undefined>;
+  rowNumber?: number;
+  step: string;
+  userMessage: string;
+}): Promise<T> {
+  try {
+    const result = await operation();
+
+    if (result === null || result === undefined) {
+      throw new Error("Prisma operation did not return a record.");
+    }
+
+    return result;
+  } catch (error) {
+    throw new NavigoParticipantImportApplyError({
+      code: getPrismaErrorCode(error),
+      folio,
+      logMessage: sanitizeRotationImportLogMessage(error),
+      message: buildNavigoParticipantImportRowMessage({
+        folio,
+        message: userMessage,
+        rowNumber
+      }),
+      rowNumber,
+      step
+    });
+  }
+}
+
+function buildNavigoParticipantImportRowMessage({
+  folio,
+  message,
+  rowNumber
+}: {
+  folio: string;
+  message: string;
+  rowNumber?: number;
+}) {
+  return `Fila ${rowNumber ?? "?"} / ${folio}: ${message}`;
 }
 
 async function upsertParticipantRotationForCodes({
@@ -3354,6 +3604,22 @@ async function upsertParticipantRotationForCodes({
     leftFragranceCode,
     rightFragranceCode
   });
+  const currentLeftCode = getAssignedArm(participant, "LEFT", 1)?.studyProduct.internalCode ?? null;
+  const currentRightCode = getAssignedArm(participant, "RIGHT", 2)?.studyProduct.internalCode ?? null;
+
+  if (
+    hasT0Started(participant) &&
+    ((currentLeftCode && currentLeftCode !== leftFragranceCode) ||
+      (currentRightCode && currentRightCode !== rightFragranceCode))
+  ) {
+    throw new NavigoRotationApplyError({
+      folio,
+      logMessage: "t0 already started for participant rotation update",
+      message: "No se puede actualizar la rotacion porque T0 ya fue iniciado.",
+      step: "rotation-locked-after-t0"
+    });
+  }
+
   const leftArm = await resolveNavigoStudyArm({
     code: "LEFT",
     folio,
@@ -3907,6 +4173,134 @@ class NavigoRotationApplyError extends Error {
   }
 }
 
+class NavigoParticipantImportApplyError extends Error {
+  code?: string;
+  folio: string;
+  logMessage: string;
+  rowNumber: number;
+  step: string;
+
+  constructor({
+    code,
+    folio,
+    logMessage,
+    message,
+    rowNumber,
+    step
+  }: {
+    code?: string;
+    folio: string;
+    logMessage?: string;
+    message: string;
+    rowNumber?: number;
+    step: string;
+  }) {
+    super(message);
+    this.name = "NavigoParticipantImportApplyError";
+    this.code = code;
+    this.folio = folio;
+    this.logMessage = logMessage ?? message;
+    this.rowNumber = rowNumber ?? -1;
+    this.step = step;
+  }
+}
+
+function toNavigoParticipantImportApplyError(
+  error: unknown,
+  input: {
+    folio: string;
+    rowNumber?: number;
+    stepOverride?: string;
+    userMessageOverride?: string;
+  }
+): NavigoParticipantImportApplyError {
+  if (error instanceof NavigoParticipantImportApplyError) {
+    return error;
+  }
+
+  if (error instanceof NavigoRotationApplyError) {
+    return new NavigoParticipantImportApplyError({
+      code: error.code,
+      folio: input.folio,
+      logMessage: error.logMessage,
+      message: buildNavigoParticipantImportRowMessage({
+        folio: input.folio,
+        message: input.userMessageOverride ?? mapNavigoRotationStepToParticipantImportMessage(error.step),
+        rowNumber: input.rowNumber
+      }),
+      rowNumber: input.rowNumber,
+      step: input.stepOverride ?? error.step
+    });
+  }
+
+  return new NavigoParticipantImportApplyError({
+    code: getPrismaErrorCode(error),
+    folio: input.folio,
+    logMessage: sanitizeRotationImportLogMessage(error),
+    message: buildNavigoParticipantImportRowMessage({
+      folio: input.folio,
+      message: input.userMessageOverride ?? "no fue posible aplicar la fila.",
+      rowNumber: input.rowNumber
+    }),
+    rowNumber: input.rowNumber,
+    step: input.stepOverride ?? "apply-row"
+  });
+}
+
+function toNavigoParticipantImportApplyFailure(
+  error: unknown,
+  input: { folio: string; rowNumber: number }
+): {
+  code?: string;
+  folio: string;
+  logMessage: string;
+  message: string;
+  rowNumber: number;
+  step: string;
+} {
+  const failure = toNavigoParticipantImportApplyError(error, input);
+
+  return {
+    code: failure.code,
+    folio: failure.folio,
+    logMessage: failure.logMessage,
+    message: failure.message,
+    rowNumber: failure.rowNumber,
+    step: failure.step
+  };
+}
+
+function mapNavigoRotationStepToParticipantImportMessage(step: string): string {
+  switch (step) {
+    case "study-arm-left-lookup":
+    case "study-arm-left-update":
+    case "study-arm-left-create":
+      return "no se pudo crear o reutilizar StudyArm LEFT.";
+    case "study-arm-right-lookup":
+    case "study-arm-right-update":
+    case "study-arm-right-create":
+      return "no se pudo crear o reutilizar StudyArm RIGHT.";
+    case "study-product-left":
+      return "no se pudo crear StudyProduct para primera fragancia.";
+    case "study-product-right":
+      return "no se pudo crear StudyProduct para segunda fragancia.";
+    case "rotation-plan":
+      return "no se pudo crear RotationPlan.";
+    case "rotation-plan-arms":
+      return "no se pudieron guardar RotationPlanArm.";
+    case "participant-rotation-assignment":
+      return "no se pudo crear ParticipantRotationAssignment.";
+    case "participant-arm-left":
+      return "no se pudo crear ParticipantArmAssignment LEFT.";
+    case "participant-arm-right":
+      return "no se pudo crear ParticipantArmAssignment RIGHT.";
+    case "rotation-locked-after-t0":
+      return "no se puede actualizar la rotacion porque T0 ya fue iniciado.";
+    default:
+      return "no se pudo guardar la rotacion.";
+  }
+}
+
 function toNavigoRotationApplyFailure(error: unknown): {
   folio?: string;
   logMessage: string;
@@ -3928,6 +4322,26 @@ function toNavigoRotationApplyFailure(error: unknown): {
     message: code ? "Error de base de datos al guardar la rotacion. Revisa logs." : "No fue posible guardar la rotacion. Revisa logs.",
     step: "apply"
   };
+}
+
+function logNavigoParticipantImportApplyFailure({
+  code,
+  folio,
+  message,
+  rowNumber,
+  step,
+  studyId
+}: {
+  code?: string;
+  folio: string;
+  message: string;
+  rowNumber: number;
+  step: string;
+  studyId: string;
+}) {
+  console.error(
+    `navigo participant import apply failed: studyId=${studyId} row=${rowNumber} folio=${folio} step=${step} code=${code ?? "UNKNOWN"} message=${message}`
+  );
 }
 
 function logNavigoRotationApplyFailure({

@@ -933,6 +933,8 @@ describe("navigo app MVP rules", () => {
     expect(operationsPanel).toContain("Participantes existentes");
     expect(operationsPanel).toContain("Correo");
     expect(operationsPanel).toContain("Reclutador");
+    expect(operationsPanel).toContain("Errores al aplicar");
+    expect(operationsPanel).toContain("La previsualizacion sigue siendo valida, pero ocurrio un error al aplicar algunas filas.");
     expect(operationsPanel).toContain("No fue posible previsualizar participantes por un error tecnico. Revisa logs.");
     expect(actions).toContain("previewNavigoParticipantImportTextAction");
     expect(actions).toContain("applyNavigoParticipantImportRowsAction");
@@ -1063,6 +1065,131 @@ describe("navigo app MVP rules", () => {
     expect(state.rotationAssignments).toHaveLength(1);
   });
 
+  it("completes a partial existing participant without duplicating profile or study participant", async () => {
+    const state = createNavigoParticipantImportState();
+    state.participantProfiles.push({
+      createdByUserId: "admin-1",
+      email: null,
+      id: "profile-existing",
+      name: "PRUEBA UNO",
+      phone: "+525512345678",
+      status: "ACTIVE"
+    });
+    state.studyParticipants.push({
+      applicationStartedAt: null,
+      createdByUserId: "admin-1",
+      id: "study-participant-existing",
+      operationalStatus: "ASSIGNED",
+      participantProfileId: "profile-existing",
+      screeningStatus: "PASSED",
+      studyId: state.study.id
+    });
+
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const result = await repository.applyParticipantImport({
+      actorUserId: "admin-1",
+      generateLinks: true,
+      rows: [
+        {
+          celular: "+525512345678",
+          correo: null,
+          folio: "NAV-010",
+          nombre: "PRUEBA UNO",
+          observaciones: "PRUEBA",
+          primeraFragancia: "AAA",
+          reclutador: "GABY",
+          segundaFragancia: "BBB"
+        }
+      ],
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(true);
+    expect(state.participantProfiles).toHaveLength(1);
+    expect(state.studyParticipants).toHaveLength(1);
+    expect(state.confirmations).toHaveLength(1);
+    expect(state.rotationAssignments).toHaveLength(1);
+    expect(state.accessTokens).toHaveLength(1);
+  });
+
+  it("reports a sanitized per-row error when study product creation fails and preserves preview", async () => {
+    const state = createNavigoParticipantImportState({ failStudyProductUpsert: true });
+    const repository = createNavigoAppRepository(state.prisma as never);
+
+    const result = await repository.applyParticipantImport({
+      actorUserId: "admin-1",
+      generateLinks: true,
+      rows: [
+        {
+          celular: "+525512345678",
+          correo: null,
+          folio: "NAV-010",
+          nombre: "PRUEBA UNO",
+          observaciones: "PRUEBA",
+          primeraFragancia: "AAA",
+          reclutador: "GABY",
+          segundaFragancia: "BBB"
+        }
+      ],
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? [] : result.data?.applyErrors).toHaveLength(1);
+    expect(result.ok ? "" : result.data?.applyErrors[0]?.message ?? "").toContain(
+      "Fila 2 / NAV-010: no se pudo crear StudyProduct para primera fragancia."
+    );
+    expect(result.ok ? null : result.data?.preview).not.toBeNull();
+  });
+
+  it("blocks participant rotation changes after T0 has started", async () => {
+    const state = createNavigoParticipantImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+
+    await repository.applyParticipantImport({
+      actorUserId: "admin-1",
+      generateLinks: false,
+      rows: [
+        {
+          celular: "+525512345678",
+          correo: null,
+          folio: "NAV-010",
+          nombre: "PRUEBA UNO",
+          observaciones: "PRUEBA",
+          primeraFragancia: "AAA",
+          reclutador: "GABY",
+          segundaFragancia: "BBB"
+        }
+      ],
+      studyId: state.study.id
+    });
+
+    state.studyParticipants[0]!.applicationStartedAt = new Date("2026-06-27T10:00:00.000Z");
+
+    const result = await repository.applyParticipantImport({
+      actorUserId: "admin-1",
+      generateLinks: false,
+      rows: [
+        {
+          celular: "+525512345678",
+          correo: null,
+          folio: "NAV-010",
+          nombre: "PRUEBA UNO",
+          observaciones: "PRUEBA",
+          primeraFragancia: "CCC",
+          reclutador: "GABY",
+          segundaFragancia: "DDD"
+        }
+      ],
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.data?.applyErrors[0]?.message ?? "").toContain(
+      "Fila 2 / NAV-010: no se puede actualizar la rotacion porque T0 ya fue iniciado."
+    );
+  });
+
   it("flags duplicate folios or phones in participant import preview", async () => {
     const state = createNavigoParticipantImportState();
     const repository = createNavigoAppRepository(state.prisma as never);
@@ -1110,6 +1237,17 @@ describe("navigo app MVP rules", () => {
 
     expect(result.ok).toBe(true);
     expect(result.ok ? result.data.rows[0]?.errors : []).toContain("folio no encontrado");
+  });
+
+  it("keeps participant import apply flow sequential without Promise.all inside the apply transaction path", () => {
+    const repositorySource = readWorkspaceFile("src", "modules", "navigo-app", "repository.ts");
+    const applyStart = repositorySource.indexOf("async applyParticipantImport(input)");
+    const applyEnd = repositorySource.indexOf("async startT0(input)");
+    const applySource = repositorySource.slice(applyStart, applyEnd);
+
+    expect(applySource).not.toContain("Promise.all");
+    expect(applySource).toContain("for (const row of preview.rows)");
+    expect(applySource).toContain("await prisma.$transaction(async (tx)");
   });
 
   it("keeps the rotation import panel from depending on multipart server action upload", () => {
@@ -1857,7 +1995,10 @@ function createNavigoFoundationState() {
 }
 
 function createNavigoParticipantImportState(
-  { failExistingLookup = false }: { failExistingLookup?: boolean } = {}
+  {
+    failExistingLookup = false,
+    failStudyProductUpsert = false
+  }: { failExistingLookup?: boolean; failStudyProductUpsert?: boolean } = {}
 ) {
   const study = {
     code: NAVIGO_STUDY_CODE,
@@ -2329,6 +2470,10 @@ function createNavigoParticipantImportState(
         update: Partial<(typeof products)[number]>;
         where: { studyId_internalCode: { internalCode: string; studyId: string } };
       }) {
+        if (failStudyProductUpsert) {
+          throw { code: "P2002", message: "duplicate key in study product upsert" };
+        }
+
         const target = products.find(
           (item) =>
             item.internalCode === args.where.studyId_internalCode.internalCode &&
