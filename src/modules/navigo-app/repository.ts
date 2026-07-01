@@ -27,7 +27,6 @@ import {
   isNavigoT0Complete,
   isNavigoEmail,
   isNavigoPhone,
-  navigoActivityLabel,
   normalizeNavigoEmail,
   normalizeNavigoFolio,
   normalizeNavigoParticipantName,
@@ -1968,24 +1967,15 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           studyId: input.studyId
         }
       })) as ParticipantRecord[];
-      const dashboard = {
-        participants: await Promise.all(
-          participants.map((participant) =>
-            toDashboardParticipant(participant, input.now ?? new Date(), createSupabaseEvidenceStorageClient())
-          )
-        ),
-        study,
-        timeZoneIana: resolveNavigoTimeZone(study.timeZoneIana)
-      };
+      const timeZoneIana = resolveNavigoTimeZone(study.timeZoneIana);
 
       return {
         data: {
           body: buildNavigoLinksRotationTsv({
-            dashboard,
-            now: input.now ?? new Date(),
+            participants,
             requestOrigin: input.requestOrigin
           }),
-          filename: `${dashboard.study.code}_links_rotacion_${formatDateForFilename(input.now ?? new Date(), dashboard.timeZoneIana)}.tsv`
+          filename: `${study.code}_links_rotacion_${formatDateForFilename(input.now ?? new Date(), timeZoneIana)}.tsv`
         },
         ok: true
       };
@@ -3874,12 +3864,10 @@ function parseFolioSequence(folio: string): number {
 }
 
 function buildNavigoLinksRotationTsv({
-  dashboard,
-  now,
+  participants,
   requestOrigin
 }: {
-  dashboard: NavigoAdminDashboard;
-  now: Date;
+  participants: ParticipantRecord[];
   requestOrigin: string;
 }): string {
   const header = [
@@ -3891,89 +3879,39 @@ function buildNavigoLinksRotationTsv({
     "Link participante",
     "Primera fragancia / brazo izquierdo",
     "Segunda fragancia / brazo derecho",
-    "Estado participante",
-    "Estado App",
-    "T0 estado",
-    "T0 hora",
-    "T2 estado",
-    "T2 hora ideal",
-    "T2 hora real",
-    "T4 estado",
-    "T4 hora ideal",
-    "T4 hora real",
-    "T8 estado",
-    "T8 hora ideal",
-    "T8 hora real",
-    "Ultima actualizacion",
-    "Incidencias"
+    "Estado participante"
   ];
-  const rows = dashboard.participants.map((participant) => {
-    const activities = new Map(participant.activities.map((activity) => [activity.code, activity]));
-    const t0 = activities.get("T0_SALON");
-    const t2 = activities.get("T2_HORAS");
-    const t4 = activities.get("T4_HORAS");
-    const t8 = activities.get("T8_HORAS");
-    const link = participant.participantLinkToken
-      ? new URL(`/p/${encodeURIComponent(participant.participantLinkToken)}/activities`, requestOrigin).toString()
+  const rows = participants.map((participant) => {
+    const rotation = buildParticipantRotationSummary(participant);
+    const directMetadata = readDirectMetadata(participant);
+    const participantLinkToken = participant.accessTokens?.[0]?.id ?? null;
+    const link = participantLinkToken
+      ? new URL(`/p/${encodeURIComponent(participantLinkToken)}/activities`, requestOrigin).toString()
       : "";
 
     return [
-      participant.confirmation?.folio ?? "",
-      participant.participant.name,
-      participant.participant.phone,
-      participant.participant.email,
-      readDirectMetadata(participant)?.reclutador ?? "",
+      participant.participantConfirmation?.folio ?? "",
+      participant.participantProfile.name,
+      participant.participantProfile.phone,
+      participant.participantProfile.email,
+      directMetadata?.reclutador ?? "",
       link,
-      participant.rotation.leftCode,
-      participant.rotation.rightCode,
-      participant.status,
-      participant.alert,
-      exportActivityStatus(t0),
-      exportActivityTime(t0?.actualCompletedAt ?? t0?.actualStartedAt ?? null, dashboard.timeZoneIana),
-      exportActivityStatus(t2),
-      exportActivityTime(t2?.scheduledAt ?? null, dashboard.timeZoneIana),
-      exportActivityTime(t2?.actualCompletedAt ?? t2?.actualStartedAt ?? null, dashboard.timeZoneIana),
-      exportActivityStatus(t4),
-      exportActivityTime(t4?.scheduledAt ?? null, dashboard.timeZoneIana),
-      exportActivityTime(t4?.actualCompletedAt ?? t4?.actualStartedAt ?? null, dashboard.timeZoneIana),
-      exportActivityStatus(t8),
-      exportActivityTime(t8?.scheduledAt ?? null, dashboard.timeZoneIana),
-      exportActivityTime(t8?.actualCompletedAt ?? t8?.actualStartedAt ?? null, dashboard.timeZoneIana),
-      exportActivityTime(now, dashboard.timeZoneIana),
-      [readDirectMetadata(participant)?.observaciones, participant.alert].filter(Boolean).join(" | ")
+      rotation.leftCode,
+      rotation.rightCode,
+      participantStatus(participant)
     ];
   });
 
   return buildNavigoTsv([header, ...rows]);
 }
 
-function readDirectMetadata(participant: NavigoParticipantListItem): { observaciones?: string | null; reclutador?: string | null } | null {
-  const metadata = participant.confirmation?.screeningAttempt?.evaluationJson;
+function readDirectMetadata(participant: ParticipantRecord): { observaciones?: string | null; reclutador?: string | null } | null {
+  const metadata = participant.participantConfirmation?.screeningAttempt?.evaluationJson;
   if (typeof metadata === "object" && metadata !== null && "directSource" in metadata) {
     return metadata as { observaciones?: string | null; reclutador?: string | null };
   }
 
   return null;
-}
-
-function exportActivityStatus(activity: NavigoActivityListItem | undefined): string {
-  if (!activity) {
-    return "Pendiente";
-  }
-
-  return navigoActivityLabel(activity.code) && activity.status ? activity.status : "Pendiente";
-}
-
-function exportActivityTime(value: Date | null, timeZoneIana: string): string {
-  if (!value) {
-    return "";
-  }
-
-  return new Intl.DateTimeFormat("es-MX", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: resolveNavigoTimeZone(timeZoneIana)
-  }).format(value);
 }
 
 function formatDateForFilename(value: Date, timeZoneIana: string): string {

@@ -24,14 +24,14 @@ export function NavigoParticipantOperationsPanel({ studyId }: NavigoParticipantO
         <div>
           <h2 className="text-lg font-semibold text-zinc-950">Operacion masiva de participantes</h2>
           <p className="mt-1 text-sm leading-6 text-zinc-600">
-            Registra participantes, genera enlaces y descarga un archivo compatible con Excel.
+            Registra participantes, genera enlaces y descarga un archivo tabulado compatible con Excel.
           </p>
         </div>
         <Link
           className="inline-flex w-fit rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50"
           href={`/admin/studies/${studyId}/navigo-app/links-rotation-export`}
         >
-          Exportar enlaces y rotacion
+          Exportar Excel (TSV)
         </Link>
       </div>
 

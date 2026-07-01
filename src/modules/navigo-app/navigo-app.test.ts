@@ -926,7 +926,7 @@ describe("navigo app MVP rules", () => {
     expect(adminPage).toContain("Generar enlaces para todos");
     expect(operationsPanel).toContain("Importar participantes");
     expect(operationsPanel).toContain("Descargar plantilla de participantes");
-    expect(operationsPanel).toContain("Exportar enlaces y rotacion");
+    expect(operationsPanel).toContain("Exportar Excel (TSV)");
     expect(operationsPanel).toContain("Previsualizar participantes");
     expect(operationsPanel).toContain("file.text()");
     expect(operationsPanel).toContain("Participantes nuevos");
@@ -1029,6 +1029,65 @@ describe("navigo app MVP rules", () => {
     expect(state.referenceCodes).toHaveLength(3);
     expect(state.accessTokens).toHaveLength(1);
     expect(state.activities).toHaveLength(1);
+  });
+
+  it("exports participant links and rotation as clean tabular TSV columns for Excel", async () => {
+    const state = createNavigoParticipantImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+
+    await repository.applyParticipantImport({
+      actorUserId: "admin-1",
+      generateLinks: true,
+      rows: [
+        {
+          celular: "+525512345678",
+          correo: "ana.navigo@example.com",
+          folio: "NAV-010",
+          nombre: "ANA PÉREZ ÑUÑEZ",
+          observaciones: "Texto largo, con coma; punto y coma\ny salto",
+          primeraFragancia: "AAA 123",
+          reclutador: "GABY CDMX; TURNO 1",
+          segundaFragancia: "BBB 456"
+        }
+      ],
+      studyId: state.study.id
+    });
+
+    const result = await repository.exportLinksAndRotation({
+      now: new Date("2026-06-30T12:00:00.000Z"),
+      requestOrigin: "https://encuestas.example.com",
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(true);
+    const table = parseTsv(result.ok ? result.data.body : "");
+    expect(result.ok ? result.data.filename : "").toBe("FMASCULINA-NAVIGO-2026_links_rotacion_2026-06-30.tsv");
+    expect(table[0]).toEqual([
+      "Folio",
+      "Nombre",
+      "Celular",
+      "Correo",
+      "Reclutador",
+      "Link participante",
+      "Primera fragancia / brazo izquierdo",
+      "Segunda fragancia / brazo derecho",
+      "Estado participante"
+    ]);
+    expect(table[1]).toHaveLength(table[0]?.length);
+    expect(table[1]).toEqual([
+      "NAV-010",
+      "ANA PÉREZ ÑUÑEZ",
+      "+525512345678",
+      "ana.navigo@example.com",
+      "GABY CDMX; TURNO 1",
+      expect.stringMatching(/^https:\/\/encuestas\.example\.com\/p\/.+\/activities$/),
+      "AAA 123",
+      "BBB 456",
+      "APPROVED"
+    ]);
+    expect(result.ok ? result.data.body : "").toContain("\uFEFF");
+    expect(result.ok ? result.data.body : "").toContain("\t");
+    expect(result.ok ? result.data.body : "").not.toContain("FolioNombreCelularCorreoReclutador");
   });
 
   it("does not duplicate participant import when the same row is reimported", async () => {
@@ -1608,7 +1667,7 @@ function createNavigoParticipantActivityState() {
     participantAccessToken: {
       async findFirst() {
         return {
-          expiresAt: new Date("2026-07-01T00:00:00.000Z"),
+          expiresAt: new Date("2026-12-31T00:00:00.000Z"),
           id: "token-row-1",
           status: "ACTIVE",
           studyParticipant: participant,
@@ -2426,18 +2485,35 @@ function createNavigoParticipantImportState(
         studyParticipants.push(record);
         return record;
       },
-      async findMany(args: { where: { participantProfile: { is: { phone: { in: string[] } } }; studyId: string } }) {
+      async findMany(args: {
+        orderBy?: unknown;
+        where: {
+          participantConfirmation?: { isNot: null };
+          participantProfile?: { is: { phone: { in: string[] } } };
+          studyId: string;
+        };
+      }) {
         if (failExistingLookup) {
           throw new Error("study participant lookup failed");
         }
 
+        if (args.where.participantConfirmation) {
+          return studyParticipants
+            .filter((item) => item.studyId === args.where.studyId)
+            .filter((item) => confirmations.some((confirmation) => confirmation.studyParticipantId === item.id))
+            .sort((left, right) => {
+              const leftConfirmation = confirmations.find((confirmation) => confirmation.studyParticipantId === left.id);
+              const rightConfirmation = confirmations.find((confirmation) => confirmation.studyParticipantId === right.id);
+              return (leftConfirmation?.folioSequence ?? 0) - (rightConfirmation?.folioSequence ?? 0);
+            })
+            .map((item) => buildParticipantRecord(item.id));
+        }
+
+        const phones = args.where.participantProfile?.is.phone.in ?? [];
         return studyParticipants
           .filter((item) => {
             const profile = participantProfiles.find((candidate) => candidate.id === item.participantProfileId);
-            return (
-              item.studyId === args.where.studyId &&
-              Boolean(profile?.phone && args.where.participantProfile.is.phone.in.includes(profile.phone))
-            );
+            return item.studyId === args.where.studyId && Boolean(profile?.phone && phones.includes(profile.phone));
           })
           .map((item) => buildParticipantRecord(item.id));
       },
@@ -2815,5 +2891,13 @@ function createNavigoRotationImportState({ failProductUpsert = false }: { failPr
 
 function readWorkspaceFile(...segments: string[]) {
   return readFileSync(join(process.cwd(), ...segments), "utf8");
+}
+
+function parseTsv(value: string) {
+  return value
+    .replace(/^\uFEFF/, "")
+    .split(/\r\n|\n/)
+    .filter(Boolean)
+    .map((row) => row.split("\t"));
 }
 

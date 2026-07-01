@@ -700,7 +700,7 @@ export function navigoTsvCell(value: string | number | Date | null | undefined):
 }
 
 export function buildNavigoTsv(rows: Array<Array<string | number | Date | null | undefined>>): string {
-  return `\uFEFF${rows.map((row) => row.map(navigoTsvCell).join("\t")).join("\n")}`;
+  return `\uFEFF${rows.map((row) => row.map(navigoTsvCell).join("\t")).join("\r\n")}`;
 }
 
 export function isSupportedRotationImportFilename(filename: string): boolean {
