@@ -2,9 +2,11 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
+  assignHutParticipantRotationAction,
   completeHutCallEvaluationAction,
   createHutParticipantAction,
   createHutRegistrationSlotAction,
+  deleteHutParticipantAction,
   markHutMissedDayAction,
   reactivateHutParticipantAction,
   setHutVisualOverrideAction,
@@ -79,7 +81,11 @@ export default async function HutAdminPage({ params, searchParams }: HutAdminPag
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <CreateHutParticipantForm requestOrigin={requestOrigin} studyId={studyId} />
+        <CreateHutParticipantForm
+          availableSlots={dashboard.registrationSlots.filter((slot) => slot.status === "AVAILABLE")}
+          requestOrigin={requestOrigin}
+          studyId={studyId}
+        />
         <HutParticipantImportPanel requestOrigin={requestOrigin} studyId={studyId} />
       </div>
 
@@ -114,7 +120,12 @@ export default async function HutAdminPage({ params, searchParams }: HutAdminPag
         ) : (
           <div className="divide-y divide-zinc-200">
             {dashboard.participants.map((participant) => (
-              <HutParticipantCard key={participant.id} participant={participant} studyId={studyId} />
+              <HutParticipantCard
+                availableSlots={dashboard.registrationSlots.filter((slot) => slot.status === "AVAILABLE")}
+                key={participant.id}
+                participant={participant}
+                studyId={studyId}
+              />
             ))}
           </div>
         )}
@@ -208,7 +219,15 @@ function HutRegistrationSlotTable({ slots }: { slots: HutRegistrationSlotAdmin[]
   );
 }
 
-function CreateHutParticipantForm({ requestOrigin, studyId }: { requestOrigin: string; studyId: string }) {
+function CreateHutParticipantForm({
+  availableSlots,
+  requestOrigin,
+  studyId
+}: {
+  availableSlots: HutRegistrationSlotAdmin[];
+  requestOrigin: string;
+  studyId: string;
+}) {
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
       <h2 className="text-lg font-semibold text-zinc-950">Crear participante HUT</h2>
@@ -234,6 +253,25 @@ function CreateHutParticipantForm({ requestOrigin, studyId }: { requestOrigin: s
           <input className={inputClass} name="recruiter" />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+          Folio/rotacion disponible
+          <select className={inputClass} name="slotId">
+            <option value="">Sin slot disponible</option>
+            {availableSlots.map((slot) => (
+              <option key={slot.id} value={slot.id}>
+                {slot.folio} - {slot.firstFragranceLeftArm} / {slot.secondFragranceRightArm}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Asignacion manual opcional</p>
+          <div className="mt-3 grid gap-3">
+            <input className={inputClass} name="folio" placeholder="Folio manual" />
+            <input className={inputClass} name="firstFragranceLeftArm" placeholder="Primera fragancia / brazo izquierdo" />
+            <input className={inputClass} name="secondFragranceRightArm" placeholder="Segunda fragancia / brazo derecho" />
+          </div>
+        </div>
+        <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
           Fecha de inicio de bloque 1
           <input className={inputClass} name="startDate" type="date" />
         </label>
@@ -243,7 +281,15 @@ function CreateHutParticipantForm({ requestOrigin, studyId }: { requestOrigin: s
   );
 }
 
-function HutParticipantCard({ participant, studyId }: { participant: HutAdminParticipant; studyId: string }) {
+function HutParticipantCard({
+  availableSlots,
+  participant,
+  studyId
+}: {
+  availableSlots: HutRegistrationSlotAdmin[];
+  participant: HutAdminParticipant;
+  studyId: string;
+}) {
   const disabled = participant.status === "DISQUALIFIED" || participant.status === "COMPLETED";
 
   return (
@@ -260,6 +306,7 @@ function HutParticipantCard({ participant, studyId }: { participant: HutAdminPar
           <Field label="Folio" value={participant.folio ?? "No asignado"} />
           <Field label="Primera fragancia / brazo izquierdo" value={participant.firstFragranceLeftArm ?? "No asignada"} />
           <Field label="Segunda fragancia / brazo derecho" value={participant.secondFragranceRightArm ?? "No asignada"} />
+          <Field label="Origen folio" value={participant.registrationSlot ? `Slot ${participant.registrationSlot.folio}` : participant.folio ? "Manual" : "No asignado"} />
           <Field label="Estado" value={hutParticipantStatusLabel(participant.status)} />
           <Field label="Selfie de registro" value={participant.referenceSelfie.status === "COMPLETE" ? "Completa" : "Faltante"} />
           <Field label="Bloque actual" value={String(participant.currentBlockNumber)} />
@@ -308,6 +355,26 @@ function HutParticipantCard({ participant, studyId }: { participant: HutAdminPar
         <section className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
           <h3 className="text-sm font-semibold text-zinc-950">Acciones operativas</h3>
           <div className="mt-3 space-y-3">
+            <details className="rounded-md border border-zinc-200 bg-white p-3">
+              <summary className="cursor-pointer text-sm font-semibold text-zinc-950">Asignar folio/rotacion</summary>
+              <form action={assignHutParticipantRotationAction.bind(null, studyId, participant.id)} className="mt-3 space-y-3">
+                <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                  Slot disponible
+                  <select className={inputClass} name="slotId">
+                    <option value="">Asignacion manual</option>
+                    {availableSlots.map((slot) => (
+                      <option key={slot.id} value={slot.id}>
+                        {slot.folio} - {slot.firstFragranceLeftArm} / {slot.secondFragranceRightArm}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <input className={inputClass} name="folio" placeholder="Folio manual" />
+                <input className={inputClass} name="firstFragranceLeftArm" placeholder="Primera fragancia / brazo izquierdo" />
+                <input className={inputClass} name="secondFragranceRightArm" placeholder="Segunda fragancia / brazo derecho" />
+                <SubmitButton pendingLabel="Asignando folio...">Guardar folio/rotacion</SubmitButton>
+              </form>
+            </details>
             <form action={startHutBlockAction.bind(null, studyId, participant.id, 1)}>
               <input className={inputClass} name="startDate" type="date" />
               <div className="mt-2">
@@ -363,6 +430,16 @@ function HutParticipantCard({ participant, studyId }: { participant: HutAdminPar
             </label>
             <textarea className={inputClass} name="reason" placeholder="Motivo obligatorio si se habilita" rows={2} />
             <SubmitButton pendingLabel="Guardando override...">Guardar override visual</SubmitButton>
+          </form>
+        </details>
+        <details className="rounded-md border border-rose-200 bg-rose-50 p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-rose-950">Zona peligrosa</summary>
+          <p className="mt-2 text-xs leading-5 text-rose-900">
+            Eliminar este participante borrara sus bloques, videos, selfies, verificaciones, evaluaciones y avance HUT. Esta accion no se puede deshacer.
+          </p>
+          <form action={deleteHutParticipantAction.bind(null, studyId, participant.id)} className="mt-3 space-y-2">
+            <input className={inputClass} name="confirmation" placeholder="ELIMINAR PARTICIPANTE HUT" required />
+            <SubmitButton pendingLabel="Eliminando participante...">Eliminar participante HUT</SubmitButton>
           </form>
         </details>
       </div>

@@ -84,6 +84,11 @@ export type HutAdminParticipant = {
     signedUrl: string | null;
     status: "COMPLETE" | "MISSING";
   };
+  registrationSlot: {
+    folio: string;
+    id: string;
+    status: "AVAILABLE" | "CANCELLED" | "REGISTERED";
+  } | null;
   secondFragranceRightArm: string | null;
   status: HutParticipantStatus;
   token: string;
@@ -168,10 +173,14 @@ export type HutRepository = {
   }) => Promise<HutActionResult<{ participantId: string }>>;
   createParticipant: (input: {
     email?: string | null;
+    firstFragranceLeftArm?: string | null;
+    folio?: string | null;
     name: string;
     phone?: string | null;
     recruiter?: string | null;
     requestOrigin: string;
+    secondFragranceRightArm?: string | null;
+    slotId?: string | null;
     startDate?: Date | null;
     studyId: string;
   }) => Promise<HutActionResult<{ link: string; participantId: string }>>;
@@ -207,6 +216,19 @@ export type HutRepository = {
   markMissedDay: (input: {
     participantId: string;
     reminderSent?: boolean;
+    studyId: string;
+  }) => Promise<HutActionResult<{ participantId: string }>>;
+  assignParticipantRotation: (input: {
+    firstFragranceLeftArm?: string | null;
+    folio?: string | null;
+    participantId: string;
+    secondFragranceRightArm?: string | null;
+    slotId?: string | null;
+    studyId: string;
+  }) => Promise<HutActionResult<{ participantId: string }>>;
+  deleteParticipant: (input: {
+    confirmation: string;
+    participantId: string;
     studyId: string;
   }) => Promise<HutActionResult<{ participantId: string }>>;
   reactivateParticipant: (input: {
@@ -290,6 +312,7 @@ export type HutRepository = {
 type PrismaModel = {
   count?: (args: unknown) => Promise<number>;
   create?: (args: unknown) => Promise<unknown>;
+  delete?: (args: unknown) => Promise<unknown>;
   deleteMany?: (args: unknown) => Promise<unknown>;
   findFirst?: (args: unknown) => Promise<unknown>;
   findMany?: (args: unknown) => Promise<unknown>;
@@ -544,6 +567,14 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
       const phone = normalizeHutPhone(input.phone);
       const email = normalizeHutEmail(input.email);
       const recruiter = normalizeOptionalHutText(input.recruiter);
+      const manualRotation = normalizeManualRotation({
+        firstFragranceLeftArm: input.firstFragranceLeftArm,
+        folio: input.folio,
+        secondFragranceRightArm: input.secondFragranceRightArm
+      });
+      if (!manualRotation.ok) {
+        return { message: manualRotation.message, ok: false };
+      }
       const prisma = await getPrisma();
 
       return prisma.$transaction(async (tx) => {
@@ -554,6 +585,38 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
 
         if (!study) {
           return { message: "No encontramos el estudio.", ok: false };
+        }
+
+        const slot = input.slotId
+          ? ((await tx.hutRegistrationSlot.findUnique?.({
+              select: registrationSlotSelect,
+              where: { id: input.slotId }
+            })) as HutRegistrationSlotRecord | null)
+          : null;
+
+        if (input.slotId && (!slot || slot.studyId !== input.studyId)) {
+          return { message: "No encontramos el folio HUT seleccionado.", ok: false };
+        }
+        if (slot && (slot.status !== "AVAILABLE" || slot.participantId)) {
+          return { message: "Este folio ya fue registrado.", ok: false };
+        }
+
+        const rotation = slot
+          ? {
+              firstFragranceLeftArm: slot.firstFragranceLeftArm,
+              folio: slot.folio,
+              secondFragranceRightArm: slot.secondFragranceRightArm
+            }
+          : manualRotation.data;
+
+        if (rotation?.folio) {
+          const duplicate = await findParticipantByFolio(tx, {
+            folio: rotation.folio,
+            studyId: input.studyId
+          });
+          if (duplicate) {
+            return { message: "Ya existe un participante HUT con ese folio.", ok: false };
+          }
         }
 
         const existing = await findExistingParticipant(tx, {
@@ -580,9 +643,12 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
             currentBlockNumber: 1,
             currentVideoSequence: 1,
             email,
+            firstFragranceLeftArm: rotation?.firstFragranceLeftArm ?? null,
+            folio: rotation?.folio ?? null,
             name,
             phone,
             recruiter,
+            secondFragranceRightArm: rotation?.secondFragranceRightArm ?? null,
             startDate: input.startDate ?? null,
             status: startsNow ? "BLOCK_1_IN_PROGRESS" : "NOT_STARTED",
             studyId: input.studyId,
@@ -590,39 +656,22 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
           }
         })) as { id: string };
 
-        await tx.hutBlock.create?.({
-          data: {
-            blockNumber: 1,
-            maxMissedDaysAllowed: HUT_MAX_MISSED_DAYS_PER_BLOCK,
-            participantId: participant.id,
-            requiredVideos: HUT_REQUIRED_VIDEOS_PER_BLOCK,
-            startDate: input.startDate ?? null,
-            status: startsNow ? "IN_PROGRESS" : "NOT_STARTED"
-          }
+        await createHutParticipantFoundation(tx, {
+          participantId: participant.id,
+          startDate: input.startDate ?? null,
+          startsNow
         });
-        await tx.hutBlock.create?.({
-          data: {
-            blockNumber: 2,
-            maxMissedDaysAllowed: HUT_MAX_MISSED_DAYS_PER_BLOCK,
-            participantId: participant.id,
-            requiredVideos: HUT_REQUIRED_VIDEOS_PER_BLOCK,
-            status: "NOT_STARTED"
-          }
-        });
-        await tx.hutCallEvaluation.create?.({
-          data: {
-            blockNumber: 1,
-            participantId: participant.id,
-            status: "PENDING"
-          }
-        });
-        await tx.hutCallEvaluation.create?.({
-          data: {
-            blockNumber: 2,
-            participantId: participant.id,
-            status: "PENDING"
-          }
-        });
+
+        if (slot) {
+          await tx.hutRegistrationSlot.update?.({
+            data: {
+              participantId: participant.id,
+              registeredAt: new Date(),
+              status: "REGISTERED"
+            },
+            where: { id: slot.id }
+          });
+        }
 
         return {
           data: {
@@ -655,6 +704,14 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
 
       if (!study) {
         return { message: "No encontramos el estudio.", ok: false };
+      }
+
+      const participantWithFolio = await findParticipantByFolio(prisma, {
+        folio,
+        studyId: input.studyId
+      });
+      if (participantWithFolio) {
+        return { message: "Ya existe un participante HUT con ese folio.", ok: false };
       }
 
       const existing = (await prisma.hutRegistrationSlot.findFirst?.({
@@ -942,6 +999,122 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
         return {
           data: { participantId: participant.id },
           message: "Dia omitido registrado. La tolerancia del bloque quedo consumida.",
+          ok: true
+        };
+      });
+    },
+
+    async assignParticipantRotation(input) {
+      const manualRotation = normalizeManualRotation({
+        firstFragranceLeftArm: input.firstFragranceLeftArm,
+        folio: input.folio,
+        secondFragranceRightArm: input.secondFragranceRightArm
+      });
+      if (!input.slotId && !manualRotation.ok) {
+        return { message: manualRotation.message, ok: false };
+      }
+
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipant(tx, input.participantId);
+
+        if (!participant || participant.studyId !== input.studyId) {
+          return { message: "No encontramos el participante HUT.", ok: false };
+        }
+
+        const slot = input.slotId
+          ? ((await tx.hutRegistrationSlot.findUnique?.({
+              select: registrationSlotSelect,
+              where: { id: input.slotId }
+            })) as HutRegistrationSlotRecord | null)
+          : null;
+
+        if (input.slotId && (!slot || slot.studyId !== input.studyId)) {
+          return { message: "No encontramos el folio HUT seleccionado.", ok: false };
+        }
+        if (slot && (slot.status !== "AVAILABLE" || slot.participantId)) {
+          return { message: "Este folio ya fue registrado.", ok: false };
+        }
+
+        const rotation = slot
+          ? {
+              firstFragranceLeftArm: slot.firstFragranceLeftArm,
+              folio: slot.folio,
+              secondFragranceRightArm: slot.secondFragranceRightArm
+            }
+          : manualRotation.ok
+            ? manualRotation.data
+            : null;
+
+        if (!rotation) {
+          return { message: "Captura folio y rotacion HUT.", ok: false };
+        }
+
+        const duplicate = await findParticipantByFolio(tx, {
+          excludeParticipantId: participant.id,
+          folio: rotation.folio,
+          studyId: input.studyId
+        });
+        if (duplicate) {
+          return { message: "Ya existe un participante HUT con ese folio.", ok: false };
+        }
+
+        await releaseParticipantRegistrationSlot(tx, participant.id);
+        await tx.hutParticipant.update?.({
+          data: {
+            firstFragranceLeftArm: rotation.firstFragranceLeftArm,
+            folio: rotation.folio,
+            secondFragranceRightArm: rotation.secondFragranceRightArm
+          },
+          where: { id: participant.id }
+        });
+
+        if (slot) {
+          await tx.hutRegistrationSlot.update?.({
+            data: {
+              participantId: participant.id,
+              registeredAt: new Date(),
+              status: "REGISTERED"
+            },
+            where: { id: slot.id }
+          });
+        }
+
+        return {
+          data: { participantId: participant.id },
+          message: "Folio y rotacion asignados correctamente.",
+          ok: true
+        };
+      });
+    },
+
+    async deleteParticipant(input) {
+      if (input.confirmation.trim() !== "ELIMINAR PARTICIPANTE HUT") {
+        return { message: "Escribe ELIMINAR PARTICIPANTE HUT para confirmar.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipant(tx, input.participantId);
+
+        if (!participant || participant.studyId !== input.studyId) {
+          return { message: "No encontramos el participante HUT.", ok: false };
+        }
+
+        await releaseParticipantRegistrationSlot(tx, participant.id);
+        await tx.hutVisualVerification.deleteMany?.({ where: { participantId: participant.id } });
+        await tx.hutVideoSubmission.deleteMany?.({ where: { participantId: participant.id } });
+        await tx.hutDailyCheck.deleteMany?.({ where: { participantId: participant.id } });
+        await tx.hutCallEvaluation.deleteMany?.({ where: { participantId: participant.id } });
+        await tx.hutReferenceSelfie.deleteMany?.({ where: { participantId: participant.id } });
+        await tx.hutBlock.deleteMany?.({ where: { participantId: participant.id } });
+        await tx.hutParticipant.delete?.({ where: { id: participant.id } });
+
+        return {
+          data: { participantId: participant.id },
+          message: "Participante HUT eliminado correctamente. El folio asociado quedo disponible.",
           ok: true
         };
       });
@@ -1239,6 +1412,14 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
         }
         if (slot.status !== "AVAILABLE" || slot.participantId) {
           return { message: "Este folio ya fue registrado.", ok: false };
+        }
+
+        const duplicate = await findParticipantByFolio(tx, {
+          folio: slot.folio,
+          studyId: slot.studyId
+        });
+        if (duplicate) {
+          return { message: "Ya existe un participante HUT con ese folio.", ok: false };
         }
 
         try {
@@ -1628,6 +1809,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
         [
           "Folio",
           "Link de registro",
+          "Link participante",
           "Estado",
           "Nombre participante",
           "Celular",
@@ -1638,6 +1820,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
         ...dashboard.registrationSlots.map((slot) => [
           slot.folio,
           slot.link,
+          slot.participantLink,
           slot.status,
           slot.participantName,
           slot.phone,
@@ -1684,6 +1867,67 @@ async function findExistingParticipant(
   })) as { id: string; token: string } | null;
 }
 
+async function findParticipantByFolio(
+  prisma: HutPrismaClient,
+  input: { excludeParticipantId?: string; folio: string; studyId: string }
+) {
+  const participant = (await prisma.hutParticipant.findFirst?.({
+    select: {
+      id: true,
+      token: true
+    },
+    where: {
+      folio: input.folio,
+      studyId: input.studyId
+    }
+  })) as { id: string; token: string } | null;
+
+  if (participant && participant.id !== input.excludeParticipantId) {
+    return participant;
+  }
+
+  return null;
+}
+
+function normalizeManualRotation(input: {
+  firstFragranceLeftArm?: string | null;
+  folio?: string | null;
+  secondFragranceRightArm?: string | null;
+}):
+  | { ok: true; data: { firstFragranceLeftArm: string; folio: string; secondFragranceRightArm: string } | null }
+  | { ok: false; message: string } {
+  const folio = normalizeHutText(input.folio);
+  const firstFragranceLeftArm = normalizeHutText(input.firstFragranceLeftArm);
+  const secondFragranceRightArm = normalizeHutText(input.secondFragranceRightArm);
+
+  if (!folio && !firstFragranceLeftArm && !secondFragranceRightArm) {
+    return { data: null, ok: true };
+  }
+  if (!folio || !firstFragranceLeftArm || !secondFragranceRightArm) {
+    return { message: "Captura folio, primera fragancia y segunda fragancia.", ok: false };
+  }
+
+  return {
+    data: {
+      firstFragranceLeftArm,
+      folio,
+      secondFragranceRightArm
+    },
+    ok: true
+  };
+}
+
+async function releaseParticipantRegistrationSlot(tx: HutPrismaClient, participantId: string) {
+  await tx.hutRegistrationSlot.updateMany?.({
+    data: {
+      participantId: null,
+      registeredAt: null,
+      status: "AVAILABLE"
+    },
+    where: { participantId }
+  });
+}
+
 function toAdminParticipant(participant: HutParticipantRecord, requestOrigin: string): HutAdminParticipant {
   const block1 = blockByNumber(participant, 1);
   const block2 = blockByNumber(participant, 2);
@@ -1727,6 +1971,13 @@ function toAdminParticipant(participant: HutParticipantRecord, requestOrigin: st
           signedUrl: null,
           status: "MISSING"
         },
+    registrationSlot: participant.registrationSlot
+      ? {
+          folio: participant.registrationSlot.folio,
+          id: participant.registrationSlot.id,
+          status: participant.registrationSlot.status
+        }
+      : null,
     status: participant.status,
     secondFragranceRightArm: participant.secondFragranceRightArm,
     token: participant.token,

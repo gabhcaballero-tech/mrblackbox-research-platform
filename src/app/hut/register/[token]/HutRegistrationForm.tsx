@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   completeHutRegistrationAction,
   requestHutRegistrationSelfieUploadAction
@@ -18,10 +18,110 @@ export function HutRegistrationForm({ requestOrigin, token }: HutRegistrationFor
   const [email, setEmail] = useState("");
   const [recruiter, setRecruiter] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [participantLink, setParticipantLink] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const previewUrlRef = useRef<string | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!cameraOpen || !videoRef.current || !streamRef.current) {
+      return;
+    }
+
+    videoRef.current.srcObject = streamRef.current;
+    void videoRef.current.play().catch(() => {
+      setCameraError("No fue posible iniciar la vista de camara. Puedes subir una selfie como respaldo.");
+    });
+  }, [cameraOpen]);
+
+  async function openCamera() {
+    setCameraError(null);
+    setError(null);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: "user" }
+      });
+      streamRef.current = stream;
+      setCameraOpen(true);
+    } catch {
+      setCameraError("No fue posible abrir la camara. Puedes subir una selfie como respaldo.");
+    }
+  }
+
+  function stopCamera() {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraOpen(false);
+  }
+
+  function captureSelfie() {
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
+      setCameraError("La camara aun no esta lista. Intenta de nuevo.");
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setCameraError("No fue posible tomar la selfie. Intenta de nuevo.");
+      return;
+    }
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          setCameraError("No fue posible tomar la selfie. Intenta de nuevo.");
+          return;
+        }
+        const capturedFile = new File([blob], `selfie-registro-${Date.now()}.jpg`, { type: "image/jpeg" });
+        setFile(capturedFile);
+        setPreview(capturedFile);
+        stopCamera();
+      },
+      "image/jpeg",
+      0.92
+    );
+  }
+
+  function setPreview(selectedFile: File | null) {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+    }
+    const nextUrl = selectedFile ? URL.createObjectURL(selectedFile) : null;
+    previewUrlRef.current = nextUrl;
+    setPreviewUrl(nextUrl);
+  }
+
+  function repeatSelfie() {
+    setFile(null);
+    setPreview(null);
+    void openCamera();
+  }
 
   function submit() {
     if (isPending) {
@@ -97,6 +197,7 @@ export function HutRegistrationForm({ requestOrigin, token }: HutRegistrationFor
         }
 
         setFile(null);
+        setPreview(null);
         setParticipantLink(completed.data.participantLink);
         setMessage("Registro HUT completado correctamente.");
       } catch {
@@ -128,16 +229,64 @@ export function HutRegistrationForm({ requestOrigin, token }: HutRegistrationFor
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
           Selfie de registro
-          <input
-            accept="image/jpeg,image/png,image/webp,image/*"
-            capture="user"
-            className={inputClass}
-            disabled={isPending || Boolean(participantLink)}
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            required
-            type="file"
-          />
+          <span className="text-xs font-normal leading-5 text-zinc-600">
+            Esta selfie se usara como referencia para verificar tu identidad durante el estudio.
+          </span>
         </label>
+        <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+          {cameraOpen ? (
+            <div className="space-y-3">
+              <video
+                ref={videoRef}
+                autoPlay
+                className="aspect-[3/4] w-full rounded-md bg-zinc-950 object-cover"
+                muted
+                playsInline
+              />
+              <div className="flex flex-wrap gap-2">
+                <button className={secondaryButtonClass} disabled={isPending} onClick={captureSelfie} type="button">
+                  Tomar selfie
+                </button>
+                <button className={secondaryButtonClass} disabled={isPending} onClick={stopCamera} type="button">
+                  Cancelar camara
+                </button>
+              </div>
+            </div>
+          ) : previewUrl ? (
+            <div className="space-y-3">
+              <img alt="Preview de selfie de registro" className="aspect-[3/4] w-full rounded-md bg-zinc-100 object-cover" src={previewUrl} />
+              <div className="flex flex-wrap gap-2">
+                <button className={secondaryButtonClass} disabled={isPending || Boolean(participantLink)} onClick={repeatSelfie} type="button">
+                  Repetir foto
+                </button>
+                <button className={secondaryButtonClass} disabled={isPending || Boolean(participantLink)} onClick={() => setMessage("Selfie lista para completar registro.")} type="button">
+                  Usar esta selfie
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button className={secondaryButtonClass} disabled={isPending || Boolean(participantLink)} onClick={() => void openCamera()} type="button">
+              Tomar selfie de registro
+            </button>
+          )}
+          {cameraError ? <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{cameraError}</p> : null}
+          <label className="mt-4 flex flex-col gap-1 text-sm font-medium text-zinc-700">
+            Subir archivo como respaldo
+            <input
+              accept="image/jpeg,image/png,image/webp,image/*"
+              capture="user"
+              className={inputClass}
+              disabled={isPending || Boolean(participantLink)}
+              onChange={(event) => {
+                const selectedFile = event.target.files?.[0] ?? null;
+                setFile(selectedFile);
+                setPreview(selectedFile);
+                stopCamera();
+              }}
+              type="file"
+            />
+          </label>
+        </div>
       </div>
 
       {message ? <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{message}</p> : null}
@@ -162,3 +311,4 @@ export function HutRegistrationForm({ requestOrigin, token }: HutRegistrationFor
 }
 
 const inputClass = "w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-950";
+const secondaryButtonClass = "rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400";

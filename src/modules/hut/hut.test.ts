@@ -198,6 +198,217 @@ describe("HUT module foundation", () => {
     expect(prisma.state.participants).toHaveLength(1);
   });
 
+  it("assigns an available HUT slot to an admin-created participant", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Admin",
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    await repository.createRegistrationSlot({
+      firstFragranceLeftArm: "Fragancia A",
+      folio: "HUT-010",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "Fragancia B",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    const slot = prisma.state.registrationSlots[0]!;
+    const assigned = await repository.assignParticipantRotation({
+      participantId: participant.id,
+      slotId: slot.id,
+      studyId: "study-hut"
+    });
+
+    expect(assigned.ok).toBe(true);
+    expect(participant).toMatchObject({
+      firstFragranceLeftArm: "FRAGANCIA A",
+      folio: "HUT-010",
+      secondFragranceRightArm: "FRAGANCIA B"
+    });
+    expect(slot).toMatchObject({
+      participantId: participant.id,
+      status: "REGISTERED"
+    });
+  });
+
+  it("creates an admin participant directly with an available HUT slot", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createRegistrationSlot({
+      firstFragranceLeftArm: "Fragancia A",
+      folio: "HUT-014",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "Fragancia B",
+      studyId: "study-hut"
+    });
+    const slot = prisma.state.registrationSlots[0]!;
+    const created = await repository.createParticipant({
+      name: "Participante Con Slot",
+      requestOrigin: "https://example.com",
+      slotId: slot.id,
+      studyId: "study-hut"
+    });
+
+    expect(created.ok).toBe(true);
+    expect(prisma.state.participants[0]).toMatchObject({
+      firstFragranceLeftArm: "FRAGANCIA A",
+      folio: "HUT-014",
+      secondFragranceRightArm: "FRAGANCIA B"
+    });
+    expect(slot).toMatchObject({
+      participantId: prisma.state.participants[0]?.id,
+      status: "REGISTERED"
+    });
+  });
+
+  it("blocks assigning a slot already assigned to another participant", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({ name: "Uno", requestOrigin: "https://example.com", studyId: "study-hut" });
+    await repository.createParticipant({ name: "Dos", requestOrigin: "https://example.com", studyId: "study-hut" });
+    await repository.createRegistrationSlot({
+      firstFragranceLeftArm: "Fragancia A",
+      folio: "HUT-011",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "Fragancia B",
+      studyId: "study-hut"
+    });
+    const slot = prisma.state.registrationSlots[0]!;
+    await repository.assignParticipantRotation({
+      participantId: prisma.state.participants[0]!.id,
+      slotId: slot.id,
+      studyId: "study-hut"
+    });
+    const second = await repository.assignParticipantRotation({
+      participantId: prisma.state.participants[1]!.id,
+      slotId: slot.id,
+      studyId: "study-hut"
+    });
+
+    expect(second.ok).toBe(false);
+    expect(second.ok ? "" : second.message).toBe("Este folio ya fue registrado.");
+  });
+
+  it("shows participant portal link when a HUT registration slot was assigned from admin", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({ name: "Uno", requestOrigin: "https://example.com", studyId: "study-hut" });
+    await repository.createRegistrationSlot({
+      firstFragranceLeftArm: "Fragancia A",
+      folio: "HUT-015",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "Fragancia B",
+      studyId: "study-hut"
+    });
+    await repository.assignParticipantRotation({
+      participantId: prisma.state.participants[0]?.id ?? "",
+      slotId: prisma.state.registrationSlots[0]?.id ?? "",
+      studyId: "study-hut"
+    });
+    const view = await repository.getRegistrationView(
+      prisma.state.registrationSlots[0]?.registrationToken ?? "",
+      "https://example.com"
+    );
+
+    expect(view.ok).toBe(true);
+    expect(view.ok ? view.data.status : "").toBe("REGISTERED");
+    expect(view.ok ? view.data.participantLink : "").toContain("https://example.com/hut/p/");
+  });
+
+  it("does not allow duplicate manual HUT folio in the same study", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      firstFragranceLeftArm: "Fragancia A",
+      folio: "HUT-012",
+      name: "Uno",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "Fragancia B",
+      studyId: "study-hut"
+    });
+    const duplicate = await repository.createParticipant({
+      firstFragranceLeftArm: "Fragancia C",
+      folio: "HUT-012",
+      name: "Dos",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "Fragancia D",
+      studyId: "study-hut"
+    });
+
+    expect(duplicate.ok).toBe(false);
+    expect(duplicate.ok ? "" : duplicate.message).toBe("Ya existe un participante HUT con ese folio.");
+    expect(prisma.state.participants).toHaveLength(1);
+  });
+
+  it("deletes a HUT participant with related records and releases its slot", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createRegistrationSlot({
+      firstFragranceLeftArm: "Fragancia A",
+      folio: "HUT-013",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "Fragancia B",
+      studyId: "study-hut"
+    });
+    const token = prisma.state.registrationSlots[0]?.registrationToken ?? "";
+    const signed = await repository.requestRegistrationSelfieUpload({ metadata: selfieMetadata(), storage, token });
+    await repository.completeRegistration({
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: signed.ok ? signed.data.privateStorageKey : "",
+        storageBucket: signed.ok ? signed.data.storageBucket : ""
+      },
+      name: "Ana",
+      phone: "5512345678",
+      requestOrigin: "https://example.com",
+      token
+    });
+    const participant = prisma.state.participants[0]!;
+    participant.visualVerifications.push({
+      attemptSelfieKey: "daily.jpg",
+      blockNumber: 1,
+      id: "verification-extra",
+      sequenceNumber: 1,
+      status: "MATCHED"
+    });
+    participant.videoSubmissions.push({
+      blockId: participant.blocks[0]!.id,
+      blockNumber: 1,
+      extension: "mp4",
+      mimeType: "video/mp4",
+      originalFilename: "video.mp4",
+      participantId: participant.id,
+      privateStorageKey: "video.mp4",
+      sequenceNumber: 1,
+      sizeBytes: 1024,
+      storageBucket: "participant-evidence"
+    });
+    participant.dailyChecks.push({
+      blockDayNumber: 1,
+      blockId: participant.blocks[0]!.id,
+      blockNumber: 1,
+      date: new Date(),
+      expectedVideoSequence: 1,
+      participantId: participant.id,
+      status: "COMPLETED"
+    });
+    const deleted = await repository.deleteParticipant({
+      confirmation: "ELIMINAR PARTICIPANTE HUT",
+      participantId: participant.id,
+      studyId: "study-hut"
+    });
+
+    expect(deleted.ok).toBe(true);
+    expect(prisma.state.participants).toHaveLength(0);
+    expect(prisma.state.registrationSlots[0]).toMatchObject({
+      participantId: null,
+      registeredAt: null,
+      status: "AVAILABLE"
+    });
+  });
+
   it("blocks video upload when registration selfie is missing", async () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
@@ -473,6 +684,11 @@ describe("HUT module foundation", () => {
       secondFragranceRightArm: "Fragancia B",
       studyId: "study-hut"
     });
+    await repository.assignParticipantRotation({
+      participantId: prisma.state.participants[0]?.id ?? "",
+      slotId: prisma.state.registrationSlots[0]?.id ?? "",
+      studyId: "study-hut"
+    });
 
     const result = await repository.exportProgress({
       now: new Date("2026-07-01T00:00:00.000Z"),
@@ -483,8 +699,9 @@ describe("HUT module foundation", () => {
     expect(result.ok ? result.data.filename : "").toBe("HUT-TEST_hut_avance_2026-07-01.tsv");
     expect(result.ok ? result.data.body : "").toContain("ID\tFolio\tNombre\tCelular\tCorreo\tReclutador");
     expect(result.ok ? result.data.body : "").toContain("PARTICIPANTE CON Ñ");
-    expect(result.ok ? result.data.body : "").toContain("Folio\tLink de registro\tEstado");
+    expect(result.ok ? result.data.body : "").toContain("Folio\tLink de registro\tLink participante\tEstado");
     expect(result.ok ? result.data.body : "").toContain("HUT-004\thttps://example.com/hut/register/");
+    expect(result.ok ? result.data.body : "").toContain("https://example.com/hut/p/");
     expect(result.ok ? result.data.body : "").toContain("FRAGANCIA A\tFRAGANCIA B");
   });
 
@@ -634,7 +851,14 @@ function createFakeHutPrisma() {
         state.participants.push(participant);
         return { id: participant.id };
       },
-      async findFirst(args: { where: { OR?: Array<{ email?: string; phone?: string }>; studyId: string } }) {
+      async findFirst(args: { where: { OR?: Array<{ email?: string; phone?: string }>; folio?: string; studyId: string } }) {
+        if (args.where.folio) {
+          return (
+            state.participants.find(
+              (participant) => participant.studyId === args.where.studyId && participant.folio === args.where.folio
+            ) ?? null
+          );
+        }
         return (
           state.participants.find(
             (participant) =>
@@ -657,6 +881,14 @@ function createFakeHutPrisma() {
           Object.assign(participant, args.data);
         }
         return participant;
+      },
+      async delete(args: { where: { id: string } }) {
+        const index = state.participants.findIndex((item) => item.id === args.where.id);
+        if (index >= 0) {
+          const [deleted] = state.participants.splice(index, 1);
+          return deleted;
+        }
+        return null;
       }
     },
     hutRegistrationSlot: {
@@ -687,7 +919,12 @@ function createFakeHutPrisma() {
           .map((slot) => slotWithParticipant(slot, state.participants));
       },
       async findUnique(args: { where: { registrationToken?: string } }) {
-        const slot = state.registrationSlots.find((item) => item.registrationToken === args.where.registrationToken) ?? null;
+        const slot =
+          state.registrationSlots.find(
+            (item) =>
+              (args.where.registrationToken && item.registrationToken === args.where.registrationToken) ||
+              ("id" in args.where && item.id === (args.where as { id?: string }).id)
+          ) ?? null;
         return slot ? slotWithParticipant(slot, state.participants) : null;
       },
       async update(args: { data: Partial<FakeRegistrationSlot>; where: { id: string } }) {
@@ -700,6 +937,11 @@ function createFakeHutPrisma() {
           }
         }
         return slot ? slotWithParticipant(slot, state.participants) : null;
+      },
+      async updateMany(args: { data: Partial<FakeRegistrationSlot>; where: { participantId: string } }) {
+        const slots = state.registrationSlots.filter((item) => item.participantId === args.where.participantId);
+        slots.forEach((slot) => Object.assign(slot, args.data));
+        return { count: slots.length };
       }
     },
     hutBlock: {
@@ -725,6 +967,14 @@ function createFakeHutPrisma() {
           Object.assign(block, args.data);
         }
         return block;
+      },
+      async deleteMany(args: { where: { participantId: string } }) {
+        const participant = state.participants.find((item) => item.id === args.where.participantId);
+        const count = participant?.blocks.length ?? 0;
+        if (participant) {
+          participant.blocks = [];
+        }
+        return { count };
       }
     },
     hutReferenceSelfie: {
@@ -750,6 +1000,14 @@ function createFakeHutPrisma() {
           Object.assign(participant.referenceSelfie, args.data);
         }
         return participant?.referenceSelfie ?? null;
+      },
+      async deleteMany(args: { where: { participantId: string } }) {
+        const participant = state.participants.find((item) => item.id === args.where.participantId);
+        const count = participant?.referenceSelfie ? 1 : 0;
+        if (participant) {
+          participant.referenceSelfie = null;
+        }
+        return { count };
       }
     },
     hutCallEvaluation: {
@@ -770,6 +1028,14 @@ function createFakeHutPrisma() {
           Object.assign(call, args.data);
         }
         return call;
+      },
+      async deleteMany(args: { where: { participantId: string } }) {
+        const participant = state.participants.find((item) => item.id === args.where.participantId);
+        const count = participant?.callEvaluations.length ?? 0;
+        if (participant) {
+          participant.callEvaluations = [];
+        }
+        return { count };
       }
     },
     hutDailyCheck: {
@@ -777,6 +1043,14 @@ function createFakeHutPrisma() {
         const participant = state.participants.find((item) => item.id === args.data.participantId);
         participant?.dailyChecks.push(args.data);
         return args.data;
+      },
+      async deleteMany(args: { where: { participantId: string } }) {
+        const participant = state.participants.find((item) => item.id === args.where.participantId);
+        const count = participant?.dailyChecks.length ?? 0;
+        if (participant) {
+          participant.dailyChecks = [];
+        }
+        return { count };
       }
     },
     hutVideoSubmission: {
@@ -785,6 +1059,14 @@ function createFakeHutPrisma() {
         const video = { ...args.data, id: `video-${state.nextId++}` };
         participant?.videoSubmissions.push(video);
         return video;
+      },
+      async deleteMany(args: { where: { participantId: string } }) {
+        const participant = state.participants.find((item) => item.id === args.where.participantId);
+        const count = participant?.videoSubmissions.length ?? 0;
+        if (participant) {
+          participant.videoSubmissions = [];
+        }
+        return { count };
       }
     },
     hutVisualVerification: {
@@ -806,6 +1088,14 @@ function createFakeHutPrisma() {
           Object.assign(verification, args.data);
         }
         return verification;
+      },
+      async deleteMany(args: { where: { participantId: string } }) {
+        const participant = state.participants.find((item) => item.id === args.where.participantId);
+        const count = participant?.visualVerifications.length ?? 0;
+        if (participant) {
+          participant.visualVerifications = [];
+        }
+        return { count };
       }
     }
   };

@@ -11,10 +11,14 @@ export async function createHutParticipantAction(studyId: string, formData: Form
   await requireCapability("screening:review");
   const result = await createHutRepository().createParticipant({
     email: String(formData.get("email") ?? ""),
+    firstFragranceLeftArm: String(formData.get("firstFragranceLeftArm") ?? ""),
+    folio: String(formData.get("folio") ?? ""),
     name: String(formData.get("name") ?? ""),
     phone: String(formData.get("phone") ?? ""),
     recruiter: String(formData.get("recruiter") ?? ""),
     requestOrigin: String(formData.get("requestOrigin") ?? ""),
+    secondFragranceRightArm: String(formData.get("secondFragranceRightArm") ?? ""),
+    slotId: String(formData.get("slotId") ?? ""),
     startDate: parseOptionalDate(formData.get("startDate")),
     studyId
   });
@@ -53,6 +57,31 @@ export async function importHutRegistrationSlotsAction(studyId: string, formData
     requestOrigin: String(formData.get("requestOrigin") ?? ""),
     studyId,
     text: String(formData.get("slotsText") ?? "")
+  });
+
+  redirectWithHutMessage(studyId, result);
+}
+
+export async function assignHutParticipantRotationAction(studyId: string, participantId: string, formData: FormData) {
+  await requireCapability("screening:review");
+  const result = await createHutRepository().assignParticipantRotation({
+    firstFragranceLeftArm: String(formData.get("firstFragranceLeftArm") ?? ""),
+    folio: String(formData.get("folio") ?? ""),
+    participantId,
+    secondFragranceRightArm: String(formData.get("secondFragranceRightArm") ?? ""),
+    slotId: String(formData.get("slotId") ?? ""),
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
+export async function deleteHutParticipantAction(studyId: string, participantId: string, formData: FormData) {
+  await requireCapability("screening:review");
+  const result = await createHutRepository().deleteParticipant({
+    confirmation: String(formData.get("confirmation") ?? ""),
+    participantId,
+    studyId
   });
 
   redirectWithHutMessage(studyId, result);
