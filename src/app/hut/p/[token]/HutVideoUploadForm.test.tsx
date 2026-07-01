@@ -125,7 +125,8 @@ describe("HutVideoUploadForm", () => {
 
     rerender(<HutVideoUploadForm blockNumber={1} mode="video" sequenceNumber={1} token="hut-token" />);
 
-    expect(screen.getByLabelText("Video")).toBeInTheDocument();
+    expect(screen.getAllByText("Tomar video")).toHaveLength(2);
+    expect(document.querySelector('input[type="file"][accept="video/*"]')).toBeInTheDocument();
   });
 
   it("allows taking a daily selfie with the camera and shows the privacy HUD in preview", async () => {

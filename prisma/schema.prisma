@@ -661,6 +661,7 @@ model HutParticipant {
   startDate               DateTime?
   currentBlockNumber      Int                  @default(1)
   currentVideoSequence    Int                  @default(1)
+  testMode                Boolean              @default(false)
   visualOverrideEnabled   Boolean              @default(false)
   visualOverrideReason    String?
   visualOverrideByUserId  String?              @db.Uuid

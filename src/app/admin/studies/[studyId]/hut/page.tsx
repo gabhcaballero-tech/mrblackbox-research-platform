@@ -9,7 +9,11 @@ import {
   deleteHutParticipantAction,
   markHutMissedDayAction,
   reactivateHutParticipantAction,
+  resetHutCallEvaluationAction,
+  resetHutReferenceSelfieAction,
+  resetHutVideoSubmissionAction,
   setHutVisualOverrideAction,
+  setHutTestModeAction,
   startHutBlockAction
 } from "@/modules/hut/actions";
 import { createHutRepository, type HutAdminParticipant, type HutRegistrationSlotAdmin } from "@/modules/hut";
@@ -308,6 +312,7 @@ function HutParticipantCard({
           <Field label="Segunda fragancia / brazo derecho" value={participant.secondFragranceRightArm ?? "No asignada"} />
           <Field label="Origen folio" value={participant.registrationSlot ? `Slot ${participant.registrationSlot.folio}` : participant.folio ? "Manual" : "No asignado"} />
           <Field label="Estado" value={hutParticipantStatusLabel(participant.status)} />
+          <Field label="Modo prueba" value={participant.testMode ? "Activo" : "Inactivo"} />
           <Field label="Selfie de registro" value={participant.referenceSelfie.status === "COMPLETE" ? "Completa" : "Faltante"} />
           <Field label="Bloque actual" value={String(participant.currentBlockNumber)} />
           <Field label="Video esperado" value={String(participant.currentVideoSequence)} />
@@ -332,7 +337,7 @@ function HutParticipantCard({
         <section className="rounded-md border border-zinc-200 bg-white p-3">
           <h3 className="text-sm font-semibold text-zinc-950">Selfie de registro</h3>
           <p className="mt-1 text-xs leading-5 text-zinc-600">
-            Captura o sube la selfie base antes de iniciar videos. Se usará para comparar las selfies diarias.
+            Captura la selfie base antes de iniciar videos. Se usará para comparar las selfies diarias.
           </p>
           <div className="mt-3">
             <HutReferenceSelfieUpload
@@ -345,8 +350,8 @@ function HutParticipantCard({
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
-        <BlockCard block={participant.block1} label="Bloque 1" />
-        <BlockCard block={participant.block2} label="Bloque 2" />
+        <BlockCard block={participant.block1} label="Bloque 1" participantId={participant.id} studyId={studyId} />
+        <BlockCard block={participant.block2} label="Bloque 2" participantId={participant.id} studyId={studyId} />
         <CallCard call={participant.call1} label="Evaluación 1" />
         <CallCard call={participant.call2} label="Evaluación 2" />
       </div>
@@ -431,13 +436,33 @@ function HutParticipantCard({
             <textarea className={inputClass} name="reason" placeholder="Motivo obligatorio si se habilita" rows={2} />
             <SubmitButton pendingLabel="Guardando override...">Guardar override visual</SubmitButton>
           </form>
+          <form action={setHutTestModeAction.bind(null, studyId, participant.id)} className="mt-4 space-y-2">
+            <p className="text-xs font-semibold text-amber-950">Modo prueba</p>
+            <label className="flex items-center gap-2 text-xs text-amber-950">
+              <input defaultChecked={participant.testMode} name="enabled" type="checkbox" />
+              Permitir avanzar sin esperar 5:00 a.m. ni dias reales
+            </label>
+            <SubmitButton pendingLabel="Guardando modo prueba...">Guardar modo prueba</SubmitButton>
+          </form>
         </details>
         <details className="rounded-md border border-rose-200 bg-rose-50 p-3">
           <summary className="cursor-pointer text-sm font-semibold text-rose-950">Zona peligrosa</summary>
           <p className="mt-2 text-xs leading-5 text-rose-900">
             Eliminar este participante borrara sus bloques, videos, selfies, verificaciones, evaluaciones y avance HUT. Esta accion no se puede deshacer.
           </p>
-          <form action={deleteHutParticipantAction.bind(null, studyId, participant.id)} className="mt-3 space-y-2">
+          <form action={resetHutReferenceSelfieAction.bind(null, studyId, participant.id)} className="mt-3 space-y-2">
+            <input className={inputClass} name="confirmation" placeholder="ELIMINAR SELFIE DE REGISTRO" required />
+            <SubmitButton pendingLabel="Eliminando selfie...">Eliminar selfie de registro</SubmitButton>
+          </form>
+          <form action={resetHutCallEvaluationAction.bind(null, studyId, participant.id, 1)} className="mt-4 space-y-2">
+            <input className={inputClass} name="confirmation" placeholder="RESTABLECER EVALUACION 1" required />
+            <SubmitButton pendingLabel="Restableciendo evaluacion...">Restablecer evaluacion 1</SubmitButton>
+          </form>
+          <form action={resetHutCallEvaluationAction.bind(null, studyId, participant.id, 2)} className="mt-4 space-y-2">
+            <input className={inputClass} name="confirmation" placeholder="RESTABLECER EVALUACION 2" required />
+            <SubmitButton pendingLabel="Restableciendo evaluacion...">Restablecer evaluacion 2</SubmitButton>
+          </form>
+          <form action={deleteHutParticipantAction.bind(null, studyId, participant.id)} className="mt-4 space-y-2">
             <input className={inputClass} name="confirmation" placeholder="ELIMINAR PARTICIPANTE HUT" required />
             <SubmitButton pendingLabel="Eliminando participante...">Eliminar participante HUT</SubmitButton>
           </form>
@@ -447,7 +472,17 @@ function HutParticipantCard({
   );
 }
 
-function BlockCard({ block, label }: { block: HutAdminParticipant["block1"]; label: string }) {
+function BlockCard({
+  block,
+  label,
+  participantId,
+  studyId
+}: {
+  block: HutAdminParticipant["block1"];
+  label: string;
+  participantId: string;
+  studyId: string;
+}) {
   return (
     <section className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
       <h3 className="text-sm font-semibold text-zinc-950">{label}</h3>
@@ -457,6 +492,38 @@ function BlockCard({ block, label }: { block: HutAdminParticipant["block1"]; lab
         <Field label="Días omitidos" value={`${block?.missedDaysCount ?? 0}/1`} />
         {block?.disqualificationReason ? <Field label="Motivo" value={block.disqualificationReason} /> : null}
       </dl>
+      {block ? (
+        <div className="mt-3 space-y-2">
+          {block.videos.map((video) => (
+            <div className="rounded-md border border-zinc-200 bg-white p-2" key={`${block.blockNumber}-${video.sequenceNumber}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="font-semibold text-zinc-950">Video {video.sequenceNumber}</span>
+                {video.signedUrl ? (
+                  <a className="font-semibold text-teal-700" href={video.signedUrl} rel="noreferrer" target="_blank">
+                    Ver video
+                  </a>
+                ) : (
+                  <span className="text-zinc-500">Pendiente</span>
+                )}
+              </div>
+              {video.submittedAt ? (
+                <p className="mt-1 text-xs text-zinc-500">
+                  {video.status} - {video.submittedAt.toLocaleString("es-MX")}
+                </p>
+              ) : null}
+              {video.signedUrl ? (
+                <form
+                  action={resetHutVideoSubmissionAction.bind(null, studyId, participantId, block.blockNumber as 1 | 2, video.sequenceNumber)}
+                  className="mt-2 space-y-1"
+                >
+                  <input className={inputClass} name="confirmation" placeholder={`RESTABLECER VIDEO ${video.sequenceNumber}`} />
+                  <SubmitButton pendingLabel="Restableciendo video...">{`Restablecer video ${video.sequenceNumber}`}</SubmitButton>
+                </form>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

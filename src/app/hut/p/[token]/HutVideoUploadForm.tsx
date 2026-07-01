@@ -305,7 +305,7 @@ export function HutVideoUploadForm({ blockNumber, mode, sequenceNumber, token }:
       <p className="mt-2 text-sm leading-6 text-zinc-600">
         {mode === "selfie"
           ? "Antes de subir tu video, tomaremos una selfie para confirmar tu identidad."
-          : "Puedes grabarlo desde tu celular o seleccionar un archivo de video. No cierres esta pantalla mientras se sube."}
+          : "Graba y sube tu video del dia. No cierres esta pantalla mientras se sube."}
       </p>
       {message ? (
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{message}</p>
@@ -377,16 +377,20 @@ export function HutVideoUploadForm({ blockNumber, mode, sequenceNumber, token }:
             ) : null}
           </>
         ) : (
-          <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
-            Video
+          <label className="inline-flex cursor-pointer flex-col gap-2 text-sm font-medium text-zinc-700">
+            <span>Tomar video</span>
             <input
-              accept="video/mp4,video/quicktime,video/webm,video/*"
+              accept="video/*"
               capture="environment"
-              className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-950"
+              className="sr-only"
               disabled={isPending}
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
               type="file"
             />
+            <span className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100">
+              Tomar video
+            </span>
+            {file ? <span className="text-xs font-normal text-zinc-600">{file.name}</span> : null}
           </label>
         )}
         {mode === "video" ? (

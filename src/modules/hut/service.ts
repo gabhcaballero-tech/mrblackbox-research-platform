@@ -96,6 +96,7 @@ export type HutAvailabilityInput = {
     blockDayNumber: number;
   }>;
   hasReferenceSelfie: boolean;
+  testMode?: boolean;
   hasVisualOverride: boolean;
   latestVerificationStatus?: "MATCHED" | "NOT_MATCHED" | "NOT_REQUIRED_BY_OVERRIDE" | "PENDING" | "PENDING_REVIEW" | "UNCERTAIN" | null;
   now: Date;
@@ -178,7 +179,7 @@ export function getHutCurrentAvailability(input: HutAvailabilityInput): HutAvail
     timeZoneIana: input.timeZoneIana
   });
 
-  if (input.now.getTime() < nextAvailableAt.getTime()) {
+  if (!input.testMode && input.now.getTime() < nextAvailableAt.getTime()) {
     return {
       ...base,
       available: false,

@@ -484,6 +484,33 @@ describe("HUT module foundation", () => {
     expect(availability.expectedVideoSequence).toBe(2);
   });
 
+  it("test mode ignores the 5 a.m. availability wait without affecting normal participants", () => {
+    const blockInput = {
+      ...block({ submittedVideosCount: 1 }),
+      startDate: new Date("2026-07-01T06:00:00.000Z")
+    };
+    const normalAvailability = getHutCurrentAvailability({
+      block: blockInput,
+      dailyChecks: [{ blockDayNumber: 1 }],
+      hasReferenceSelfie: true,
+      hasVisualOverride: false,
+      now: new Date("2026-07-01T11:30:00.000Z"),
+      timeZoneIana: "America/Mexico_City"
+    });
+    const testModeAvailability = getHutCurrentAvailability({
+      block: blockInput,
+      dailyChecks: [{ blockDayNumber: 1 }],
+      hasReferenceSelfie: true,
+      hasVisualOverride: false,
+      now: new Date("2026-07-01T11:30:00.000Z"),
+      testMode: true,
+      timeZoneIana: "America/Mexico_City"
+    });
+
+    expect(normalAvailability.reason).toBe("WAIT_UNTIL_5_AM");
+    expect(testModeAvailability.reason).toBe("AVAILABLE_FOR_SELFIE");
+  });
+
   it("daily selfie matched allows the video upload", async () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
@@ -510,6 +537,31 @@ describe("HUT module foundation", () => {
 
     expect(verified.ok ? verified.data.status : "").toBe("MATCHED");
     expect(video.ok).toBe(true);
+  });
+
+  it("persists participant test mode and allows consecutive uploads without calendar waits", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Prueba",
+      requestOrigin: "https://example.com",
+      startDate: new Date("2026-07-01T06:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    const enabled = await repository.setTestMode({
+      enabled: true,
+      participantId: participant.id,
+      studyId: "study-hut"
+    });
+
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+
+    expect(enabled.ok).toBe(true);
+    expect(participant.testMode).toBe(true);
+    expect(participant.videoSubmissions).toHaveLength(2);
+    expect(participant.currentVideoSequence).toBe(3);
   });
 
   it("daily selfie failed blocks the video upload", async () => {
@@ -561,6 +613,168 @@ describe("HUT module foundation", () => {
     expect(prisma.state.participants[0]?.blocks[0]?.submittedVideosCount).toBe(3);
     expect(prisma.state.participants[0]?.blocks[0]?.status).toBe("CALL_PENDING");
     expect(prisma.state.participants[0]?.status).toBe("BLOCK_1_CALL_PENDING");
+  });
+
+  it("shows submitted videos in the admin dashboard with signed links", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Video",
+      requestOrigin: "https://example.com",
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    const dashboard = await repository.getAdminDashboard({
+      requestOrigin: "https://example.com",
+      storage,
+      studyId: "study-hut"
+    });
+
+    expect(dashboard?.participants[0]?.block1?.videos).toHaveLength(3);
+    expect(dashboard?.participants[0]?.block1?.videos[0]).toMatchObject({
+      sequenceNumber: 1,
+      signedUrl: expect.stringContaining("https://storage.example/")
+    });
+    expect(dashboard?.participants[0]?.block1?.videos[1]).toMatchObject({
+      sequenceNumber: 2,
+      signedUrl: null
+    });
+  });
+
+  it("resets a reference selfie without deleting the HUT participant", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Selfie",
+      requestOrigin: "https://example.com",
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    participant.referenceSelfie = referenceSelfie();
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+
+    const reset = await repository.resetReferenceSelfie({
+      confirmation: "ELIMINAR SELFIE DE REGISTRO",
+      participantId: participant.id,
+      studyId: "study-hut"
+    });
+
+    expect(reset.ok).toBe(true);
+    expect(prisma.state.participants).toHaveLength(1);
+    expect(participant.referenceSelfie).toBeNull();
+    expect(participant.visualVerifications).toHaveLength(0);
+  });
+
+  it("resets a submitted video and recalculates the next expected sequence", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Reset",
+      requestOrigin: "https://example.com",
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    const reset = await repository.resetVideoSubmission({
+      blockNumber: 1,
+      confirmation: "RESTABLECER VIDEO 2",
+      participantId: participant.id,
+      sequenceNumber: 2,
+      studyId: "study-hut"
+    });
+
+    expect(reset.ok).toBe(true);
+    expect(participant.videoSubmissions.map((video) => video.sequenceNumber)).toEqual([1]);
+    expect(participant.visualVerifications.map((verification) => verification.sequenceNumber)).toEqual([1]);
+    expect(participant.blocks[0]?.submittedVideosCount).toBe(1);
+    expect(participant.currentVideoSequence).toBe(2);
+  });
+
+  it("requires special confirmation when resetting a video after call evaluation was completed", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Evaluado",
+      requestOrigin: "https://example.com",
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await repository.completeCallEvaluation({ blockNumber: 1, participantId: participant.id, studyId: "study-hut" });
+
+    const blocked = await repository.resetVideoSubmission({
+      blockNumber: 1,
+      confirmation: "RESTABLECER VIDEO 3",
+      participantId: participant.id,
+      sequenceNumber: 3,
+      studyId: "study-hut"
+    });
+    const allowed = await repository.resetVideoSubmission({
+      blockNumber: 1,
+      confirmation: "RESTABLECER VIDEO 3 CON EVALUACION",
+      participantId: participant.id,
+      sequenceNumber: 3,
+      studyId: "study-hut"
+    });
+
+    expect(blocked.ok).toBe(false);
+    expect(blocked.ok ? "" : blocked.message).toContain("evaluacion 1 ya esta completada");
+    expect(allowed.ok).toBe(true);
+    expect(participant.videoSubmissions.map((video) => video.sequenceNumber)).toEqual([1, 2]);
+    expect(participant.callEvaluations[0]?.status).toBe("PENDING");
+    expect(participant.blocks[0]?.status).toBe("IN_PROGRESS");
+  });
+
+  it("blocks resetting evaluation 1 when block 2 has progress unless special confirmation is provided", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Bloque 2",
+      requestOrigin: "https://example.com",
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await repository.completeCallEvaluation({ blockNumber: 1, participantId: participant.id, studyId: "study-hut" });
+    await repository.startBlock({
+      blockNumber: 2,
+      participantId: participant.id,
+      startDate: new Date("2020-01-05T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+
+    const blocked = await repository.resetCallEvaluation({
+      blockNumber: 1,
+      confirmation: "RESTABLECER EVALUACION 1",
+      participantId: participant.id,
+      studyId: "study-hut"
+    });
+    const allowed = await repository.resetCallEvaluation({
+      blockNumber: 1,
+      confirmation: "RESTABLECER EVALUACION 1 CON BLOQUE 2",
+      participantId: participant.id,
+      studyId: "study-hut"
+    });
+
+    expect(blocked.ok).toBe(false);
+    expect(blocked.ok ? "" : blocked.message).toContain("El bloque 2 ya tiene avance");
+    expect(allowed.ok).toBe(true);
+    expect(participant.callEvaluations[0]?.status).toBe("PENDING");
+    expect(participant.status).toBe("BLOCK_1_CALL_PENDING");
   });
 
   it("allows one omitted day and keeps the next upload as video 2", async () => {
@@ -842,6 +1056,7 @@ function createFakeHutPrisma() {
           status: (args.data.status as FakeParticipant["status"]) ?? "NOT_STARTED",
           study: state.study,
           studyId: String(args.data.studyId),
+          testMode: Boolean(args.data.testMode ?? false),
           token: String(args.data.token),
           visualOverrideEnabled: false,
           visualOverrideReason: null,
@@ -1044,13 +1259,21 @@ function createFakeHutPrisma() {
         participant?.dailyChecks.push(args.data);
         return args.data;
       },
-      async deleteMany(args: { where: { participantId: string } }) {
+      async deleteMany(args: { where: { blockId?: string; expectedVideoSequence?: { gte: number }; participantId: string } }) {
         const participant = state.participants.find((item) => item.id === args.where.participantId);
-        const count = participant?.dailyChecks.length ?? 0;
+        const before = participant?.dailyChecks.length ?? 0;
         if (participant) {
-          participant.dailyChecks = [];
+          participant.dailyChecks = participant.dailyChecks.filter((check) => {
+            if (args.where.blockId && check.blockId !== args.where.blockId) {
+              return true;
+            }
+            if (args.where.expectedVideoSequence && check.expectedVideoSequence < args.where.expectedVideoSequence.gte) {
+              return true;
+            }
+            return false;
+          });
         }
-        return { count };
+        return { count: before - (participant?.dailyChecks.length ?? 0) };
       }
     },
     hutVideoSubmission: {
@@ -1060,13 +1283,21 @@ function createFakeHutPrisma() {
         participant?.videoSubmissions.push(video);
         return video;
       },
-      async deleteMany(args: { where: { participantId: string } }) {
+      async deleteMany(args: { where: { blockNumber?: number; participantId: string; sequenceNumber?: { gte: number } } }) {
         const participant = state.participants.find((item) => item.id === args.where.participantId);
-        const count = participant?.videoSubmissions.length ?? 0;
+        const before = participant?.videoSubmissions.length ?? 0;
         if (participant) {
-          participant.videoSubmissions = [];
+          participant.videoSubmissions = participant.videoSubmissions.filter((video) => {
+            if (args.where.blockNumber && video.blockNumber !== args.where.blockNumber) {
+              return true;
+            }
+            if (args.where.sequenceNumber && video.sequenceNumber < args.where.sequenceNumber.gte) {
+              return true;
+            }
+            return false;
+          });
         }
-        return { count };
+        return { count: before - (participant?.videoSubmissions.length ?? 0) };
       }
     },
     hutVisualVerification: {
@@ -1089,13 +1320,21 @@ function createFakeHutPrisma() {
         }
         return verification;
       },
-      async deleteMany(args: { where: { participantId: string } }) {
+      async deleteMany(args: { where: { blockNumber?: number; participantId: string; sequenceNumber?: { gte: number } } }) {
         const participant = state.participants.find((item) => item.id === args.where.participantId);
-        const count = participant?.visualVerifications.length ?? 0;
+        const before = participant?.visualVerifications.length ?? 0;
         if (participant) {
-          participant.visualVerifications = [];
+          participant.visualVerifications = participant.visualVerifications.filter((verification) => {
+            if (args.where.blockNumber && verification.blockNumber !== args.where.blockNumber) {
+              return true;
+            }
+            if (args.where.sequenceNumber && verification.sequenceNumber < args.where.sequenceNumber.gte) {
+              return true;
+            }
+            return false;
+          });
         }
-        return { count };
+        return { count: before - (participant?.visualVerifications.length ?? 0) };
       }
     }
   };
@@ -1144,6 +1383,7 @@ type FakeParticipant = {
     timeZoneIana: string;
   };
   studyId: string;
+  testMode: boolean;
   token: string;
   visualOverrideEnabled: boolean;
   visualOverrideReason: string | null;

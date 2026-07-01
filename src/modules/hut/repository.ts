@@ -91,6 +91,7 @@ export type HutAdminParticipant = {
   } | null;
   secondFragranceRightArm: string | null;
   status: HutParticipantStatus;
+  testMode: boolean;
   token: string;
   usedToleranceInCurrentBlock: boolean;
   visualOverrideEnabled: boolean;
@@ -117,12 +118,20 @@ export type HutBlockSummary = {
   missedDaysCount: number;
   status: HutBlockStatus;
   submittedVideosCount: number;
+  videos: HutVideoSummary[];
 };
 
 export type HutCallSummary = {
   blockNumber: number;
   completedAt: Date | null;
   status: HutCallEvaluationStatus;
+};
+
+export type HutVideoSummary = {
+  sequenceNumber: number;
+  signedUrl: string | null;
+  status: string;
+  submittedAt: Date | null;
 };
 
 export type HutAdminDashboard = {
@@ -198,6 +207,7 @@ export type HutRepository = {
   }) => Promise<HutActionResult<{ body: string; filename: string }>>;
   getAdminDashboard: (input: {
     requestOrigin: string;
+    storage?: HutStorageClient;
     studyId: string;
   }) => Promise<HutAdminDashboard | null>;
   getPortalView: (token: string) => Promise<HutActionResult<HutPortalView>>;
@@ -216,6 +226,24 @@ export type HutRepository = {
   markMissedDay: (input: {
     participantId: string;
     reminderSent?: boolean;
+    studyId: string;
+  }) => Promise<HutActionResult<{ participantId: string }>>;
+  resetReferenceSelfie: (input: {
+    confirmation: string;
+    participantId: string;
+    studyId: string;
+  }) => Promise<HutActionResult<{ participantId: string }>>;
+  resetVideoSubmission: (input: {
+    blockNumber: 1 | 2;
+    confirmation: string;
+    participantId: string;
+    sequenceNumber: number;
+    studyId: string;
+  }) => Promise<HutActionResult<{ participantId: string }>>;
+  resetCallEvaluation: (input: {
+    blockNumber: 1 | 2;
+    confirmation: string;
+    participantId: string;
     studyId: string;
   }) => Promise<HutActionResult<{ participantId: string }>>;
   assignParticipantRotation: (input: {
@@ -294,6 +322,11 @@ export type HutRepository = {
     reason: string;
     studyId: string;
   }) => Promise<HutActionResult<{ participantId: string }>>;
+  setTestMode: (input: {
+    enabled: boolean;
+    participantId: string;
+    studyId: string;
+  }) => Promise<HutActionResult<{ participantId: string }>>;
   confirmVideoUpload: (input: {
     metadata: HutVideoUploadMetadata & {
       privateStorageKey: string;
@@ -351,6 +384,7 @@ type HutParticipantRecord = {
   status: HutParticipantStatus;
   study: HutStudySummary;
   studyId: string;
+  testMode: boolean;
   token: string;
   referenceSelfie: HutReferenceSelfieRecord | null;
   registrationSlot?: HutRegistrationSlotRecord | null;
@@ -407,7 +441,11 @@ type HutDailyCheckRecord = {
 type HutVideoRecord = {
   blockNumber: number;
   id?: string;
+  privateStorageKey?: string;
   sequenceNumber: number;
+  status?: string;
+  storageBucket?: string;
+  submittedAt?: Date;
 };
 
 type HutVisualVerificationRecord = {
@@ -486,6 +524,7 @@ const participantSelect = {
   status: true,
   study: { select: studySelect },
   studyId: true,
+  testMode: true,
   token: true,
   visualOverrideEnabled: true,
   visualOverrideReason: true,
@@ -504,7 +543,11 @@ const participantSelect = {
     select: {
       blockNumber: true,
       id: true,
-      sequenceNumber: true
+      privateStorageKey: true,
+      sequenceNumber: true,
+      status: true,
+      storageBucket: true,
+      submittedAt: true
     }
   }
 } as const;
@@ -832,7 +875,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
       })) as HutRegistrationSlotRecord[];
 
       return {
-        participants: participants.map((participant) => toAdminParticipant(participant, input.requestOrigin)),
+        participants: await Promise.all(
+          participants.map((participant) => toAdminParticipant(participant, input.requestOrigin, input.storage))
+        ),
         registrationSlots: registrationSlots.map((slot) => toAdminRegistrationSlot(slot, input.requestOrigin)),
         study
       };
@@ -1115,6 +1160,197 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
         return {
           data: { participantId: participant.id },
           message: "Participante HUT eliminado correctamente. El folio asociado quedo disponible.",
+          ok: true
+        };
+      });
+    },
+
+    async resetReferenceSelfie(input) {
+      if (input.confirmation.trim() !== "ELIMINAR SELFIE DE REGISTRO") {
+        return { message: "Escribe ELIMINAR SELFIE DE REGISTRO para confirmar.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipant(tx, input.participantId);
+
+        if (!participant || participant.studyId !== input.studyId) {
+          return { message: "No encontramos el participante HUT.", ok: false };
+        }
+
+        await tx.hutVisualVerification.deleteMany?.({ where: { participantId: participant.id } });
+        await tx.hutReferenceSelfie.deleteMany?.({ where: { participantId: participant.id } });
+
+        return {
+          data: { participantId: participant.id },
+          message: "Selfie de registro eliminada. Las verificaciones diarias deberan repetirse.",
+          ok: true
+        };
+      });
+    },
+
+    async resetVideoSubmission(input) {
+      const expectedConfirmation = `RESTABLECER VIDEO ${input.sequenceNumber}`;
+      const completedEvaluationConfirmation = `${expectedConfirmation} CON EVALUACION`;
+      const confirmation = input.confirmation.trim();
+      if (confirmation !== expectedConfirmation && confirmation !== completedEvaluationConfirmation) {
+        return { message: `Escribe ${expectedConfirmation} para confirmar.`, ok: false };
+      }
+
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipant(tx, input.participantId);
+
+        if (!participant || participant.studyId !== input.studyId) {
+          return { message: "No encontramos el participante HUT.", ok: false };
+        }
+
+        const block = blockByNumber(participant, input.blockNumber);
+        if (!block) {
+          return { message: "No encontramos el bloque HUT.", ok: false };
+        }
+
+        const call = callByNumber(participant, input.blockNumber);
+        if (call?.status === "COMPLETED" && confirmation !== completedEvaluationConfirmation) {
+          return {
+            message: `La evaluacion ${input.blockNumber} ya esta completada. Escribe ${completedEvaluationConfirmation} para restablecer el video y la evaluacion.`,
+            ok: false
+          };
+        }
+
+        await tx.hutVisualVerification.deleteMany?.({
+          where: {
+            blockNumber: input.blockNumber,
+            participantId: participant.id,
+            sequenceNumber: { gte: input.sequenceNumber }
+          }
+        });
+        await tx.hutVideoSubmission.deleteMany?.({
+          where: {
+            blockNumber: input.blockNumber,
+            participantId: participant.id,
+            sequenceNumber: { gte: input.sequenceNumber }
+          }
+        });
+        await tx.hutDailyCheck.deleteMany?.({
+          where: {
+            blockId: block.id,
+            expectedVideoSequence: { gte: input.sequenceNumber },
+            participantId: participant.id
+          }
+        });
+        await tx.hutCallEvaluation.update?.({
+          data: {
+            completedAt: null,
+            evaluatorName: null,
+            notes: null,
+            status: "PENDING"
+          },
+          where: {
+            participantId_blockNumber: {
+              blockNumber: input.blockNumber,
+              participantId: participant.id
+            }
+          }
+        });
+
+        const remainingVideos = participant.videoSubmissions?.filter(
+          (video) => video.blockNumber === input.blockNumber && video.sequenceNumber < input.sequenceNumber
+        ).length ?? 0;
+        const nextSequence = Math.min(remainingVideos + 1, block.requiredVideos);
+        await tx.hutBlock.update?.({
+          data: {
+            completedAt: null,
+            status: block.startDate ? "IN_PROGRESS" : "NOT_STARTED",
+            submittedVideosCount: remainingVideos
+          },
+          where: { id: block.id }
+        });
+        await tx.hutParticipant.update?.({
+          data: {
+            currentBlockNumber: input.blockNumber,
+            currentVideoSequence: nextSequence,
+            status: block.startDate ? participantStatusForStartedBlock(input.blockNumber) : "NOT_STARTED"
+          },
+          where: { id: participant.id }
+        });
+
+        return {
+          data: { participantId: participant.id },
+          message: `Video ${input.sequenceNumber} restablecido. El siguiente esperado vuelve a ser video ${nextSequence}.`,
+          ok: true
+        };
+      });
+    },
+
+    async resetCallEvaluation(input) {
+      const expectedConfirmation = `RESTABLECER EVALUACION ${input.blockNumber}`;
+      const block2Confirmation = `${expectedConfirmation} CON BLOQUE 2`;
+      const confirmation = input.confirmation.trim();
+      if (confirmation !== expectedConfirmation && confirmation !== block2Confirmation) {
+        return { message: `Escribe ${expectedConfirmation} para confirmar.`, ok: false };
+      }
+
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipant(tx, input.participantId);
+
+        if (!participant || participant.studyId !== input.studyId) {
+          return { message: "No encontramos el participante HUT.", ok: false };
+        }
+
+        const block = blockByNumber(participant, input.blockNumber);
+        if (!block) {
+          return { message: "No encontramos el bloque HUT.", ok: false };
+        }
+
+        const block2HasProgress =
+          input.blockNumber === 1 &&
+          (participant.videoSubmissions?.some((video) => video.blockNumber === 2) ||
+            blockByNumber(participant, 2)?.status !== "NOT_STARTED");
+        if (block2HasProgress && confirmation !== block2Confirmation) {
+          return {
+            message: `El bloque 2 ya tiene avance. Escribe ${block2Confirmation} para restablecer la evaluacion 1.`,
+            ok: false
+          };
+        }
+
+        await tx.hutCallEvaluation.update?.({
+          data: {
+            completedAt: null,
+            evaluatorName: null,
+            notes: null,
+            status: "PENDING"
+          },
+          where: {
+            participantId_blockNumber: {
+              blockNumber: input.blockNumber,
+              participantId: participant.id
+            }
+          }
+        });
+        await tx.hutBlock.update?.({
+          data: {
+            completedAt: null,
+            status: "CALL_PENDING"
+          },
+          where: { id: block.id }
+        });
+        await tx.hutParticipant.update?.({
+          data: {
+            currentBlockNumber: input.blockNumber,
+            currentVideoSequence: block.requiredVideos,
+            status: input.blockNumber === 1 ? "BLOCK_1_CALL_PENDING" : "BLOCK_2_CALL_PENDING"
+          },
+          where: { id: participant.id }
+        });
+
+        return {
+          data: { participantId: participant.id },
+          message: `Evaluacion ${input.blockNumber} restablecida correctamente.`,
           ok: true
         };
       });
@@ -1636,6 +1872,28 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
       };
     },
 
+    async setTestMode(input) {
+      const prisma = await getPrisma();
+      const participant = await findParticipant(prisma, input.participantId);
+
+      if (!participant || participant.studyId !== input.studyId) {
+        return { message: "No encontramos el participante HUT.", ok: false };
+      }
+
+      await prisma.hutParticipant.update?.({
+        data: {
+          testMode: input.enabled
+        },
+        where: { id: participant.id }
+      });
+
+      return {
+        data: { participantId: participant.id },
+        message: input.enabled ? "Modo prueba HUT activado para este participante." : "Modo prueba HUT desactivado.",
+        ok: true
+      };
+    },
+
     async confirmVideoUpload(input) {
       const prisma = await getPrisma();
       const now = new Date();
@@ -1928,7 +2186,11 @@ async function releaseParticipantRegistrationSlot(tx: HutPrismaClient, participa
   });
 }
 
-function toAdminParticipant(participant: HutParticipantRecord, requestOrigin: string): HutAdminParticipant {
+async function toAdminParticipant(
+  participant: HutParticipantRecord,
+  requestOrigin: string,
+  storage?: HutStorageClient
+): Promise<HutAdminParticipant> {
   const block1 = blockByNumber(participant, 1);
   const block2 = blockByNumber(participant, 2);
   const call1 = callByNumber(participant, 1);
@@ -1945,8 +2207,8 @@ function toAdminParticipant(participant: HutParticipantRecord, requestOrigin: st
       nextAvailableAt: availability.nextAvailableAt,
       reason: availability.reason
     },
-    block1: block1 ? toBlockSummary(block1) : null,
-    block2: block2 ? toBlockSummary(block2) : null,
+    block1: block1 ? await toBlockSummary(block1, participant, storage) : null,
+    block2: block2 ? await toBlockSummary(block2, participant, storage) : null,
     call1: call1 ? toCallSummary(call1) : null,
     call2: call2 ? toCallSummary(call2) : null,
     currentBlockNumber: participant.currentBlockNumber,
@@ -1980,6 +2242,7 @@ function toAdminParticipant(participant: HutParticipantRecord, requestOrigin: st
       : null,
     status: participant.status,
     secondFragranceRightArm: participant.secondFragranceRightArm,
+    testMode: participant.testMode,
     token: participant.token,
     usedToleranceInCurrentBlock: Boolean(block && block.missedDaysCount >= block.maxMissedDaysAllowed),
     visualOverrideEnabled: participant.visualOverrideEnabled
@@ -2020,8 +2283,8 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
         nextAvailableAt: availability.nextAvailableAt,
         reason: availability.reason
       },
-      block1: block1 ? toBlockSummary(block1) : null,
-      block2: block2 ? toBlockSummary(block2) : null,
+      block1: block1 ? toBasicBlockSummary(block1) : null,
+      block2: block2 ? toBasicBlockSummary(block2) : null,
       message:
         "Gracias por tu participacion. Por las reglas del estudio, no es posible continuar con esta etapa. El equipo podra contactarte si requiere informacion adicional.",
       name: participant.name,
@@ -2047,8 +2310,8 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
       nextAvailableAt: availability.nextAvailableAt,
       reason: availability.reason
     },
-    block1: block1 ? toBlockSummary(block1) : null,
-    block2: block2 ? toBlockSummary(block2) : null,
+    block1: block1 ? toBasicBlockSummary(block1) : null,
+    block2: block2 ? toBasicBlockSummary(block2) : null,
     message: hutPortalMessage(participant),
     name: participant.name,
     participantId: participant.id,
@@ -2074,13 +2337,25 @@ function hutPortalMessage(participant: HutParticipantRecord): string {
   }
 }
 
-function toBlockSummary(block: HutBlockRecord): HutBlockSummary {
+async function toBlockSummary(
+  block: HutBlockRecord,
+  participant: HutParticipantRecord,
+  storage?: HutStorageClient
+): Promise<HutBlockSummary> {
+  return {
+    ...toBasicBlockSummary(block),
+    videos: await buildVideoSummaries(block, participant, storage)
+  };
+}
+
+function toBasicBlockSummary(block: HutBlockRecord): HutBlockSummary {
   return {
     blockNumber: block.blockNumber,
     disqualificationReason: block.disqualificationReason,
     missedDaysCount: block.missedDaysCount,
     status: block.status,
-    submittedVideosCount: block.submittedVideosCount
+    submittedVideosCount: block.submittedVideosCount,
+    videos: []
   };
 }
 
@@ -2090,6 +2365,43 @@ function toCallSummary(call: HutCallRecord): HutCallSummary {
     completedAt: call.completedAt,
     status: call.status
   };
+}
+
+async function buildVideoSummaries(
+  block: HutBlockRecord,
+  participant: HutParticipantRecord,
+  storage?: HutStorageClient
+): Promise<HutVideoSummary[]> {
+  const videos = participant.videoSubmissions?.filter((video) => video.blockNumber === block.blockNumber) ?? [];
+
+  return Promise.all(
+    Array.from({ length: block.requiredVideos }, async (_, index) => {
+      const sequenceNumber = index + 1;
+      const video = videos.find((item) => item.sequenceNumber === sequenceNumber);
+      return {
+        sequenceNumber,
+        signedUrl: video ? await signedVideoUrl(video, storage) : null,
+        status: video?.status ?? "PENDING",
+        submittedAt: video?.submittedAt ?? null
+      };
+    })
+  );
+}
+
+async function signedVideoUrl(video: HutVideoRecord, storage?: HutStorageClient): Promise<string | null> {
+  if (!video.privateStorageKey || !video.storageBucket) {
+    return null;
+  }
+
+  try {
+    return await (storage ?? createSupabaseEvidenceStorageClient()).createSignedReadUrl({
+      bucket: video.storageBucket,
+      expiresInSeconds: 60 * 10,
+      privateStorageKey: video.privateStorageKey
+    });
+  } catch {
+    return null;
+  }
 }
 
 function blockByNumber(participant: HutParticipantRecord, blockNumber: 1 | 2) {
@@ -2123,6 +2435,7 @@ function currentAvailability(participant: HutParticipantRecord, block: HutBlockR
     hasVisualOverride: participant.visualOverrideEnabled,
     latestVerificationStatus: latestVerification?.status ?? null,
     now,
+    testMode: participant.testMode,
     timeZoneIana: participant.study.timeZoneIana || "America/Mexico_City"
   });
 }

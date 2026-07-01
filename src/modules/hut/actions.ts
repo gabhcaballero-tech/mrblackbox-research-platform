@@ -87,6 +87,53 @@ export async function deleteHutParticipantAction(studyId: string, participantId:
   redirectWithHutMessage(studyId, result);
 }
 
+export async function resetHutReferenceSelfieAction(studyId: string, participantId: string, formData: FormData) {
+  await requireCapability("screening:review");
+  const result = await createHutRepository().resetReferenceSelfie({
+    confirmation: String(formData.get("confirmation") ?? ""),
+    participantId,
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
+export async function resetHutVideoSubmissionAction(
+  studyId: string,
+  participantId: string,
+  blockNumber: 1 | 2,
+  sequenceNumber: number,
+  formData: FormData
+) {
+  await requireCapability("screening:review");
+  const result = await createHutRepository().resetVideoSubmission({
+    blockNumber,
+    confirmation: String(formData.get("confirmation") ?? ""),
+    participantId,
+    sequenceNumber,
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
+export async function resetHutCallEvaluationAction(
+  studyId: string,
+  participantId: string,
+  blockNumber: 1 | 2,
+  formData: FormData
+) {
+  await requireCapability("screening:review");
+  const result = await createHutRepository().resetCallEvaluation({
+    blockNumber,
+    confirmation: String(formData.get("confirmation") ?? ""),
+    participantId,
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
 export async function startHutBlockAction(studyId: string, participantId: string, blockNumber: 1 | 2, formData: FormData) {
   await requireCapability("screening:review");
   const startDate = parseOptionalDate(formData.get("startDate")) ?? new Date();
@@ -142,6 +189,17 @@ export async function setHutVisualOverrideAction(studyId: string, participantId:
     enabled: formData.get("enabled") === "on",
     participantId,
     reason: String(formData.get("reason") ?? ""),
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
+export async function setHutTestModeAction(studyId: string, participantId: string, formData: FormData) {
+  await requireCapability("screening:review");
+  const result = await createHutRepository().setTestMode({
+    enabled: formData.get("enabled") === "on",
+    participantId,
     studyId
   });
 
