@@ -4,12 +4,13 @@ import { notFound } from "next/navigation";
 import {
   completeHutCallEvaluationAction,
   createHutParticipantAction,
+  createHutRegistrationSlotAction,
   markHutMissedDayAction,
   reactivateHutParticipantAction,
   setHutVisualOverrideAction,
   startHutBlockAction
 } from "@/modules/hut/actions";
-import { createHutRepository, type HutAdminParticipant } from "@/modules/hut";
+import { createHutRepository, type HutAdminParticipant, type HutRegistrationSlotAdmin } from "@/modules/hut";
 import { SubmitButton } from "@/app/admin/_components/SubmitButton";
 import { requireCapability } from "@/shared/auth/session";
 import { AppShell } from "@/shared/ui/AppShell";
@@ -18,6 +19,7 @@ import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { resolveRequestOrigin } from "@/shared/utils/request-origin";
 import { HutParticipantImportPanel } from "./_components/HutParticipantImportPanel";
+import { HutRegistrationSlotImportPanel } from "./_components/HutRegistrationSlotImportPanel";
 import { HutReferenceSelfieUpload } from "./_components/HutReferenceSelfieUpload";
 
 export const dynamic = "force-dynamic";
@@ -81,6 +83,20 @@ export default async function HutAdminPage({ params, searchParams }: HutAdminPag
         <HutParticipantImportPanel requestOrigin={requestOrigin} studyId={studyId} />
       </div>
 
+      <section className="mt-8 rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+          <CreateHutRegistrationSlotForm requestOrigin={requestOrigin} studyId={studyId} />
+          <HutRegistrationSlotImportPanel requestOrigin={requestOrigin} studyId={studyId} />
+        </div>
+        <div className="mt-6">
+          <h2 className="text-lg font-semibold text-zinc-950">Folios y rotacion</h2>
+          <p className="mt-1 text-sm text-zinc-600">
+            Estos links se usan en campo para registrar al participante, capturar datos y guardar la selfie base.
+          </p>
+          <HutRegistrationSlotTable slots={dashboard.registrationSlots} />
+        </div>
+      </section>
+
       <section className="mt-8 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
         <div className="border-b border-zinc-200 px-4 py-3">
           <h2 className="text-lg font-semibold text-zinc-950">Participantes HUT</h2>
@@ -104,6 +120,91 @@ export default async function HutAdminPage({ params, searchParams }: HutAdminPag
         )}
       </section>
     </AppShell>
+  );
+}
+
+function CreateHutRegistrationSlotForm({ requestOrigin, studyId }: { requestOrigin: string; studyId: string }) {
+  return (
+    <section>
+      <h2 className="text-lg font-semibold text-zinc-950">Crear folio HUT</h2>
+      <p className="mt-2 text-sm leading-6 text-zinc-600">
+        Prepara el folio y su rotacion antes de capturar datos del participante.
+      </p>
+      <form action={createHutRegistrationSlotAction.bind(null, studyId)} className="mt-4 grid gap-3">
+        <input name="requestOrigin" type="hidden" value={requestOrigin} />
+        <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+          Folio
+          <input className={inputClass} name="folio" required />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+          Primera fragancia / brazo izquierdo
+          <input className={inputClass} name="firstFragranceLeftArm" required />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+          Segunda fragancia / brazo derecho
+          <input className={inputClass} name="secondFragranceRightArm" required />
+        </label>
+        <SubmitButton pendingLabel="Creando folio...">Crear folio HUT</SubmitButton>
+      </form>
+    </section>
+  );
+}
+
+function HutRegistrationSlotTable({ slots }: { slots: HutRegistrationSlotAdmin[] }) {
+  if (slots.length === 0) {
+    return (
+      <div className="mt-4">
+        <EmptyState
+          title="Sin folios HUT"
+          description="Crea o importa folios con rotacion para generar links de registro en campo."
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 overflow-x-auto">
+      <table className="min-w-full divide-y divide-zinc-200 text-left text-sm">
+        <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
+          <tr>
+            <th className="px-3 py-2">Folio</th>
+            <th className="px-3 py-2">Link de registro</th>
+            <th className="px-3 py-2">Estado</th>
+            <th className="px-3 py-2">Participante</th>
+            <th className="px-3 py-2">Celular</th>
+            <th className="px-3 py-2">Primera fragancia / brazo izquierdo</th>
+            <th className="px-3 py-2">Segunda fragancia / brazo derecho</th>
+            <th className="px-3 py-2">Selfie</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-200">
+          {slots.map((slot) => (
+            <tr key={slot.id}>
+              <td className="whitespace-nowrap px-3 py-2 font-semibold text-zinc-950">{slot.folio}</td>
+              <td className="max-w-64 px-3 py-2">
+                <a className="block truncate font-semibold text-teal-700" href={slot.link} rel="noreferrer" target="_blank" title={slot.link}>
+                  {slot.link}
+                </a>
+              </td>
+              <td className="whitespace-nowrap px-3 py-2">{hutRegistrationSlotStatusLabel(slot.status)}</td>
+              <td className="px-3 py-2">
+                {slot.participantLink ? (
+                  <a className="font-semibold text-teal-700" href={slot.participantLink} rel="noreferrer" target="_blank">
+                    {slot.participantName ?? "Abrir portal"}
+                  </a>
+                ) : (
+                  slot.participantName ?? "-"
+                )}
+              </td>
+              <td className="whitespace-nowrap px-3 py-2">{slot.phone ?? "-"}</td>
+              <td className="px-3 py-2">{slot.firstFragranceLeftArm}</td>
+              <td className="px-3 py-2">{slot.secondFragranceRightArm}</td>
+              <td className="whitespace-nowrap px-3 py-2">{slot.referenceSelfieStatus === "COMPLETE" ? "Completa" : "Faltante"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -156,6 +257,9 @@ function HutParticipantCard({ participant, studyId }: { participant: HutAdminPar
           <Field label="Celular" value={participant.phone ?? "No capturado"} />
           <Field label="Correo" value={participant.email ?? "No capturado"} />
           <Field label="Reclutador" value={participant.recruiter ?? "No capturado"} />
+          <Field label="Folio" value={participant.folio ?? "No asignado"} />
+          <Field label="Primera fragancia / brazo izquierdo" value={participant.firstFragranceLeftArm ?? "No asignada"} />
+          <Field label="Segunda fragancia / brazo derecho" value={participant.secondFragranceRightArm ?? "No asignada"} />
           <Field label="Estado" value={hutParticipantStatusLabel(participant.status)} />
           <Field label="Selfie de registro" value={participant.referenceSelfie.status === "COMPLETE" ? "Completa" : "Faltante"} />
           <Field label="Bloque actual" value={String(participant.currentBlockNumber)} />
@@ -332,6 +436,15 @@ function hutCallStatusLabel(status: string) {
     PENDING: "Pendiente",
     RESCHEDULE_NEEDED: "Reagendar",
     SCHEDULED: "Programada"
+  };
+  return labels[status] ?? status;
+}
+
+function hutRegistrationSlotStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    AVAILABLE: "Disponible",
+    CANCELLED: "Cancelado",
+    REGISTERED: "Registrado"
   };
   return labels[status] ?? status;
 }

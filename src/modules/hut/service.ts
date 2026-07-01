@@ -116,6 +116,10 @@ export function createHutParticipantToken(): string {
   return randomUUID();
 }
 
+export function createHutRegistrationToken(): string {
+  return randomUUID();
+}
+
 export function normalizeHutText(value: unknown): string {
   return String(value ?? "")
     .normalize("NFC")
@@ -138,6 +142,10 @@ export function normalizeHutPhone(value: unknown): string | null {
 export function normalizeOptionalHutText(value: unknown): string | null {
   const normalized = normalizeHutText(value);
   return normalized.length > 0 ? normalized : null;
+}
+
+export function normalizeHutFolio(value: unknown): string {
+  return normalizeHutText(value).replace(/\s+/g, "-");
 }
 
 export function nextHutVideoSequence(block: Pick<HutBlockState, "requiredVideos" | "submittedVideosCount">): number | null {
@@ -355,6 +363,37 @@ export function parseHutParticipantImportText(text: string): Array<{
       };
     })
     .filter((row) => row.name.length > 0);
+}
+
+export function parseHutRegistrationSlotImportText(text: string): Array<{
+  firstFragranceLeftArm: string;
+  folio: string;
+  secondFragranceRightArm: string;
+}> {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) {
+    return [];
+  }
+
+  const delimiter = lines[0]?.includes("\t") ? "\t" : lines[0]?.includes(";") ? ";" : ",";
+  const maybeHeader = splitDelimitedLine(lines[0] ?? "", delimiter).map((item) => item.toLowerCase());
+  const hasHeader = maybeHeader.some((item) => ["folio", "firstfragranceleftarm", "primera fragancia / brazo izquierdo"].includes(item));
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+
+  return dataLines
+    .map((line) => {
+      const [folio, firstFragranceLeftArm, secondFragranceRightArm] = splitDelimitedLine(line, delimiter);
+      return {
+        firstFragranceLeftArm: normalizeHutText(firstFragranceLeftArm),
+        folio: normalizeHutFolio(folio),
+        secondFragranceRightArm: normalizeHutText(secondFragranceRightArm)
+      };
+    })
+    .filter((row) => row.folio.length > 0 && row.firstFragranceLeftArm.length > 0 && row.secondFragranceRightArm.length > 0);
 }
 
 export function buildHutTsv(rows: Array<Array<string | number | Date | null | undefined>>): string {

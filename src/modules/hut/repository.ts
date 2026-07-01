@@ -4,6 +4,7 @@ import {
   applyHutVideoSubmission,
   buildHutTsv,
   createHutParticipantToken,
+  createHutRegistrationToken,
   getHutCurrentAvailability,
   HUT_MAX_BLOCK_CALENDAR_DAYS,
   HUT_MAX_MISSED_DAYS_PER_BLOCK,
@@ -15,6 +16,7 @@ import {
   normalizeHutText,
   normalizeOptionalHutText,
   parseHutParticipantImportText,
+  parseHutRegistrationSlotImportText,
   participantStatusForStartedBlock,
   type HutBlockStatus,
   type HutCallEvaluationStatus,
@@ -22,8 +24,10 @@ import {
 } from "./service";
 import {
   assertHutSelfieStorageKey,
+  assertHutRegistrationSelfieStorageKey,
   assertHutVideoStorageKey,
   createHutSignedDailySelfieUpload,
+  createHutSignedRegistrationSelfieUpload,
   createHutSignedReferenceSelfieUpload,
   createHutSignedVideoUpload,
   HUT_VIDEO_BUCKET,
@@ -67,6 +71,8 @@ export type HutAdminParticipant = {
   currentBlockNumber: number;
   currentVideoSequence: number;
   email: string | null;
+  firstFragranceLeftArm: string | null;
+  folio: string | null;
   id: string;
   link: string;
   name: string;
@@ -78,10 +84,26 @@ export type HutAdminParticipant = {
     signedUrl: string | null;
     status: "COMPLETE" | "MISSING";
   };
+  secondFragranceRightArm: string | null;
   status: HutParticipantStatus;
   token: string;
   usedToleranceInCurrentBlock: boolean;
   visualOverrideEnabled: boolean;
+};
+
+export type HutRegistrationSlotAdmin = {
+  email: string | null;
+  firstFragranceLeftArm: string;
+  folio: string;
+  id: string;
+  link: string;
+  participantId: string | null;
+  participantLink: string | null;
+  participantName: string | null;
+  phone: string | null;
+  referenceSelfieStatus: "COMPLETE" | "MISSING";
+  secondFragranceRightArm: string;
+  status: "AVAILABLE" | "CANCELLED" | "REGISTERED";
 };
 
 export type HutBlockSummary = {
@@ -100,7 +122,19 @@ export type HutCallSummary = {
 
 export type HutAdminDashboard = {
   participants: HutAdminParticipant[];
+  registrationSlots: HutRegistrationSlotAdmin[];
   study: HutStudySummary;
+};
+
+export type HutRegistrationView = {
+  firstFragranceLeftArm: string;
+  folio: string;
+  participantLink: string | null;
+  participantName: string | null;
+  registrationToken: string;
+  secondFragranceRightArm: string;
+  status: "AVAILABLE" | "CANCELLED" | "REGISTERED";
+  studyName: string;
 };
 
 export type HutPortalView = {
@@ -141,6 +175,13 @@ export type HutRepository = {
     startDate?: Date | null;
     studyId: string;
   }) => Promise<HutActionResult<{ link: string; participantId: string }>>;
+  createRegistrationSlot: (input: {
+    firstFragranceLeftArm: string;
+    folio: string;
+    requestOrigin: string;
+    secondFragranceRightArm: string;
+    studyId: string;
+  }) => Promise<HutActionResult<{ link: string; slotId: string }>>;
   exportProgress: (input: {
     now?: Date;
     requestOrigin: string;
@@ -151,9 +192,15 @@ export type HutRepository = {
     studyId: string;
   }) => Promise<HutAdminDashboard | null>;
   getPortalView: (token: string) => Promise<HutActionResult<HutPortalView>>;
+  getRegistrationView: (token: string, requestOrigin: string) => Promise<HutActionResult<HutRegistrationView>>;
   importParticipants: (input: {
     requestOrigin: string;
     startDate?: Date | null;
+    studyId: string;
+    text: string;
+  }) => Promise<HutActionResult<{ created: number; skipped: number }>>;
+  importRegistrationSlots: (input: {
+    requestOrigin: string;
     studyId: string;
     text: string;
   }) => Promise<HutActionResult<{ created: number; skipped: number }>>;
@@ -188,6 +235,23 @@ export type HutRepository = {
     participantId: string;
     studyId: string;
   }) => Promise<HutActionResult<{ participantId: string }>>;
+  requestRegistrationSelfieUpload: (input: {
+    metadata: HutSelfieUploadMetadata;
+    storage?: HutStorageClient;
+    token: string;
+  }) => Promise<HutActionResult<HutSignedSelfieUpload>>;
+  completeRegistration: (input: {
+    email?: string | null;
+    metadata: HutSelfieUploadMetadata & {
+      privateStorageKey: string;
+      storageBucket: string;
+    };
+    name: string;
+    phone: string;
+    recruiter?: string | null;
+    requestOrigin: string;
+    token: string;
+  }) => Promise<HutActionResult<{ participantLink: string; participantId: string }>>;
   requestDailySelfieUpload: (input: {
     metadata: HutSelfieUploadMetadata;
     storage?: HutStorageClient;
@@ -241,6 +305,7 @@ type HutPrismaClient = PrismaClientLike & {
   hutDailyCheck: PrismaModel;
   hutParticipant: PrismaModel;
   hutReferenceSelfie: PrismaModel;
+  hutRegistrationSlot: PrismaModel;
   hutVideoSubmission: PrismaModel;
   hutVisualVerification: PrismaModel;
   study: PrismaModel;
@@ -253,6 +318,8 @@ type HutParticipantRecord = {
   currentVideoSequence: number;
   dailyChecks?: HutDailyCheckRecord[];
   email: string | null;
+  firstFragranceLeftArm: string | null;
+  folio: string | null;
   id: string;
   name: string;
   phone: string | null;
@@ -263,10 +330,25 @@ type HutParticipantRecord = {
   studyId: string;
   token: string;
   referenceSelfie: HutReferenceSelfieRecord | null;
+  registrationSlot?: HutRegistrationSlotRecord | null;
+  secondFragranceRightArm: string | null;
   videoSubmissions?: HutVideoRecord[];
   visualOverrideEnabled: boolean;
   visualOverrideReason: string | null;
   visualVerifications?: HutVisualVerificationRecord[];
+};
+
+type HutRegistrationSlotRecord = {
+  firstFragranceLeftArm: string;
+  folio: string;
+  id: string;
+  participant: (Pick<HutParticipantRecord, "email" | "id" | "name" | "phone" | "referenceSelfie" | "token">) | null;
+  participantId: string | null;
+  registrationToken: string;
+  secondFragranceRightArm: string;
+  status: "AVAILABLE" | "CANCELLED" | "REGISTERED";
+  study: HutStudySummary;
+  studyId: string;
 };
 
 type HutReferenceSelfieRecord = {
@@ -355,6 +437,8 @@ const participantSelect = {
     }
   },
   email: true,
+  firstFragranceLeftArm: true,
+  folio: true,
   id: true,
   name: true,
   phone: true,
@@ -366,6 +450,15 @@ const participantSelect = {
       storageBucket: true
     }
   },
+  registrationSlot: {
+    select: {
+      folio: true,
+      id: true,
+      registrationToken: true,
+      status: true
+    }
+  },
+  secondFragranceRightArm: true,
   startDate: true,
   status: true,
   study: { select: studySelect },
@@ -391,6 +484,34 @@ const participantSelect = {
       sequenceNumber: true
     }
   }
+} as const;
+
+const registrationSlotSelect = {
+  firstFragranceLeftArm: true,
+  folio: true,
+  id: true,
+  participant: {
+    select: {
+      email: true,
+      id: true,
+      name: true,
+      phone: true,
+      referenceSelfie: {
+        select: {
+          capturedAt: true,
+          privateStorageKey: true,
+          storageBucket: true
+        }
+      },
+      token: true
+    }
+  },
+  participantId: true,
+  registrationToken: true,
+  secondFragranceRightArm: true,
+  status: true,
+  study: { select: studySelect },
+  studyId: true
 } as const;
 
 export function createHutRepository(prismaClient?: HutPrismaClient): HutRepository {
@@ -514,6 +635,68 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
       });
     },
 
+    async createRegistrationSlot(input) {
+      const folio = normalizeHutText(input.folio);
+      const firstFragranceLeftArm = normalizeHutText(input.firstFragranceLeftArm);
+      const secondFragranceRightArm = normalizeHutText(input.secondFragranceRightArm);
+
+      if (!folio) {
+        return { message: "Captura el folio HUT.", ok: false };
+      }
+      if (!firstFragranceLeftArm || !secondFragranceRightArm) {
+        return { message: "Captura ambas fragancias o brazos de la rotacion.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+      const study = (await prisma.study.findUnique?.({
+        select: studySelect,
+        where: { id: input.studyId }
+      })) as HutStudySummary | null;
+
+      if (!study) {
+        return { message: "No encontramos el estudio.", ok: false };
+      }
+
+      const existing = (await prisma.hutRegistrationSlot.findFirst?.({
+        select: registrationSlotSelect,
+        where: {
+          folio,
+          studyId: input.studyId
+        }
+      })) as HutRegistrationSlotRecord | null;
+
+      if (existing) {
+        return {
+          data: {
+            link: registrationLink(input.requestOrigin, existing.registrationToken),
+            slotId: existing.id
+          },
+          message: "El folio HUT ya existia; se reutilizo su link de registro.",
+          ok: true
+        };
+      }
+
+      const token = createHutRegistrationToken();
+      const slot = (await prisma.hutRegistrationSlot.create?.({
+        data: {
+          firstFragranceLeftArm,
+          folio,
+          registrationToken: token,
+          secondFragranceRightArm,
+          studyId: input.studyId
+        }
+      })) as { id: string };
+
+      return {
+        data: {
+          link: registrationLink(input.requestOrigin, token),
+          slotId: slot.id
+        },
+        message: "Folio HUT creado correctamente.",
+        ok: true
+      };
+    },
+
     async importParticipants(input) {
       const rows = parseHutParticipantImportText(input.text);
       const repository = createHutRepository(await getPrisma());
@@ -542,6 +725,33 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
       };
     },
 
+    async importRegistrationSlots(input) {
+      const rows = parseHutRegistrationSlotImportText(input.text);
+      const repository = createHutRepository(await getPrisma());
+      let created = 0;
+      let skipped = 0;
+
+      for (const row of rows) {
+        const result = await repository.createRegistrationSlot({
+          ...row,
+          requestOrigin: input.requestOrigin,
+          studyId: input.studyId
+        });
+
+        if (result.ok && result.message?.includes("creado")) {
+          created += 1;
+        } else {
+          skipped += 1;
+        }
+      }
+
+      return {
+        data: { created, skipped },
+        message: `Importacion de folios HUT completada. Creados: ${created}. Omitidos/reutilizados: ${skipped}.`,
+        ok: true
+      };
+    },
+
     async getAdminDashboard(input) {
       const prisma = await getPrisma();
       const study = (await prisma.study.findUnique?.({
@@ -558,9 +768,15 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
         select: participantSelect,
         where: { studyId: input.studyId }
       })) as HutParticipantRecord[];
+      const registrationSlots = (await prisma.hutRegistrationSlot.findMany?.({
+        orderBy: [{ folio: "asc" }],
+        select: registrationSlotSelect,
+        where: { studyId: input.studyId }
+      })) as HutRegistrationSlotRecord[];
 
       return {
         participants: participants.map((participant) => toAdminParticipant(participant, input.requestOrigin)),
+        registrationSlots: registrationSlots.map((slot) => toAdminRegistrationSlot(slot, input.requestOrigin)),
         study
       };
     },
@@ -575,6 +791,32 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
 
       return {
         data: toPortalView(participant),
+        ok: true
+      };
+    },
+
+    async getRegistrationView(token, requestOrigin) {
+      const prisma = await getPrisma();
+      const slot = (await prisma.hutRegistrationSlot.findUnique?.({
+        select: registrationSlotSelect,
+        where: { registrationToken: token }
+      })) as HutRegistrationSlotRecord | null;
+
+      if (!slot) {
+        return { message: "Este link de registro HUT no es valido.", ok: false };
+      }
+
+      return {
+        data: {
+          firstFragranceLeftArm: slot.firstFragranceLeftArm,
+          folio: slot.folio,
+          participantLink: slot.participant ? participantLink(requestOrigin, slot.participant.token) : null,
+          participantName: slot.participant?.name ?? null,
+          registrationToken: slot.registrationToken,
+          secondFragranceRightArm: slot.secondFragranceRightArm,
+          status: slot.status,
+          studyName: slot.study.name
+        },
         ok: true
       };
     },
@@ -940,6 +1182,134 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
       });
     },
 
+    async requestRegistrationSelfieUpload(input) {
+      const prisma = await getPrisma();
+      const slot = (await prisma.hutRegistrationSlot.findUnique?.({
+        select: registrationSlotSelect,
+        where: { registrationToken: input.token }
+      })) as HutRegistrationSlotRecord | null;
+
+      if (!slot) {
+        return { message: "Este link de registro HUT no es valido.", ok: false };
+      }
+      if (slot.status !== "AVAILABLE" || slot.participantId) {
+        return { message: "Este folio ya fue registrado.", ok: false };
+      }
+
+      try {
+        const signed = await createHutSignedRegistrationSelfieUpload({
+          metadata: input.metadata,
+          slotId: slot.id,
+          storage: input.storage,
+          studyId: slot.studyId
+        });
+        return { data: signed, ok: true };
+      } catch (error) {
+        return { message: error instanceof Error ? error.message : "No fue posible preparar la selfie de registro.", ok: false };
+      }
+    },
+
+    async completeRegistration(input) {
+      const name = normalizeHutText(input.name);
+      const phone = normalizeHutPhone(input.phone);
+      const email = normalizeHutEmail(input.email);
+      const recruiter = normalizeOptionalHutText(input.recruiter);
+
+      if (!name) {
+        return { message: "Captura el nombre del participante.", ok: false };
+      }
+      if (!phone) {
+        return { message: "Captura el celular del participante.", ok: false };
+      }
+      if (input.metadata.storageBucket !== HUT_VIDEO_BUCKET) {
+        return { message: "No fue posible validar la selfie de registro.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+      const now = new Date();
+
+      return prisma.$transaction(async (tx) => {
+        const slot = (await tx.hutRegistrationSlot.findUnique?.({
+          select: registrationSlotSelect,
+          where: { registrationToken: input.token }
+        })) as HutRegistrationSlotRecord | null;
+
+        if (!slot) {
+          return { message: "Este link de registro HUT no es valido.", ok: false };
+        }
+        if (slot.status !== "AVAILABLE" || slot.participantId) {
+          return { message: "Este folio ya fue registrado.", ok: false };
+        }
+
+        try {
+          assertHutRegistrationSelfieStorageKey({
+            privateStorageKey: input.metadata.privateStorageKey,
+            slotId: slot.id,
+            studyId: slot.studyId
+          });
+        } catch (error) {
+          return { message: error instanceof Error ? error.message : "No fue posible validar la selfie de registro.", ok: false };
+        }
+
+        const token = createHutParticipantToken();
+        const participant = (await tx.hutParticipant.create?.({
+          data: {
+            currentBlockNumber: 1,
+            currentVideoSequence: 1,
+            email,
+            firstFragranceLeftArm: slot.firstFragranceLeftArm,
+            folio: slot.folio,
+            name,
+            phone,
+            recruiter,
+            secondFragranceRightArm: slot.secondFragranceRightArm,
+            startDate: now,
+            status: "BLOCK_1_IN_PROGRESS",
+            studyId: slot.studyId,
+            token
+          }
+        })) as { id: string };
+
+        await createHutParticipantFoundation(tx, {
+          participantId: participant.id,
+          startDate: now,
+          startsNow: true
+        });
+
+        await tx.hutReferenceSelfie.create?.({
+          data: {
+            capturedAt: now,
+            capturedByRole: "FIELD_REGISTRATION",
+            extension: extensionFromFilename(input.metadata.originalFilename),
+            mimeType: input.metadata.mimeType,
+            originalFilename: input.metadata.originalFilename,
+            participantId: participant.id,
+            privateStorageKey: input.metadata.privateStorageKey,
+            sizeBytes: input.metadata.sizeBytes,
+            storageBucket: input.metadata.storageBucket
+          }
+        });
+
+        await tx.hutRegistrationSlot.update?.({
+          data: {
+            participantId: participant.id,
+            registeredAt: now,
+            status: "REGISTERED"
+          },
+          where: { id: slot.id }
+        });
+
+        return {
+          data: {
+            participantId: participant.id,
+            participantLink: participantLink(input.requestOrigin, token)
+          },
+          message: "Registro HUT completado correctamente.",
+          ok: true
+        };
+      });
+    },
+
     async requestDailySelfieUpload(input) {
       const prisma = await getPrisma();
       const participant = await findParticipantByToken(prisma, input.token);
@@ -1214,10 +1584,13 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
       const rows = [
         [
           "ID",
+          "Folio",
           "Nombre",
           "Celular",
           "Correo",
           "Reclutador",
+          "Primera fragancia / brazo izquierdo",
+          "Segunda fragancia / brazo derecho",
           "Link participante",
           "Estado general",
           "Bloque actual",
@@ -1232,10 +1605,13 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
         ],
         ...dashboard.participants.map((participant) => [
           participant.id,
+          participant.folio,
           participant.name,
           participant.phone,
           participant.email,
           participant.recruiter,
+          participant.firstFragranceLeftArm,
+          participant.secondFragranceRightArm,
           participant.link,
           participant.status,
           participant.currentBlockNumber,
@@ -1247,6 +1623,27 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
           participant.block2?.missedDaysCount ?? 0,
           participant.call2?.status ?? "PENDING",
           participant.block1?.disqualificationReason ?? participant.block2?.disqualificationReason ?? ""
+        ]),
+        [],
+        [
+          "Folio",
+          "Link de registro",
+          "Estado",
+          "Nombre participante",
+          "Celular",
+          "Primera fragancia / brazo izquierdo",
+          "Segunda fragancia / brazo derecho",
+          "Selfie de registro"
+        ],
+        ...dashboard.registrationSlots.map((slot) => [
+          slot.folio,
+          slot.link,
+          slot.status,
+          slot.participantName,
+          slot.phone,
+          slot.firstFragranceLeftArm,
+          slot.secondFragranceRightArm,
+          slot.referenceSelfieStatus
         ])
       ];
 
@@ -1311,6 +1708,8 @@ function toAdminParticipant(participant: HutParticipantRecord, requestOrigin: st
     currentBlockNumber: participant.currentBlockNumber,
     currentVideoSequence: participant.currentVideoSequence,
     email: participant.email,
+    firstFragranceLeftArm: participant.firstFragranceLeftArm,
+    folio: participant.folio,
     id: participant.id,
     link: participantLink(requestOrigin, participant.token),
     name: participant.name,
@@ -1329,9 +1728,27 @@ function toAdminParticipant(participant: HutParticipantRecord, requestOrigin: st
           status: "MISSING"
         },
     status: participant.status,
+    secondFragranceRightArm: participant.secondFragranceRightArm,
     token: participant.token,
     usedToleranceInCurrentBlock: Boolean(block && block.missedDaysCount >= block.maxMissedDaysAllowed),
     visualOverrideEnabled: participant.visualOverrideEnabled
+  };
+}
+
+function toAdminRegistrationSlot(slot: HutRegistrationSlotRecord, requestOrigin: string): HutRegistrationSlotAdmin {
+  return {
+    email: slot.participant?.email ?? null,
+    firstFragranceLeftArm: slot.firstFragranceLeftArm,
+    folio: slot.folio,
+    id: slot.id,
+    link: registrationLink(requestOrigin, slot.registrationToken),
+    participantId: slot.participantId,
+    participantLink: slot.participant ? participantLink(requestOrigin, slot.participant.token) : null,
+    participantName: slot.participant?.name ?? null,
+    phone: slot.participant?.phone ?? null,
+    referenceSelfieStatus: slot.participant?.referenceSelfie ? "COMPLETE" : "MISSING",
+    secondFragranceRightArm: slot.secondFragranceRightArm,
+    status: slot.status
   };
 }
 
@@ -1523,6 +1940,49 @@ async function disqualifyParticipant(
 
 function participantLink(requestOrigin: string, token: string) {
   return new URL(`/hut/p/${encodeURIComponent(token)}`, requestOrigin).toString();
+}
+
+function registrationLink(requestOrigin: string, token: string) {
+  return new URL(`/hut/register/${encodeURIComponent(token)}`, requestOrigin).toString();
+}
+
+async function createHutParticipantFoundation(
+  tx: HutPrismaClient,
+  input: { participantId: string; startDate: Date | null; startsNow: boolean }
+) {
+  await tx.hutBlock.create?.({
+    data: {
+      blockNumber: 1,
+      maxMissedDaysAllowed: HUT_MAX_MISSED_DAYS_PER_BLOCK,
+      participantId: input.participantId,
+      requiredVideos: HUT_REQUIRED_VIDEOS_PER_BLOCK,
+      startDate: input.startDate,
+      status: input.startsNow ? "IN_PROGRESS" : "NOT_STARTED"
+    }
+  });
+  await tx.hutBlock.create?.({
+    data: {
+      blockNumber: 2,
+      maxMissedDaysAllowed: HUT_MAX_MISSED_DAYS_PER_BLOCK,
+      participantId: input.participantId,
+      requiredVideos: HUT_REQUIRED_VIDEOS_PER_BLOCK,
+      status: "NOT_STARTED"
+    }
+  });
+  await tx.hutCallEvaluation.create?.({
+    data: {
+      blockNumber: 1,
+      participantId: input.participantId,
+      status: "PENDING"
+    }
+  });
+  await tx.hutCallEvaluation.create?.({
+    data: {
+      blockNumber: 2,
+      participantId: input.participantId,
+      status: "PENDING"
+    }
+  });
 }
 
 function extensionFromFilename(filename: string): string {

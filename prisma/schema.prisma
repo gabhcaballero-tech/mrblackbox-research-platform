@@ -171,6 +171,12 @@ enum HutVisualVerificationStatus {
   NOT_REQUIRED_BY_OVERRIDE
 }
 
+enum HutRegistrationSlotStatus {
+  AVAILABLE
+  REGISTERED
+  CANCELLED
+}
+
 enum QuestionnairePurpose {
   SCREENER
   MEASUREMENT
@@ -422,6 +428,7 @@ model Study {
   activitySchedules        ActivitySchedule[]
   exportJobs               ExportJob[]
   hutParticipants          HutParticipant[]
+  hutRegistrationSlots     HutRegistrationSlot[]
 
   @@index([status])
   @@index([createdByUserId])
@@ -640,37 +647,64 @@ model ParticipantAccessToken {
 }
 
 model HutParticipant {
-  id                     String               @id @default(uuid()) @db.Uuid
-  studyId                String               @db.Uuid
-  name                   String
-  phone                  String?
-  email                  String?
-  recruiter              String?
-  token                  String               @unique
-  status                 HutParticipantStatus @default(NOT_STARTED)
-  startDate              DateTime?
-  currentBlockNumber     Int                  @default(1)
-  currentVideoSequence   Int                  @default(1)
-  visualOverrideEnabled  Boolean              @default(false)
-  visualOverrideReason   String?
-  visualOverrideByUserId String?              @db.Uuid
-  visualOverrideAt       DateTime?
-  createdAt              DateTime             @default(now())
-  updatedAt              DateTime             @updatedAt
+  id                      String               @id @default(uuid()) @db.Uuid
+  studyId                 String               @db.Uuid
+  folio                   String?
+  name                    String
+  phone                   String?
+  email                   String?
+  recruiter               String?
+  firstFragranceLeftArm   String?
+  secondFragranceRightArm String?
+  token                   String               @unique
+  status                  HutParticipantStatus @default(NOT_STARTED)
+  startDate               DateTime?
+  currentBlockNumber      Int                  @default(1)
+  currentVideoSequence    Int                  @default(1)
+  visualOverrideEnabled   Boolean              @default(false)
+  visualOverrideReason    String?
+  visualOverrideByUserId  String?              @db.Uuid
+  visualOverrideAt        DateTime?
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
 
   study               Study                   @relation(fields: [studyId], references: [id])
   visualOverrideBy    InternalUser?           @relation("HutVisualOverrideBy", fields: [visualOverrideByUserId], references: [id])
   referenceSelfie     HutReferenceSelfie?
+  registrationSlot    HutRegistrationSlot?    @relation("HutRegistrationSlotParticipant")
   blocks              HutBlock[]
   videoSubmissions    HutVideoSubmission[]
   dailyChecks         HutDailyCheck[]
   callEvaluations     HutCallEvaluation[]
   visualVerifications HutVisualVerification[]
 
+  @@unique([studyId, folio])
   @@index([studyId, status])
   @@index([token])
   @@index([visualOverrideByUserId])
   @@map("hut_participants")
+}
+
+model HutRegistrationSlot {
+  id                      String                    @id @default(uuid()) @db.Uuid
+  studyId                 String                    @db.Uuid
+  folio                   String
+  registrationToken       String                    @unique
+  participantId           String?                   @unique @db.Uuid
+  firstFragranceLeftArm   String
+  secondFragranceRightArm String
+  status                  HutRegistrationSlotStatus @default(AVAILABLE)
+  registeredAt            DateTime?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+
+  study       Study           @relation(fields: [studyId], references: [id])
+  participant HutParticipant? @relation("HutRegistrationSlotParticipant", fields: [participantId], references: [id])
+
+  @@unique([studyId, folio])
+  @@index([studyId, status])
+  @@index([participantId])
+  @@map("hut_registration_slots")
 }
 
 model HutReferenceSelfie {

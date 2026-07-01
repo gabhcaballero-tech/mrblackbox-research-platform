@@ -22,6 +22,19 @@ export async function createHutParticipantAction(studyId: string, formData: Form
   redirectWithHutMessage(studyId, result);
 }
 
+export async function createHutRegistrationSlotAction(studyId: string, formData: FormData) {
+  await requireCapability("screening:review");
+  const result = await createHutRepository().createRegistrationSlot({
+    firstFragranceLeftArm: String(formData.get("firstFragranceLeftArm") ?? ""),
+    folio: String(formData.get("folio") ?? ""),
+    requestOrigin: String(formData.get("requestOrigin") ?? ""),
+    secondFragranceRightArm: String(formData.get("secondFragranceRightArm") ?? ""),
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result);
+}
+
 export async function importHutParticipantsAction(studyId: string, formData: FormData) {
   await requireCapability("screening:review");
   const result = await createHutRepository().importParticipants({
@@ -29,6 +42,17 @@ export async function importHutParticipantsAction(studyId: string, formData: For
     startDate: parseOptionalDate(formData.get("startDate")),
     studyId,
     text: String(formData.get("participantsText") ?? "")
+  });
+
+  redirectWithHutMessage(studyId, result);
+}
+
+export async function importHutRegistrationSlotsAction(studyId: string, formData: FormData) {
+  await requireCapability("screening:review");
+  const result = await createHutRepository().importRegistrationSlots({
+    requestOrigin: String(formData.get("requestOrigin") ?? ""),
+    studyId,
+    text: String(formData.get("slotsText") ?? "")
   });
 
   redirectWithHutMessage(studyId, result);
@@ -128,6 +152,37 @@ export async function confirmHutReferenceSelfieUploadAction(
   revalidatePath(`/admin/studies/${studyId}/hut`);
 
   return result;
+}
+
+export async function requestHutRegistrationSelfieUploadAction(
+  token: string,
+  metadata: HutSelfieUploadMetadata
+): Promise<HutActionResult<HutSignedSelfieUpload>> {
+  return createHutRepository().requestRegistrationSelfieUpload({
+    metadata,
+    token
+  });
+}
+
+export async function completeHutRegistrationAction(
+  token: string,
+  metadata: HutSelfieUploadMetadata & {
+    privateStorageKey: string;
+    storageBucket: string;
+  },
+  formData: {
+    email?: string | null;
+    name: string;
+    phone: string;
+    recruiter?: string | null;
+    requestOrigin: string;
+  }
+): Promise<HutActionResult<{ participantLink: string; participantId: string }>> {
+  return createHutRepository().completeRegistration({
+    ...formData,
+    metadata,
+    token
+  });
 }
 
 export async function requestHutVideoUploadAction(

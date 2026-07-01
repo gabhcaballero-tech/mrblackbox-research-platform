@@ -7,7 +7,8 @@ import {
   getHutCurrentAvailability,
   hutBlockDayAvailableAt,
   nextHutVideoSequence,
-  parseHutParticipantImportText
+  parseHutParticipantImportText,
+  parseHutRegistrationSlotImportText
 } from ".";
 import type { HutStorageClient } from "./storage";
 
@@ -94,6 +95,107 @@ describe("HUT module foundation", () => {
 
     expect(confirmed.ok).toBe(true);
     expect(participant?.referenceSelfie?.privateStorageKey).toContain("/reference-selfie/");
+  });
+
+  it("creates a HUT registration folio with rotation and registration link", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const result = await repository.createRegistrationSlot({
+      firstFragranceLeftArm: "Fragancia A",
+      folio: "HUT-001",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "Fragancia B",
+      studyId: "study-hut"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.link : "").toContain("https://example.com/hut/register/");
+    expect(prisma.state.registrationSlots[0]).toMatchObject({
+      firstFragranceLeftArm: "FRAGANCIA A",
+      folio: "HUT-001",
+      secondFragranceRightArm: "FRAGANCIA B",
+      status: "AVAILABLE"
+    });
+  });
+
+  it("registers a participant from folio link and stores reference selfie", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createRegistrationSlot({
+      firstFragranceLeftArm: "Fragancia A",
+      folio: "HUT-002",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "Fragancia B",
+      studyId: "study-hut"
+    });
+    const token = prisma.state.registrationSlots[0]?.registrationToken ?? "";
+    const signed = await repository.requestRegistrationSelfieUpload({ metadata: selfieMetadata(), storage, token });
+    const registered = await repository.completeRegistration({
+      email: "ana@example.com",
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: signed.ok ? signed.data.privateStorageKey : "",
+        storageBucket: signed.ok ? signed.data.storageBucket : ""
+      },
+      name: "Ana Participante",
+      phone: "55 1234 5678",
+      recruiter: "Gaby",
+      requestOrigin: "https://example.com",
+      token
+    });
+
+    expect(registered.ok).toBe(true);
+    expect(prisma.state.registrationSlots[0]?.status).toBe("REGISTERED");
+    expect(prisma.state.participants[0]).toMatchObject({
+      firstFragranceLeftArm: "FRAGANCIA A",
+      folio: "HUT-002",
+      name: "ANA PARTICIPANTE",
+      phone: "5512345678",
+      secondFragranceRightArm: "FRAGANCIA B",
+      status: "BLOCK_1_IN_PROGRESS"
+    });
+    expect(prisma.state.participants[0]?.referenceSelfie?.privateStorageKey).toContain("/hut-registration-slots/");
+    expect(registered.ok ? registered.data.participantLink : "").toContain("/hut/p/");
+  });
+
+  it("does not allow registering the same HUT folio twice", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createRegistrationSlot({
+      firstFragranceLeftArm: "Fragancia A",
+      folio: "HUT-003",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "Fragancia B",
+      studyId: "study-hut"
+    });
+    const token = prisma.state.registrationSlots[0]?.registrationToken ?? "";
+    const signed = await repository.requestRegistrationSelfieUpload({ metadata: selfieMetadata(), storage, token });
+    await repository.completeRegistration({
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: signed.ok ? signed.data.privateStorageKey : "",
+        storageBucket: signed.ok ? signed.data.storageBucket : ""
+      },
+      name: "Ana",
+      phone: "5512345678",
+      requestOrigin: "https://example.com",
+      token
+    });
+    const second = await repository.completeRegistration({
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: signed.ok ? signed.data.privateStorageKey : "",
+        storageBucket: signed.ok ? signed.data.storageBucket : ""
+      },
+      name: "Otra Persona",
+      phone: "5587654321",
+      requestOrigin: "https://example.com",
+      token
+    });
+
+    expect(second.ok).toBe(false);
+    expect(second.ok ? "" : second.message).toBe("Este folio ya fue registrado.");
+    expect(prisma.state.participants).toHaveLength(1);
   });
 
   it("blocks video upload when registration selfie is missing", async () => {
@@ -364,6 +466,13 @@ describe("HUT module foundation", () => {
       requestOrigin: "https://example.com",
       studyId: "study-hut"
     });
+    await repository.createRegistrationSlot({
+      firstFragranceLeftArm: "Fragancia A",
+      folio: "HUT-004",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "Fragancia B",
+      studyId: "study-hut"
+    });
 
     const result = await repository.exportProgress({
       now: new Date("2026-07-01T00:00:00.000Z"),
@@ -372,8 +481,11 @@ describe("HUT module foundation", () => {
     });
 
     expect(result.ok ? result.data.filename : "").toBe("HUT-TEST_hut_avance_2026-07-01.tsv");
-    expect(result.ok ? result.data.body : "").toContain("ID\tNombre\tCelular\tCorreo\tReclutador\tLink participante");
+    expect(result.ok ? result.data.body : "").toContain("ID\tFolio\tNombre\tCelular\tCorreo\tReclutador");
     expect(result.ok ? result.data.body : "").toContain("PARTICIPANTE CON Ñ");
+    expect(result.ok ? result.data.body : "").toContain("Folio\tLink de registro\tEstado");
+    expect(result.ok ? result.data.body : "").toContain("HUT-004\thttps://example.com/hut/register/");
+    expect(result.ok ? result.data.body : "").toContain("FRAGANCIA A\tFRAGANCIA B");
   });
 
   it("parses participant import text and preserves tabular export columns", () => {
@@ -386,6 +498,18 @@ describe("HUT module foundation", () => {
     expect(rows[0]).toMatchObject({ name: "ANA Ñ", phone: "5512345678", recruiter: "GABY" });
     expect(tsv.startsWith("\uFEFF")).toBe(true);
     expect(tsv).toContain("ANA Ñ\tTexto con tab y salto; conserva comas");
+  });
+
+  it("parses HUT registration folios with rotation", () => {
+    const rows = parseHutRegistrationSlotImportText(
+      "folio\tprimera fragancia / brazo izquierdo\tsegunda fragancia / brazo derecho\nHUT-005\tFragancia A\tFragancia B"
+    );
+
+    expect(rows[0]).toMatchObject({
+      firstFragranceLeftArm: "FRAGANCIA A",
+      folio: "HUT-005",
+      secondFragranceRightArm: "FRAGANCIA B"
+    });
   });
 });
 
@@ -449,6 +573,7 @@ function createFakeHutPrisma() {
   const state = {
     nextId: 1,
     participants: [] as FakeParticipant[],
+    registrationSlots: [] as FakeRegistrationSlot[],
     study: {
       code: "HUT-TEST",
       id: "study-hut",
@@ -487,11 +612,15 @@ function createFakeHutPrisma() {
           currentVideoSequence: Number(args.data.currentVideoSequence ?? 1),
           dailyChecks: [],
           email: (args.data.email as string | null) ?? null,
+          firstFragranceLeftArm: (args.data.firstFragranceLeftArm as string | null) ?? null,
+          folio: (args.data.folio as string | null) ?? null,
           id: `participant-${state.nextId++}`,
           name: String(args.data.name),
           phone: (args.data.phone as string | null) ?? null,
           recruiter: (args.data.recruiter as string | null) ?? null,
           referenceSelfie: null,
+          registrationSlot: null,
+          secondFragranceRightArm: (args.data.secondFragranceRightArm as string | null) ?? null,
           startDate: (args.data.startDate as Date | null) ?? null,
           status: (args.data.status as FakeParticipant["status"]) ?? "NOT_STARTED",
           study: state.study,
@@ -528,6 +657,49 @@ function createFakeHutPrisma() {
           Object.assign(participant, args.data);
         }
         return participant;
+      }
+    },
+    hutRegistrationSlot: {
+      async create(args: { data: Partial<FakeRegistrationSlot> }) {
+        const slot: FakeRegistrationSlot = {
+          firstFragranceLeftArm: String(args.data.firstFragranceLeftArm),
+          folio: String(args.data.folio),
+          id: `slot-${state.nextId++}`,
+          participantId: null,
+          registeredAt: null,
+          registrationToken: String(args.data.registrationToken),
+          secondFragranceRightArm: String(args.data.secondFragranceRightArm),
+          status: (args.data.status as FakeRegistrationSlot["status"]) ?? "AVAILABLE",
+          study: state.study,
+          studyId: String(args.data.studyId)
+        };
+        state.registrationSlots.push(slot);
+        return { id: slot.id };
+      },
+      async findFirst(args: { where: { folio?: string; studyId: string } }) {
+        const slot =
+          state.registrationSlots.find((item) => item.studyId === args.where.studyId && item.folio === args.where.folio) ?? null;
+        return slot ? slotWithParticipant(slot, state.participants) : null;
+      },
+      async findMany(args: { where: { studyId: string } }) {
+        return state.registrationSlots
+          .filter((slot) => slot.studyId === args.where.studyId)
+          .map((slot) => slotWithParticipant(slot, state.participants));
+      },
+      async findUnique(args: { where: { registrationToken?: string } }) {
+        const slot = state.registrationSlots.find((item) => item.registrationToken === args.where.registrationToken) ?? null;
+        return slot ? slotWithParticipant(slot, state.participants) : null;
+      },
+      async update(args: { data: Partial<FakeRegistrationSlot>; where: { id: string } }) {
+        const slot = state.registrationSlots.find((item) => item.id === args.where.id);
+        if (slot) {
+          Object.assign(slot, args.data);
+          const participant = state.participants.find((item) => item.id === slot.participantId);
+          if (participant) {
+            participant.registrationSlot = slot;
+          }
+        }
+        return slot ? slotWithParticipant(slot, state.participants) : null;
       }
     },
     hutBlock: {
@@ -656,11 +828,15 @@ type FakeParticipant = {
   currentVideoSequence: number;
   dailyChecks: FakeDailyCheck[];
   email: string | null;
+  firstFragranceLeftArm: string | null;
+  folio: string | null;
   id: string;
   name: string;
   phone: string | null;
   recruiter: string | null;
   referenceSelfie: FakeReferenceSelfie | null;
+  registrationSlot: FakeRegistrationSlot | null;
+  secondFragranceRightArm: string | null;
   startDate: Date | null;
   status:
     | "NOT_STARTED"
@@ -683,6 +859,25 @@ type FakeParticipant = {
   visualOverrideReason: string | null;
   visualVerifications: FakeVisualVerification[];
   videoSubmissions: Array<FakeVideo & { id?: string }>;
+};
+
+type FakeRegistrationSlot = {
+  firstFragranceLeftArm: string;
+  folio: string;
+  id: string;
+  participantId: string | null;
+  registeredAt: Date | null;
+  registrationToken: string;
+  secondFragranceRightArm: string;
+  status: "AVAILABLE" | "CANCELLED" | "REGISTERED";
+  study: {
+    code: string;
+    id: string;
+    name: string;
+    status: string;
+    timeZoneIana: string;
+  };
+  studyId: string;
 };
 
 type FakeReferenceSelfie = {
@@ -774,5 +969,23 @@ function faceResult(status: "MATCH" | "NO_MATCH" | "UNCERTAIN", score: number) {
     method: "@vladmandic/human:faceres+blazeface:v1",
     score,
     status
+  };
+}
+
+function slotWithParticipant(slot: FakeRegistrationSlot, participants: FakeParticipant[]) {
+  const participant = participants.find((item) => item.id === slot.participantId) ?? null;
+
+  return {
+    ...slot,
+    participant: participant
+        ? {
+            email: participant.email,
+            id: participant.id,
+            name: participant.name,
+            phone: participant.phone,
+            referenceSelfie: participant.referenceSelfie,
+            token: participant.token
+          }
+        : null
   };
 }
