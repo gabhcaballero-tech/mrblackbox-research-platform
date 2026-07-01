@@ -78,6 +78,40 @@ export type HutMissedDayDecision =
       reminderStatus: "MISSED";
     };
 
+export type HutAvailabilityReason =
+  | "AVAILABLE_FOR_SELFIE"
+  | "AVAILABLE_FOR_VIDEO"
+  | "BLOCK_NOT_ACTIVE"
+  | "MISSING_REFERENCE_SELFIE"
+  | "WAIT_UNTIL_5_AM"
+  | "VISUAL_VERIFICATION_FAILED"
+  | "VISUAL_VERIFICATION_PENDING";
+
+export type HutAvailabilityInput = {
+  block: HutBlockState & {
+    id?: string;
+    startDate: Date | null;
+  };
+  dailyChecks: Array<{
+    blockDayNumber: number;
+  }>;
+  hasReferenceSelfie: boolean;
+  hasVisualOverride: boolean;
+  latestVerificationStatus?: "MATCHED" | "NOT_MATCHED" | "NOT_REQUIRED_BY_OVERRIDE" | "PENDING" | "PENDING_REVIEW" | "UNCERTAIN" | null;
+  now: Date;
+  timeZoneIana: string;
+};
+
+export type HutAvailability = {
+  available: boolean;
+  blockNumber: 1 | 2;
+  blockDayNumber: number;
+  daysMissedInBlock: number;
+  expectedVideoSequence: number;
+  nextAvailableAt: Date | null;
+  reason: HutAvailabilityReason;
+};
+
 export function createHutParticipantToken(): string {
   return randomUUID();
 }
@@ -109,6 +143,93 @@ export function normalizeOptionalHutText(value: unknown): string | null {
 export function nextHutVideoSequence(block: Pick<HutBlockState, "requiredVideos" | "submittedVideosCount">): number | null {
   const next = block.submittedVideosCount + 1;
   return next <= block.requiredVideos ? next : null;
+}
+
+export function getHutCurrentAvailability(input: HutAvailabilityInput): HutAvailability {
+  const expectedVideoSequence = nextHutVideoSequence(input.block) ?? input.block.requiredVideos;
+  const blockDayNumber = nextHutBlockDayNumber(input.dailyChecks);
+  const base = {
+    blockNumber: input.block.blockNumber,
+    blockDayNumber,
+    daysMissedInBlock: input.block.missedDaysCount,
+    expectedVideoSequence,
+    nextAvailableAt: null
+  };
+
+  if (input.block.status !== "IN_PROGRESS" || !input.block.startDate) {
+    return {
+      ...base,
+      available: false,
+      reason: "BLOCK_NOT_ACTIVE"
+    };
+  }
+
+  const nextAvailableAt = hutBlockDayAvailableAt({
+    blockDayNumber,
+    startDate: input.block.startDate,
+    timeZoneIana: input.timeZoneIana
+  });
+
+  if (input.now.getTime() < nextAvailableAt.getTime()) {
+    return {
+      ...base,
+      available: false,
+      nextAvailableAt,
+      reason: "WAIT_UNTIL_5_AM"
+    };
+  }
+
+  if (!input.hasReferenceSelfie && !input.hasVisualOverride) {
+    return {
+      ...base,
+      available: false,
+      nextAvailableAt,
+      reason: "MISSING_REFERENCE_SELFIE"
+    };
+  }
+
+  if (input.hasVisualOverride) {
+    return {
+      ...base,
+      available: true,
+      nextAvailableAt,
+      reason: "AVAILABLE_FOR_VIDEO"
+    };
+  }
+
+  if (input.latestVerificationStatus === "MATCHED") {
+    return {
+      ...base,
+      available: true,
+      nextAvailableAt,
+      reason: "AVAILABLE_FOR_VIDEO"
+    };
+  }
+
+  if (input.latestVerificationStatus === "NOT_MATCHED" || input.latestVerificationStatus === "UNCERTAIN") {
+    return {
+      ...base,
+      available: false,
+      nextAvailableAt,
+      reason: "VISUAL_VERIFICATION_FAILED"
+    };
+  }
+
+  if (input.latestVerificationStatus === "PENDING" || input.latestVerificationStatus === "PENDING_REVIEW") {
+    return {
+      ...base,
+      available: false,
+      nextAvailableAt,
+      reason: "VISUAL_VERIFICATION_PENDING"
+    };
+  }
+
+  return {
+    ...base,
+    available: true,
+    nextAvailableAt,
+    reason: "AVAILABLE_FOR_SELFIE"
+  };
 }
 
 export function applyHutVideoSubmission(block: HutBlockState): HutBlockProgressDecision {
@@ -175,6 +296,34 @@ export function participantStatusForCallPendingBlock(blockNumber: 1 | 2): "BLOCK
   return blockNumber === 1 ? "BLOCK_1_CALL_PENDING" : "BLOCK_2_CALL_PENDING";
 }
 
+export function nextHutBlockDayNumber(dailyChecks: Array<{ blockDayNumber: number }>): number {
+  const maxExistingDay = dailyChecks.reduce((max, check) => Math.max(max, check.blockDayNumber), 0);
+  return maxExistingDay + 1;
+}
+
+export function hutBlockDayAvailableAt({
+  blockDayNumber,
+  startDate,
+  timeZoneIana
+}: {
+  blockDayNumber: number;
+  startDate: Date;
+  timeZoneIana: string;
+}): Date {
+  const start = getTimeZoneDateParts(startDate, timeZoneIana);
+  const localDate = new Date(Date.UTC(start.year, start.month - 1, start.day + blockDayNumber - 1, 5, 0, 0, 0));
+
+  return localDateTimeToUtc({
+    day: localDate.getUTCDate(),
+    hour: 5,
+    minute: 0,
+    month: localDate.getUTCMonth() + 1,
+    second: 0,
+    timeZoneIana,
+    year: localDate.getUTCFullYear()
+  });
+}
+
 export function parseHutParticipantImportText(text: string): Array<{
   email: string | null;
   name: string;
@@ -224,4 +373,60 @@ function escapeTsvCell(value: string | number | Date | null | undefined): string
 
 function splitDelimitedLine(line: string, delimiter: string): string[] {
   return line.split(delimiter).map((item) => item.trim());
+}
+
+function getTimeZoneDateParts(date: Date, timeZoneIana: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: timeZoneIana,
+    year: "numeric"
+  }).formatToParts(date);
+
+  return {
+    day: Number(parts.find((part) => part.type === "day")?.value),
+    month: Number(parts.find((part) => part.type === "month")?.value),
+    year: Number(parts.find((part) => part.type === "year")?.value)
+  };
+}
+
+function localDateTimeToUtc({
+  day,
+  hour,
+  minute,
+  month,
+  second,
+  timeZoneIana,
+  year
+}: {
+  day: number;
+  hour: number;
+  minute: number;
+  month: number;
+  second: number;
+  timeZoneIana: string;
+  year: number;
+}): Date {
+  const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute, second, 0));
+  const zoneParts = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
+    month: "2-digit",
+    second: "2-digit",
+    timeZone: timeZoneIana,
+    year: "numeric"
+  }).formatToParts(utcGuess);
+  const zoneAsUtc = Date.UTC(
+    Number(zoneParts.find((part) => part.type === "year")?.value),
+    Number(zoneParts.find((part) => part.type === "month")?.value) - 1,
+    Number(zoneParts.find((part) => part.type === "day")?.value),
+    Number(zoneParts.find((part) => part.type === "hour")?.value),
+    Number(zoneParts.find((part) => part.type === "minute")?.value),
+    Number(zoneParts.find((part) => part.type === "second")?.value)
+  );
+  const offset = zoneAsUtc - utcGuess.getTime();
+
+  return new Date(utcGuess.getTime() - offset);
 }

@@ -2,6 +2,8 @@ export {
   buildHutTsv,
   applyHutMissedDay,
   applyHutVideoSubmission,
+  getHutCurrentAvailability,
+  hutBlockDayAvailableAt,
   nextHutVideoSequence,
   normalizeHutText,
   parseHutParticipantImportText

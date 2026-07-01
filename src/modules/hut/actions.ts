@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createHutRepository, type HutActionResult } from "./repository";
-import type { HutSignedVideoUpload, HutVideoUploadMetadata } from "./storage";
+import type { HutSelfieUploadMetadata, HutSignedSelfieUpload, HutSignedVideoUpload, HutVideoUploadMetadata } from "./storage";
 import { requireCapability } from "@/shared/auth/session";
+import type { NavigoFaceVerificationClientResult } from "@/modules/navigo-app/face-verification-contract";
 
 export async function createHutParticipantAction(studyId: string, formData: FormData) {
   await requireCapability("screening:review");
@@ -81,6 +82,54 @@ export async function reactivateHutParticipantAction(studyId: string, participan
   redirectWithHutMessage(studyId, result, participantId);
 }
 
+export async function setHutVisualOverrideAction(studyId: string, participantId: string, formData: FormData) {
+  const actor = await requireCapability("screening:review");
+  const result = await createHutRepository().setVisualOverride({
+    actorUserId: actor.id,
+    enabled: formData.get("enabled") === "on",
+    participantId,
+    reason: String(formData.get("reason") ?? ""),
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
+export async function requestHutReferenceSelfieUploadAction(
+  studyId: string,
+  participantId: string,
+  metadata: HutSelfieUploadMetadata
+): Promise<HutActionResult<HutSignedSelfieUpload>> {
+  const actor = await requireCapability("screening:review");
+  return createHutRepository().requestReferenceSelfieUpload({
+    actorUserId: actor.id,
+    metadata,
+    participantId,
+    studyId
+  });
+}
+
+export async function confirmHutReferenceSelfieUploadAction(
+  studyId: string,
+  participantId: string,
+  metadata: HutSelfieUploadMetadata & {
+    privateStorageKey: string;
+    storageBucket: string;
+  }
+): Promise<HutActionResult<{ participantId: string }>> {
+  const actor = await requireCapability("screening:review");
+  const result = await createHutRepository().confirmReferenceSelfieUpload({
+    actorUserId: actor.id,
+    metadata,
+    participantId,
+    studyId
+  });
+
+  revalidatePath(`/admin/studies/${studyId}/hut`);
+
+  return result;
+}
+
 export async function requestHutVideoUploadAction(
   token: string,
   metadata: HutVideoUploadMetadata
@@ -89,6 +138,35 @@ export async function requestHutVideoUploadAction(
     metadata,
     token
   });
+}
+
+export async function requestHutDailySelfieUploadAction(
+  token: string,
+  metadata: HutSelfieUploadMetadata
+): Promise<HutActionResult<HutSignedSelfieUpload & { referenceSelfieSignedUrl: string }>> {
+  return createHutRepository().requestDailySelfieUpload({
+    metadata,
+    token
+  });
+}
+
+export async function confirmHutDailySelfieUploadAction(
+  token: string,
+  metadata: HutSelfieUploadMetadata & {
+    faceVerification?: NavigoFaceVerificationClientResult | null;
+    privateStorageKey: string;
+    storageBucket: string;
+  }
+): Promise<HutActionResult<{ status: "MATCHED" | "NOT_MATCHED" | "PENDING_REVIEW" | "UNCERTAIN" }>> {
+  const result = await createHutRepository().confirmDailySelfieUpload({
+    faceVerification: metadata.faceVerification,
+    metadata,
+    token
+  });
+
+  revalidatePath(`/hut/p/${encodeURIComponent(token)}`);
+
+  return result;
 }
 
 export async function confirmHutVideoUploadAction(

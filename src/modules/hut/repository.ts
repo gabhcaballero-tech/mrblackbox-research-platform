@@ -4,9 +4,11 @@ import {
   applyHutVideoSubmission,
   buildHutTsv,
   createHutParticipantToken,
+  getHutCurrentAvailability,
   HUT_MAX_BLOCK_CALENDAR_DAYS,
   HUT_MAX_MISSED_DAYS_PER_BLOCK,
   HUT_REQUIRED_VIDEOS_PER_BLOCK,
+  nextHutBlockDayNumber,
   nextHutVideoSequence,
   normalizeHutEmail,
   normalizeHutPhone,
@@ -19,13 +21,25 @@ import {
   type HutParticipantStatus
 } from "./service";
 import {
+  assertHutSelfieStorageKey,
   assertHutVideoStorageKey,
+  createHutSignedDailySelfieUpload,
+  createHutSignedReferenceSelfieUpload,
   createHutSignedVideoUpload,
   HUT_VIDEO_BUCKET,
+  type HutSelfieUploadMetadata,
+  type HutSignedSelfieUpload,
   type HutSignedVideoUpload,
   type HutStorageClient,
   type HutVideoUploadMetadata
 } from "./storage";
+import {
+  createSupabaseEvidenceStorageClient,
+} from "@/modules/participant-portal/evidence-storage";
+import {
+  normalizeNavigoFaceVerificationForStorage,
+  type NavigoFaceVerificationClientResult
+} from "@/modules/navigo-app/face-verification-contract";
 
 export type HutActionResult<T = void> =
   | { ok: true; data: T; message?: string }
@@ -40,6 +54,12 @@ export type HutStudySummary = {
 };
 
 export type HutAdminParticipant = {
+  availability: {
+    blockNumber?: number;
+    expectedVideoSequence?: number;
+    nextAvailableAt: Date | null;
+    reason: string;
+  };
   block1: HutBlockSummary | null;
   block2: HutBlockSummary | null;
   call1: HutCallSummary | null;
@@ -53,8 +73,15 @@ export type HutAdminParticipant = {
   phone: string | null;
   recruiter: string | null;
   reminderPending: boolean;
+  referenceSelfie: {
+    capturedAt: Date;
+    signedUrl: string | null;
+    status: "COMPLETE" | "MISSING";
+  };
   status: HutParticipantStatus;
   token: string;
+  usedToleranceInCurrentBlock: boolean;
+  visualOverrideEnabled: boolean;
 };
 
 export type HutBlockSummary = {
@@ -81,6 +108,12 @@ export type HutPortalView = {
     blockNumber: number;
     sequenceNumber: number;
   } | null;
+  availability: {
+    blockNumber?: number;
+    expectedVideoSequence?: number;
+    nextAvailableAt: Date | null;
+    reason: string;
+  };
   block1: HutBlockSummary | null;
   block2: HutBlockSummary | null;
   message: string;
@@ -139,6 +172,42 @@ export type HutRepository = {
     storage?: HutStorageClient;
     token: string;
   }) => Promise<HutActionResult<HutSignedVideoUpload>>;
+  requestReferenceSelfieUpload: (input: {
+    actorUserId: string;
+    metadata: HutSelfieUploadMetadata;
+    participantId: string;
+    storage?: HutStorageClient;
+    studyId: string;
+  }) => Promise<HutActionResult<HutSignedSelfieUpload>>;
+  confirmReferenceSelfieUpload: (input: {
+    actorUserId: string;
+    metadata: HutSelfieUploadMetadata & {
+      privateStorageKey: string;
+      storageBucket: string;
+    };
+    participantId: string;
+    studyId: string;
+  }) => Promise<HutActionResult<{ participantId: string }>>;
+  requestDailySelfieUpload: (input: {
+    metadata: HutSelfieUploadMetadata;
+    storage?: HutStorageClient;
+    token: string;
+  }) => Promise<HutActionResult<HutSignedSelfieUpload & { referenceSelfieSignedUrl: string }>>;
+  confirmDailySelfieUpload: (input: {
+    faceVerification?: NavigoFaceVerificationClientResult | null;
+    metadata: HutSelfieUploadMetadata & {
+      privateStorageKey: string;
+      storageBucket: string;
+    };
+    token: string;
+  }) => Promise<HutActionResult<{ status: "MATCHED" | "NOT_MATCHED" | "UNCERTAIN" | "PENDING_REVIEW" }>>;
+  setVisualOverride: (input: {
+    actorUserId: string;
+    enabled: boolean;
+    participantId: string;
+    reason: string;
+    studyId: string;
+  }) => Promise<HutActionResult<{ participantId: string }>>;
   confirmVideoUpload: (input: {
     metadata: HutVideoUploadMetadata & {
       privateStorageKey: string;
@@ -171,7 +240,9 @@ type HutPrismaClient = PrismaClientLike & {
   hutCallEvaluation: PrismaModel;
   hutDailyCheck: PrismaModel;
   hutParticipant: PrismaModel;
+  hutReferenceSelfie: PrismaModel;
   hutVideoSubmission: PrismaModel;
+  hutVisualVerification: PrismaModel;
   study: PrismaModel;
 };
 
@@ -191,7 +262,17 @@ type HutParticipantRecord = {
   study: HutStudySummary;
   studyId: string;
   token: string;
+  referenceSelfie: HutReferenceSelfieRecord | null;
   videoSubmissions?: HutVideoRecord[];
+  visualOverrideEnabled: boolean;
+  visualOverrideReason: string | null;
+  visualVerifications?: HutVisualVerificationRecord[];
+};
+
+type HutReferenceSelfieRecord = {
+  capturedAt: Date;
+  privateStorageKey: string;
+  storageBucket: string;
 };
 
 type HutBlockRecord = {
@@ -220,7 +301,16 @@ type HutDailyCheckRecord = {
 
 type HutVideoRecord = {
   blockNumber: number;
+  id?: string;
   sequenceNumber: number;
+};
+
+type HutVisualVerificationRecord = {
+  attemptSelfieKey: string;
+  blockNumber: number;
+  id: string;
+  sequenceNumber: number;
+  status: "MATCHED" | "NOT_MATCHED" | "NOT_REQUIRED_BY_OVERRIDE" | "PENDING" | "PENDING_REVIEW" | "UNCERTAIN";
 };
 
 const studySelect = {
@@ -269,15 +359,35 @@ const participantSelect = {
   name: true,
   phone: true,
   recruiter: true,
+  referenceSelfie: {
+    select: {
+      capturedAt: true,
+      privateStorageKey: true,
+      storageBucket: true
+    }
+  },
   startDate: true,
   status: true,
   study: { select: studySelect },
   studyId: true,
   token: true,
+  visualOverrideEnabled: true,
+  visualOverrideReason: true,
+  visualVerifications: {
+    orderBy: { createdAt: "desc" },
+    select: {
+      attemptSelfieKey: true,
+      blockNumber: true,
+      id: true,
+      sequenceNumber: true,
+      status: true
+    }
+  },
   videoSubmissions: {
     orderBy: [{ blockNumber: "asc" }, { sequenceNumber: "asc" }],
     select: {
       blockNumber: true,
+      id: true,
       sequenceNumber: true
     }
   }
@@ -717,6 +827,11 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
         return { message: "No hay videos disponibles para subir en este momento.", ok: false };
       }
 
+      const availability = currentAvailability(participant, block, new Date());
+      if (availability.reason !== "AVAILABLE_FOR_VIDEO") {
+        return { message: videoUnavailableMessage(availability.reason, availability.nextAvailableAt), ok: false };
+      }
+
       const sequenceNumber = nextHutVideoSequence(block);
       if (!sequenceNumber) {
         return { message: "Este bloque ya tiene todos sus videos.", ok: false };
@@ -737,6 +852,239 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
       }
     },
 
+    async requestReferenceSelfieUpload(input) {
+      const prisma = await getPrisma();
+      const participant = await findParticipant(prisma, input.participantId);
+
+      if (!participant || participant.studyId !== input.studyId) {
+        return { message: "No encontramos el participante HUT.", ok: false };
+      }
+
+      if (participant.blocks.some((block) => block.status !== "NOT_STARTED")) {
+        return { message: "La selfie de registro solo puede reemplazarse antes de iniciar el bloque.", ok: false };
+      }
+
+      try {
+        const signed = await createHutSignedReferenceSelfieUpload({
+          metadata: input.metadata,
+          participantId: participant.id,
+          storage: input.storage,
+          studyId: participant.studyId
+        });
+        return { data: signed, ok: true };
+      } catch (error) {
+        return { message: error instanceof Error ? error.message : "No fue posible preparar la selfie de registro.", ok: false };
+      }
+    },
+
+    async confirmReferenceSelfieUpload(input) {
+      const prisma = await getPrisma();
+      const now = new Date();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipant(tx, input.participantId);
+
+        if (!participant || participant.studyId !== input.studyId) {
+          return { message: "No encontramos el participante HUT.", ok: false };
+        }
+
+        if (input.metadata.storageBucket !== HUT_VIDEO_BUCKET) {
+          return { message: "No fue posible validar la selfie de registro.", ok: false };
+        }
+
+        try {
+          assertHutSelfieStorageKey({
+            participantId: participant.id,
+            privateStorageKey: input.metadata.privateStorageKey,
+            studyId: participant.studyId
+          });
+        } catch (error) {
+          return { message: error instanceof Error ? error.message : "No fue posible validar la selfie de registro.", ok: false };
+        }
+
+        const existing = (await tx.hutReferenceSelfie.findFirst?.({
+          select: { id: true },
+          where: { participantId: participant.id }
+        })) as { id: string } | null;
+        const data = {
+          capturedAt: now,
+          capturedByRole: "INTERNAL_USER",
+          capturedByUserId: input.actorUserId,
+          extension: extensionFromFilename(input.metadata.originalFilename),
+          mimeType: input.metadata.mimeType,
+          originalFilename: input.metadata.originalFilename,
+          privateStorageKey: input.metadata.privateStorageKey,
+          sizeBytes: input.metadata.sizeBytes,
+          storageBucket: input.metadata.storageBucket
+        };
+
+        if (existing) {
+          await tx.hutReferenceSelfie.update?.({
+            data,
+            where: { id: existing.id }
+          });
+        } else {
+          await tx.hutReferenceSelfie.create?.({
+            data: {
+              ...data,
+              participantId: participant.id
+            }
+          });
+        }
+
+        return {
+          data: { participantId: participant.id },
+          message: "Selfie de registro guardada correctamente.",
+          ok: true
+        };
+      });
+    },
+
+    async requestDailySelfieUpload(input) {
+      const prisma = await getPrisma();
+      const participant = await findParticipantByToken(prisma, input.token);
+
+      if (!participant) {
+        return { message: "Este enlace HUT no es valido.", ok: false };
+      }
+
+      const block = activeBlock(participant);
+      if (!block) {
+        return { message: "No hay actividad HUT disponible.", ok: false };
+      }
+
+      const availability = currentAvailability(participant, block, new Date());
+      if (availability.reason !== "AVAILABLE_FOR_SELFIE") {
+        return { message: videoUnavailableMessage(availability.reason, availability.nextAvailableAt), ok: false };
+      }
+
+      if (!participant.referenceSelfie) {
+        return { message: "Tu registro aun no esta completo. Contacta al encuestador.", ok: false };
+      }
+
+      try {
+        const storage = input.storage ?? createSupabaseEvidenceStorageClient();
+        const [signed, referenceSelfieSignedUrl] = await Promise.all([
+          createHutSignedDailySelfieUpload({
+            blockNumber: block.blockNumber,
+            metadata: input.metadata,
+            participantId: participant.id,
+            sequenceNumber: availability.expectedVideoSequence,
+            storage,
+            studyId: participant.studyId
+          }),
+          storage.createSignedReadUrl({
+            bucket: participant.referenceSelfie.storageBucket,
+            expiresInSeconds: 60 * 10,
+            privateStorageKey: participant.referenceSelfie.privateStorageKey
+          })
+        ]);
+        return { data: { ...signed, referenceSelfieSignedUrl }, ok: true };
+      } catch (error) {
+        return { message: error instanceof Error ? error.message : "No fue posible preparar la selfie diaria.", ok: false };
+      }
+    },
+
+    async confirmDailySelfieUpload(input) {
+      const prisma = await getPrisma();
+      const now = new Date();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipantByToken(tx, input.token);
+
+        if (!participant) {
+          return { message: "Este enlace HUT no es valido.", ok: false };
+        }
+
+        const block = activeBlock(participant);
+        if (!block) {
+          return { message: "No hay actividad HUT disponible.", ok: false };
+        }
+
+        const availability = currentAvailability(participant, block, now);
+        if (availability.reason !== "AVAILABLE_FOR_SELFIE") {
+          return { message: videoUnavailableMessage(availability.reason, availability.nextAvailableAt), ok: false };
+        }
+
+        if (!participant.referenceSelfie) {
+          return { message: "Tu registro aun no esta completo. Contacta al encuestador.", ok: false };
+        }
+
+        if (input.metadata.storageBucket !== HUT_VIDEO_BUCKET) {
+          return { message: "No fue posible validar la selfie diaria.", ok: false };
+        }
+
+        try {
+          assertHutSelfieStorageKey({
+            participantId: participant.id,
+            privateStorageKey: input.metadata.privateStorageKey,
+            studyId: participant.studyId
+          });
+        } catch (error) {
+          return { message: error instanceof Error ? error.message : "No fue posible validar la selfie diaria.", ok: false };
+        }
+
+        const normalized = normalizeNavigoFaceVerificationForStorage(input.faceVerification);
+        const status = hutVisualStatusFromReview(normalized.reviewStatus);
+        await tx.hutVisualVerification.create?.({
+          data: {
+            attemptExtension: extensionFromFilename(input.metadata.originalFilename),
+            attemptMimeType: input.metadata.mimeType,
+            attemptOriginalFilename: input.metadata.originalFilename,
+            attemptSelfieKey: input.metadata.privateStorageKey,
+            attemptSizeBytes: input.metadata.sizeBytes,
+            attemptStorageBucket: input.metadata.storageBucket,
+            blockId: block.id,
+            blockNumber: block.blockNumber,
+            participantId: participant.id,
+            referenceSelfieKey: participant.referenceSelfie.privateStorageKey,
+            sequenceNumber: availability.expectedVideoSequence,
+            similarityScore: input.faceVerification?.score ?? null,
+            status,
+            verificationDate: now
+          }
+        });
+
+        return {
+          data: { status },
+          message:
+            status === "MATCHED"
+              ? "Identidad confirmada. Ya puedes subir tu video."
+              : "No pudimos confirmar tu identidad. Contacta al supervisor antes de continuar.",
+          ok: true
+        };
+      });
+    },
+
+    async setVisualOverride(input) {
+      if (input.enabled && !input.reason.trim()) {
+        return { message: "Captura el motivo del override visual.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+      const participant = await findParticipant(prisma, input.participantId);
+
+      if (!participant || participant.studyId !== input.studyId) {
+        return { message: "No encontramos el participante HUT.", ok: false };
+      }
+
+      await prisma.hutParticipant.update?.({
+        data: {
+          visualOverrideAt: input.enabled ? new Date() : null,
+          visualOverrideByUserId: input.enabled ? input.actorUserId : null,
+          visualOverrideEnabled: input.enabled,
+          visualOverrideReason: input.enabled ? input.reason.trim() : null
+        },
+        where: { id: participant.id }
+      });
+
+      return {
+        data: { participantId: participant.id },
+        message: input.enabled ? "Override visual habilitado para este participante." : "Override visual deshabilitado.",
+        ok: true
+      };
+    },
+
     async confirmVideoUpload(input) {
       const prisma = await getPrisma();
       const now = new Date();
@@ -751,6 +1099,11 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
         const block = activeBlock(participant);
         if (!block) {
           return { message: "No hay videos disponibles para confirmar.", ok: false };
+        }
+
+        const availability = currentAvailability(participant, block, now);
+        if (availability.reason !== "AVAILABLE_FOR_VIDEO") {
+          return { message: videoUnavailableMessage(availability.reason, availability.nextAvailableAt), ok: false };
         }
 
         if (input.metadata.storageBucket !== HUT_VIDEO_BUCKET) {
@@ -783,7 +1136,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
         }
 
         const decision = applyHutVideoSubmission(block);
-        await tx.hutVideoSubmission.create?.({
+        const video = (await tx.hutVideoSubmission.create?.({
           data: {
             blockId: block.id,
             blockNumber: block.blockNumber,
@@ -798,7 +1151,14 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
             submittedAt: now,
             status: "SUBMITTED"
           }
-        });
+        })) as { id: string } | undefined;
+        const verification = latestVerificationForSequence(participant, block.blockNumber, sequenceNumber);
+        if (verification && video?.id) {
+          await tx.hutVisualVerification.update?.({
+            data: { videoSubmissionId: video.id },
+            where: { id: verification.id }
+          });
+        }
         await tx.hutDailyCheck.create?.({
           data: {
             blockDayNumber,
@@ -932,8 +1292,18 @@ function toAdminParticipant(participant: HutParticipantRecord, requestOrigin: st
   const block2 = blockByNumber(participant, 2);
   const call1 = callByNumber(participant, 1);
   const call2 = callByNumber(participant, 2);
+  const block = activeBlock(participant);
+  const availability = block
+    ? currentAvailability(participant, block, new Date())
+    : { nextAvailableAt: null, reason: "BLOCK_NOT_ACTIVE" };
 
   return {
+    availability: {
+      blockNumber: "blockNumber" in availability ? availability.blockNumber : undefined,
+      expectedVideoSequence: "expectedVideoSequence" in availability ? availability.expectedVideoSequence : undefined,
+      nextAvailableAt: availability.nextAvailableAt,
+      reason: availability.reason
+    },
     block1: block1 ? toBlockSummary(block1) : null,
     block2: block2 ? toBlockSummary(block2) : null,
     call1: call1 ? toCallSummary(call1) : null,
@@ -947,8 +1317,21 @@ function toAdminParticipant(participant: HutParticipantRecord, requestOrigin: st
     phone: participant.phone,
     recruiter: participant.recruiter,
     reminderPending: Boolean(participant.dailyChecks?.some((check) => check.status === "REMINDER_PENDING")),
+    referenceSelfie: participant.referenceSelfie
+      ? {
+          capturedAt: participant.referenceSelfie.capturedAt,
+          signedUrl: null,
+          status: "COMPLETE"
+        }
+      : {
+          capturedAt: new Date(0),
+          signedUrl: null,
+          status: "MISSING"
+        },
     status: participant.status,
-    token: participant.token
+    token: participant.token,
+    usedToleranceInCurrentBlock: Boolean(block && block.missedDaysCount >= block.maxMissedDaysAllowed),
+    visualOverrideEnabled: participant.visualOverrideEnabled
   };
 }
 
@@ -956,10 +1339,19 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
   const block = activeBlock(participant);
   const block1 = blockByNumber(participant, 1);
   const block2 = blockByNumber(participant, 2);
+  const availability = block
+    ? currentAvailability(participant, block, new Date())
+    : { nextAvailableAt: null, reason: "BLOCK_NOT_ACTIVE" };
 
   if (participant.status === "DISQUALIFIED") {
     return {
       availableUpload: null,
+      availability: {
+        blockNumber: "blockNumber" in availability ? availability.blockNumber : undefined,
+        expectedVideoSequence: "expectedVideoSequence" in availability ? availability.expectedVideoSequence : undefined,
+        nextAvailableAt: availability.nextAvailableAt,
+        reason: availability.reason
+      },
       block1: block1 ? toBlockSummary(block1) : null,
       block2: block2 ? toBlockSummary(block2) : null,
       message:
@@ -972,7 +1364,7 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
     };
   }
 
-  const availableUpload = block
+  const availableUpload = block && availability.reason === "AVAILABLE_FOR_VIDEO"
     ? {
         blockNumber: block.blockNumber,
         sequenceNumber: nextHutVideoSequence(block) ?? block.requiredVideos
@@ -981,6 +1373,12 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
 
   return {
     availableUpload,
+    availability: {
+      blockNumber: "blockNumber" in availability ? availability.blockNumber : undefined,
+      expectedVideoSequence: "expectedVideoSequence" in availability ? availability.expectedVideoSequence : undefined,
+      nextAvailableAt: availability.nextAvailableAt,
+      reason: availability.reason
+    },
     block1: block1 ? toBlockSummary(block1) : null,
     block2: block2 ? toBlockSummary(block2) : null,
     message: hutPortalMessage(participant),
@@ -1043,9 +1441,63 @@ function activeBlock(participant: HutParticipantRecord) {
 }
 
 function nextBlockDayNumber(participant: HutParticipantRecord, block: HutBlockRecord): number {
-  const dailyChecks = participant.dailyChecks?.filter((check) => check.blockId === block.id) ?? [];
-  const maxExistingDay = dailyChecks.reduce((max, check) => Math.max(max, check.blockDayNumber), 0);
-  return maxExistingDay + 1;
+  return nextHutBlockDayNumber(participant.dailyChecks?.filter((check) => check.blockId === block.id) ?? []);
+}
+
+function currentAvailability(participant: HutParticipantRecord, block: HutBlockRecord, now: Date) {
+  const sequenceNumber = nextHutVideoSequence(block) ?? block.requiredVideos;
+  const latestVerification = latestVerificationForSequence(participant, block.blockNumber, sequenceNumber);
+
+  return getHutCurrentAvailability({
+    block,
+    dailyChecks: participant.dailyChecks?.filter((check) => check.blockId === block.id) ?? [],
+    hasReferenceSelfie: Boolean(participant.referenceSelfie),
+    hasVisualOverride: participant.visualOverrideEnabled,
+    latestVerificationStatus: latestVerification?.status ?? null,
+    now,
+    timeZoneIana: participant.study.timeZoneIana || "America/Mexico_City"
+  });
+}
+
+function latestVerificationForSequence(
+  participant: HutParticipantRecord,
+  blockNumber: number,
+  sequenceNumber: number
+) {
+  return (
+    participant.visualVerifications?.find(
+      (verification) =>
+        verification.blockNumber === blockNumber && verification.sequenceNumber === sequenceNumber
+    ) ?? null
+  );
+}
+
+function hutVisualStatusFromReview(reviewStatus: "APPROVED" | "PENDING" | "REJECTED") {
+  if (reviewStatus === "APPROVED") {
+    return "MATCHED" as const;
+  }
+  if (reviewStatus === "REJECTED") {
+    return "NOT_MATCHED" as const;
+  }
+
+  return "UNCERTAIN" as const;
+}
+
+function videoUnavailableMessage(reason: string, nextAvailableAt: Date | null) {
+  if (reason === "WAIT_UNTIL_5_AM") {
+    return `Tu siguiente video estara disponible a partir de las 5:00 a.m.${nextAvailableAt ? ` (${nextAvailableAt.toISOString()})` : ""}.`;
+  }
+  if (reason === "MISSING_REFERENCE_SELFIE") {
+    return "Tu registro aun no esta completo. Contacta al encuestador.";
+  }
+  if (reason === "AVAILABLE_FOR_SELFIE") {
+    return "Antes de subir tu video, tomaremos una selfie para confirmar tu identidad.";
+  }
+  if (reason === "VISUAL_VERIFICATION_FAILED" || reason === "VISUAL_VERIFICATION_PENDING") {
+    return "No pudimos confirmar tu identidad. Contacta al supervisor antes de continuar.";
+  }
+
+  return "No hay videos disponibles para subir en este momento.";
 }
 
 async function disqualifyParticipant(

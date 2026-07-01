@@ -162,6 +162,15 @@ enum HutCallEvaluationStatus {
   RESCHEDULE_NEEDED
 }
 
+enum HutVisualVerificationStatus {
+  PENDING
+  MATCHED
+  NOT_MATCHED
+  UNCERTAIN
+  PENDING_REVIEW
+  NOT_REQUIRED_BY_OVERRIDE
+}
+
 enum QuestionnairePurpose {
   SCREENER
   MEASUREMENT
@@ -379,6 +388,9 @@ model InternalUser {
   reviewedMediaEvidence       MediaEvidencePlaceholder[]       @relation("MediaEvidenceReviewedBy")
   exportJobs                  ExportJob[]                      @relation("ExportJobRequestedBy")
   auditLogs                   AuditLog[]                       @relation("AuditLogActor")
+  capturedHutReferenceSelfies HutReferenceSelfie[]             @relation("HutReferenceSelfieCapturedBy")
+  reviewedHutVisualVerifications HutVisualVerification[]        @relation("HutVisualVerificationReviewedBy")
+  hutVisualOverrides          HutParticipant[]                 @relation("HutVisualOverrideBy")
 
   @@map("internal_users")
 }
@@ -639,18 +651,48 @@ model HutParticipant {
   startDate            DateTime?
   currentBlockNumber   Int                  @default(1)
   currentVideoSequence Int                  @default(1)
+  visualOverrideEnabled Boolean              @default(false)
+  visualOverrideReason  String?
+  visualOverrideByUserId String?             @db.Uuid
+  visualOverrideAt      DateTime?
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
 
   study             Study                 @relation(fields: [studyId], references: [id])
+  visualOverrideBy  InternalUser?         @relation("HutVisualOverrideBy", fields: [visualOverrideByUserId], references: [id])
+  referenceSelfie   HutReferenceSelfie?
   blocks            HutBlock[]
   videoSubmissions  HutVideoSubmission[]
   dailyChecks       HutDailyCheck[]
   callEvaluations   HutCallEvaluation[]
+  visualVerifications HutVisualVerification[]
 
   @@index([studyId, status])
   @@index([token])
+  @@index([visualOverrideByUserId])
   @@map("hut_participants")
+}
+
+model HutReferenceSelfie {
+  id                String   @id @default(uuid()) @db.Uuid
+  participantId     String   @unique @db.Uuid
+  storageBucket     String
+  privateStorageKey String   @unique
+  originalFilename  String?
+  mimeType          String
+  extension         String
+  sizeBytes         Int
+  capturedAt        DateTime @default(now())
+  capturedByUserId  String?  @db.Uuid
+  capturedByRole    String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  participant HutParticipant @relation(fields: [participantId], references: [id])
+  capturedBy  InternalUser?   @relation("HutReferenceSelfieCapturedBy", fields: [capturedByUserId], references: [id])
+
+  @@index([capturedByUserId])
+  @@map("hut_reference_selfies")
 }
 
 model HutBlock {
@@ -696,8 +738,9 @@ model HutVideoSubmission {
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
 
-  participant HutParticipant @relation(fields: [participantId], references: [id])
-  block       HutBlock       @relation(fields: [blockId], references: [id])
+  participant        HutParticipant          @relation(fields: [participantId], references: [id])
+  block              HutBlock                @relation(fields: [blockId], references: [id])
+  visualVerification HutVisualVerification?
 
   @@unique([blockId, sequenceNumber])
   @@index([participantId, submittedAt])
@@ -744,6 +787,40 @@ model HutCallEvaluation {
   @@unique([participantId, blockNumber])
   @@index([status])
   @@map("hut_call_evaluations")
+}
+
+model HutVisualVerification {
+  id                    String                      @id @default(uuid()) @db.Uuid
+  participantId         String                      @db.Uuid
+  blockId               String                      @db.Uuid
+  videoSubmissionId     String?                     @unique @db.Uuid
+  blockNumber           Int
+  sequenceNumber        Int
+  verificationDate      DateTime
+  referenceSelfieKey    String
+  attemptSelfieKey      String                      @unique
+  attemptStorageBucket  String
+  attemptOriginalFilename String?
+  attemptMimeType       String
+  attemptExtension      String
+  attemptSizeBytes      Int
+  status                HutVisualVerificationStatus
+  similarityScore       Float?
+  reviewedByUserId      String?                     @db.Uuid
+  reviewedAt            DateTime?
+  overrideReason        String?
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+
+  participant     HutParticipant      @relation(fields: [participantId], references: [id])
+  block           HutBlock            @relation(fields: [blockId], references: [id])
+  videoSubmission HutVideoSubmission? @relation(fields: [videoSubmissionId], references: [id])
+  reviewedBy      InternalUser?       @relation("HutVisualVerificationReviewedBy", fields: [reviewedByUserId], references: [id])
+
+  @@unique([participantId, blockNumber, sequenceNumber])
+  @@index([blockId, status])
+  @@index([reviewedByUserId])
+  @@map("hut_visual_verifications")
 }
 
 model QuestionnaireDraft {

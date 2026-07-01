@@ -44,12 +44,29 @@ export default async function HutParticipantPage({ params }: HutParticipantPageP
           <ProgressSummary view={view} />
         </section>
 
+        {view.availability.reason === "AVAILABLE_FOR_SELFIE" ? (
+          <HutVideoUploadForm
+            blockNumber={view.availability.blockNumber ?? view.availableUpload?.blockNumber ?? 1}
+            mode="selfie"
+            sequenceNumber={view.availability.expectedVideoSequence ?? view.availableUpload?.sequenceNumber ?? 1}
+            token={view.token}
+          />
+        ) : null}
+
         {view.availableUpload ? (
           <HutVideoUploadForm
             blockNumber={view.availableUpload.blockNumber}
+            mode="video"
             sequenceNumber={view.availableUpload.sequenceNumber}
             token={view.token}
           />
+        ) : null}
+
+        {!view.availableUpload && view.availability.reason !== "AVAILABLE_FOR_SELFIE" ? (
+          <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-semibold text-zinc-950">Actividad no disponible</h2>
+            <p className="mt-2 text-sm leading-6 text-zinc-600">{availabilityMessage(view.availability.reason, view.availability.nextAvailableAt)}</p>
+          </section>
         ) : null}
       </main>
     </div>
@@ -86,4 +103,18 @@ function hutParticipantStatusLabel(status: string) {
     NOT_STARTED: "No iniciado"
   };
   return labels[status] ?? status;
+}
+
+function availabilityMessage(reason: string, nextAvailableAt: Date | null) {
+  if (reason === "WAIT_UNTIL_5_AM") {
+    return `Tu siguiente video estará disponible a partir de las 5:00 a.m.${nextAvailableAt ? ` (${nextAvailableAt.toLocaleString("es-MX")})` : ""}.`;
+  }
+  if (reason === "MISSING_REFERENCE_SELFIE") {
+    return "Tu registro aún no está completo. Contacta al encuestador.";
+  }
+  if (reason === "VISUAL_VERIFICATION_FAILED" || reason === "VISUAL_VERIFICATION_PENDING") {
+    return "No pudimos confirmar tu identidad. Contacta al supervisor antes de continuar.";
+  }
+
+  return "Aún no tienes una actividad disponible. Espera indicaciones del equipo.";
 }

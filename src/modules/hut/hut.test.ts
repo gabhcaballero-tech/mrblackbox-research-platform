@@ -4,6 +4,8 @@ import {
   applyHutVideoSubmission,
   buildHutTsv,
   createHutRepository,
+  getHutCurrentAvailability,
+  hutBlockDayAvailableAt,
   nextHutVideoSequence,
   parseHutParticipantImportText
 } from ".";
@@ -52,7 +54,7 @@ describe("HUT module foundation", () => {
       phone: "5512345678",
       recruiter: "Reclutadora",
       requestOrigin: "https://example.com",
-      startDate: new Date("2026-07-01T00:00:00.000Z"),
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
       studyId: "study-hut"
     });
 
@@ -62,22 +64,185 @@ describe("HUT module foundation", () => {
     expect(prisma.state.participants[0]?.blocks).toHaveLength(2);
   });
 
+  it("stores a registration reference selfie for a HUT participant", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Selfie",
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0];
+    const signed = await repository.requestReferenceSelfieUpload({
+      actorUserId: "user-1",
+      metadata: selfieMetadata(),
+      participantId: participant?.id ?? "",
+      storage,
+      studyId: "study-hut"
+    });
+    expect(signed.ok).toBe(true);
+    const confirmed = await repository.confirmReferenceSelfieUpload({
+      actorUserId: "user-1",
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: signed.ok ? signed.data.privateStorageKey : "",
+        storageBucket: signed.ok ? signed.data.storageBucket : ""
+      },
+      participantId: participant?.id ?? "",
+      studyId: "study-hut"
+    });
+
+    expect(confirmed.ok).toBe(true);
+    expect(participant?.referenceSelfie?.privateStorageKey).toContain("/reference-selfie/");
+  });
+
+  it("blocks video upload when registration selfie is missing", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Sin Selfie",
+      requestOrigin: "https://example.com",
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const result = await repository.requestVideoUpload({
+      metadata: videoMetadata(),
+      storage,
+      token: prisma.state.participants[0]?.token ?? ""
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.message).toContain("registro aun no esta completo");
+  });
+
+  it("does not request selfie or upload before 5 a.m. in study timezone", () => {
+    const availability = getHutCurrentAvailability({
+      block: {
+        ...block(),
+        startDate: new Date("2026-07-01T06:00:00.000Z")
+      },
+      dailyChecks: [],
+      hasReferenceSelfie: true,
+      hasVisualOverride: false,
+      now: new Date("2026-07-01T10:59:00.000Z"),
+      timeZoneIana: "America/Mexico_City"
+    });
+
+    expect(availability.available).toBe(false);
+    expect(availability.reason).toBe("WAIT_UNTIL_5_AM");
+  });
+
+  it("asks for daily selfie after 5 a.m. when no verification exists", () => {
+    const availability = getHutCurrentAvailability({
+      block: {
+        ...block(),
+        startDate: new Date("2026-07-01T06:00:00.000Z")
+      },
+      dailyChecks: [],
+      hasReferenceSelfie: true,
+      hasVisualOverride: false,
+      now: new Date("2026-07-01T11:00:00.000Z"),
+      timeZoneIana: "America/Mexico_City"
+    });
+
+    expect(availability.available).toBe(true);
+    expect(availability.reason).toBe("AVAILABLE_FOR_SELFIE");
+  });
+
+  it("makes video 2 unavailable until 5 a.m. of the next day after video 1", () => {
+    const nextAvailable = hutBlockDayAvailableAt({
+      blockDayNumber: 2,
+      startDate: new Date("2026-07-01T06:00:00.000Z"),
+      timeZoneIana: "America/Mexico_City"
+    });
+    const availability = getHutCurrentAvailability({
+      block: {
+        ...block({ submittedVideosCount: 1 }),
+        startDate: new Date("2026-07-01T06:00:00.000Z")
+      },
+      dailyChecks: [{ blockDayNumber: 1 }],
+      hasReferenceSelfie: true,
+      hasVisualOverride: false,
+      now: new Date(nextAvailable.getTime() - 60_000),
+      timeZoneIana: "America/Mexico_City"
+    });
+
+    expect(availability.reason).toBe("WAIT_UNTIL_5_AM");
+    expect(availability.expectedVideoSequence).toBe(2);
+  });
+
+  it("daily selfie matched allows the video upload", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Matched",
+      requestOrigin: "https://example.com",
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0];
+    participant!.referenceSelfie = referenceSelfie();
+    const token = participant?.token ?? "";
+    const signed = await repository.requestDailySelfieUpload({ metadata: selfieMetadata(), storage, token });
+    const verified = await repository.confirmDailySelfieUpload({
+      faceVerification: faceResult("MATCH", 0.62),
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: signed.ok ? signed.data.privateStorageKey : "",
+        storageBucket: signed.ok ? signed.data.storageBucket : ""
+      },
+      token
+    });
+    const video = await repository.requestVideoUpload({ metadata: videoMetadata(), storage, token });
+
+    expect(verified.ok ? verified.data.status : "").toBe("MATCHED");
+    expect(video.ok).toBe(true);
+  });
+
+  it("daily selfie failed blocks the video upload", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Fallo",
+      requestOrigin: "https://example.com",
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0];
+    participant!.referenceSelfie = referenceSelfie();
+    const token = participant?.token ?? "";
+    const signed = await repository.requestDailySelfieUpload({ metadata: selfieMetadata(), storage, token });
+    await repository.confirmDailySelfieUpload({
+      faceVerification: faceResult("NO_MATCH", 0.2),
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: signed.ok ? signed.data.privateStorageKey : "",
+        storageBucket: signed.ok ? signed.data.storageBucket : ""
+      },
+      token
+    });
+    const video = await repository.requestVideoUpload({ metadata: videoMetadata(), storage, token });
+
+    expect(video.ok).toBe(false);
+    expect(video.ok ? "" : video.message).toContain("No pudimos confirmar tu identidad");
+  });
+
   it("uploads video 1, 2 and 3 and then enables phone evaluation", async () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     const created = await repository.createParticipant({
       name: "Participante Uno",
       requestOrigin: "https://example.com",
-      startDate: new Date("2026-07-01T00:00:00.000Z"),
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
       studyId: "study-hut"
     });
     const token = prisma.state.participants[0]?.token ?? "";
 
-    await uploadNextVideo(repository, token, storage);
+    await uploadNextVideo(repository, token, storage, prisma.state);
     expect(prisma.state.participants[0]?.currentVideoSequence).toBe(2);
-    await uploadNextVideo(repository, token, storage);
+    await uploadNextVideo(repository, token, storage, prisma.state);
     expect(prisma.state.participants[0]?.currentVideoSequence).toBe(3);
-    await uploadNextVideo(repository, token, storage);
+    await uploadNextVideo(repository, token, storage, prisma.state);
 
     expect(created.ok).toBe(true);
     expect(prisma.state.participants[0]?.blocks[0]?.submittedVideosCount).toBe(3);
@@ -91,16 +256,16 @@ describe("HUT module foundation", () => {
     await repository.createParticipant({
       name: "Participante Dos",
       requestOrigin: "https://example.com",
-      startDate: new Date("2026-07-01T00:00:00.000Z"),
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
       studyId: "study-hut"
     });
     const participant = prisma.state.participants[0];
     const token = participant?.token ?? "";
 
-    await uploadNextVideo(repository, token, storage);
+    await uploadNextVideo(repository, token, storage, prisma.state);
     await repository.markMissedDay({ participantId: participant?.id ?? "", reminderSent: true, studyId: "study-hut" });
     expect(participant?.currentVideoSequence).toBe(2);
-    await uploadNextVideo(repository, token, storage);
+    await uploadNextVideo(repository, token, storage, prisma.state);
 
     expect(participant?.blocks[0]?.missedDaysCount).toBe(1);
     expect(participant?.videoSubmissions[1]?.sequenceNumber).toBe(2);
@@ -112,15 +277,15 @@ describe("HUT module foundation", () => {
     await repository.createParticipant({
       name: "Participante Tres",
       requestOrigin: "https://example.com",
-      startDate: new Date("2026-07-01T00:00:00.000Z"),
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
       studyId: "study-hut"
     });
     const participant = prisma.state.participants[0];
     const token = participant?.token ?? "";
 
-    await uploadNextVideo(repository, token, storage);
+    await uploadNextVideo(repository, token, storage, prisma.state);
     await repository.markMissedDay({ participantId: participant?.id ?? "", reminderSent: true, studyId: "study-hut" });
-    await uploadNextVideo(repository, token, storage);
+    await uploadNextVideo(repository, token, storage, prisma.state);
     const result = await repository.markMissedDay({ participantId: participant?.id ?? "", studyId: "study-hut" });
 
     expect(result.ok).toBe(true);
@@ -134,21 +299,21 @@ describe("HUT module foundation", () => {
     await repository.createParticipant({
       name: "Participante Cuatro",
       requestOrigin: "https://example.com",
-      startDate: new Date("2026-07-01T00:00:00.000Z"),
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
       studyId: "study-hut"
     });
     const participant = prisma.state.participants[0];
     const token = participant?.token ?? "";
 
-    await uploadNextVideo(repository, token, storage);
+    await uploadNextVideo(repository, token, storage, prisma.state);
     await repository.markMissedDay({ participantId: participant?.id ?? "", studyId: "study-hut" });
-    await uploadNextVideo(repository, token, storage);
-    await uploadNextVideo(repository, token, storage);
+    await uploadNextVideo(repository, token, storage, prisma.state);
+    await uploadNextVideo(repository, token, storage, prisma.state);
     await repository.completeCallEvaluation({ blockNumber: 1, participantId: participant?.id ?? "", studyId: "study-hut" });
     await repository.startBlock({
       blockNumber: 2,
       participantId: participant?.id ?? "",
-      startDate: new Date("2026-07-05T00:00:00.000Z"),
+      startDate: new Date("2020-01-05T00:00:00.000Z"),
       studyId: "study-hut"
     });
     await repository.markMissedDay({ participantId: participant?.id ?? "", studyId: "study-hut" });
@@ -164,25 +329,25 @@ describe("HUT module foundation", () => {
     await repository.createParticipant({
       name: "Participante Cinco",
       requestOrigin: "https://example.com",
-      startDate: new Date("2026-07-01T00:00:00.000Z"),
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
       studyId: "study-hut"
     });
     const participant = prisma.state.participants[0];
     const token = participant?.token ?? "";
 
-    await uploadNextVideo(repository, token, storage);
-    await uploadNextVideo(repository, token, storage);
-    await uploadNextVideo(repository, token, storage);
+    await uploadNextVideo(repository, token, storage, prisma.state);
+    await uploadNextVideo(repository, token, storage, prisma.state);
+    await uploadNextVideo(repository, token, storage, prisma.state);
     await repository.completeCallEvaluation({ blockNumber: 1, participantId: participant?.id ?? "", studyId: "study-hut" });
     await repository.startBlock({
       blockNumber: 2,
       participantId: participant?.id ?? "",
-      startDate: new Date("2026-07-05T00:00:00.000Z"),
+      startDate: new Date("2020-01-05T00:00:00.000Z"),
       studyId: "study-hut"
     });
-    await uploadNextVideo(repository, token, storage);
-    await uploadNextVideo(repository, token, storage);
-    await uploadNextVideo(repository, token, storage);
+    await uploadNextVideo(repository, token, storage, prisma.state);
+    await uploadNextVideo(repository, token, storage, prisma.state);
+    await uploadNextVideo(repository, token, storage, prisma.state);
     await repository.completeCallEvaluation({ blockNumber: 2, participantId: participant?.id ?? "", studyId: "study-hut" });
 
     expect(participant?.status).toBe("COMPLETED");
@@ -239,8 +404,22 @@ function block(input: Partial<Parameters<typeof applyHutVideoSubmission>[0]> = {
 async function uploadNextVideo(
   repository: ReturnType<typeof createHutRepository>,
   token: string,
-  storage: HutStorageClient
+  storage: HutStorageClient,
+  state: { participants: FakeParticipant[] }
 ) {
+  const participant = state.participants.find((item) => item.token === token);
+  if (participant) {
+    participant.referenceSelfie ??= referenceSelfie();
+    const activeBlock = participant.blocks.find((item) => item.status === "IN_PROGRESS");
+    const sequenceNumber = activeBlock ? activeBlock.submittedVideosCount + 1 : 1;
+    participant.visualVerifications.unshift({
+      attemptSelfieKey: `daily-${activeBlock?.blockNumber ?? 1}-${sequenceNumber}.jpg`,
+      blockNumber: activeBlock?.blockNumber ?? 1,
+      id: `verification-${participant.visualVerifications.length + 1}`,
+      sequenceNumber,
+      status: "MATCHED"
+    });
+  }
   const requested = await repository.requestVideoUpload({
     metadata: {
       mimeType: "video/mp4",
@@ -312,11 +491,15 @@ function createFakeHutPrisma() {
           name: String(args.data.name),
           phone: (args.data.phone as string | null) ?? null,
           recruiter: (args.data.recruiter as string | null) ?? null,
+          referenceSelfie: null,
           startDate: (args.data.startDate as Date | null) ?? null,
           status: (args.data.status as FakeParticipant["status"]) ?? "NOT_STARTED",
           study: state.study,
           studyId: String(args.data.studyId),
           token: String(args.data.token),
+          visualOverrideEnabled: false,
+          visualOverrideReason: null,
+          visualVerifications: [],
           videoSubmissions: []
         };
         state.participants.push(participant);
@@ -372,6 +555,31 @@ function createFakeHutPrisma() {
         return block;
       }
     },
+    hutReferenceSelfie: {
+      async create(args: { data: Partial<FakeReferenceSelfie> & { participantId: string } }) {
+        const participant = state.participants.find((item) => item.id === args.data.participantId);
+        const selfie = {
+          capturedAt: (args.data.capturedAt as Date) ?? new Date(),
+          id: `reference-${state.nextId++}`,
+          privateStorageKey: String(args.data.privateStorageKey),
+          storageBucket: String(args.data.storageBucket)
+        };
+        if (participant) {
+          participant.referenceSelfie = selfie;
+        }
+        return selfie;
+      },
+      async findFirst(args: { where: { participantId: string } }) {
+        return state.participants.find((item) => item.id === args.where.participantId)?.referenceSelfie ?? null;
+      },
+      async update(args: { data: Partial<FakeReferenceSelfie>; where: { id: string } }) {
+        const participant = state.participants.find((item) => item.referenceSelfie?.id === args.where.id);
+        if (participant?.referenceSelfie) {
+          Object.assign(participant.referenceSelfie, args.data);
+        }
+        return participant?.referenceSelfie ?? null;
+      }
+    },
     hutCallEvaluation: {
       async create(args: { data: Partial<FakeCall> & { participantId: string } }) {
         const participant = state.participants.find((item) => item.id === args.data.participantId);
@@ -402,14 +610,36 @@ function createFakeHutPrisma() {
     hutVideoSubmission: {
       async create(args: { data: FakeVideo }) {
         const participant = state.participants.find((item) => item.id === args.data.participantId);
-        participant?.videoSubmissions.push(args.data);
-        return args.data;
+        const video = { ...args.data, id: `video-${state.nextId++}` };
+        participant?.videoSubmissions.push(video);
+        return video;
+      }
+    },
+    hutVisualVerification: {
+      async create(args: { data: Partial<FakeVisualVerification> & { participantId: string } }) {
+        const participant = state.participants.find((item) => item.id === args.data.participantId);
+        const verification: FakeVisualVerification = {
+          attemptSelfieKey: String(args.data.attemptSelfieKey),
+          blockNumber: Number(args.data.blockNumber),
+          id: `verification-${state.nextId++}`,
+          sequenceNumber: Number(args.data.sequenceNumber),
+          status: args.data.status as FakeVisualVerification["status"]
+        };
+        participant?.visualVerifications.unshift(verification);
+        return verification;
+      },
+      async update(args: { data: { videoSubmissionId?: string }; where: { id: string } }) {
+        const verification = state.participants.flatMap((item) => item.visualVerifications).find((item) => item.id === args.where.id);
+        if (verification) {
+          Object.assign(verification, args.data);
+        }
+        return verification;
       }
     }
   };
 
   const storage: HutStorageClient = {
-    createSignedReadUrl: vi.fn(),
+    createSignedReadUrl: vi.fn(async () => "https://storage.example/reference-selfie.jpg"),
     createSignedUploadUrl: vi.fn(async (input) => ({
       signedUrl: `https://storage.example/${input.privateStorageKey}`,
       token: "signed-token"
@@ -430,6 +660,7 @@ type FakeParticipant = {
   name: string;
   phone: string | null;
   recruiter: string | null;
+  referenceSelfie: FakeReferenceSelfie | null;
   startDate: Date | null;
   status:
     | "NOT_STARTED"
@@ -448,7 +679,17 @@ type FakeParticipant = {
   };
   studyId: string;
   token: string;
-  videoSubmissions: FakeVideo[];
+  visualOverrideEnabled: boolean;
+  visualOverrideReason: string | null;
+  visualVerifications: FakeVisualVerification[];
+  videoSubmissions: Array<FakeVideo & { id?: string }>;
+};
+
+type FakeReferenceSelfie = {
+  capturedAt: Date;
+  id: string;
+  privateStorageKey: string;
+  storageBucket: string;
 };
 
 type FakeBlock = {
@@ -492,3 +733,46 @@ type FakeVideo = {
   sizeBytes: number;
   storageBucket: string;
 };
+
+type FakeVisualVerification = {
+  attemptSelfieKey: string;
+  blockNumber: number;
+  id: string;
+  sequenceNumber: number;
+  status: "MATCHED" | "NOT_MATCHED" | "NOT_REQUIRED_BY_OVERRIDE" | "PENDING" | "PENDING_REVIEW" | "UNCERTAIN";
+  videoSubmissionId?: string;
+};
+
+function videoMetadata() {
+  return {
+    mimeType: "video/mp4",
+    originalFilename: "video.mp4",
+    sizeBytes: 1024
+  };
+}
+
+function selfieMetadata() {
+  return {
+    mimeType: "image/jpeg",
+    originalFilename: "selfie.jpg",
+    sizeBytes: 1024
+  };
+}
+
+function referenceSelfie(): FakeReferenceSelfie {
+  return {
+    capturedAt: new Date("2026-07-01T12:00:00.000Z"),
+    id: "reference-selfie",
+    privateStorageKey: "studies/study-hut/hut-participants/participant-1/reference-selfie/base.jpg",
+    storageBucket: "participant-evidence"
+  };
+}
+
+function faceResult(status: "MATCH" | "NO_MATCH" | "UNCERTAIN", score: number) {
+  return {
+    evaluatedAt: new Date("2026-07-01T12:00:00.000Z").toISOString(),
+    method: "@vladmandic/human:faceres+blazeface:v1",
+    score,
+    status
+  };
+}
