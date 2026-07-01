@@ -6,7 +6,8 @@ export {
   hutBlockDayAvailableAt,
   nextHutVideoSequence,
   normalizeHutText,
-  parseHutParticipantImportText
+  parseHutParticipantImportText,
+  parseHutRegistrationSlotImportText
 } from "./service";
 export type {
   HutBlockStatus,
@@ -20,6 +21,7 @@ export type {
   HutActionResult,
   HutAdminDashboard,
   HutAdminParticipant,
+  HutRegistrationSlotAdmin,
   HutPortalView
 } from "./repository";
 export type {
