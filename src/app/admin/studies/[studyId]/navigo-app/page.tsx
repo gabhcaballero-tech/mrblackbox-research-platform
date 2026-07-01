@@ -9,7 +9,8 @@ import {
   registerNavigoDirectParticipantAction,
   resetNavigoParticipantAppAction,
   reviewNavigoActivityIdentityAction,
-  startNavigoT0Action
+  startNavigoT0Action,
+  updateNavigoVisualVerificationModeAction
 } from "@/modules/navigo-app/actions";
 import {
   createNavigoAppRepository,
@@ -319,6 +320,7 @@ function ParticipantRow({
             </Link>
           ) : null}
         </section>
+        <VisualVerificationModeForm participant={participant} studyId={studyId} />
         <form action={startNavigoT0Action.bind(null, studyId, participant.id)} className="space-y-3">
           <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
             {participant.applicationStartedAt ? "Corregir hora base T0" : "Hora base T0"}
@@ -432,6 +434,47 @@ function CorrectionActions({
         <SubmitButton pendingLabel="Eliminando etapas...">Eliminar etapas</SubmitButton>
       </form>
     </details>
+  );
+}
+
+function VisualVerificationModeForm({
+  participant,
+  studyId
+}: {
+  participant: NavigoParticipantListItem;
+  studyId: string;
+}) {
+  const disabled = Boolean(participant.applicationStartedAt);
+  const modeLabel = participant.visualVerificationMode === "disabled" ? "No requerida" : "Requerida";
+
+  return (
+    <section className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+      <div className="flex flex-col gap-1">
+        <h3 className="text-sm font-semibold text-zinc-950">Identificacion visual</h3>
+        <p className="text-xs leading-5 text-zinc-600">
+          Estado actual: <span className="font-semibold text-zinc-900">{modeLabel}</span>. Esta decision se configura por participante y no puede cambiarse desde el link publico.
+        </p>
+        {disabled ? (
+          <p className="text-xs leading-5 text-amber-800">
+            T0 ya fue iniciado. Para conservar trazabilidad, no se cambia la identificacion visual desde aqui.
+          </p>
+        ) : null}
+      </div>
+      <form action={updateNavigoVisualVerificationModeAction.bind(null, studyId, participant.id)} className="mt-3 space-y-3">
+        <select
+          className={inputClass}
+          defaultValue={participant.visualVerificationMode}
+          disabled={disabled}
+          name="visualVerificationMode"
+        >
+          <option value="required">Requerida</option>
+          <option value="disabled">No requerida</option>
+        </select>
+        <SubmitButton disabled={disabled} pendingLabel="Guardando identificacion visual...">
+          Guardar identificacion visual
+        </SubmitButton>
+      </form>
+    </section>
   );
 }
 

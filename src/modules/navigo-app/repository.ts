@@ -77,6 +77,7 @@ export type NavigoParticipantListItem = {
   hasRecoverableToken: boolean;
   participantLinkToken: string | null;
   id: string;
+  visualVerificationMode: NavigoVisualVerificationMode;
   participant: {
     email: string | null;
     name: string;
@@ -427,6 +428,11 @@ export type NavigoAppRepository = {
     status: "APPROVED" | "PENDING" | "REJECTED";
     studyId: string;
   }) => Promise<NavigoMaintenanceResult>;
+  updateParticipantVisualVerificationMode: (input: {
+    actorUserId: string;
+    mode: NavigoVisualVerificationMode;
+    studyParticipantId: string;
+  }) => Promise<NavigoMaintenanceResult>;
   resetParticipantApp: (input: {
     actorUserId: string;
     reason: string;
@@ -550,6 +556,7 @@ const activitySelect = {
 const participantSelect = {
   applicationStartedAt: true,
   id: true,
+  visualVerificationMode: true,
   participantConfirmation: {
     select: {
       folio: true,
@@ -747,6 +754,7 @@ type ParticipantRecord = {
   } | null;
   screeningStatus: "INCOMPLETE" | "NOT_STARTED" | "PASSED" | "PENDING_REVIEW" | "STARTED" | "TERMINATED";
   study: StudyRecord;
+  visualVerificationMode: string | null;
 };
 type ActivityRecord = NavigoActivityRecord & {
   activitySchedule: NavigoScheduleRecord & { questionnaireVersionId: string | null };
@@ -1213,6 +1221,43 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           ok: true
         };
       });
+    },
+
+    async updateParticipantVisualVerificationMode(input) {
+      const mode = resolveNavigoVisualVerificationMode(input.mode);
+      const prisma = await getPrisma();
+
+      const participant = (await prisma.studyParticipant.findUnique?.({
+        select: participantWithActivitiesSelect,
+        where: { id: input.studyParticipantId }
+      })) as ParticipantRecord | null;
+
+      if (!participant) {
+        return { message: "No encontramos el participante.", ok: false };
+      }
+
+      if (participant.study.code !== NAVIGO_STUDY_CODE) {
+        return { message: "Solo el estudio Navigo permite configurar identificacion visual.", ok: false };
+      }
+
+      if (participant.applicationStartedAt || hasT0Started(participant)) {
+        return { message: "La identificacion visual solo puede cambiarse antes de iniciar T0.", ok: false };
+      }
+
+      await prisma.studyParticipant.update?.({
+        data: {
+          visualVerificationMode: mode
+        },
+        where: { id: participant.id }
+      });
+
+      return {
+        message:
+          mode === "disabled"
+            ? "Identificacion visual marcada como no requerida para este participante."
+            : "Identificacion visual marcada como requerida para este participante.",
+        ok: true
+      };
     },
 
     async getAdminDashboard(studyId, now = new Date()) {
@@ -1830,7 +1875,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         };
       }
 
-      const visualVerificationMode = getNavigoVisualVerificationMode();
+      const visualVerificationMode = resolveParticipantVisualVerificationMode(participant);
       const selfieCapturePurpose = resolveSelfieCapturePurpose({
         activity,
         mode: visualVerificationMode,
@@ -2050,7 +2095,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
 
       const purpose = resolveSelfieCapturePurpose({
         activity,
-        mode: getNavigoVisualVerificationMode(),
+        mode: resolveParticipantVisualVerificationMode(participant),
         participant
       });
 
@@ -2173,7 +2218,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
 
       const purpose = resolveSelfieCapturePurpose({
         activity,
-        mode: getNavigoVisualVerificationMode(),
+        mode: resolveParticipantVisualVerificationMode(participant),
         participant
       });
 
@@ -2350,7 +2395,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           };
         }
 
-        if (getNavigoVisualVerificationMode() === "required" && !hasApprovedActivitySelfie(activity)) {
+        if (resolveParticipantVisualVerificationMode(participant) === "required" && !hasApprovedActivitySelfie(activity)) {
           return { message: "Toma una selfie aprobada de esta evaluacion antes de guardar las respuestas.", ok: false };
         }
 
@@ -2904,6 +2949,7 @@ async function toDashboardParticipant(
       participant,
       storage
     }),
+    visualVerificationMode: resolveParticipantVisualVerificationMode(participant),
     rotation,
     rotationReady: rotation.ready,
     participantLinkToken: participant.accessTokens?.[0]?.id ?? null,
@@ -4653,8 +4699,10 @@ function getAssignedArm(participant: ParticipantRecord, code: "LEFT" | "RIGHT", 
   );
 }
 
-function getNavigoVisualVerificationMode(): NavigoVisualVerificationMode {
-  return resolveNavigoVisualVerificationMode(process.env.NAVIGO_VISUAL_VERIFICATION_MODE);
+function resolveParticipantVisualVerificationMode(
+  participant: Pick<ParticipantRecord, "visualVerificationMode">
+): NavigoVisualVerificationMode {
+  return resolveNavigoVisualVerificationMode(participant.visualVerificationMode ?? process.env.NAVIGO_VISUAL_VERIFICATION_MODE);
 }
 
 function hasRegisteredSelfie(participant: Pick<ParticipantRecord, "participantEvidence">): boolean {
@@ -4727,7 +4775,7 @@ function selfieNotRequiredMessage({
   activity: ActivityRecord;
   participant: ParticipantRecord;
 }): string {
-  if (getNavigoVisualVerificationMode() === "disabled") {
+  if (resolveParticipantVisualVerificationMode(participant) === "disabled") {
     return "Este estudio no requiere selfie de identidad para esta evaluacion.";
   }
 

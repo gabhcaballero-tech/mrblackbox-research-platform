@@ -924,6 +924,10 @@ describe("navigo app MVP rules", () => {
 
     expect(adminPage).toContain("Registrar participante");
     expect(adminPage).toContain("Generar enlaces para todos");
+    expect(adminPage).toContain("Identificacion visual");
+    expect(adminPage).toContain("updateNavigoVisualVerificationModeAction");
+    expect(adminPage).toContain("visualVerificationMode");
+    expect(adminPage).toContain("No requerida");
     expect(operationsPanel).toContain("Importar participantes");
     expect(operationsPanel).toContain("Descargar plantilla de participantes");
     expect(operationsPanel).toContain("Exportar Excel (TSV)");
@@ -939,6 +943,7 @@ describe("navigo app MVP rules", () => {
     expect(actions).toContain("previewNavigoParticipantImportTextAction");
     expect(actions).toContain("applyNavigoParticipantImportRowsAction");
     expect(actions).toContain("generateNavigoParticipantLinksForStudyAction");
+    expect(actions).toContain("updateNavigoVisualVerificationModeAction");
   });
 
   it("previews the sample participant TSV with six valid rows", async () => {
@@ -1141,7 +1146,8 @@ describe("navigo app MVP rules", () => {
       operationalStatus: "ASSIGNED",
       participantProfileId: "profile-existing",
       screeningStatus: "PASSED",
-      studyId: state.study.id
+      studyId: state.study.id,
+      visualVerificationMode: null
     });
 
     const repository = createNavigoAppRepository(state.prisma as never);
@@ -1486,11 +1492,12 @@ describe("navigo app MVP rules", () => {
     expect(t4?.status).toBe("COMPLETED");
   });
 
-  it("skips activity selfies when visual verification is disabled", async () => {
+  it("skips activity selfies when the participant visual verification mode is disabled", async () => {
     const state = createNavigoParticipantActivityState();
     const repository = createNavigoAppRepository(state.prisma as never);
     const originalMode = process.env.NAVIGO_VISUAL_VERIFICATION_MODE;
-    process.env.NAVIGO_VISUAL_VERIFICATION_MODE = "disabled";
+    process.env.NAVIGO_VISUAL_VERIFICATION_MODE = "required";
+    state.participant.visualVerificationMode = "disabled";
     state.participant.participantEvidence = [];
 
     try {
@@ -1518,6 +1525,68 @@ describe("navigo app MVP rules", () => {
         process.env.NAVIGO_VISUAL_VERIFICATION_MODE = originalMode;
       }
     }
+  });
+
+  it("uses the global visual verification mode only when the participant has no override", async () => {
+    const state = createNavigoParticipantActivityState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const originalMode = process.env.NAVIGO_VISUAL_VERIFICATION_MODE;
+    process.env.NAVIGO_VISUAL_VERIFICATION_MODE = "disabled";
+    state.participant.visualVerificationMode = null;
+    state.participant.participantEvidence = [];
+
+    try {
+      const view = await repository.getActivityCaptureView({
+        activityId: "activity-T4_HORAS",
+        testMode: true,
+        token: "token-1"
+      });
+
+      expect(view.ok).toBe(true);
+      expect(view.ok ? view.data.requiresSelfie : true).toBe(false);
+      expect(view.ok ? view.data.visualVerificationMode : "required").toBe("disabled");
+    } finally {
+      if (originalMode === undefined) {
+        delete process.env.NAVIGO_VISUAL_VERIFICATION_MODE;
+      } else {
+        process.env.NAVIGO_VISUAL_VERIFICATION_MODE = originalMode;
+      }
+    }
+  });
+
+  it("allows admin or supervisor workflow to set participant visual verification before T0", async () => {
+    const state = createNavigoParticipantActivityState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    state.participant.applicationStartedAt = null;
+    for (const activity of state.activities) {
+      activity.actualCompletedAt = null;
+      activity.actualStartedAt = null;
+      activity.status = "AVAILABLE";
+      activity.responses = [];
+    }
+
+    const result = await repository.updateParticipantVisualVerificationMode({
+      actorUserId: "supervisor-1",
+      mode: "disabled",
+      studyParticipantId: "study-participant-1"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(state.participant.visualVerificationMode).toBe("disabled");
+  });
+
+  it("blocks changing participant visual verification after T0 starts", async () => {
+    const state = createNavigoParticipantActivityState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+
+    const result = await repository.updateParticipantVisualVerificationMode({
+      actorUserId: "supervisor-1",
+      mode: "disabled",
+      studyParticipantId: "study-participant-1"
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.message).toBe("La identificacion visual solo puede cambiarse antes de iniciar T0.");
   });
 
   it("creates a reference selfie at T0 without running activity face comparison", async () => {
@@ -1705,7 +1774,7 @@ function createNavigoParticipantActivityState() {
   const participant = {
     accessTokens: [],
     activities,
-    applicationStartedAt: new Date("2026-06-25T15:00:00.000Z"),
+    applicationStartedAt: new Date("2026-06-25T15:00:00.000Z") as Date | null,
     id: "study-participant-1",
     participantConfirmation: {
       folio: "NAV-001",
@@ -1748,7 +1817,8 @@ function createNavigoParticipantActivityState() {
       rotationCode: "NAV-001__AAA__BBB"
     },
     screeningStatus: "PASSED" as const,
-    study
+    study,
+    visualVerificationMode: null as string | null
   };
   const responses: Array<{
     answerJson: unknown;
@@ -1797,6 +1867,18 @@ function createNavigoParticipantActivityState() {
           type: args.data.type
         });
         return args.data;
+      }
+    },
+    studyParticipant: {
+      async findUnique(args: { where: { id: string } }) {
+        return args.where.id === participant.id ? participant : null;
+      },
+      async update(args: { data: { visualVerificationMode?: string | null }; where: { id: string } }) {
+        if (args.where.id !== participant.id) {
+          throw new Error("participant not found");
+        }
+        participant.visualVerificationMode = args.data.visualVerificationMode ?? null;
+        return participant;
       }
     },
     researchResponse: {
@@ -1856,7 +1938,7 @@ function createParticipantActivity(
     participantActivityEvidence: ReturnType<typeof createActivitySelfieEvidence>[];
     questionnaireVersionId: string | null;
     responses: Array<{ answerJson: unknown; questionId: string }>;
-    status: "COMPLETED" | "PENDING" | "STARTED";
+    status: "AVAILABLE" | "COMPLETED" | "PENDING" | "STARTED";
   }> = {}
 ) {
   const offsets = {
@@ -2208,6 +2290,7 @@ function createNavigoParticipantImportState(
     participantProfileId: string;
     screeningStatus: "PASSED";
     studyId: string;
+    visualVerificationMode: string | null;
   }> = [];
   const screeningAttempts: Array<{
     completedAt: Date | null;
@@ -2369,7 +2452,8 @@ function createNavigoParticipantImportState(
           }
         : null,
       screeningStatus: participant.screeningStatus,
-      study
+      study,
+      visualVerificationMode: participant.visualVerificationMode
     };
   }
 
@@ -2744,7 +2828,8 @@ function createNavigoRotationImportState({ failProductUpsert = false }: { failPr
       rotationCode: string;
     },
     screeningStatus: "PASSED" as const,
-    study
+    study,
+    visualVerificationMode: null
   };
   const arms: Array<{ code: string; id: string; label: string; sortOrder: number; studyId: string }> = [];
   const products: Array<{

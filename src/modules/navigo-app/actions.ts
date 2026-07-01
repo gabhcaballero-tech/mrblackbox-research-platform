@@ -211,6 +211,31 @@ export async function configureNavigoRotationAction(studyId: string, studyPartic
   });
 }
 
+export async function updateNavigoVisualVerificationModeAction(studyId: string, studyParticipantId: string, formData: FormData) {
+  const actor = await requireCapability("screening:review");
+  const mode = String(formData.get("visualVerificationMode") ?? "");
+
+  if (mode !== "required" && mode !== "disabled") {
+    redirectWithNavigoMessage(studyId, { error: "Selecciona si la identificacion visual es requerida o no requerida.", participant: studyParticipantId });
+  }
+
+  const result = await createNavigoAppRepository().updateParticipantVisualVerificationMode({
+    actorUserId: actor.id,
+    mode,
+    studyParticipantId
+  });
+
+  if (!result.ok) {
+    redirectWithNavigoMessage(studyId, { error: result.message, participant: studyParticipantId });
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+  redirectWithNavigoMessage(studyId, {
+    message: result.message,
+    participant: studyParticipantId
+  });
+}
+
 export async function previewNavigoRotationImportAction(
   studyId: string,
   _previousState: NavigoRotationImportActionState,
