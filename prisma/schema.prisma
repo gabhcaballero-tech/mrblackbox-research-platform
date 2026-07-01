@@ -362,35 +362,35 @@ model InternalUser {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  createdStudies              Study[]                         @relation("StudyCreatedBy")
-  createdParticipantProfiles  ParticipantProfile[]            @relation("ParticipantProfileCreatedBy")
-  createdStudyParticipants    StudyParticipant[]              @relation("StudyParticipantCreatedBy")
-  registeredApplicationTimes  StudyParticipant[]              @relation("ApplicationTimeRegisteredBy")
-  applicationTimeEvents       ApplicationTimeEvent[]           @relation("ApplicationTimeEventCreatedBy")
-  createdAccessTokens         ParticipantAccessToken[]         @relation("ParticipantAccessTokenCreatedBy")
-  revokedAccessTokens         ParticipantAccessToken[]         @relation("ParticipantAccessTokenRevokedBy")
-  createdQuestionnaireDrafts  QuestionnaireDraft[]             @relation("QuestionnaireDraftCreatedBy")
-  updatedQuestionnaireDrafts  QuestionnaireDraft[]             @relation("QuestionnaireDraftUpdatedBy")
-  publishedQuestionnaires     QuestionnaireVersion[]           @relation("QuestionnaireVersionPublishedBy")
-  retiredQuestionnaires       QuestionnaireVersion[]           @relation("QuestionnaireVersionRetiredBy")
-  createdLibraryItems         LibraryItem[]                    @relation("LibraryItemCreatedBy")
-  createdLibraryRevisions     LibraryItemRevision[]            @relation("LibraryItemRevisionCreatedBy")
-  retiredLibraryRevisions     LibraryItemRevision[]            @relation("LibraryItemRevisionRetiredBy")
-  insertedLibraryUses         QuestionnaireDraftLibraryUse[]    @relation("QuestionnaireDraftLibraryUseInsertedBy")
-  screeningAttempts           ScreeningAttempt[]               @relation("ScreeningAttemptFieldUser")
-  reviewedParticipantEvidence ParticipantEvidence[]             @relation("ParticipantEvidenceReviewedBy")
-  reviewedParticipantActivityEvidence ParticipantActivityEvidence[] @relation("ParticipantActivityEvidenceReviewedBy")
-  reviewedParticipantScreeningReviews ParticipantScreeningReview[] @relation("ParticipantScreeningReviewReviewedBy")
-  approvedParticipantConfirmations ParticipantConfirmation[]     @relation("ParticipantConfirmationApprovedBy")
-  manualParticipantMessagesMarkedSent ParticipantConfirmation[]  @relation("ParticipantConfirmationManualMessageMarkedSentBy")
-  rotationAssignments         ParticipantRotationAssignment[]  @relation("ParticipantRotationAssignedBy")
-  reopenedActivities          ParticipantActivity[]            @relation("ParticipantActivityReopenedBy")
-  reviewedMediaEvidence       MediaEvidencePlaceholder[]       @relation("MediaEvidenceReviewedBy")
-  exportJobs                  ExportJob[]                      @relation("ExportJobRequestedBy")
-  auditLogs                   AuditLog[]                       @relation("AuditLogActor")
-  capturedHutReferenceSelfies HutReferenceSelfie[]             @relation("HutReferenceSelfieCapturedBy")
-  reviewedHutVisualVerifications HutVisualVerification[]        @relation("HutVisualVerificationReviewedBy")
-  hutVisualOverrides          HutParticipant[]                 @relation("HutVisualOverrideBy")
+  createdStudies                      Study[]                         @relation("StudyCreatedBy")
+  createdParticipantProfiles          ParticipantProfile[]            @relation("ParticipantProfileCreatedBy")
+  createdStudyParticipants            StudyParticipant[]              @relation("StudyParticipantCreatedBy")
+  registeredApplicationTimes          StudyParticipant[]              @relation("ApplicationTimeRegisteredBy")
+  applicationTimeEvents               ApplicationTimeEvent[]          @relation("ApplicationTimeEventCreatedBy")
+  createdAccessTokens                 ParticipantAccessToken[]        @relation("ParticipantAccessTokenCreatedBy")
+  revokedAccessTokens                 ParticipantAccessToken[]        @relation("ParticipantAccessTokenRevokedBy")
+  createdQuestionnaireDrafts          QuestionnaireDraft[]            @relation("QuestionnaireDraftCreatedBy")
+  updatedQuestionnaireDrafts          QuestionnaireDraft[]            @relation("QuestionnaireDraftUpdatedBy")
+  publishedQuestionnaires             QuestionnaireVersion[]          @relation("QuestionnaireVersionPublishedBy")
+  retiredQuestionnaires               QuestionnaireVersion[]          @relation("QuestionnaireVersionRetiredBy")
+  createdLibraryItems                 LibraryItem[]                   @relation("LibraryItemCreatedBy")
+  createdLibraryRevisions             LibraryItemRevision[]           @relation("LibraryItemRevisionCreatedBy")
+  retiredLibraryRevisions             LibraryItemRevision[]           @relation("LibraryItemRevisionRetiredBy")
+  insertedLibraryUses                 QuestionnaireDraftLibraryUse[]  @relation("QuestionnaireDraftLibraryUseInsertedBy")
+  screeningAttempts                   ScreeningAttempt[]              @relation("ScreeningAttemptFieldUser")
+  reviewedParticipantEvidence         ParticipantEvidence[]           @relation("ParticipantEvidenceReviewedBy")
+  reviewedParticipantActivityEvidence ParticipantActivityEvidence[]   @relation("ParticipantActivityEvidenceReviewedBy")
+  reviewedParticipantScreeningReviews ParticipantScreeningReview[]    @relation("ParticipantScreeningReviewReviewedBy")
+  approvedParticipantConfirmations    ParticipantConfirmation[]       @relation("ParticipantConfirmationApprovedBy")
+  manualParticipantMessagesMarkedSent ParticipantConfirmation[]       @relation("ParticipantConfirmationManualMessageMarkedSentBy")
+  rotationAssignments                 ParticipantRotationAssignment[] @relation("ParticipantRotationAssignedBy")
+  reopenedActivities                  ParticipantActivity[]           @relation("ParticipantActivityReopenedBy")
+  reviewedMediaEvidence               MediaEvidencePlaceholder[]      @relation("MediaEvidenceReviewedBy")
+  exportJobs                          ExportJob[]                     @relation("ExportJobRequestedBy")
+  auditLogs                           AuditLog[]                      @relation("AuditLogActor")
+  capturedHutReferenceSelfies         HutReferenceSelfie[]            @relation("HutReferenceSelfieCapturedBy")
+  reviewedHutVisualVerifications      HutVisualVerification[]         @relation("HutVisualVerificationReviewedBy")
+  hutVisualOverrides                  HutParticipant[]                @relation("HutVisualOverrideBy")
 
   @@map("internal_users")
 }
@@ -408,20 +408,20 @@ model Study {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
-  createdBy           InternalUser          @relation("StudyCreatedBy", fields: [createdByUserId], references: [id])
-  products            StudyProduct[]
-  arms                StudyArm[]
-  rotationPlans       RotationPlan[]
-  participants        StudyParticipant[]
-  participantPortalConfig ParticipantPortalStudyConfig?
+  createdBy                InternalUser                  @relation("StudyCreatedBy", fields: [createdByUserId], references: [id])
+  products                 StudyProduct[]
+  arms                     StudyArm[]
+  rotationPlans            RotationPlan[]
+  participants             StudyParticipant[]
+  participantPortalConfig  ParticipantPortalStudyConfig?
   participantConfirmations ParticipantConfirmation[]
-  questionnaireDrafts QuestionnaireDraft[]
-  questionnaireVersions QuestionnaireVersion[]
-  libraryItems        LibraryItem[]
-  quotaDefinitions    QuotaDefinition[]
-  activitySchedules   ActivitySchedule[]
-  exportJobs          ExportJob[]
-  hutParticipants     HutParticipant[]
+  questionnaireDrafts      QuestionnaireDraft[]
+  questionnaireVersions    QuestionnaireVersion[]
+  libraryItems             LibraryItem[]
+  quotaDefinitions         QuotaDefinition[]
+  activitySchedules        ActivitySchedule[]
+  exportJobs               ExportJob[]
+  hutParticipants          HutParticipant[]
 
   @@index([status])
   @@index([createdByUserId])
@@ -461,11 +461,11 @@ model StudyProduct {
   isSensitive  Boolean  @default(true)
   createdAt    DateTime @default(now())
 
-  study                  Study                   @relation(fields: [studyId], references: [id])
-  rotationPlanArms       RotationPlanArm[]
+  study                     Study                       @relation(fields: [studyId], references: [id])
+  rotationPlanArms          RotationPlanArm[]
   participantArmAssignments ParticipantArmAssignment[]
-  researchResponses      ResearchResponse[]      @relation("ResearchResponseProductContext")
-  attributeOrders        ParticipantAttributeOrder[] @relation("AttributeOrderProductContext")
+  researchResponses         ResearchResponse[]          @relation("ResearchResponseProductContext")
+  attributeOrders           ParticipantAttributeOrder[] @relation("AttributeOrderProductContext")
 
   @@unique([studyId, internalCode])
   @@index([studyId])
@@ -480,10 +480,10 @@ model StudyArm {
   sortOrder Int
   createdAt DateTime @default(now())
 
-  study                     Study                    @relation(fields: [studyId], references: [id])
+  study                     Study                       @relation(fields: [studyId], references: [id])
   rotationPlanArms          RotationPlanArm[]
   participantArmAssignments ParticipantArmAssignment[]
-  researchResponses         ResearchResponse[]       @relation("ResearchResponseArmContext")
+  researchResponses         ResearchResponse[]          @relation("ResearchResponseArmContext")
   attributeOrders           ParticipantAttributeOrder[] @relation("AttributeOrderArmContext")
 
   @@unique([studyId, code])
@@ -528,20 +528,20 @@ model RotationPlanArm {
 }
 
 model ParticipantProfile {
-  id                String                   @id @default(uuid()) @db.Uuid
-  participantAuthUserId String?              @unique @db.Uuid
-  externalReference String?
-  name              String
-  phone             String?
-  email             String?
-  address           String?
-  city              String?
-  age               Int?
-  gender            String?
-  status            ParticipantProfileStatus @default(ACTIVE)
-  createdByUserId   String?                  @db.Uuid
-  createdAt         DateTime                 @default(now())
-  updatedAt         DateTime                 @updatedAt
+  id                    String                   @id @default(uuid()) @db.Uuid
+  participantAuthUserId String?                  @unique @db.Uuid
+  externalReference     String?
+  name                  String
+  phone                 String?
+  email                 String?
+  address               String?
+  city                  String?
+  age                   Int?
+  gender                String?
+  status                ParticipantProfileStatus @default(ACTIVE)
+  createdByUserId       String?                  @db.Uuid
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
 
   createdBy      InternalUser?      @relation("ParticipantProfileCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
   participations StudyParticipant[]
@@ -568,23 +568,23 @@ model StudyParticipant {
   createdAt                              DateTime                          @default(now())
   updatedAt                              DateTime                          @updatedAt
 
-  participantProfile             ParticipantProfile             @relation(fields: [participantProfileId], references: [id])
-  study                          Study                          @relation(fields: [studyId], references: [id])
-  createdBy                      InternalUser?                  @relation("StudyParticipantCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  applicationStartedAtRegisteredBy InternalUser?                @relation("ApplicationTimeRegisteredBy", fields: [applicationStartedAtRegisteredByUserId], references: [id])
-  applicationTimeEvents          ApplicationTimeEvent[]
-  accessTokens                   ParticipantAccessToken[]
-  screeningAttempts              ScreeningAttempt[]
-  participantConsents            ParticipantConsent[]
-  participantEvidence            ParticipantEvidence[]
-  participantActivityEvidence    ParticipantActivityEvidence[]
-  participantScreeningReviews    ParticipantScreeningReview[]
-  participantConfirmation        ParticipantConfirmation?
-  quotaEvaluations               QuotaEvaluation[]
-  rotationAssignment             ParticipantRotationAssignment?
-  armAssignments                 ParticipantArmAssignment[]
-  activities                     ParticipantActivity[]
-  attributeOrders                ParticipantAttributeOrder[]
+  participantProfile               ParticipantProfile             @relation(fields: [participantProfileId], references: [id])
+  study                            Study                          @relation(fields: [studyId], references: [id])
+  createdBy                        InternalUser?                  @relation("StudyParticipantCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  applicationStartedAtRegisteredBy InternalUser?                  @relation("ApplicationTimeRegisteredBy", fields: [applicationStartedAtRegisteredByUserId], references: [id])
+  applicationTimeEvents            ApplicationTimeEvent[]
+  accessTokens                     ParticipantAccessToken[]
+  screeningAttempts                ScreeningAttempt[]
+  participantConsents              ParticipantConsent[]
+  participantEvidence              ParticipantEvidence[]
+  participantActivityEvidence      ParticipantActivityEvidence[]
+  participantScreeningReviews      ParticipantScreeningReview[]
+  participantConfirmation          ParticipantConfirmation?
+  quotaEvaluations                 QuotaEvaluation[]
+  rotationAssignment               ParticipantRotationAssignment?
+  armAssignments                   ParticipantArmAssignment[]
+  activities                       ParticipantActivity[]
+  attributeOrders                  ParticipantAttributeOrder[]
 
   @@unique([participantProfileId, studyId])
   @@index([studyId, operationalStatus])
@@ -594,16 +594,16 @@ model StudyParticipant {
 }
 
 model ApplicationTimeEvent {
-  id                           String                    @id @default(uuid()) @db.Uuid
-  studyParticipantId           String                    @db.Uuid
+  id                           String                   @id @default(uuid()) @db.Uuid
+  studyParticipantId           String                   @db.Uuid
   eventType                    ApplicationTimeEventType
   previousApplicationStartedAt DateTime?
   newApplicationStartedAt      DateTime
   timeZoneIana                 String
   reason                       String
   activityStateAtEvent         ActivityStateAtEvent
-  createdByUserId              String                    @db.Uuid
-  createdAt                    DateTime                  @default(now())
+  createdByUserId              String                   @db.Uuid
+  createdAt                    DateTime                 @default(now())
 
   studyParticipant StudyParticipant @relation(fields: [studyParticipantId], references: [id])
   createdBy        InternalUser     @relation("ApplicationTimeEventCreatedBy", fields: [createdByUserId], references: [id])
@@ -614,23 +614,23 @@ model ApplicationTimeEvent {
 }
 
 model ParticipantAccessToken {
-  id               String                               @id @default(uuid()) @db.Uuid
-  studyParticipantId String                             @db.Uuid
-  tokenHash        String                               @unique
-  status           ParticipantAccessTokenStatus          @default(ACTIVE)
-  expiresAt        DateTime
-  expiresAtPolicy  ParticipantAccessTokenExpiryPolicy    @default(SEVEN_DAYS_AFTER_LAST_SCHEDULED_ACTIVITY)
-  lastUsedAt       DateTime?
-  createdByUserId  String                               @db.Uuid
-  createdAt        DateTime                             @default(now())
-  revokedAt        DateTime?
-  revokedByUserId  String?                              @db.Uuid
-  revocationReason ParticipantAccessTokenRevocationReason?
-  replacedByTokenId String?                             @unique @db.Uuid
+  id                 String                                  @id @default(uuid()) @db.Uuid
+  studyParticipantId String                                  @db.Uuid
+  tokenHash          String                                  @unique
+  status             ParticipantAccessTokenStatus            @default(ACTIVE)
+  expiresAt          DateTime
+  expiresAtPolicy    ParticipantAccessTokenExpiryPolicy      @default(SEVEN_DAYS_AFTER_LAST_SCHEDULED_ACTIVITY)
+  lastUsedAt         DateTime?
+  createdByUserId    String                                  @db.Uuid
+  createdAt          DateTime                                @default(now())
+  revokedAt          DateTime?
+  revokedByUserId    String?                                 @db.Uuid
+  revocationReason   ParticipantAccessTokenRevocationReason?
+  replacedByTokenId  String?                                 @unique @db.Uuid
 
-  studyParticipant StudyParticipant       @relation(fields: [studyParticipantId], references: [id])
-  createdBy        InternalUser           @relation("ParticipantAccessTokenCreatedBy", fields: [createdByUserId], references: [id])
-  revokedBy        InternalUser?          @relation("ParticipantAccessTokenRevokedBy", fields: [revokedByUserId], references: [id])
+  studyParticipant StudyParticipant        @relation(fields: [studyParticipantId], references: [id])
+  createdBy        InternalUser            @relation("ParticipantAccessTokenCreatedBy", fields: [createdByUserId], references: [id])
+  revokedBy        InternalUser?           @relation("ParticipantAccessTokenRevokedBy", fields: [revokedByUserId], references: [id])
   replacedByToken  ParticipantAccessToken? @relation("TokenReplacement", fields: [replacedByTokenId], references: [id])
   replacesToken    ParticipantAccessToken? @relation("TokenReplacement")
 
@@ -640,31 +640,31 @@ model ParticipantAccessToken {
 }
 
 model HutParticipant {
-  id                   String               @id @default(uuid()) @db.Uuid
-  studyId              String               @db.Uuid
-  name                 String
-  phone                String?
-  email                String?
-  recruiter            String?
-  token                String               @unique
-  status               HutParticipantStatus @default(NOT_STARTED)
-  startDate            DateTime?
-  currentBlockNumber   Int                  @default(1)
-  currentVideoSequence Int                  @default(1)
-  visualOverrideEnabled Boolean              @default(false)
-  visualOverrideReason  String?
-  visualOverrideByUserId String?             @db.Uuid
-  visualOverrideAt      DateTime?
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
+  id                     String               @id @default(uuid()) @db.Uuid
+  studyId                String               @db.Uuid
+  name                   String
+  phone                  String?
+  email                  String?
+  recruiter              String?
+  token                  String               @unique
+  status                 HutParticipantStatus @default(NOT_STARTED)
+  startDate              DateTime?
+  currentBlockNumber     Int                  @default(1)
+  currentVideoSequence   Int                  @default(1)
+  visualOverrideEnabled  Boolean              @default(false)
+  visualOverrideReason   String?
+  visualOverrideByUserId String?              @db.Uuid
+  visualOverrideAt       DateTime?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
 
-  study             Study                 @relation(fields: [studyId], references: [id])
-  visualOverrideBy  InternalUser?         @relation("HutVisualOverrideBy", fields: [visualOverrideByUserId], references: [id])
-  referenceSelfie   HutReferenceSelfie?
-  blocks            HutBlock[]
-  videoSubmissions  HutVideoSubmission[]
-  dailyChecks       HutDailyCheck[]
-  callEvaluations   HutCallEvaluation[]
+  study               Study                   @relation(fields: [studyId], references: [id])
+  visualOverrideBy    InternalUser?           @relation("HutVisualOverrideBy", fields: [visualOverrideByUserId], references: [id])
+  referenceSelfie     HutReferenceSelfie?
+  blocks              HutBlock[]
+  videoSubmissions    HutVideoSubmission[]
+  dailyChecks         HutDailyCheck[]
+  callEvaluations     HutCallEvaluation[]
   visualVerifications HutVisualVerification[]
 
   @@index([studyId, status])
@@ -689,7 +689,7 @@ model HutReferenceSelfie {
   updatedAt         DateTime @updatedAt
 
   participant HutParticipant @relation(fields: [participantId], references: [id])
-  capturedBy  InternalUser?   @relation("HutReferenceSelfieCapturedBy", fields: [capturedByUserId], references: [id])
+  capturedBy  InternalUser?  @relation("HutReferenceSelfieCapturedBy", fields: [capturedByUserId], references: [id])
 
   @@index([capturedByUserId])
   @@map("hut_reference_selfies")
@@ -711,9 +711,10 @@ model HutBlock {
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt
 
-  participant      HutParticipant       @relation(fields: [participantId], references: [id])
-  videoSubmissions HutVideoSubmission[]
-  dailyChecks      HutDailyCheck[]
+  participant         HutParticipant          @relation(fields: [participantId], references: [id])
+  videoSubmissions    HutVideoSubmission[]
+  dailyChecks         HutDailyCheck[]
+  visualVerifications HutVisualVerification[]
 
   @@unique([participantId, blockNumber])
   @@index([status])
@@ -738,8 +739,8 @@ model HutVideoSubmission {
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
 
-  participant        HutParticipant          @relation(fields: [participantId], references: [id])
-  block              HutBlock                @relation(fields: [blockId], references: [id])
+  participant        HutParticipant         @relation(fields: [participantId], references: [id])
+  block              HutBlock               @relation(fields: [blockId], references: [id])
   visualVerification HutVisualVerification?
 
   @@unique([blockId, sequenceNumber])
@@ -790,27 +791,27 @@ model HutCallEvaluation {
 }
 
 model HutVisualVerification {
-  id                    String                      @id @default(uuid()) @db.Uuid
-  participantId         String                      @db.Uuid
-  blockId               String                      @db.Uuid
-  videoSubmissionId     String?                     @unique @db.Uuid
-  blockNumber           Int
-  sequenceNumber        Int
-  verificationDate      DateTime
-  referenceSelfieKey    String
-  attemptSelfieKey      String                      @unique
-  attemptStorageBucket  String
+  id                      String                      @id @default(uuid()) @db.Uuid
+  participantId           String                      @db.Uuid
+  blockId                 String                      @db.Uuid
+  videoSubmissionId       String?                     @unique @db.Uuid
+  blockNumber             Int
+  sequenceNumber          Int
+  verificationDate        DateTime
+  referenceSelfieKey      String
+  attemptSelfieKey        String                      @unique
+  attemptStorageBucket    String
   attemptOriginalFilename String?
-  attemptMimeType       String
-  attemptExtension      String
-  attemptSizeBytes      Int
-  status                HutVisualVerificationStatus
-  similarityScore       Float?
-  reviewedByUserId      String?                     @db.Uuid
-  reviewedAt            DateTime?
-  overrideReason        String?
-  createdAt             DateTime                    @default(now())
-  updatedAt             DateTime                    @updatedAt
+  attemptMimeType         String
+  attemptExtension        String
+  attemptSizeBytes        Int
+  status                  HutVisualVerificationStatus
+  similarityScore         Float?
+  reviewedByUserId        String?                     @db.Uuid
+  reviewedAt              DateTime?
+  overrideReason          String?
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
 
   participant     HutParticipant      @relation(fields: [participantId], references: [id])
   block           HutBlock            @relation(fields: [blockId], references: [id])
@@ -835,10 +836,10 @@ model QuestionnaireDraft {
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
 
-  study     Study          @relation(fields: [studyId], references: [id])
-  createdBy InternalUser   @relation("QuestionnaireDraftCreatedBy", fields: [createdByUserId], references: [id])
-  updatedBy InternalUser?  @relation("QuestionnaireDraftUpdatedBy", fields: [updatedByUserId], references: [id])
-  versions  QuestionnaireVersion[]
+  study       Study                          @relation(fields: [studyId], references: [id])
+  createdBy   InternalUser                   @relation("QuestionnaireDraftCreatedBy", fields: [createdByUserId], references: [id])
+  updatedBy   InternalUser?                  @relation("QuestionnaireDraftUpdatedBy", fields: [updatedByUserId], references: [id])
+  versions    QuestionnaireVersion[]
   libraryUses QuestionnaireDraftLibraryUse[]
 
   @@index([studyId, purpose, status])
@@ -858,16 +859,16 @@ model QuestionnaireVersion {
   retiredAt            DateTime?
   status               QuestionnaireVersionStatus @default(ACTIVE)
 
-  questionnaireDraft QuestionnaireDraft   @relation(fields: [questionnaireDraftId], references: [id])
-  study              Study                @relation(fields: [studyId], references: [id])
-  publishedBy        InternalUser         @relation("QuestionnaireVersionPublishedBy", fields: [publishedByUserId], references: [id])
-  retiredBy          InternalUser?        @relation("QuestionnaireVersionRetiredBy", fields: [retiredByUserId], references: [id])
-  attributeSets      QuestionnaireAttributeSet[]
-  screeningAttempts  ScreeningAttempt[]
-  activitySchedules  ActivitySchedule[]
-  researchResponses  ResearchResponse[]
+  questionnaireDraft   QuestionnaireDraft             @relation(fields: [questionnaireDraftId], references: [id])
+  study                Study                          @relation(fields: [studyId], references: [id])
+  publishedBy          InternalUser                   @relation("QuestionnaireVersionPublishedBy", fields: [publishedByUserId], references: [id])
+  retiredBy            InternalUser?                  @relation("QuestionnaireVersionRetiredBy", fields: [retiredByUserId], references: [id])
+  attributeSets        QuestionnaireAttributeSet[]
+  screeningAttempts    ScreeningAttempt[]
+  activitySchedules    ActivitySchedule[]
+  researchResponses    ResearchResponse[]
   randomizationConfigs AttributeRandomizationConfig[]
-  attributeOrders    ParticipantAttributeOrder[]
+  attributeOrders      ParticipantAttributeOrder[]
 
   @@unique([questionnaireDraftId, versionNumber])
   @@unique([studyId, definitionHash])
@@ -889,9 +890,9 @@ model LibraryItem {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  study      Study?               @relation(fields: [studyId], references: [id])
-  createdBy  InternalUser         @relation("LibraryItemCreatedBy", fields: [createdByUserId], references: [id])
-  revisions  LibraryItemRevision[]
+  study     Study?                @relation(fields: [studyId], references: [id])
+  createdBy InternalUser          @relation("LibraryItemCreatedBy", fields: [createdByUserId], references: [id])
+  revisions LibraryItemRevision[]
 
   @@index([studyId, type, status])
   @@index([createdByUserId])
@@ -899,20 +900,20 @@ model LibraryItem {
 }
 
 model LibraryItemRevision {
-  id              String   @id @default(uuid()) @db.Uuid
-  libraryItemId   String   @db.Uuid
+  id              String                    @id @default(uuid()) @db.Uuid
+  libraryItemId   String                    @db.Uuid
   revisionNumber  Int
   contentJson     Json
   contentHash     String?
   status          LibraryItemRevisionStatus @default(ACTIVE)
-  createdByUserId String   @db.Uuid
-  createdAt       DateTime @default(now())
-  retiredByUserId String?  @db.Uuid
+  createdByUserId String                    @db.Uuid
+  createdAt       DateTime                  @default(now())
+  retiredByUserId String?                   @db.Uuid
   retiredAt       DateTime?
 
-  libraryItem       LibraryItem                 @relation(fields: [libraryItemId], references: [id])
-  createdBy         InternalUser                @relation("LibraryItemRevisionCreatedBy", fields: [createdByUserId], references: [id])
-  retiredBy         InternalUser?               @relation("LibraryItemRevisionRetiredBy", fields: [retiredByUserId], references: [id])
+  libraryItem       LibraryItem                    @relation(fields: [libraryItemId], references: [id])
+  createdBy         InternalUser                   @relation("LibraryItemRevisionCreatedBy", fields: [createdByUserId], references: [id])
+  retiredBy         InternalUser?                  @relation("LibraryItemRevisionRetiredBy", fields: [retiredByUserId], references: [id])
   questionnaireUses QuestionnaireAttributeSet[]
   draftUses         QuestionnaireDraftLibraryUse[]
 
@@ -959,27 +960,27 @@ model QuestionnaireAttributeSet {
 }
 
 model ScreeningAttempt {
-  id                     String          @id @default(uuid()) @db.Uuid
-  studyParticipantId     String          @db.Uuid
-  fieldUserId            String?         @db.Uuid
-  questionnaireVersionId String          @db.Uuid
+  id                     String                 @id @default(uuid()) @db.Uuid
+  studyParticipantId     String                 @db.Uuid
+  fieldUserId            String?                @db.Uuid
+  questionnaireVersionId String                 @db.Uuid
   source                 ScreeningAttemptSource @default(FIELD)
-  status                 ScreeningStatus @default(STARTED)
+  status                 ScreeningStatus        @default(STARTED)
   terminationCode        String?
   terminationReason      String?
   nseScore               Int?
   nseClass               String?
   evaluationJson         Json?
-  startedAt              DateTime        @default(now())
+  startedAt              DateTime               @default(now())
   completedAt            DateTime?
 
-  studyParticipant     StudyParticipant    @relation(fields: [studyParticipantId], references: [id])
-  fieldUser            InternalUser?       @relation("ScreeningAttemptFieldUser", fields: [fieldUserId], references: [id], onDelete: Restrict)
-  questionnaireVersion QuestionnaireVersion @relation(fields: [questionnaireVersionId], references: [id])
-  answers              ScreeningAnswer[]
-  participantEvidence  ParticipantEvidence[]
+  studyParticipant           StudyParticipant            @relation(fields: [studyParticipantId], references: [id])
+  fieldUser                  InternalUser?               @relation("ScreeningAttemptFieldUser", fields: [fieldUserId], references: [id], onDelete: Restrict)
+  questionnaireVersion       QuestionnaireVersion        @relation(fields: [questionnaireVersionId], references: [id])
+  answers                    ScreeningAnswer[]
+  participantEvidence        ParticipantEvidence[]
   participantScreeningReview ParticipantScreeningReview?
-  participantConfirmation ParticipantConfirmation?
+  participantConfirmation    ParticipantConfirmation?
 
   @@index([studyParticipantId, status])
   @@index([fieldUserId, startedAt])
@@ -1113,11 +1114,11 @@ model ParticipantConfirmation {
   manualMessageMarkedSentByUserId String?             @db.Uuid
   manualMessageMarkedSentAt       DateTime?
 
-  study                     Study                     @relation(fields: [studyId], references: [id])
-  studyParticipant          StudyParticipant          @relation(fields: [studyParticipantId], references: [id])
-  screeningAttempt          ScreeningAttempt          @relation(fields: [screeningAttemptId], references: [id])
-  approvedBy                InternalUser              @relation("ParticipantConfirmationApprovedBy", fields: [approvedByUserId], references: [id])
-  manualMessageMarkedSentBy InternalUser?             @relation("ParticipantConfirmationManualMessageMarkedSentBy", fields: [manualMessageMarkedSentByUserId], references: [id])
+  study                     Study                      @relation(fields: [studyId], references: [id])
+  studyParticipant          StudyParticipant           @relation(fields: [studyParticipantId], references: [id])
+  screeningAttempt          ScreeningAttempt           @relation(fields: [screeningAttemptId], references: [id])
+  approvedBy                InternalUser               @relation("ParticipantConfirmationApprovedBy", fields: [approvedByUserId], references: [id])
+  manualMessageMarkedSentBy InternalUser?              @relation("ParticipantConfirmationManualMessageMarkedSentBy", fields: [manualMessageMarkedSentByUserId], references: [id])
   referenceCodes            ParticipantReferenceCode[]
 
   @@unique([studyId, folioSequence])
@@ -1202,9 +1203,9 @@ model ParticipantRotationAssignment {
   assignedAt         DateTime               @default(now())
   changedAt          DateTime?
 
-  studyParticipant StudyParticipant      @relation(fields: [studyParticipantId], references: [id])
-  rotationPlan     RotationPlan          @relation(fields: [rotationPlanId], references: [id])
-  assignedBy       InternalUser          @relation("ParticipantRotationAssignedBy", fields: [assignedByUserId], references: [id])
+  studyParticipant StudyParticipant           @relation(fields: [studyParticipantId], references: [id])
+  rotationPlan     RotationPlan               @relation(fields: [rotationPlanId], references: [id])
+  assignedBy       InternalUser               @relation("ParticipantRotationAssignedBy", fields: [assignedByUserId], references: [id])
   arms             ParticipantArmAssignment[]
 
   @@index([rotationPlanId])
@@ -1249,8 +1250,8 @@ model ActivitySchedule {
   sortOrder              Int
   status                 ActivityScheduleStatus @default(ACTIVE)
 
-  study                Study                 @relation(fields: [studyId], references: [id])
-  questionnaireVersion QuestionnaireVersion? @relation(fields: [questionnaireVersionId], references: [id])
+  study                 Study                 @relation(fields: [studyId], references: [id])
+  questionnaireVersion  QuestionnaireVersion? @relation(fields: [questionnaireVersionId], references: [id])
   participantActivities ParticipantActivity[]
 
   @@unique([studyId, code])
@@ -1276,13 +1277,13 @@ model ParticipantActivity {
   reopenedAt         DateTime?
   reopenReason       String?
 
-  studyParticipant StudyParticipant @relation(fields: [studyParticipantId], references: [id])
-  activitySchedule ActivitySchedule @relation(fields: [activityScheduleId], references: [id])
-  reopenedBy       InternalUser?    @relation("ParticipantActivityReopenedBy", fields: [reopenedByUserId], references: [id])
-  reminders        ReminderLog[]
-  responses        ResearchResponse[]
+  studyParticipant            StudyParticipant              @relation(fields: [studyParticipantId], references: [id])
+  activitySchedule            ActivitySchedule              @relation(fields: [activityScheduleId], references: [id])
+  reopenedBy                  InternalUser?                 @relation("ParticipantActivityReopenedBy", fields: [reopenedByUserId], references: [id])
+  reminders                   ReminderLog[]
+  responses                   ResearchResponse[]
   participantActivityEvidence ParticipantActivityEvidence[]
-  mediaEvidence    MediaEvidencePlaceholder?
+  mediaEvidence               MediaEvidencePlaceholder?
 
   @@unique([studyParticipantId, activityScheduleId, occurrenceKey], map: "participant_activity_occurrence_unique")
   @@index([studyParticipantId, status])
@@ -1291,10 +1292,10 @@ model ParticipantActivity {
 }
 
 model ReminderLog {
-  id                    String         @id @default(uuid()) @db.Uuid
-  participantActivityId String         @db.Uuid
+  id                    String          @id @default(uuid()) @db.Uuid
+  participantActivityId String          @db.Uuid
   channel               ReminderChannel
-  status                ReminderStatus @default(PLANNED)
+  status                ReminderStatus  @default(PLANNED)
   scheduledFor          DateTime?
   sentAt                DateTime?
   metadataJson          Json?
@@ -1333,13 +1334,13 @@ model ResearchResponse {
 }
 
 model AttributeRandomizationConfig {
-  id                     String  @id @default(uuid()) @db.Uuid
-  questionnaireVersionId String  @db.Uuid
-  blockInstanceKey       String
+  id                       String  @id @default(uuid()) @db.Uuid
+  questionnaireVersionId   String  @db.Uuid
+  blockInstanceKey         String
   shareOrderAcrossProducts Boolean @default(true)
-  groupSize              Int
-  finalQuestionEnabled   Boolean @default(true)
-  finalQuestionText      String
+  groupSize                Int
+  finalQuestionEnabled     Boolean @default(true)
+  finalQuestionText        String
 
   questionnaireVersion QuestionnaireVersion @relation(fields: [questionnaireVersionId], references: [id])
 
@@ -1348,23 +1349,23 @@ model AttributeRandomizationConfig {
 }
 
 model ParticipantAttributeOrder {
-  id                     String                    @id @default(uuid()) @db.Uuid
-  studyParticipantId     String                    @db.Uuid
-  questionnaireVersionId String                    @db.Uuid
-  blockInstanceKey       String
-  orderKey               String
-  contextType            AttributeOrderContextType
-  contextProductId       String?                   @db.Uuid
-  contextArmId           String?                   @db.Uuid
-  seed                   String
+  id                          String                    @id @default(uuid()) @db.Uuid
+  studyParticipantId          String                    @db.Uuid
+  questionnaireVersionId      String                    @db.Uuid
+  blockInstanceKey            String
+  orderKey                    String
+  contextType                 AttributeOrderContextType
+  contextProductId            String?                   @db.Uuid
+  contextArmId                String?                   @db.Uuid
+  seed                        String
   orderedAttributeRevisionIds Json
   groupedAttributeRevisionIds Json
-  createdAt              DateTime                  @default(now())
+  createdAt                   DateTime                  @default(now())
 
-  studyParticipant     StudyParticipant    @relation(fields: [studyParticipantId], references: [id])
+  studyParticipant     StudyParticipant     @relation(fields: [studyParticipantId], references: [id])
   questionnaireVersion QuestionnaireVersion @relation(fields: [questionnaireVersionId], references: [id])
-  contextProduct       StudyProduct?       @relation("AttributeOrderProductContext", fields: [contextProductId], references: [id])
-  contextArm           StudyArm?           @relation("AttributeOrderArmContext", fields: [contextArmId], references: [id])
+  contextProduct       StudyProduct?        @relation("AttributeOrderProductContext", fields: [contextProductId], references: [id])
+  contextArm           StudyArm?            @relation("AttributeOrderArmContext", fields: [contextArmId], references: [id])
 
   @@unique([studyParticipantId, questionnaireVersionId, blockInstanceKey, orderKey])
   @@index([questionnaireVersionId, blockInstanceKey])
