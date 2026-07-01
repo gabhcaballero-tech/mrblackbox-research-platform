@@ -924,7 +924,8 @@ describe("navigo app MVP rules", () => {
 
     expect(adminPage).toContain("Registrar participante");
     expect(adminPage).toContain("Generar enlaces para todos");
-    expect(adminPage).toContain("Identificacion visual");
+    expect(adminPage).toContain("Identificación visual");
+    expect(adminPage).toContain("Identificación visual: ");
     expect(adminPage).toContain("updateNavigoVisualVerificationModeAction");
     expect(adminPage).toContain("visualVerificationMode");
     expect(adminPage).toContain("No requerida");
@@ -1586,7 +1587,7 @@ describe("navigo app MVP rules", () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.ok ? "" : result.message).toBe("La identificacion visual solo puede cambiarse antes de iniciar T0.");
+    expect(result.ok ? "" : result.message).toBe("La identificación visual solo puede cambiarse antes de iniciar T0.");
   });
 
   it("creates a reference selfie at T0 without running activity face comparison", async () => {

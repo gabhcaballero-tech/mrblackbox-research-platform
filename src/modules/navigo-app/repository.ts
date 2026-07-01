@@ -1238,11 +1238,11 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
       }
 
       if (participant.study.code !== NAVIGO_STUDY_CODE) {
-        return { message: "Solo el estudio Navigo permite configurar identificacion visual.", ok: false };
+        return { message: "Solo el estudio Navigo permite configurar identificación visual.", ok: false };
       }
 
       if (participant.applicationStartedAt || hasT0Started(participant)) {
-        return { message: "La identificacion visual solo puede cambiarse antes de iniciar T0.", ok: false };
+        return { message: "La identificación visual solo puede cambiarse antes de iniciar T0.", ok: false };
       }
 
       await prisma.studyParticipant.update?.({
@@ -1255,8 +1255,8 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
       return {
         message:
           mode === "disabled"
-            ? "Identificacion visual marcada como no requerida para este participante."
-            : "Identificacion visual marcada como requerida para este participante.",
+            ? "Identificación visual marcada como no requerida para este participante."
+            : "Identificación visual marcada como requerida para este participante.",
         ok: true
       };
     },

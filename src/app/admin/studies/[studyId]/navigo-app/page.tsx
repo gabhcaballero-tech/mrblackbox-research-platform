@@ -255,6 +255,12 @@ function ParticipantRow({
             <dd className="inline text-zinc-900">{participant.status === "APPROVED" ? "Confirmado" : participant.status}</dd>
           </div>
           <div>
+            <dt className="inline font-medium text-zinc-500">Identificación visual: </dt>
+            <dd className="inline font-semibold text-zinc-900">
+              {participant.visualVerificationMode === "disabled" ? "No requerida" : "Requerida"}
+            </dd>
+          </div>
+          <div>
             <dt className="inline font-medium text-zinc-500">Alerta: </dt>
             <dd className="inline text-zinc-900">{participant.alert}</dd>
           </div>
@@ -448,15 +454,15 @@ function VisualVerificationModeForm({
   const modeLabel = participant.visualVerificationMode === "disabled" ? "No requerida" : "Requerida";
 
   return (
-    <section className="mt-4 rounded-md border border-teal-200 bg-teal-50 p-3">
+    <section className="mt-4 rounded-md border border-teal-300 bg-teal-50 p-3 shadow-sm">
       <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-semibold text-zinc-950">Identificacion visual</h3>
+        <h3 className="text-sm font-semibold text-zinc-950">Identificación visual</h3>
         <p className="text-xs leading-5 text-zinc-600">
-          Estado actual: <span className="font-semibold text-zinc-900">{modeLabel}</span>. Esta decision se configura por participante y no puede cambiarse desde el link publico.
+          Estado actual: <span className="font-semibold text-zinc-900">{modeLabel}</span>. Esta decisión se configura por participante y no puede cambiarse desde el link público.
         </p>
         {disabled ? (
           <p className="text-xs leading-5 text-amber-800">
-            La identificacion visual solo puede modificarse antes de iniciar T0.
+            La identificación visual solo puede modificarse antes de iniciar T0.
           </p>
         ) : null}
       </div>
@@ -470,8 +476,8 @@ function VisualVerificationModeForm({
           <option value="required">Requerida</option>
           <option value="disabled">No requerida</option>
         </select>
-        <SubmitButton disabled={disabled} pendingLabel="Guardando identificacion visual...">
-          Guardar identificacion visual
+        <SubmitButton disabled={disabled} pendingLabel="Guardando identificación visual...">
+          Guardar identificación visual
         </SubmitButton>
       </form>
     </section>

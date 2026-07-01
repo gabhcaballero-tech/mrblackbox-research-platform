@@ -216,7 +216,7 @@ export async function updateNavigoVisualVerificationModeAction(studyId: string, 
   const mode = String(formData.get("visualVerificationMode") ?? "");
 
   if (mode !== "required" && mode !== "disabled") {
-    redirectWithNavigoMessage(studyId, { error: "Selecciona si la identificacion visual es requerida o no requerida.", participant: studyParticipantId });
+    redirectWithNavigoMessage(studyId, { error: "Selecciona si la identificación visual es requerida o no requerida.", participant: studyParticipantId });
   }
 
   const result = await createNavigoAppRepository().updateParticipantVisualVerificationMode({
