@@ -6,6 +6,15 @@ import {
   requestHutRegistrationSelfieUploadAction
 } from "@/modules/hut/actions";
 import { createBrowserSupabaseClient } from "@/shared/auth/supabase/browser";
+import {
+  mirroredSelfiePreviewStyle,
+  SelfiePrivacyHud,
+  selfieMediaClass,
+  selfieMediaFrameClass,
+  shouldMirrorSelfiePreview
+} from "@/shared/ui/SelfiePrivacyHud";
+
+const FRONT_CAMERA_FACING_MODE = "user";
 
 type HutRegistrationFormProps = {
   requestOrigin: string;
@@ -46,7 +55,7 @@ export function HutRegistrationForm({ requestOrigin, token }: HutRegistrationFor
 
     videoRef.current.srcObject = streamRef.current;
     void videoRef.current.play().catch(() => {
-      setCameraError("No fue posible iniciar la vista de camara. Puedes subir una selfie como respaldo.");
+      setCameraError("No fue posible iniciar la vista de camara. Intenta de nuevo.");
     });
   }, [cameraOpen]);
 
@@ -57,12 +66,12 @@ export function HutRegistrationForm({ requestOrigin, token }: HutRegistrationFor
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
-        video: { facingMode: "user" }
+        video: { facingMode: FRONT_CAMERA_FACING_MODE }
       });
       streamRef.current = stream;
       setCameraOpen(true);
     } catch {
-      setCameraError("No fue posible abrir la camara. Puedes subir una selfie como respaldo.");
+      setCameraError("No fue posible abrir la camara. Intenta de nuevo.");
     }
   }
 
@@ -136,7 +145,7 @@ export function HutRegistrationForm({ requestOrigin, token }: HutRegistrationFor
       return;
     }
     if (!file) {
-      setError("Toma o selecciona la selfie de registro.");
+      setError("Toma la selfie de registro para continuar.");
       return;
     }
 
@@ -236,13 +245,19 @@ export function HutRegistrationForm({ requestOrigin, token }: HutRegistrationFor
         <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
           {cameraOpen ? (
             <div className="space-y-3">
-              <video
-                ref={videoRef}
-                autoPlay
-                className="aspect-[3/4] w-full rounded-md bg-zinc-950 object-cover"
-                muted
-                playsInline
-              />
+              <div className={selfieMediaFrameClass}>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  className={selfieMediaClass}
+                  data-mirrored={shouldMirrorSelfiePreview(FRONT_CAMERA_FACING_MODE) ? "true" : "false"}
+                  muted
+                  playsInline
+                  style={shouldMirrorSelfiePreview(FRONT_CAMERA_FACING_MODE) ? mirroredSelfiePreviewStyle : undefined}
+                />
+                <SelfiePrivacyHud mode="camera" testIdPrefix="hut-registration-selfie" />
+              </div>
+              <p className="text-xs leading-5 text-zinc-600">Coloca tus ojos dentro de las guias y mira de frente.</p>
               <div className="flex flex-wrap gap-2">
                 <button className={secondaryButtonClass} disabled={isPending} onClick={captureSelfie} type="button">
                   Tomar selfie
@@ -254,7 +269,18 @@ export function HutRegistrationForm({ requestOrigin, token }: HutRegistrationFor
             </div>
           ) : previewUrl ? (
             <div className="space-y-3">
-              <img alt="Preview de selfie de registro" className="aspect-[3/4] w-full rounded-md bg-zinc-100 object-cover" src={previewUrl} />
+              <div className={selfieMediaFrameClass}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  alt="Preview de selfie de registro"
+                  className={selfieMediaClass}
+                  data-mirrored={shouldMirrorSelfiePreview(FRONT_CAMERA_FACING_MODE) ? "true" : "false"}
+                  src={previewUrl}
+                  style={shouldMirrorSelfiePreview(FRONT_CAMERA_FACING_MODE) ? mirroredSelfiePreviewStyle : undefined}
+                />
+                <SelfiePrivacyHud mode="preview" testIdPrefix="hut-registration-selfie" />
+              </div>
+              <p className="text-xs leading-5 text-zinc-600">Coloca tus ojos dentro de las guias y mira de frente.</p>
               <div className="flex flex-wrap gap-2">
                 <button className={secondaryButtonClass} disabled={isPending || Boolean(participantLink)} onClick={repeatSelfie} type="button">
                   Repetir foto
@@ -270,22 +296,6 @@ export function HutRegistrationForm({ requestOrigin, token }: HutRegistrationFor
             </button>
           )}
           {cameraError ? <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{cameraError}</p> : null}
-          <label className="mt-4 flex flex-col gap-1 text-sm font-medium text-zinc-700">
-            Subir archivo como respaldo
-            <input
-              accept="image/jpeg,image/png,image/webp,image/*"
-              capture="user"
-              className={inputClass}
-              disabled={isPending || Boolean(participantLink)}
-              onChange={(event) => {
-                const selectedFile = event.target.files?.[0] ?? null;
-                setFile(selectedFile);
-                setPreview(selectedFile);
-                stopCamera();
-              }}
-              type="file"
-            />
-          </label>
         </div>
       </div>
 
