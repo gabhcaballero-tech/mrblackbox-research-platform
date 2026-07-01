@@ -113,11 +113,13 @@ export default async function NavigoActivityPage({ params, searchParams }: Navig
         fragranceCodes={data.blindLabels}
         questions={data.questions}
         registeredSelfie={data.registeredSelfie}
-        requiresSelfie={data.activity.code !== "T0_SALON"}
+        requiresSelfie={data.requiresSelfie}
+        selfieCapturePurpose={data.selfieCapturePurpose}
         selfieCount={data.selfieCount}
         selfieReviewStatus={data.selfieReviewStatus}
         testModeParams={data.testMode ? testModeParams : null}
         token={parsedToken.data}
+        visualVerificationMode={data.visualVerificationMode}
       />
     </PublicParticipantShell>
   );

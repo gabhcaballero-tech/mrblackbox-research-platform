@@ -55,7 +55,7 @@ function renderCapture(overrides: Partial<Parameters<typeof NavigoActivityCaptur
       fragranceCodes={{ left: "CODIGO-A", right: "CODIGO-B" }}
       questions={questions}
       registeredSelfie={null}
-      requiresSelfie
+      requiresSelfie={true}
       selfieCount={0}
       selfieReviewStatus={null}
       testModeParams={null}
@@ -204,6 +204,17 @@ describe("NavigoActivityCapture", () => {
     expect(screen.getByText(questions[0]?.text ?? "")).toBeInTheDocument();
   });
 
+  it("skips selfie capture and goes straight to AP1 to AP7 when visual verification is disabled", () => {
+    renderCapture({
+      requiresSelfie: false,
+      visualVerificationMode: "disabled"
+    });
+
+    expect(screen.queryByText("Selfie de identificación")).not.toBeInTheDocument();
+    expect(screen.queryByText("Verificación visual de identidad")).not.toBeInTheDocument();
+    expect(screen.getByText("Preguntas AP1 a AP7")).toBeInTheDocument();
+  });
+
   it("keeps AP1 to AP7 hidden when activity identity review is pending or rejected", () => {
     const pending = renderCapture({ selfieCount: 1, selfieReviewStatus: "PENDING" });
 
@@ -282,6 +293,35 @@ describe("NavigoActivityCapture", () => {
       "signed-token",
       expect.any(File),
       expect.objectContaining({ upsert: false })
+    );
+    expect(await screen.findByText("Preguntas AP1 a AP7")).toBeInTheDocument();
+  });
+
+  it("creates the initial T0 reference selfie without running facial comparison", async () => {
+    vi.mocked(confirmNavigoActivitySelfieUploadAction).mockResolvedValueOnce({
+      data: { internalNote: "reference_created", reviewStatus: "APPROVED", selfieCount: 1 },
+      ok: true
+    });
+    renderCapture({
+      activityId: "activity-t0",
+      existingResponses: {},
+      registeredSelfie: null,
+      requiresSelfie: true,
+      selfieCapturePurpose: "reference_capture"
+    });
+
+    expect(screen.getByText("Tomaremos una selfie inicial para usarla como referencia durante el estudio.")).toBeInTheDocument();
+    expect(screen.getByText("Esta selfie será utilizada para verificar tu identidad en evaluaciones posteriores.")).toBeInTheDocument();
+
+    await uploadSelfie();
+
+    expect(verifyNavigoFaceIdentity).not.toHaveBeenCalled();
+    expect(confirmNavigoActivitySelfieUploadAction).toHaveBeenCalledWith(
+      "participant-token",
+      "activity-t0",
+      expect.objectContaining({
+        faceVerification: null
+      })
     );
     expect(await screen.findByText("Preguntas AP1 a AP7")).toBeInTheDocument();
   });

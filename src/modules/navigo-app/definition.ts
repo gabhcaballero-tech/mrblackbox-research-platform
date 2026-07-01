@@ -10,6 +10,7 @@ export const NAVIGO_T0_IDENTITY_QUESTION_ID = "T0_IDENTITY_CONFIRMED";
 export const NAVIGO_ACTIVITY_CODES = ["T0_SALON", "T2_HORAS", "T4_HORAS", "T8_HORAS"] as const;
 
 export type NavigoActivityCode = (typeof NAVIGO_ACTIVITY_CODES)[number];
+export type NavigoVisualVerificationMode = "disabled" | "required";
 
 export type NavigoMeasurementDefinition = {
   purpose: "MEASUREMENT";
@@ -149,6 +150,10 @@ export function createNavigoScheduleSeeds(questionnaireVersionId: string): Navig
 export function resolveNavigoTimeZone(timeZoneIana: string | null | undefined): string {
   const normalized = timeZoneIana?.trim();
   return normalized ? normalized : NAVIGO_APP_DEFAULT_TIME_ZONE;
+}
+
+export function resolveNavigoVisualVerificationMode(value: string | null | undefined): NavigoVisualVerificationMode {
+  return value?.trim().toLowerCase() === "disabled" ? "disabled" : "required";
 }
 
 export const NAVIGO_APP_SUMMARY = {

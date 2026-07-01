@@ -28,10 +28,12 @@ type NavigoActivityCaptureProps = {
     signedUrl: string;
   } | null;
   requiresSelfie: boolean;
+  selfieCapturePurpose?: "activity_verification" | "reference_capture" | null;
   selfieReviewStatus: "APPROVED" | "PENDING" | "REJECTED" | null;
   selfieCount: number;
   testModeParams: NavigoTestModeParams | null;
   token: string;
+  visualVerificationMode?: "disabled" | "required";
 };
 
 const FRONT_CAMERA_FACING_MODE = "user";
@@ -47,20 +49,26 @@ export function NavigoActivityCapture({
   questions,
   registeredSelfie,
   requiresSelfie,
+  selfieCapturePurpose = requiresSelfie ? "activity_verification" : null,
   selfieReviewStatus,
   selfieCount,
   testModeParams,
-  token
+  token,
+  visualVerificationMode = "required"
 }: NavigoActivityCaptureProps) {
   const router = useRouter();
   const [selfies, setSelfies] = useState(selfieCount);
+  const skipsVisualVerification = visualVerificationMode === "disabled";
   const [identityConfirmed, setIdentityConfirmed] = useState(
-    readAnswerValue(existingResponses[NAVIGO_T0_IDENTITY_QUESTION_ID]) === "YES"
+    skipsVisualVerification || readAnswerValue(existingResponses[NAVIGO_T0_IDENTITY_QUESTION_ID]) === "YES"
   );
   const [identityRejected, setIdentityRejected] = useState(
     readAnswerValue(existingResponses[NAVIGO_T0_IDENTITY_QUESTION_ID]) === "NO"
   );
   const [identityStep, setIdentityStep] = useState<"identity" | "incident" | "questions">(() => {
+    if (skipsVisualVerification) {
+      return "questions";
+    }
     if (requiresSelfie) {
       return "questions";
     }
@@ -281,11 +289,14 @@ export function NavigoActivityCapture({
           return;
         }
 
-        setSelfieProcessingLabel("Verificando identidad...");
-        const faceVerification = await runActivityFaceVerification({
-          capturedSelfie: file,
-          registeredSelfieUrl: registeredSelfie?.signedUrl ?? null
-        });
+        setSelfieProcessingLabel(selfieCapturePurpose === "reference_capture" ? "Guardando selfie..." : "Verificando identidad...");
+        const faceVerification =
+          selfieCapturePurpose === "reference_capture"
+            ? null
+            : await runActivityFaceVerification({
+                capturedSelfie: file,
+                registeredSelfieUrl: registeredSelfie?.signedUrl ?? null
+              });
 
         const confirmed = await confirmNavigoActivitySelfieUploadAction(token, activityId, {
           faceVerification,
@@ -301,6 +312,9 @@ export function NavigoActivityCapture({
 
         setSelfies(confirmed.data.selfieCount);
         setIdentityReviewStatus(confirmed.data.reviewStatus);
+        if (selfieCapturePurpose === "reference_capture") {
+          setIdentityConfirmed(true);
+        }
         setMessage(activityIdentityMessage(confirmed.data.reviewStatus));
         clearCapturedPhoto();
       } catch {
@@ -342,13 +356,17 @@ export function NavigoActivityCapture({
         <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-zinc-950">Selfie de identificación</h2>
           <p className="mt-2 text-sm leading-6 text-zinc-600">
-            Toma una selfie clara para confirmar que eres la misma persona que participa en el estudio.
+            {selfieCapturePurpose === "reference_capture"
+              ? "Tomaremos una selfie inicial para usarla como referencia durante el estudio."
+              : "Toma una selfie clara para confirmar que eres la misma persona que participa en el estudio."}
           </p>
           <p className="mt-2 text-sm leading-6 text-zinc-600">
             Coloca tus ojos dentro de las guías y mira de frente.
           </p>
           <p className="mt-1 text-sm leading-6 text-zinc-500">
-            La selfie será utilizada para verificar tu identidad durante el estudio.
+            {selfieCapturePurpose === "reference_capture"
+              ? "Esta selfie será utilizada para verificar tu identidad en evaluaciones posteriores."
+              : "La selfie será utilizada para verificar tu identidad durante el estudio."}
           </p>
           <p className="mt-2 text-sm text-zinc-500">Selfie registrada: {selfies}/1</p>
 

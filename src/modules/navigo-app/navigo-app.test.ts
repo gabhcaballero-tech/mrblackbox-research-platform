@@ -1486,6 +1486,97 @@ describe("navigo app MVP rules", () => {
     expect(t4?.status).toBe("COMPLETED");
   });
 
+  it("skips activity selfies when visual verification is disabled", async () => {
+    const state = createNavigoParticipantActivityState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const originalMode = process.env.NAVIGO_VISUAL_VERIFICATION_MODE;
+    process.env.NAVIGO_VISUAL_VERIFICATION_MODE = "disabled";
+    state.participant.participantEvidence = [];
+
+    try {
+      const view = await repository.getActivityCaptureView({
+        activityId: "activity-T4_HORAS",
+        testMode: true,
+        token: "token-1"
+      });
+      const saved = await repository.submitActivityResponses({
+        activityId: "activity-T4_HORAS",
+        answers: completeNavigoAnswers(),
+        testMode: true,
+        token: "token-1"
+      });
+
+      expect(view.ok).toBe(true);
+      expect(view.ok ? view.data.requiresSelfie : true).toBe(false);
+      expect(view.ok ? view.data.visualVerificationStatus : null).toBe("not_required");
+      expect(saved.ok).toBe(true);
+      expect(state.responses.filter((response) => response.participantActivityId === "activity-T4_HORAS")).toHaveLength(7);
+    } finally {
+      if (originalMode === undefined) {
+        delete process.env.NAVIGO_VISUAL_VERIFICATION_MODE;
+      } else {
+        process.env.NAVIGO_VISUAL_VERIFICATION_MODE = originalMode;
+      }
+    }
+  });
+
+  it("creates a reference selfie at T0 without running activity face comparison", async () => {
+    const state = createNavigoParticipantActivityState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    state.participant.participantEvidence = [];
+
+    const request = await repository.requestActivitySelfieUpload({
+      activityId: "activity-T0_SALON",
+      metadata: {
+        evidenceType: "SELFIE_IDENTIFICATION",
+        mimeType: "image/jpeg",
+        originalFilename: "referencia.jpg",
+        sizeBytes: 100
+      },
+      storage: state.storage,
+      token: "token-1"
+    });
+
+    expect(request.ok).toBe(true);
+    expect(request.ok ? request.data.privateStorageKey : "").toContain("/screening-attempts/attempt-1/");
+
+    const confirmed = await repository.confirmActivitySelfieUpload({
+      activityId: "activity-T0_SALON",
+      metadata: {
+        evidenceType: "SELFIE_IDENTIFICATION",
+        faceVerification: null,
+        mimeType: "image/jpeg",
+        originalFilename: "referencia.jpg",
+        privateStorageKey: request.ok ? request.data.privateStorageKey : "",
+        sizeBytes: 100,
+        storageBucket: "participant-evidence"
+      },
+      token: "token-1"
+    });
+
+    expect(confirmed.ok).toBe(true);
+    expect(confirmed.ok ? confirmed.data.reviewStatus : "PENDING").toBe("APPROVED");
+    expect(confirmed.ok ? confirmed.data.internalNote : null).toBe("reference_created");
+    expect(state.participant.participantEvidence).toHaveLength(1);
+    expect(state.participant.participantEvidence[0]?.privateStorageKey).toContain("/screening-attempts/attempt-1/");
+    expect(state.responses.some((response) => response.questionId === "T0_IDENTITY_CONFIRMED")).toBe(true);
+  });
+
+  it("blocks later activities when visual verification is required and reference selfie is missing", async () => {
+    const state = createNavigoParticipantActivityState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    state.participant.participantEvidence = [];
+
+    const view = await repository.getActivityCaptureView({
+      activityId: "activity-T4_HORAS",
+      testMode: true,
+      token: "token-1"
+    });
+
+    expect(view.ok).toBe(false);
+    expect(view.ok ? "" : view.message).toBe("No encontramos una foto registrada para comparar. Contacta al supervisor antes de continuar.");
+  });
+
   it("serves the rotation template as a tab-separated file with UTF-8 BOM", () => {
     const route = readWorkspaceFile(
       "src",
@@ -1618,7 +1709,11 @@ function createNavigoParticipantActivityState() {
     id: "study-participant-1",
     participantConfirmation: {
       folio: "NAV-001",
-      referenceCodes: []
+      referenceCodes: [],
+      screeningAttempt: {
+        evaluationJson: null,
+        id: "attempt-1"
+      }
     },
     participantEvidence: [
       {
@@ -1664,6 +1759,11 @@ function createNavigoParticipantActivityState() {
     validationStatus: string;
   }> = [];
   const tx = {
+    activitySchedule: {
+      async findMany() {
+        return activities.map((activity) => activity.activitySchedule);
+      }
+    },
     participantAccessToken: {
       async findFirst() {
         return {
@@ -1686,6 +1786,17 @@ function createNavigoParticipantActivityState() {
         }
         Object.assign(target, args.data);
         return target;
+      }
+    },
+    participantEvidence: {
+      async create(args: { data: (typeof participant.participantEvidence)[number] & { internalNote?: string | null; reviewStatus?: string } }) {
+        participant.participantEvidence.unshift({
+          id: `participant-evidence-${participant.participantEvidence.length + 1}`,
+          privateStorageKey: args.data.privateStorageKey,
+          storageBucket: args.data.storageBucket,
+          type: args.data.type
+        });
+        return args.data;
       }
     },
     researchResponse: {
@@ -2220,7 +2331,7 @@ function createNavigoParticipantImportState(
             referenceCodes: referenceCodes
               .filter((item) => item.confirmationId === confirmation.id)
               .sort((left, right) => left.slot - right.slot),
-            screeningAttempt: attempt ? { evaluationJson: attempt.evaluationJson } : null
+            screeningAttempt: attempt ? { evaluationJson: attempt.evaluationJson, id: attempt.id } : null
           }
         : null,
       participantEvidence: [],
@@ -2609,7 +2720,11 @@ function createNavigoRotationImportState({ failProductUpsert = false }: { failPr
     id: "study-participant-1",
     participantConfirmation: {
       folio: "NAV-001",
-      referenceCodes: []
+      referenceCodes: [],
+      screeningAttempt: {
+        evaluationJson: null,
+        id: "attempt-1"
+      }
     },
     participantEvidence: [],
     participantProfile: {

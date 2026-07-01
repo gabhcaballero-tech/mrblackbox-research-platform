@@ -3,6 +3,7 @@ import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
 import {
   PARTICIPANT_EVIDENCE_BUCKET,
   assertEvidenceStorageKeyBelongsToAttempt,
+  buildEvidenceStorageKey,
   createSupabaseEvidenceStorageClient,
   validateEvidenceUploadMetadata,
   type EvidenceStorageClient,
@@ -15,7 +16,9 @@ import {
   NAVIGO_T0_IDENTITY_QUESTION_ID,
   createNavigoMeasurementDefinition,
   resolveNavigoTimeZone,
-  type NavigoActivityCode
+  resolveNavigoVisualVerificationMode,
+  type NavigoActivityCode,
+  type NavigoVisualVerificationMode
 } from "./definition";
 import {
   buildNavigoActivityTimeline,
@@ -69,7 +72,7 @@ export type NavigoParticipantListItem = {
   confirmation: {
     folio: string;
     referenceCodes: Array<{ code: string; slot: number }>;
-    screeningAttempt?: { evaluationJson: unknown } | null;
+    screeningAttempt?: { evaluationJson: unknown; id: string } | null;
   } | null;
   hasRecoverableToken: boolean;
   participantLinkToken: string | null;
@@ -295,11 +298,15 @@ export type NavigoActivityCaptureView =
         registeredSelfie: {
           signedUrl: string;
         } | null;
+        requiresSelfie: boolean;
+        selfieCapturePurpose: NavigoSelfieCapturePurpose | null;
         selfieReviewStatus: "APPROVED" | "PENDING" | "REJECTED" | null;
         selfieCount: number;
         study: NavigoStudySummary;
         testMode: boolean;
         timeZoneIana: string;
+        visualVerificationMode: NavigoVisualVerificationMode;
+        visualVerificationStatus: NavigoVisualVerificationStatus;
       };
       ok: true;
     };
@@ -310,6 +317,16 @@ export type NavigoSignedActivityUpload = {
   storageBucket: string;
   token: string;
 };
+
+export type NavigoSelfieCapturePurpose = "activity_verification" | "reference_capture";
+export type NavigoVisualVerificationStatus =
+  | "failed"
+  | "matched"
+  | "not_required"
+  | "pending_review"
+  | "reference_created"
+  | "uncertain"
+  | null;
 
 export type NavigoActionResult<T = unknown> =
   | {
@@ -452,11 +469,13 @@ type Delegate = {
 type NavigoPrismaClient = PrismaClientLike & {
   $transaction: <T>(callback: (tx: NavigoTransactionClient) => Promise<T>) => Promise<T>;
   activitySchedule: Delegate;
+  applicationTimeEvent: Delegate;
   participantAccessToken: Delegate;
   participantActivity: Delegate;
   participantActivityEvidence: Delegate;
   participantArmAssignment: Delegate;
   participantConfirmation: Delegate;
+  participantEvidence: Delegate;
   participantProfile: Delegate;
   participantReferenceCode: Delegate;
   participantRotationAssignment: Delegate;
@@ -536,6 +555,7 @@ const participantSelect = {
       folio: true,
       screeningAttempt: {
         select: {
+          id: true,
           evaluationJson: true
         }
       },
@@ -641,6 +661,7 @@ const participantImportLookupSelect = {
       folio: true,
       screeningAttempt: {
         select: {
+          id: true,
           evaluationJson: true
         }
       }
@@ -681,7 +702,7 @@ type ParticipantImportLookupRecord = {
   id: string;
   participantConfirmation: {
     folio: string;
-    screeningAttempt?: { evaluationJson: unknown } | null;
+    screeningAttempt?: { evaluationJson: unknown; id: string } | null;
   } | null;
   participantProfile: {
     email: string | null;
@@ -705,7 +726,7 @@ type ParticipantRecord = {
   participantConfirmation: {
     folio: string;
     referenceCodes: Array<{ code: string; slot: number }>;
-    screeningAttempt?: { evaluationJson: unknown } | null;
+    screeningAttempt?: { evaluationJson: unknown; id: string } | null;
   } | null;
   participantEvidence: Array<{
     id: string;
@@ -1809,7 +1830,26 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         };
       }
 
+      const visualVerificationMode = getNavigoVisualVerificationMode();
+      const selfieCapturePurpose = resolveSelfieCapturePurpose({
+        activity,
+        mode: visualVerificationMode,
+        participant
+      });
+
+      if (
+        visualVerificationMode === "required" &&
+        !hasRegisteredSelfie(participant) &&
+        activity.activitySchedule.code !== "T0_SALON"
+      ) {
+        return {
+          message: "No encontramos una foto registrada para comparar. Contacta al supervisor antes de continuar.",
+          ok: false
+        };
+      }
+
       const activitySelfie = getActivitySelfie(activity);
+      const requiresSelfie = selfieCapturePurpose !== null;
 
       return {
         data: {
@@ -1821,13 +1861,22 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           questions: createNavigoMeasurementDefinition().questions,
           registeredSelfie: await createRegisteredSelfiePreview({
             participant,
-            storage: input.storage ?? createSupabaseEvidenceStorageClient()
+            storage: input.storage
           }),
+          requiresSelfie,
+          selfieCapturePurpose,
           selfieReviewStatus: activitySelfie?.reviewStatus ?? null,
           selfieCount: getActivitySelfieCount(activity),
           study: participant.study,
           testMode: Boolean(input.testMode),
-          timeZoneIana: resolveNavigoTimeZone(participant.study.timeZoneIana)
+          timeZoneIana: resolveNavigoTimeZone(participant.study.timeZoneIana),
+          visualVerificationMode,
+          visualVerificationStatus: resolveVisualVerificationStatus({
+            activity,
+            mode: visualVerificationMode,
+            participant,
+            purpose: selfieCapturePurpose
+          })
         },
         ok: true
       };
@@ -1999,11 +2048,17 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         return { message: "No encontramos esta evaluacion para tu enlace.", ok: false };
       }
 
-      if (activity.activitySchedule.code === "T0_SALON") {
-        return { message: "T0 no requiere selfie nueva. Confirma la identidad contra la foto registrada.", ok: false };
+      const purpose = resolveSelfieCapturePurpose({
+        activity,
+        mode: getNavigoVisualVerificationMode(),
+        participant
+      });
+
+      if (!purpose) {
+        return { message: selfieNotRequiredMessage({ activity, participant }), ok: false };
       }
 
-      if (getActivitySelfieCount(activity) > 0) {
+      if (purpose === "activity_verification" && getActivitySelfieCount(activity) > 0) {
         return { message: "Ya existe una selfie registrada para esta evaluacion.", ok: false };
       }
 
@@ -2011,13 +2066,19 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         maxImageBytes: 8388608,
         metadata: input.metadata
       });
-      const privateStorageKey = buildActivityEvidenceStorageKey({
-        activityId: activity.id,
-        evidenceType: metadata.evidenceType,
-        extension: metadata.extension,
-        participantProfileId: participant.participantProfile.id,
-        studyId: participant.study.id
-      });
+      if (purpose === "reference_capture" && !getReferenceScreeningAttemptId(participant)) {
+        return { message: "No encontramos el intento de filtro para preparar la selfie de referencia.", ok: false };
+      }
+      const privateStorageKey =
+        purpose === "reference_capture"
+          ? buildReferenceSelfieStorageKey({ metadata, participant })
+          : buildActivityEvidenceStorageKey({
+              activityId: activity.id,
+              evidenceType: metadata.evidenceType,
+              extension: metadata.extension,
+              participantProfileId: participant.participantProfile.id,
+              studyId: participant.study.id
+            });
       const storage = input.storage ?? createSupabaseEvidenceStorageClient();
       const signed = await storage.createSignedUploadUrl({
         bucket: PARTICIPANT_EVIDENCE_BUCKET,
@@ -2106,16 +2167,31 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         return { message: "No encontramos esta evaluacion para tu enlace.", ok: false };
       }
 
-      if (activity.activitySchedule.code === "T0_SALON") {
-        return { message: "T0 no requiere selfie nueva. Confirma la identidad contra la foto registrada.", ok: false };
-      }
-
       if (input.metadata.evidenceType !== "SELFIE_IDENTIFICATION") {
         return { message: "Esta evaluacion solo permite selfie de identificacion.", ok: false };
       }
 
-      if (getActivitySelfieCount(activity) > 0) {
+      const purpose = resolveSelfieCapturePurpose({
+        activity,
+        mode: getNavigoVisualVerificationMode(),
+        participant
+      });
+
+      if (!purpose) {
+        return { message: selfieNotRequiredMessage({ activity, participant }), ok: false };
+      }
+
+      if (purpose === "activity_verification" && getActivitySelfieCount(activity) > 0) {
         return { message: "Ya existe una selfie registrada para esta evaluacion.", ok: false };
+      }
+
+      if (purpose === "reference_capture") {
+        return saveReferenceSelfieFromActivity({
+          activity,
+          metadata: input.metadata,
+          participant,
+          prisma
+        });
       }
 
       assertActivityEvidenceKeyBelongsToActivity({
@@ -2274,7 +2350,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           };
         }
 
-        if (!hasApprovedActivitySelfie(activity)) {
+        if (getNavigoVisualVerificationMode() === "required" && !hasApprovedActivitySelfie(activity)) {
           return { message: "Toma una selfie aprobada de esta evaluacion antes de guardar las respuestas.", ok: false };
         }
 
@@ -2680,7 +2756,7 @@ async function createRegisteredSelfiePreview({
   storage
 }: {
   participant: ParticipantRecord;
-  storage: EvidenceStorageClient;
+  storage?: EvidenceStorageClient;
 }): Promise<{ signedUrl: string } | null> {
   const selfie = participant.participantEvidence.find((evidence) => evidence.type === "SELFIE_IDENTIFICATION");
 
@@ -2691,7 +2767,8 @@ async function createRegisteredSelfiePreview({
   let signedUrl: string;
 
   try {
-    signedUrl = await storage.createSignedReadUrl({
+    const storageClient = storage ?? createSupabaseEvidenceStorageClient();
+    signedUrl = await storageClient.createSignedReadUrl({
       bucket: selfie.storageBucket,
       expiresInSeconds: 300,
       privateStorageKey: selfie.privateStorageKey
@@ -4576,6 +4653,91 @@ function getAssignedArm(participant: ParticipantRecord, code: "LEFT" | "RIGHT", 
   );
 }
 
+function getNavigoVisualVerificationMode(): NavigoVisualVerificationMode {
+  return resolveNavigoVisualVerificationMode(process.env.NAVIGO_VISUAL_VERIFICATION_MODE);
+}
+
+function hasRegisteredSelfie(participant: Pick<ParticipantRecord, "participantEvidence">): boolean {
+  return participant.participantEvidence.some((evidence) => evidence.type === "SELFIE_IDENTIFICATION");
+}
+
+function resolveSelfieCapturePurpose({
+  activity,
+  mode,
+  participant
+}: {
+  activity: ActivityRecord;
+  mode: NavigoVisualVerificationMode;
+  participant: ParticipantRecord;
+}): NavigoSelfieCapturePurpose | null {
+  if (mode === "disabled") {
+    return null;
+  }
+
+  if (!hasRegisteredSelfie(participant)) {
+    return activity.activitySchedule.code === "T0_SALON" ? "reference_capture" : null;
+  }
+
+  return activity.activitySchedule.code === "T0_SALON" ? null : "activity_verification";
+}
+
+function resolveVisualVerificationStatus({
+  activity,
+  mode,
+  participant,
+  purpose
+}: {
+  activity: ActivityRecord;
+  mode: NavigoVisualVerificationMode;
+  participant: ParticipantRecord;
+  purpose: NavigoSelfieCapturePurpose | null;
+}): NavigoVisualVerificationStatus {
+  if (mode === "disabled") {
+    return "not_required";
+  }
+
+  if (purpose === "reference_capture") {
+    return null;
+  }
+
+  if (activity.activitySchedule.code === "T0_SALON" && hasRegisteredSelfie(participant)) {
+    return "matched";
+  }
+
+  const selfie = getActivitySelfie(activity);
+  if (!selfie) {
+    return null;
+  }
+
+  if (selfie.reviewStatus === "APPROVED") {
+    return "matched";
+  }
+
+  if (selfie.reviewStatus === "REJECTED") {
+    return "failed";
+  }
+
+  return "uncertain";
+}
+
+function selfieNotRequiredMessage({
+  activity,
+  participant
+}: {
+  activity: ActivityRecord;
+  participant: ParticipantRecord;
+}): string {
+  if (getNavigoVisualVerificationMode() === "disabled") {
+    return "Este estudio no requiere selfie de identidad para esta evaluacion.";
+  }
+
+  if (!hasRegisteredSelfie(participant) && activity.activitySchedule.code !== "T0_SALON") {
+    return "No encontramos una foto registrada para comparar. Contacta al supervisor antes de continuar.";
+  }
+
+  return "Esta evaluacion no requiere selfie nueva.";
+}
+
 function getActivitySelfie(activity: Pick<ActivityRecord, "id" | "participantActivityEvidence">) {
   return activity.participantActivityEvidence.find(
     (evidence) => evidence.participantActivityId === activity.id && evidence.type === "SELFIE_IDENTIFICATION"
@@ -4632,6 +4794,126 @@ function previousActivityRequiredMessage(blockedByCode: NavigoActivityCode | und
   }
 
   return "La evaluacion 0 en salon aun no esta completa.";
+}
+
+function getReferenceScreeningAttemptId(participant: ParticipantRecord): string | null {
+  return participant.participantConfirmation?.screeningAttempt?.id ?? null;
+}
+
+function buildReferenceSelfieStorageKey({
+  metadata,
+  participant
+}: {
+  metadata: EvidenceUploadMetadata & { extension: string };
+  participant: ParticipantRecord;
+}): string {
+  const attemptId = getReferenceScreeningAttemptId(participant);
+
+  if (!attemptId) {
+    throw new Error("Missing screening attempt for Navigo reference selfie.");
+  }
+
+  return buildEvidenceStorageKey({
+    attemptId,
+    evidenceType: metadata.evidenceType,
+    extension: metadata.extension,
+    participantProfileId: participant.participantProfile.id,
+    studyId: participant.study.id
+  });
+}
+
+async function saveReferenceSelfieFromActivity({
+  activity,
+  metadata,
+  participant,
+  prisma
+}: {
+  activity: ActivityRecord;
+  metadata: EvidenceUploadMetadata & {
+    faceVerification?: NavigoFaceVerificationClientResult | null;
+    privateStorageKey: string;
+    storageBucket: string;
+  };
+  participant: ParticipantRecord;
+  prisma: NavigoPrismaClient;
+}): Promise<NavigoActionResult<{
+  internalNote: string | null;
+  reviewStatus: "APPROVED" | "PENDING" | "REJECTED";
+  selfieCount: number;
+}>> {
+  const attemptId = getReferenceScreeningAttemptId(participant);
+
+  if (!attemptId) {
+    return {
+      message: "No encontramos el intento de filtro para guardar la selfie de referencia.",
+      ok: false
+    };
+  }
+
+  assertEvidenceStorageKeyBelongsToAttempt({
+    attemptId,
+    participantProfileId: participant.participantProfile.id,
+    privateStorageKey: metadata.privateStorageKey,
+    studyId: participant.study.id
+  });
+
+  await prisma.participantEvidence.create?.({
+    data: {
+      extension: extensionFromFilename(metadata.originalFilename),
+      internalNote: "reference_created",
+      mimeType: metadata.mimeType,
+      originalFilename: metadata.originalFilename,
+      privateStorageKey: metadata.privateStorageKey,
+      rejectionReason: null,
+      reviewStatus: "APPROVED",
+      reviewedAt: new Date(),
+      screeningAttemptId: attemptId,
+      sizeBytes: metadata.sizeBytes,
+      storageBucket: metadata.storageBucket,
+      studyParticipantId: participant.id,
+      type: "SELFIE_IDENTIFICATION"
+    }
+  });
+
+  if (activity.activitySchedule.code === "T0_SALON") {
+    const now = new Date();
+    const questionnaireVersionId = await resolveNavigoMeasurementQuestionnaireVersionId({
+      participant,
+      prisma
+    });
+
+    if (questionnaireVersionId) {
+      await saveNavigoMeasurementResponses({
+        activityId: activity.id,
+        answers: [
+          {
+            answerJson: { value: "YES" },
+            questionId: NAVIGO_T0_IDENTITY_QUESTION_ID
+          }
+        ],
+        prisma,
+        questionnaireVersionId
+      });
+    }
+
+    await prisma.participantActivity.update?.({
+      data: {
+        actualStartedAt: activity.actualStartedAt ?? now,
+        lastSavedAt: now,
+        status: "STARTED"
+      },
+      where: { id: activity.id }
+    });
+  }
+
+  return {
+    data: {
+      internalNote: "reference_created",
+      reviewStatus: "APPROVED",
+      selfieCount: 1
+    },
+    ok: true
+  };
 }
 
 function buildActivityEvidenceStorageKey({
