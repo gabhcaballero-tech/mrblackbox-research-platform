@@ -74,6 +74,7 @@ export type HutAdminParticipant = {
   firstFragranceLeftArm: string | null;
   folio: string | null;
   id: string;
+  identityReview: HutIdentityReviewSummary;
   link: string;
   name: string;
   phone: string | null;
@@ -132,6 +133,28 @@ export type HutVideoSummary = {
   signedUrl: string | null;
   status: string;
   submittedAt: Date | null;
+};
+
+export type HutIdentityReviewItem = {
+  attemptSignedUrl: string | null;
+  blockNumber: number;
+  reviewLabel: string;
+  reviewedAt: Date | null;
+  reviewedByUserId: string | null;
+  sequenceNumber: number;
+  similarityPercentage: number | null;
+  status: "MATCHED" | "NOT_MATCHED" | "NOT_REQUIRED_BY_OVERRIDE" | "PENDING" | "PENDING_REVIEW" | "UNCERTAIN";
+  verificationDate: Date | null;
+  verificationId: string | null;
+  reviewNotes: string | null;
+};
+
+export type HutIdentityReviewSummary = {
+  items: HutIdentityReviewItem[];
+  lastReviewedAt: Date | null;
+  lastStatus: string | null;
+  referenceSignedUrl: string | null;
+  summaryLabel: "FALLIDA" | "OK" | "PENDIENTE" | "REVISION_REQUERIDA" | "SIN_SELFIE_BASE";
 };
 
 export type HutAdminDashboard = {
@@ -327,6 +350,14 @@ export type HutRepository = {
     participantId: string;
     studyId: string;
   }) => Promise<HutActionResult<{ participantId: string }>>;
+  reviewVisualVerification: (input: {
+    actorUserId: string;
+    decision: "approve" | "pending" | "reject";
+    participantId: string;
+    reason: string;
+    studyId: string;
+    verificationId: string;
+  }) => Promise<HutActionResult<{ participantId: string; verificationId: string }>>;
   confirmVideoUpload: (input: {
     metadata: HutVideoUploadMetadata & {
       privateStorageKey: string;
@@ -450,10 +481,16 @@ type HutVideoRecord = {
 
 type HutVisualVerificationRecord = {
   attemptSelfieKey: string;
+  attemptStorageBucket: string;
   blockNumber: number;
   id: string;
+  overrideReason: string | null;
+  reviewedAt: Date | null;
+  reviewedByUserId: string | null;
   sequenceNumber: number;
+  similarityScore: number | null;
   status: "MATCHED" | "NOT_MATCHED" | "NOT_REQUIRED_BY_OVERRIDE" | "PENDING" | "PENDING_REVIEW" | "UNCERTAIN";
+  verificationDate: Date;
 };
 
 const studySelect = {
@@ -532,10 +569,16 @@ const participantSelect = {
     orderBy: { createdAt: "desc" },
     select: {
       attemptSelfieKey: true,
+      attemptStorageBucket: true,
       blockNumber: true,
       id: true,
+      overrideReason: true,
+      reviewedAt: true,
+      reviewedByUserId: true,
       sequenceNumber: true,
-      status: true
+      similarityScore: true,
+      status: true,
+      verificationDate: true
     }
   },
   videoSubmissions: {
@@ -1894,6 +1937,56 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
       };
     },
 
+    async reviewVisualVerification(input) {
+      const reason = input.reason.trim();
+      if (!reason) {
+        return { message: "Captura una nota obligatoria para la revision manual.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipant(tx, input.participantId);
+
+        if (!participant || participant.studyId !== input.studyId) {
+          return { message: "No encontramos el participante HUT.", ok: false };
+        }
+
+        const verification = participant.visualVerifications?.find((item) => item.id === input.verificationId) ?? null;
+        if (!verification) {
+          return { message: "No encontramos la verificacion visual.", ok: false };
+        }
+
+        const status =
+          input.decision === "approve"
+            ? "MATCHED"
+            : input.decision === "reject"
+              ? "NOT_MATCHED"
+              : "PENDING_REVIEW";
+
+        await tx.hutVisualVerification.update?.({
+          data: {
+            overrideReason: reason,
+            reviewedAt: new Date(),
+            reviewedByUserId: input.actorUserId,
+            status
+          },
+          where: { id: verification.id }
+        });
+
+        return {
+          data: { participantId: participant.id, verificationId: verification.id },
+          message:
+            input.decision === "approve"
+              ? "Identidad aprobada manualmente."
+              : input.decision === "reject"
+                ? "Identidad marcada como no coincidente."
+                : "Verificacion visual marcada en revision.",
+          ok: true
+        };
+      });
+    },
+
     async confirmVideoUpload(input) {
       const prisma = await getPrisma();
       const now = new Date();
@@ -2199,6 +2292,10 @@ async function toAdminParticipant(
   const availability = block
     ? currentAvailability(participant, block, new Date())
     : { nextAvailableAt: null, reason: "BLOCK_NOT_ACTIVE" };
+  const referenceSignedUrl = participant.referenceSelfie
+    ? await signedStorageUrl(participant.referenceSelfie.privateStorageKey, participant.referenceSelfie.storageBucket, storage)
+    : null;
+  const identityReview = await buildIdentityReviewSummary(participant, referenceSignedUrl, storage);
 
   return {
     availability: {
@@ -2217,6 +2314,7 @@ async function toAdminParticipant(
     firstFragranceLeftArm: participant.firstFragranceLeftArm,
     folio: participant.folio,
     id: participant.id,
+    identityReview,
     link: participantLink(requestOrigin, participant.token),
     name: participant.name,
     phone: participant.phone,
@@ -2225,7 +2323,7 @@ async function toAdminParticipant(
     referenceSelfie: participant.referenceSelfie
       ? {
           capturedAt: participant.referenceSelfie.capturedAt,
-          signedUrl: null,
+          signedUrl: referenceSignedUrl,
           status: "COMPLETE"
         }
       : {
@@ -2389,19 +2487,112 @@ async function buildVideoSummaries(
 }
 
 async function signedVideoUrl(video: HutVideoRecord, storage?: HutStorageClient): Promise<string | null> {
-  if (!video.privateStorageKey || !video.storageBucket) {
+  return signedStorageUrl(video.privateStorageKey ?? null, video.storageBucket ?? null, storage);
+}
+
+async function signedStorageUrl(
+  privateStorageKey: string | null | undefined,
+  storageBucket: string | null | undefined,
+  storage?: HutStorageClient
+): Promise<string | null> {
+  if (!privateStorageKey || !storageBucket) {
     return null;
   }
 
   try {
     return await (storage ?? createSupabaseEvidenceStorageClient()).createSignedReadUrl({
-      bucket: video.storageBucket,
+      bucket: storageBucket,
       expiresInSeconds: 60 * 10,
-      privateStorageKey: video.privateStorageKey
+      privateStorageKey
     });
   } catch {
     return null;
   }
+}
+
+async function buildIdentityReviewSummary(
+  participant: HutParticipantRecord,
+  referenceSignedUrl: string | null,
+  storage?: HutStorageClient
+): Promise<HutIdentityReviewSummary> {
+  const items = await Promise.all(
+    [1, 2].flatMap((blockNumber) =>
+      Array.from({ length: HUT_REQUIRED_VIDEOS_PER_BLOCK }, (_, index) =>
+        buildIdentityReviewItem(participant, blockNumber as 1 | 2, index + 1, storage)
+      )
+    )
+  );
+
+  const reviewedItems = items.filter((item) => item.reviewedAt);
+  const latestReviewed = reviewedItems.sort((left, right) => (right.reviewedAt?.getTime() ?? 0) - (left.reviewedAt?.getTime() ?? 0))[0] ?? null;
+  const effectiveItems = items.filter((item) => item.verificationId);
+  const summaryLabel = participant.referenceSelfie
+    ? effectiveItems.some((item) => item.status === "NOT_MATCHED")
+      ? "FALLIDA"
+      : effectiveItems.some((item) => item.status === "UNCERTAIN" || item.status === "PENDING_REVIEW")
+        ? "REVISION_REQUERIDA"
+        : effectiveItems.some((item) => item.status === "MATCHED" || item.status === "NOT_REQUIRED_BY_OVERRIDE")
+          ? "OK"
+          : "PENDIENTE"
+    : "SIN_SELFIE_BASE";
+
+  return {
+    items,
+    lastReviewedAt: latestReviewed?.reviewedAt ?? null,
+    lastStatus: latestReviewed ? latestReviewed.reviewLabel : effectiveItems[0]?.reviewLabel ?? null,
+    referenceSignedUrl,
+    summaryLabel
+  };
+}
+
+async function buildIdentityReviewItem(
+  participant: HutParticipantRecord,
+  blockNumber: 1 | 2,
+  sequenceNumber: number,
+  storage?: HutStorageClient
+): Promise<HutIdentityReviewItem> {
+  const verification =
+    participant.visualVerifications?.find(
+      (item) => item.blockNumber === blockNumber && item.sequenceNumber === sequenceNumber
+    ) ?? null;
+
+  return {
+    attemptSignedUrl: verification
+      ? await signedStorageUrl(verification.attemptSelfieKey, verification.attemptStorageBucket, storage)
+      : null,
+    blockNumber,
+    reviewLabel: verification ? visualVerificationLabel(verification.status, Boolean(verification.reviewedAt)) : "Pendiente",
+    reviewedAt: verification?.reviewedAt ?? null,
+    reviewedByUserId: verification?.reviewedByUserId ?? null,
+    reviewNotes: verification?.overrideReason ?? null,
+    sequenceNumber,
+    similarityPercentage: verification?.similarityScore != null ? Math.round(verification.similarityScore * 100) : null,
+    status: verification?.status ?? "PENDING",
+    verificationDate: verification?.verificationDate ?? null,
+    verificationId: verification?.id ?? null
+  };
+}
+
+function visualVerificationLabel(
+  status: HutVisualVerificationRecord["status"],
+  reviewedManually: boolean
+): string {
+  if (reviewedManually && status === "MATCHED") {
+    return "Aprobada manualmente";
+  }
+  if (reviewedManually && status === "NOT_MATCHED") {
+    return "Rechazada manualmente";
+  }
+
+  const labels: Record<HutVisualVerificationRecord["status"], string> = {
+    MATCHED: "OK",
+    NOT_MATCHED: "No coincide",
+    NOT_REQUIRED_BY_OVERRIDE: "Override visual",
+    PENDING: "Pendiente",
+    PENDING_REVIEW: "Revisión requerida",
+    UNCERTAIN: "Revisión requerida"
+  };
+  return labels[status];
 }
 
 function blockByNumber(participant: HutParticipantRecord, blockNumber: 1 | 2) {

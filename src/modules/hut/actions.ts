@@ -206,6 +206,30 @@ export async function setHutTestModeAction(studyId: string, participantId: strin
   redirectWithHutMessage(studyId, result, participantId);
 }
 
+export async function reviewHutVisualVerificationAction(
+  studyId: string,
+  participantId: string,
+  verificationId: string,
+  formData: FormData
+) {
+  const actor = await requireCapability("screening:review");
+  const decision = String(formData.get("decision") ?? "").trim();
+  if (decision !== "approve" && decision !== "reject" && decision !== "pending") {
+    redirectWithHutMessage(studyId, { message: "Selecciona una decision valida para la revision visual.", ok: false }, participantId);
+  }
+
+  const result = await createHutRepository().reviewVisualVerification({
+    actorUserId: actor.id,
+    decision,
+    participantId,
+    reason: String(formData.get("reason") ?? ""),
+    studyId,
+    verificationId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
 export async function requestHutReferenceSelfieUploadAction(
   studyId: string,
   participantId: string,

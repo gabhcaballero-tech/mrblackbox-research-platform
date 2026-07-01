@@ -368,10 +368,16 @@ describe("HUT module foundation", () => {
     const participant = prisma.state.participants[0]!;
     participant.visualVerifications.push({
       attemptSelfieKey: "daily.jpg",
+      attemptStorageBucket: "participant-evidence",
       blockNumber: 1,
       id: "verification-extra",
+      overrideReason: null,
+      reviewedAt: null,
+      reviewedByUserId: null,
       sequenceNumber: 1,
-      status: "MATCHED"
+      similarityScore: 0.81,
+      status: "MATCHED",
+      verificationDate: new Date("2026-07-01T12:00:00.000Z")
     });
     participant.videoSubmissions.push({
       blockId: participant.blocks[0]!.id,
@@ -667,6 +673,131 @@ describe("HUT module foundation", () => {
       sequenceNumber: 2,
       signedUrl: null
     });
+  });
+
+  it("includes signed identity review URLs without exposing private storage keys", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Identidad",
+      requestOrigin: "https://example.com",
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    participant.referenceSelfie = referenceSelfie();
+    const signed = await repository.requestDailySelfieUpload({ metadata: selfieMetadata(), storage, token: participant.token });
+    await repository.confirmDailySelfieUpload({
+      faceVerification: faceResult("UNCERTAIN", 0.47),
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: signed.ok ? signed.data.privateStorageKey : "",
+        storageBucket: signed.ok ? signed.data.storageBucket : ""
+      },
+      token: participant.token
+    });
+
+    const dashboard = await repository.getAdminDashboard({
+      requestOrigin: "https://example.com",
+      storage,
+      studyId: "study-hut"
+    });
+    const review = dashboard?.participants[0]?.identityReview.items.find((item) => item.blockNumber === 1 && item.sequenceNumber === 1);
+
+    expect(dashboard?.participants[0]?.referenceSelfie.signedUrl).toContain("https://storage.example/");
+    expect(review).toMatchObject({
+      reviewLabel: "Revisión requerida",
+      similarityPercentage: 47,
+      status: "UNCERTAIN"
+    });
+    expect(review?.attemptSignedUrl).toContain("https://storage.example/");
+    expect(review).not.toHaveProperty("attemptSelfieKey");
+  });
+
+  it("allows approving identity manually and unlocks the participant when blocked only by visual review", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Manual",
+      requestOrigin: "https://example.com",
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    participant.referenceSelfie = referenceSelfie();
+    const signed = await repository.requestDailySelfieUpload({ metadata: selfieMetadata(), storage, token: participant.token });
+    await repository.confirmDailySelfieUpload({
+      faceVerification: faceResult("NO_MATCH", 0.22),
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: signed.ok ? signed.data.privateStorageKey : "",
+        storageBucket: signed.ok ? signed.data.storageBucket : ""
+      },
+      token: participant.token
+    });
+    const verificationId = participant.visualVerifications[0]!.id;
+
+    const approved = await repository.reviewVisualVerification({
+      actorUserId: "user-1",
+      decision: "approve",
+      participantId: participant.id,
+      reason: "Supervisor confirma que es la misma persona.",
+      studyId: "study-hut",
+      verificationId
+    });
+    const video = await repository.requestVideoUpload({ metadata: videoMetadata(), storage, token: participant.token });
+
+    expect(approved.ok).toBe(true);
+    expect(participant.visualVerifications[0]).toMatchObject({
+      overrideReason: "Supervisor confirma que es la misma persona.",
+      reviewedAt: expect.any(Date),
+      reviewedByUserId: "user-1",
+      status: "MATCHED"
+    });
+    expect(video.ok).toBe(true);
+  });
+
+  it("allows rejecting identity manually and keeps the participant blocked", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Rechazo",
+      requestOrigin: "https://example.com",
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    participant.referenceSelfie = referenceSelfie();
+    const signed = await repository.requestDailySelfieUpload({ metadata: selfieMetadata(), storage, token: participant.token });
+    await repository.confirmDailySelfieUpload({
+      faceVerification: faceResult("UNCERTAIN", 0.41),
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: signed.ok ? signed.data.privateStorageKey : "",
+        storageBucket: signed.ok ? signed.data.storageBucket : ""
+      },
+      token: participant.token
+    });
+    const verificationId = participant.visualVerifications[0]!.id;
+
+    const rejected = await repository.reviewVisualVerification({
+      actorUserId: "user-2",
+      decision: "reject",
+      participantId: participant.id,
+      reason: "No coincide con la selfie base.",
+      studyId: "study-hut",
+      verificationId
+    });
+    const video = await repository.requestVideoUpload({ metadata: videoMetadata(), storage, token: participant.token });
+
+    expect(rejected.ok).toBe(true);
+    expect(participant.visualVerifications[0]).toMatchObject({
+      overrideReason: "No coincide con la selfie base.",
+      reviewedByUserId: "user-2",
+      status: "NOT_MATCHED"
+    });
+    expect(video.ok).toBe(false);
+    expect(video.ok ? "" : video.message).toContain("No pudimos confirmar tu identidad");
   });
 
   it("resets a reference selfie without deleting the HUT participant", async () => {
@@ -994,10 +1125,16 @@ async function uploadNextVideo(
     const sequenceNumber = activeBlock ? activeBlock.submittedVideosCount + 1 : 1;
     participant.visualVerifications.unshift({
       attemptSelfieKey: `daily-${activeBlock?.blockNumber ?? 1}-${sequenceNumber}.jpg`,
+      attemptStorageBucket: "participant-evidence",
       blockNumber: activeBlock?.blockNumber ?? 1,
       id: `verification-${participant.visualVerifications.length + 1}`,
+      overrideReason: null,
+      reviewedAt: null,
+      reviewedByUserId: null,
       sequenceNumber,
-      status: "MATCHED"
+      similarityScore: 0.82,
+      status: "MATCHED",
+      verificationDate: new Date("2026-07-01T12:00:00.000Z")
     });
   }
   const requested = await repository.requestVideoUpload({
@@ -1330,15 +1467,31 @@ function createFakeHutPrisma() {
         const participant = state.participants.find((item) => item.id === args.data.participantId);
         const verification: FakeVisualVerification = {
           attemptSelfieKey: String(args.data.attemptSelfieKey),
+          attemptStorageBucket: String(args.data.attemptStorageBucket ?? "participant-evidence"),
           blockNumber: Number(args.data.blockNumber),
           id: `verification-${state.nextId++}`,
+          overrideReason: (args.data.overrideReason as string | null) ?? null,
+          reviewedAt: (args.data.reviewedAt as Date | null) ?? null,
+          reviewedByUserId: (args.data.reviewedByUserId as string | null) ?? null,
           sequenceNumber: Number(args.data.sequenceNumber),
-          status: args.data.status as FakeVisualVerification["status"]
+          similarityScore: (args.data.similarityScore as number | null) ?? null,
+          status: args.data.status as FakeVisualVerification["status"],
+          verificationDate: (args.data.verificationDate as Date) ?? new Date(),
+          videoSubmissionId: (args.data.videoSubmissionId as string | undefined) ?? undefined
         };
         participant?.visualVerifications.unshift(verification);
         return verification;
       },
-      async update(args: { data: { videoSubmissionId?: string }; where: { id: string } }) {
+      async update(args: {
+        data: {
+          overrideReason?: string | null;
+          reviewedAt?: Date | null;
+          reviewedByUserId?: string | null;
+          status?: FakeVisualVerification["status"];
+          videoSubmissionId?: string;
+        };
+        where: { id: string };
+      }) {
         const verification = state.participants.flatMap((item) => item.visualVerifications).find((item) => item.id === args.where.id);
         if (verification) {
           Object.assign(verification, args.data);
@@ -1486,10 +1639,16 @@ type FakeVideo = {
 
 type FakeVisualVerification = {
   attemptSelfieKey: string;
+  attemptStorageBucket: string;
   blockNumber: number;
   id: string;
+  overrideReason: string | null;
+  reviewedAt: Date | null;
+  reviewedByUserId: string | null;
   sequenceNumber: number;
+  similarityScore: number | null;
   status: "MATCHED" | "NOT_MATCHED" | "NOT_REQUIRED_BY_OVERRIDE" | "PENDING" | "PENDING_REVIEW" | "UNCERTAIN";
+  verificationDate: Date;
   videoSubmissionId?: string;
 };
 

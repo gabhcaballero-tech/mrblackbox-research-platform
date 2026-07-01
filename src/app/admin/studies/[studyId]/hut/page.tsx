@@ -9,6 +9,7 @@ import {
   deleteHutParticipantAction,
   markHutMissedDayAction,
   reactivateHutParticipantAction,
+  reviewHutVisualVerificationAction,
   resetHutCallEvaluationAction,
   resetHutReferenceSelfieAction,
   resetHutVideoSubmissionAction,
@@ -369,6 +370,7 @@ function HutParticipantCard({
             />
           </div>
         </section>
+        <IdentityReviewCard participant={participant} studyId={studyId} />
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
@@ -483,6 +485,136 @@ function HutParticipantCard({
         </details>
       </div>
     </article>
+  );
+}
+
+function IdentityReviewCard({ participant, studyId }: { participant: HutAdminParticipant; studyId: string }) {
+  return (
+    <section className="rounded-md border border-zinc-200 bg-white p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-950">Revision de identidad</h3>
+          <p className="mt-1 text-xs leading-5 text-zinc-600">
+            Compara la selfie base con las selfies diarias y registra la decision manual cuando haga falta.
+          </p>
+        </div>
+        <div className="text-right text-xs">
+          <p className="font-semibold text-zinc-950">{`Identidad diaria: ${identitySummaryLabel(participant.identityReview.summaryLabel)}`}</p>
+          <p className="mt-1 text-zinc-500">
+            {participant.identityReview.lastReviewedAt
+              ? `Ultima revision: ${participant.identityReview.lastReviewedAt.toLocaleString("es-MX")}`
+              : "Ultima revision: Sin revision manual"}
+          </p>
+          {participant.identityReview.lastStatus ? (
+            <p className="mt-1 text-zinc-500">{participant.identityReview.lastStatus}</p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 text-xs text-zinc-700">
+        <Field label="Selfie de registro" value={participant.referenceSelfie.status === "COMPLETE" ? "Completa" : "Faltante"} />
+      </div>
+
+      {!participant.identityReview.referenceSignedUrl ? (
+        <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+          Falta selfie de registro.
+        </p>
+      ) : (
+        <div className="mt-3">
+          <a
+            className="text-xs font-semibold text-teal-700"
+            href={participant.identityReview.referenceSignedUrl}
+            rel="noreferrer"
+            target="_blank"
+          >
+            Ver selfie de registro
+          </a>
+        </div>
+      )}
+
+      <div className="mt-4 space-y-3">
+        {participant.identityReview.items.map((item) => (
+          <details className="rounded-md border border-zinc-200 bg-zinc-50 p-3" key={`${participant.id}-${item.blockNumber}-${item.sequenceNumber}`}>
+            <summary className="cursor-pointer list-none">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-zinc-950">{`B${item.blockNumber} Video ${item.sequenceNumber}`}</p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    {item.verificationDate ? item.verificationDate.toLocaleString("es-MX") : "Sin selfie diaria registrada"}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className={`text-xs font-semibold ${identityStatusClass(item.status)}`}>{item.reviewLabel}</p>
+                  {item.similarityPercentage != null ? <p className="mt-1 text-xs text-zinc-500">{`Similitud: ${item.similarityPercentage}%`}</p> : null}
+                </div>
+              </div>
+            </summary>
+
+            {item.status === "NOT_MATCHED" || item.status === "UNCERTAIN" || item.status === "PENDING_REVIEW" ? (
+              <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                Esta verificacion requiere revision manual.
+              </p>
+            ) : null}
+
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <MediaPanel
+                emptyLabel="Selfie base no disponible"
+                title="Selfie de registro/base"
+                url={participant.identityReview.referenceSignedUrl}
+              />
+              <MediaPanel
+                emptyLabel="Selfie diaria pendiente"
+                title={`Selfie diaria B${item.blockNumber} Video ${item.sequenceNumber}`}
+                url={item.attemptSignedUrl}
+              />
+            </div>
+
+            <div className="mt-3 grid gap-1 text-xs text-zinc-700">
+              <Field label="Estado de verificacion" value={item.reviewLabel} />
+              <Field label="Fecha/hora" value={item.verificationDate ? item.verificationDate.toLocaleString("es-MX") : "Pendiente"} />
+              {item.reviewedAt ? <Field label="Revision manual" value={item.reviewedAt.toLocaleString("es-MX")} /> : null}
+              {item.reviewNotes ? <Field label="Nota" value={item.reviewNotes} /> : null}
+            </div>
+
+            {item.verificationId ? (
+              <form action={reviewHutVisualVerificationAction.bind(null, studyId, participant.id, item.verificationId)} className="mt-3 space-y-2">
+                <textarea className={inputClass} name="reason" placeholder="Motivo o nota obligatoria" required rows={2} />
+                <div className="flex flex-wrap gap-2">
+                  <button className={primaryButtonClass} name="decision" type="submit" value="approve">
+                    Aprobar manualmente
+                  </button>
+                  <button className={dangerButtonClass} name="decision" type="submit" value="reject">
+                    Marcar como no coincide
+                  </button>
+                  <button className={secondaryActionButtonClass} name="decision" type="submit" value="pending">
+                    Mantener en revision
+                  </button>
+                </div>
+              </form>
+            ) : null}
+          </details>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MediaPanel({ emptyLabel, title, url }: { emptyLabel: string; title: string; url: string | null }) {
+  return (
+    <div className="rounded-md border border-zinc-200 bg-white p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{title}</p>
+      {url ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img alt={title} className="mt-3 aspect-[3/4] w-full rounded-md bg-zinc-100 object-cover" src={url} />
+          <a className="mt-2 inline-block text-xs font-semibold text-teal-700" href={url} rel="noreferrer" target="_blank">
+            Ver imagen completa
+          </a>
+        </>
+      ) : (
+        <p className="mt-3 text-xs text-zinc-500">{emptyLabel}</p>
+      )}
+    </div>
   );
 }
 
@@ -608,3 +740,31 @@ function hutRegistrationSlotStatusLabel(status: string) {
 }
 
 const inputClass = "w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-950";
+const primaryButtonClass = "rounded-md bg-teal-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-teal-800";
+const dangerButtonClass = "rounded-md bg-rose-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-800";
+const secondaryActionButtonClass =
+  "rounded-md border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-800 transition hover:bg-zinc-100";
+
+function identitySummaryLabel(status: HutAdminParticipant["identityReview"]["summaryLabel"]) {
+  const labels: Record<HutAdminParticipant["identityReview"]["summaryLabel"], string> = {
+    FALLIDA: "Fallida",
+    OK: "OK",
+    PENDIENTE: "Pendiente",
+    REVISION_REQUERIDA: "Revision requerida",
+    SIN_SELFIE_BASE: "Falta selfie base"
+  };
+  return labels[status];
+}
+
+function identityStatusClass(status: HutAdminParticipant["identityReview"]["items"][number]["status"]) {
+  if (status === "MATCHED" || status === "NOT_REQUIRED_BY_OVERRIDE") {
+    return "text-emerald-700";
+  }
+  if (status === "NOT_MATCHED") {
+    return "text-rose-700";
+  }
+  if (status === "UNCERTAIN" || status === "PENDING_REVIEW") {
+    return "text-amber-700";
+  }
+  return "text-zinc-600";
+}

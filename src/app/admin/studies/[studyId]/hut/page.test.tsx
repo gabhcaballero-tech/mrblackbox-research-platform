@@ -34,6 +34,7 @@ vi.mock("@/modules/hut/actions", () => {
     deleteHutParticipantAction: action,
     markHutMissedDayAction: action,
     reactivateHutParticipantAction: action,
+    reviewHutVisualVerificationAction: action,
     resetHutCallEvaluationAction: action,
     resetHutReferenceSelfieAction: action,
     resetHutVideoSubmissionAction: action,
@@ -150,8 +151,8 @@ describe("HutAdminPage", () => {
 
     expect(screen.getByText("Modo prueba: Inactivo")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Activar modo prueba" })).toBeInTheDocument();
-    expect(screen.getByText("Selfie de registro:")).toBeInTheDocument();
-    expect(screen.getByText("Faltante")).toBeInTheDocument();
+    expect(screen.getAllByText("Selfie de registro:").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Faltante").length).toBeGreaterThan(0);
     expect(screen.getByTestId("hut-reference-selfie-upload-participant-1")).toHaveAttribute("data-disabled", "false");
     expect(screen.getByRole("button", { name: "Tomar selfie de registro" })).toBeEnabled();
   });
@@ -217,6 +218,25 @@ type TestParticipant = {
   firstFragranceLeftArm: string | null;
   folio: string | null;
   id: string;
+  identityReview: {
+    items: Array<{
+      attemptSignedUrl: string | null;
+      blockNumber: number;
+      reviewLabel: string;
+      reviewedAt: Date | null;
+      reviewedByUserId: string | null;
+      reviewNotes: string | null;
+      sequenceNumber: number;
+      similarityPercentage: number | null;
+      status: "MATCHED" | "NOT_MATCHED" | "NOT_REQUIRED_BY_OVERRIDE" | "PENDING" | "PENDING_REVIEW" | "UNCERTAIN";
+      verificationDate: Date | null;
+      verificationId: string | null;
+    }>;
+    lastReviewedAt: Date | null;
+    lastStatus: string | null;
+    referenceSignedUrl: string | null;
+    summaryLabel: "FALLIDA" | "OK" | "PENDIENTE" | "REVISION_REQUERIDA" | "SIN_SELFIE_BASE";
+  };
   link: string;
   name: string;
   phone: string | null;
@@ -311,6 +331,27 @@ function baseParticipant() {
     firstFragranceLeftArm: "FRAGANCIA A",
     folio: "HUT-001",
     id: "participant-1",
+    identityReview: {
+      items: [
+        {
+          attemptSignedUrl: null,
+          blockNumber: 1,
+          reviewLabel: "Pendiente",
+          reviewedAt: null,
+          reviewedByUserId: null,
+          reviewNotes: null,
+          sequenceNumber: 1,
+          similarityPercentage: null,
+          status: "PENDING" as const,
+          verificationDate: null,
+          verificationId: null
+        }
+      ],
+      lastReviewedAt: null,
+      lastStatus: null,
+      referenceSignedUrl: null,
+      summaryLabel: "PENDIENTE" as const
+    },
     link: "https://example.com/hut/p/token-1",
     name: "Participante HUT",
     phone: null,
