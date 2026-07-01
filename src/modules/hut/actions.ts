@@ -198,7 +198,7 @@ export async function setHutVisualOverrideAction(studyId: string, participantId:
 export async function setHutTestModeAction(studyId: string, participantId: string, formData: FormData) {
   await requireCapability("screening:review");
   const result = await createHutRepository().setTestMode({
-    enabled: formData.get("enabled") === "on",
+    enabled: formData.get("enabled") === "on" || formData.get("enabled") === "true",
     participantId,
     studyId
   });

@@ -295,6 +295,9 @@ function HutParticipantCard({
   studyId: string;
 }) {
   const disabled = participant.status === "DISQUALIFIED" || participant.status === "COMPLETED";
+  const referenceSelfieDisabledReason = disabled
+    ? "No se puede modificar porque la participacion ya esta cerrada."
+    : null;
 
   return (
     <article className="grid gap-5 p-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.2fr)_minmax(280px,0.85fr)]">
@@ -318,6 +321,24 @@ function HutParticipantCard({
           <Field label="Video esperado" value={String(participant.currentVideoSequence)} />
           <Field label="Siguiente disponibilidad" value={participant.availability.nextAvailableAt ? participant.availability.nextAvailableAt.toLocaleString("es-MX") : "No disponible"} />
         </dl>
+        <section className="rounded-md border border-sky-200 bg-sky-50 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-sky-950">{`Modo prueba: ${participant.testMode ? "Activo" : "Inactivo"}`}</p>
+              {participant.testMode ? (
+                <p className="mt-1 text-xs leading-5 text-sky-900">
+                  Este participante puede avanzar sin esperar 5:00 a.m. ni dias reales.
+                </p>
+              ) : null}
+            </div>
+            <form action={setHutTestModeAction.bind(null, studyId, participant.id)}>
+              {participant.testMode ? null : <input name="enabled" type="hidden" value="true" />}
+              <SubmitButton pendingLabel="Guardando modo prueba...">
+                {participant.testMode ? "Desactivar modo prueba" : "Activar modo prueba"}
+              </SubmitButton>
+            </form>
+          </div>
+        </section>
         {participant.referenceSelfie.status === "MISSING" ? (
           <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
             Falta selfie de registro.
@@ -341,7 +362,8 @@ function HutParticipantCard({
           </p>
           <div className="mt-3">
             <HutReferenceSelfieUpload
-              disabled={participant.block1?.status !== "NOT_STARTED"}
+              disabled={Boolean(referenceSelfieDisabledReason)}
+              disabledReason={referenceSelfieDisabledReason}
               participantId={participant.id}
               studyId={studyId}
             />
@@ -435,14 +457,6 @@ function HutParticipantCard({
             </label>
             <textarea className={inputClass} name="reason" placeholder="Motivo obligatorio si se habilita" rows={2} />
             <SubmitButton pendingLabel="Guardando override...">Guardar override visual</SubmitButton>
-          </form>
-          <form action={setHutTestModeAction.bind(null, studyId, participant.id)} className="mt-4 space-y-2">
-            <p className="text-xs font-semibold text-amber-950">Modo prueba</p>
-            <label className="flex items-center gap-2 text-xs text-amber-950">
-              <input defaultChecked={participant.testMode} name="enabled" type="checkbox" />
-              Permitir avanzar sin esperar 5:00 a.m. ni dias reales
-            </label>
-            <SubmitButton pendingLabel="Guardando modo prueba...">Guardar modo prueba</SubmitButton>
           </form>
         </details>
         <details className="rounded-md border border-rose-200 bg-rose-50 p-3">

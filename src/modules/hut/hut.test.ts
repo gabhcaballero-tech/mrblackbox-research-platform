@@ -564,6 +564,31 @@ describe("HUT module foundation", () => {
     expect(participant.currentVideoSequence).toBe(3);
   });
 
+  it("allows disabling test mode after it was activated", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Modo",
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+
+    await repository.setTestMode({
+      enabled: true,
+      participantId: participant.id,
+      studyId: "study-hut"
+    });
+    const disabled = await repository.setTestMode({
+      enabled: false,
+      participantId: participant.id,
+      studyId: "study-hut"
+    });
+
+    expect(disabled.ok).toBe(true);
+    expect(participant.testMode).toBe(false);
+  });
+
   it("daily selfie failed blocks the video upload", async () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);

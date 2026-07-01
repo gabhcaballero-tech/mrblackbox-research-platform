@@ -18,11 +18,17 @@ const FRONT_CAMERA_FACING_MODE = "user";
 
 type HutReferenceSelfieUploadProps = {
   disabled: boolean;
+  disabledReason?: string | null;
   participantId: string;
   studyId: string;
 };
 
-export function HutReferenceSelfieUpload({ disabled, participantId, studyId }: HutReferenceSelfieUploadProps) {
+export function HutReferenceSelfieUpload({
+  disabled,
+  disabledReason = null,
+  participantId,
+  studyId
+}: HutReferenceSelfieUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [cameraState, setCameraState] = useState<"idle" | "opening" | "ready">("idle");
   const [message, setMessage] = useState<string | null>(null);
@@ -215,6 +221,9 @@ export function HutReferenceSelfieUpload({ disabled, participantId, studyId }: H
     <div className="space-y-2">
       {message ? <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">{message}</p> : null}
       {error ? <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{error}</p> : null}
+      {disabled && disabledReason ? (
+        <p className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">{disabledReason}</p>
+      ) : null}
       {cameraState === "idle" && !previewUrl ? (
         <button className={secondaryButtonClass} disabled={disabled || isPending} onClick={() => void openCamera()} type="button">
           Tomar selfie de registro
