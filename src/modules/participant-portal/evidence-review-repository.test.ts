@@ -81,7 +81,7 @@ function createDeleteContext(options?: {
   evidence?: Array<{ id: string }>;
   folioSequences?: Array<{ folioSequence: number }>;
   internalUser?: { id: string } | null;
-  participantActivityEvidence?: Array<{ id: string }>;
+  participantActivityEvidence?: Array<{ id: string; privateStorageKey?: string; storageBucket?: string }>;
   participantActivities?: Array<{ id: string }>;
   participantArmAssignments?: Array<{ id: string }>;
   participantAttributeOrders?: Array<{ id: string }>;
@@ -91,6 +91,7 @@ function createDeleteContext(options?: {
 }) {
   const ctx = {
     applicationTimeEvent: {
+      deleteMany: vi.fn(async () => ({ count: 1 })),
       findMany: vi.fn(async () => options?.applicationTimeEvents ?? [])
     },
     internalUser: {
@@ -100,15 +101,19 @@ function createDeleteContext(options?: {
       deleteMany: vi.fn(async () => ({ count: 1 }))
     },
     participantActivity: {
+      deleteMany: vi.fn(async () => ({ count: 1 })),
       findMany: vi.fn(async () => options?.participantActivities ?? [])
     },
     participantActivityEvidence: {
+      deleteMany: vi.fn(async () => ({ count: 1 })),
       findMany: vi.fn(async () => options?.participantActivityEvidence ?? [])
     },
     participantArmAssignment: {
+      deleteMany: vi.fn(async () => ({ count: 1 })),
       findMany: vi.fn(async () => options?.participantArmAssignments ?? [])
     },
     participantAttributeOrder: {
+      deleteMany: vi.fn(async () => ({ count: 1 })),
       findMany: vi.fn(async () => options?.participantAttributeOrders ?? [])
     },
     participantConfirmation: {
@@ -146,6 +151,7 @@ function createDeleteContext(options?: {
       findMany: vi.fn(async () => [])
     },
     participantRotationAssignment: {
+      deleteMany: vi.fn(async () => ({ count: 1 })),
       findMany: vi.fn(async () => options?.participantRotationAssignments ?? [])
     },
     participantScreeningReview: {
@@ -157,6 +163,15 @@ function createDeleteContext(options?: {
       findMany: vi.fn(async () => options?.quotaEvaluations ?? [])
     },
     screeningAnswer: {
+      deleteMany: vi.fn(async () => ({ count: 1 }))
+    },
+    researchResponse: {
+      deleteMany: vi.fn(async () => ({ count: 1 }))
+    },
+    reminderLog: {
+      deleteMany: vi.fn(async () => ({ count: 1 }))
+    },
+    mediaEvidencePlaceholder: {
       deleteMany: vi.fn(async () => ({ count: 1 }))
     },
     screeningAttempt: {
@@ -670,9 +685,19 @@ describe("participant evidence review repository cleanup", () => {
     expect(result.ok ? "" : result.message).not.toContain("screening_attempts adicionales");
   });
 
-  it("blocks grouped cleanup only for unsupported relations outside additional attempts", async () => {
+  it("cleans Navigo relations during grouped test cleanup", async () => {
     const context = createDeleteContext({
-      applicationTimeEvents: [{ id: "event-1" }]
+      applicationTimeEvents: [{ id: "event-1" }],
+      participantActivities: [{ id: "activity-1" }],
+      participantActivityEvidence: [
+        {
+          id: "activity-evidence-1",
+          privateStorageKey: "studies/study-1/participants/profile-1/activities/activity-1/selfie_identification/selfie.jpg",
+          storageBucket: "participant-evidence"
+        }
+      ],
+      participantArmAssignments: [{ id: "arm-assignment-1" }],
+      participantRotationAssignments: [{ id: "rotation-assignment-1" }]
     });
     const base = buildAttempt();
     context.screeningAttempt.findUnique = vi.fn(async () =>
@@ -706,15 +731,61 @@ describe("participant evidence review repository cleanup", () => {
       reason: "PRUEBAS AGRUPADAS"
     });
 
-    expect(result).toEqual({
-      message: "No se puede eliminar porque existen relaciones no soportadas: application_time_events.",
-      ok: false
+    expect(result.ok).toBe(true);
+    expect(context.researchResponse.deleteMany).toHaveBeenCalledWith({
+      where: {
+        participantActivityId: {
+          in: ["activity-1"]
+        }
+      }
+    });
+    expect(context.participantActivityEvidence.deleteMany).toHaveBeenCalledWith({
+      where: {
+        participantActivityId: {
+          in: ["activity-1"]
+        }
+      }
+    });
+    expect(context.applicationTimeEvent.deleteMany).toHaveBeenCalledWith({
+      where: { studyParticipantId: "study-participant-1" }
+    });
+    expect(context.participantArmAssignment.deleteMany).toHaveBeenCalledWith({
+      where: { studyParticipantId: "study-participant-1" }
+    });
+    expect(context.participantRotationAssignment.deleteMany).toHaveBeenCalledWith({
+      where: { studyParticipantId: "study-participant-1" }
+    });
+    expect(result.ok ? result.evidenceToDelete : []).toContainEqual({
+      bucket: "participant-evidence",
+      privateStorageKey: "studies/study-1/participants/profile-1/activities/activity-1/selfie_identification/selfie.jpg"
     });
   });
 
-  it("blocks deletion with a specific unsupported relation name", async () => {
+  it("cleans Navigo relations during single test cleanup", async () => {
     const context = createDeleteContext({
-      applicationTimeEvents: [{ id: "event-1" }]
+      applicationTimeEvents: [{ id: "event-1" }],
+      participantActivities: [{ id: "activity-1" }],
+      participantArmAssignments: [{ id: "arm-assignment-1" }],
+      participantRotationAssignments: [{ id: "rotation-assignment-1" }]
+    });
+    const repository = createRepositoryWithContext(context);
+
+    const result = await repository.deleteTestRecord({
+      attemptId: "attempt-1",
+      deletedByUserId: "admin-1",
+      reason: "PRUEBA"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(context.applicationTimeEvent.deleteMany).toHaveBeenCalled();
+    expect(context.participantActivity.deleteMany).toHaveBeenCalled();
+    expect(context.participantArmAssignment.deleteMany).toHaveBeenCalled();
+    expect(context.participantRotationAssignment.deleteMany).toHaveBeenCalled();
+  });
+
+  it("still blocks deletion with a specific unsupported relation name", async () => {
+    const context = createDeleteContext({
+      quotaEvaluations: [{ id: "quota-1" }]
     });
     const repository = createRepositoryWithContext(context);
 
@@ -725,7 +796,7 @@ describe("participant evidence review repository cleanup", () => {
     });
 
     expect(result).toEqual({
-      message: "No se puede eliminar porque existen relaciones no soportadas: application_time_events.",
+      message: "No se puede eliminar porque existen relaciones no soportadas: quota_evaluations.",
       ok: false
     });
   });

@@ -259,6 +259,7 @@ function ParticipantRow({
             <dd className="inline text-zinc-900">{participant.alert}</dd>
           </div>
         </dl>
+        <VisualVerificationModeForm participant={participant} studyId={studyId} />
       </div>
 
       <div className="space-y-4">
@@ -320,7 +321,6 @@ function ParticipantRow({
             </Link>
           ) : null}
         </section>
-        <VisualVerificationModeForm participant={participant} studyId={studyId} />
         <form action={startNavigoT0Action.bind(null, studyId, participant.id)} className="space-y-3">
           <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
             {participant.applicationStartedAt ? "Corregir hora base T0" : "Hora base T0"}
@@ -444,11 +444,11 @@ function VisualVerificationModeForm({
   participant: NavigoParticipantListItem;
   studyId: string;
 }) {
-  const disabled = Boolean(participant.applicationStartedAt);
+  const disabled = !participant.canChangeVisualVerificationMode;
   const modeLabel = participant.visualVerificationMode === "disabled" ? "No requerida" : "Requerida";
 
   return (
-    <section className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+    <section className="mt-4 rounded-md border border-teal-200 bg-teal-50 p-3">
       <div className="flex flex-col gap-1">
         <h3 className="text-sm font-semibold text-zinc-950">Identificacion visual</h3>
         <p className="text-xs leading-5 text-zinc-600">
@@ -456,7 +456,7 @@ function VisualVerificationModeForm({
         </p>
         {disabled ? (
           <p className="text-xs leading-5 text-amber-800">
-            T0 ya fue iniciado. Para conservar trazabilidad, no se cambia la identificacion visual desde aqui.
+            La identificacion visual solo puede modificarse antes de iniciar T0.
           </p>
         ) : null}
       </div>

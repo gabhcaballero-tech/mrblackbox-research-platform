@@ -525,13 +525,14 @@ describe("ScreeningSupervisionComponents", () => {
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText("Escribe ELIMINAR PRUEBAS DEL PARTICIPANTE para confirmar")).toBeInTheDocument();
     expect(screen.getByText(/Esta accion elimina todos los intentos de prueba/)).toBeInTheDocument();
+    expect(screen.getAllByText(/borrara actividades, rotacion, eventos, evidencias y respuestas asociadas/).length).toBeGreaterThan(0);
   });
 
   it("shows focused cleanup errors in the dangerous cleanup zone", () => {
     render(
       <EvidenceReviewPanel
         canDeleteTestRecord
-        error="No se puede eliminar porque existen relaciones no soportadas: participant_activities."
+        error="No se puede eliminar porque existen relaciones no soportadas: quota_evaluations."
         focus="zona-peligro"
         detail={{
           attemptId: "attempt-1",
@@ -582,7 +583,7 @@ describe("ScreeningSupervisionComponents", () => {
 
     expect(dangerZone).not.toBeNull();
     expect(dangerZone?.textContent).toContain(
-      "No se puede eliminar porque existen relaciones no soportadas: participant_activities."
+      "No se puede eliminar porque existen relaciones no soportadas: quota_evaluations."
     );
   });
 });

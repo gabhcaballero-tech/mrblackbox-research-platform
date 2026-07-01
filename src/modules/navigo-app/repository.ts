@@ -69,6 +69,7 @@ export type NavigoParticipantListItem = {
   activities: NavigoActivityListItem[];
   alert: string;
   applicationStartedAt: Date | null;
+  canChangeVisualVerificationMode: boolean;
   confirmation: {
     folio: string;
     referenceCodes: Array<{ code: string; slot: number }>;
@@ -2937,6 +2938,7 @@ async function toDashboardParticipant(
     activities: activitiesWithAvailability,
     alert,
     applicationStartedAt: participant.applicationStartedAt,
+    canChangeVisualVerificationMode: !hasT0Started(participant),
     confirmation: participant.participantConfirmation,
     hasRecoverableToken: Boolean(participant.accessTokens?.[0]),
     id: participant.id,

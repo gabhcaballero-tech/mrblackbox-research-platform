@@ -230,7 +230,8 @@ type EvidenceReviewTransactionClient = {
     updateMany: (args: unknown) => Promise<unknown>;
   };
   participantActivityEvidence: {
-    findMany: (args: unknown) => Promise<Array<{ id: string }>>;
+    deleteMany: (args: unknown) => Promise<unknown>;
+    findMany: (args: unknown) => Promise<Array<{ id: string; privateStorageKey?: string; storageBucket?: string }>>;
   };
   participantConsent: {
     deleteMany: (args: unknown) => Promise<unknown>;
@@ -262,6 +263,9 @@ type EvidenceReviewTransactionClient = {
   screeningAnswer: {
     deleteMany: (args: unknown) => Promise<unknown>;
   };
+  researchResponse: {
+    deleteMany: (args: unknown) => Promise<unknown>;
+  };
   screeningAttempt: {
     delete: (args: unknown) => Promise<unknown>;
     deleteMany: (args: unknown) => Promise<unknown>;
@@ -274,18 +278,29 @@ type EvidenceReviewTransactionClient = {
     update: (args: unknown) => Promise<unknown>;
   };
   applicationTimeEvent: {
+    deleteMany: (args: unknown) => Promise<unknown>;
     findMany: (args: unknown) => Promise<Array<{ id: string }>>;
   };
   participantActivity: {
+    deleteMany: (args: unknown) => Promise<unknown>;
     findMany: (args: unknown) => Promise<Array<{ id: string }>>;
   };
+  reminderLog: {
+    deleteMany: (args: unknown) => Promise<unknown>;
+  };
+  mediaEvidencePlaceholder: {
+    deleteMany: (args: unknown) => Promise<unknown>;
+  };
   participantArmAssignment: {
+    deleteMany: (args: unknown) => Promise<unknown>;
     findMany: (args: unknown) => Promise<Array<{ id: string }>>;
   };
   participantAttributeOrder: {
+    deleteMany: (args: unknown) => Promise<unknown>;
     findMany: (args: unknown) => Promise<Array<{ id: string }>>;
   };
   participantRotationAssignment: {
+    deleteMany: (args: unknown) => Promise<unknown>;
     findMany: (args: unknown) => Promise<Array<{ id: string }>>;
   };
   quotaEvaluation: {
@@ -728,19 +743,21 @@ export function createEvidenceReviewRepository(
             };
           }
 
-          const evidenceToDelete = attempt.participantEvidence
-            .filter((item) =>
+          const activityEvidenceToDelete = await listParticipantActivityEvidenceToDelete(tx, studyParticipantId);
+          const evidenceToDelete = [
+            ...attempt.participantEvidence.filter((item) =>
               storageKeyBelongsToAttempt({
                 attemptId: attempt.id,
                 participantProfileId,
                 privateStorageKey: item.privateStorageKey,
                 studyId
               })
-            )
-            .map((item) => ({
+            ).map((item) => ({
               bucket: item.storageBucket,
               privateStorageKey: item.privateStorageKey
-            }));
+            })),
+            ...activityEvidenceToDelete
+          ];
 
           if (attempt.participantConfirmation?.id) {
             await tx.participantReferenceCode.deleteMany({
@@ -785,6 +802,7 @@ export function createEvidenceReviewRepository(
               studyParticipantId
             }
           });
+          await deleteNavigoStudyParticipantRelations(tx, studyParticipantId);
           await tx.studyParticipant.delete({
             where: {
               id: studyParticipantId
@@ -877,21 +895,23 @@ export function createEvidenceReviewRepository(
             };
           }
 
-          const evidenceToDelete = attempts.flatMap((cleanupAttempt) =>
-            cleanupAttempt.participantEvidence
-              .filter((item) =>
+          const activityEvidenceToDelete = await listParticipantActivityEvidenceToDelete(tx, studyParticipantId);
+          const evidenceToDelete = [
+            ...attempts.flatMap((cleanupAttempt) =>
+              cleanupAttempt.participantEvidence.filter((item) =>
                 storageKeyBelongsToAttempt({
                   attemptId: cleanupAttempt.id,
                   participantProfileId,
                   privateStorageKey: item.privateStorageKey,
                   studyId
                 })
-              )
-              .map((item) => ({
+              ).map((item) => ({
                 bucket: item.storageBucket,
                 privateStorageKey: item.privateStorageKey
               }))
-          );
+            ),
+            ...activityEvidenceToDelete
+          ];
           const confirmationIds = attempts
             .map((cleanupAttempt) => cleanupAttempt.participantConfirmation?.id)
             .filter((id): id is string => Boolean(id));
@@ -951,6 +971,7 @@ export function createEvidenceReviewRepository(
               studyParticipantId
             }
           });
+          await deleteNavigoStudyParticipantRelations(tx, studyParticipantId);
           await tx.studyParticipant.delete({
             where: {
               id: studyParticipantId
@@ -1301,6 +1322,90 @@ async function diagnoseDeleteStudyParticipantTestRecordBlockers(
   return blockers;
 }
 
+async function listParticipantActivityEvidenceToDelete(
+  tx: EvidenceReviewTransactionClient,
+  studyParticipantId: string
+): Promise<Array<{ bucket: string; privateStorageKey: string }>> {
+  const activityEvidence = await tx.participantActivityEvidence.findMany({
+    select: {
+      privateStorageKey: true,
+      storageBucket: true
+    },
+    where: {
+      studyParticipantId
+    }
+  });
+
+  return activityEvidence
+    .filter((item) => Boolean(item.privateStorageKey) && Boolean(item.storageBucket))
+    .map((item) => ({
+      bucket: String(item.storageBucket),
+      privateStorageKey: String(item.privateStorageKey)
+    }));
+}
+
+async function deleteNavigoStudyParticipantRelations(
+  tx: EvidenceReviewTransactionClient,
+  studyParticipantId: string
+) {
+  const activities = await tx.participantActivity.findMany({
+    select: { id: true },
+    where: { studyParticipantId }
+  });
+  const activityIds = activities.map((activity) => activity.id);
+
+  if (activityIds.length > 0) {
+    await tx.researchResponse.deleteMany({
+      where: {
+        participantActivityId: {
+          in: activityIds
+        }
+      }
+    });
+    await tx.participantActivityEvidence.deleteMany({
+      where: {
+        participantActivityId: {
+          in: activityIds
+        }
+      }
+    });
+    await tx.reminderLog.deleteMany({
+      where: {
+        participantActivityId: {
+          in: activityIds
+        }
+      }
+    });
+    await tx.mediaEvidencePlaceholder.deleteMany({
+      where: {
+        participantActivityId: {
+          in: activityIds
+        }
+      }
+    });
+    await tx.participantActivity.deleteMany({
+      where: {
+        id: {
+          in: activityIds
+        }
+      }
+    });
+  }
+
+  await tx.applicationTimeEvent.deleteMany({
+    where: { studyParticipantId }
+  });
+  await tx.participantAttributeOrder.deleteMany({
+    where: { studyParticipantId }
+  });
+  await tx.participantArmAssignment.deleteMany({
+    where: { studyParticipantId }
+  });
+  await tx.participantRotationAssignment.deleteMany({
+    where: { studyParticipantId }
+  });
+}
+
 async function findUnsupportedDeleteRelations(
   tx: EvidenceReviewTransactionClient,
   input: {
@@ -1335,55 +1440,7 @@ async function findUnsupportedDeleteRelations(
       studyParticipantId: input.studyParticipantId
     }
   });
-  const applicationTimeEvents = await tx.applicationTimeEvent.findMany({
-    select: {
-      id: true
-    },
-    where: {
-      studyParticipantId: input.studyParticipantId
-    }
-  });
   const quotaEvaluations = await tx.quotaEvaluation.findMany({
-    select: {
-      id: true
-    },
-    where: {
-      studyParticipantId: input.studyParticipantId
-    }
-  });
-  const rotationAssignments = await tx.participantRotationAssignment.findMany({
-    select: {
-      id: true
-    },
-    where: {
-      studyParticipantId: input.studyParticipantId
-    }
-  });
-  const armAssignments = await tx.participantArmAssignment.findMany({
-    select: {
-      id: true
-    },
-    where: {
-      studyParticipantId: input.studyParticipantId
-    }
-  });
-  const activities = await tx.participantActivity.findMany({
-    select: {
-      id: true
-    },
-    where: {
-      studyParticipantId: input.studyParticipantId
-    }
-  });
-  const activityEvidence = await tx.participantActivityEvidence.findMany({
-    select: {
-      id: true
-    },
-    where: {
-      studyParticipantId: input.studyParticipantId
-    }
-  });
-  const attributeOrders = await tx.participantAttributeOrder.findMany({
     select: {
       id: true
     },
@@ -1402,32 +1459,8 @@ async function findUnsupportedDeleteRelations(
     relations.push("participant_evidence adicional");
   }
 
-  if (applicationTimeEvents.length > 0) {
-    relations.push("application_time_events");
-  }
-
   if (quotaEvaluations.length > 0) {
     relations.push("quota_evaluations");
-  }
-
-  if (rotationAssignments.length > 0) {
-    relations.push("participant_rotation_assignments");
-  }
-
-  if (armAssignments.length > 0) {
-    relations.push("participant_arm_assignments");
-  }
-
-  if (activities.length > 0) {
-    relations.push("participant_activities");
-  }
-
-  if (activityEvidence.length > 0) {
-    relations.push("participant_activity_evidence");
-  }
-
-  if (attributeOrders.length > 0) {
-    relations.push("participant_attribute_orders");
   }
 
   return relations;

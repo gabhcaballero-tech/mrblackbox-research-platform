@@ -598,7 +598,7 @@ describe("participant evidence review service", () => {
   it("surfaces grouped cleanup blockers without using the old additional-attempts message", async () => {
     const repo = repository();
     vi.mocked(repo.deleteStudyParticipantTestRecords).mockResolvedValueOnce({
-      message: "No se puede eliminar porque existen relaciones no soportadas: participant_activities.",
+      message: "No se puede eliminar porque existen relaciones no soportadas: quota_evaluations.",
       ok: false
     });
 
@@ -615,7 +615,7 @@ describe("participant evidence review service", () => {
     });
 
     expect(result).toMatchObject({
-      message: "No se puede eliminar porque existen relaciones no soportadas: participant_activities.",
+      message: "No se puede eliminar porque existen relaciones no soportadas: quota_evaluations.",
       ok: false
     });
     expect(result.ok ? "" : result.message).not.toContain("screening_attempts adicionales");

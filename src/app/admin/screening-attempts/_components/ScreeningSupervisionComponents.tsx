@@ -755,6 +755,10 @@ function DeleteTestRecordForm({ detail }: { detail: ParticipantEvidenceReviewDet
         Esta accion tambien puede eliminar intentos de prueba creados desde Campo. Si el perfil pertenece a un usuario
         interno, se conservara por seguridad.
       </p>
+      <p className="mt-2 text-sm font-semibold leading-6 text-rose-950">
+        Eliminar este participante borrara actividades, rotacion, eventos, evidencias y respuestas asociadas. Esta
+        accion no se puede deshacer.
+      </p>
       <dl className="mt-4 grid gap-3 rounded-md border border-rose-200 bg-white p-3 text-sm md:grid-cols-2">
         <SummaryItem label="Participante" value={detail.participant.name} />
         <SummaryItem label="Intento" value={detail.attemptId} mono />
@@ -807,6 +811,10 @@ function DeleteParticipantTestRecordsForm({ detail }: { detail: ParticipantEvide
       <p className="mt-2 text-sm leading-6 text-red-900">
         Esta accion elimina todos los intentos de prueba de este participante en este estudio y libera folios usados.
         Usala solo antes de operacion real.
+      </p>
+      <p className="mt-2 text-sm font-semibold leading-6 text-red-950">
+        Eliminar este participante borrara actividades, rotacion, eventos, evidencias y respuestas asociadas. Esta
+        accion no se puede deshacer.
       </p>
       <dl className="mt-4 grid gap-3 rounded-md border border-red-200 bg-white p-3 text-sm md:grid-cols-2">
         <SummaryItem label="Participante" value={detail.participant.name} />
