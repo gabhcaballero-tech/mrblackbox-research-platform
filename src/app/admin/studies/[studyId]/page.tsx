@@ -136,6 +136,12 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
               App Navigo
             </Link>
           ) : null}
+          <Link
+            className="text-sm font-semibold text-zinc-700 transition hover:text-zinc-950"
+            href={`/admin/studies/${studyId}/hut`}
+          >
+            HUT
+          </Link>
         </div>
       </div>
 

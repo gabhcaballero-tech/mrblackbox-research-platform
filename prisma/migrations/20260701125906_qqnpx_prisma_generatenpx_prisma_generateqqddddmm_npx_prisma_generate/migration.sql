@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "questionnaire_draft_library_uses_questionnaireDraftId_insertedA" RENAME TO "questionnaire_draft_library_uses_questionnaireDraftId_inser_idx";

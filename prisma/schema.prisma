@@ -122,6 +122,46 @@ enum ParticipantAccessTokenRevocationReason {
   EXPIRED
 }
 
+enum HutParticipantStatus {
+  NOT_STARTED
+  BLOCK_1_IN_PROGRESS
+  BLOCK_1_CALL_PENDING
+  BLOCK_2_IN_PROGRESS
+  BLOCK_2_CALL_PENDING
+  COMPLETED
+  DISQUALIFIED
+}
+
+enum HutBlockStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  CALL_PENDING
+  COMPLETED
+  DISQUALIFIED
+}
+
+enum HutVideoSubmissionStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum HutDailyCheckStatus {
+  COMPLETED
+  MISSED
+  REMINDER_PENDING
+  REMINDER_SENT
+  NO_ACTIVITY_REQUIRED
+}
+
+enum HutCallEvaluationStatus {
+  PENDING
+  SCHEDULED
+  COMPLETED
+  NO_ANSWER
+  RESCHEDULE_NEEDED
+}
+
 enum QuestionnairePurpose {
   SCREENER
   MEASUREMENT
@@ -369,6 +409,7 @@ model Study {
   quotaDefinitions    QuotaDefinition[]
   activitySchedules   ActivitySchedule[]
   exportJobs          ExportJob[]
+  hutParticipants     HutParticipant[]
 
   @@index([status])
   @@index([createdByUserId])
@@ -584,6 +625,125 @@ model ParticipantAccessToken {
   @@index([studyParticipantId, status])
   @@index([expiresAt])
   @@map("participant_access_tokens")
+}
+
+model HutParticipant {
+  id                   String               @id @default(uuid()) @db.Uuid
+  studyId              String               @db.Uuid
+  name                 String
+  phone                String?
+  email                String?
+  recruiter            String?
+  token                String               @unique
+  status               HutParticipantStatus @default(NOT_STARTED)
+  startDate            DateTime?
+  currentBlockNumber   Int                  @default(1)
+  currentVideoSequence Int                  @default(1)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  study             Study                 @relation(fields: [studyId], references: [id])
+  blocks            HutBlock[]
+  videoSubmissions  HutVideoSubmission[]
+  dailyChecks       HutDailyCheck[]
+  callEvaluations   HutCallEvaluation[]
+
+  @@index([studyId, status])
+  @@index([token])
+  @@map("hut_participants")
+}
+
+model HutBlock {
+  id                     String         @id @default(uuid()) @db.Uuid
+  participantId          String         @db.Uuid
+  blockNumber            Int
+  startDate              DateTime?
+  status                 HutBlockStatus @default(NOT_STARTED)
+  requiredVideos         Int            @default(3)
+  submittedVideosCount   Int            @default(0)
+  missedDaysCount        Int            @default(0)
+  maxMissedDaysAllowed   Int            @default(1)
+  completedAt            DateTime?
+  disqualifiedAt         DateTime?
+  disqualificationReason String?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  participant      HutParticipant       @relation(fields: [participantId], references: [id])
+  videoSubmissions HutVideoSubmission[]
+  dailyChecks      HutDailyCheck[]
+
+  @@unique([participantId, blockNumber])
+  @@index([status])
+  @@map("hut_blocks")
+}
+
+model HutVideoSubmission {
+  id                String                   @id @default(uuid()) @db.Uuid
+  participantId     String                   @db.Uuid
+  blockId           String                   @db.Uuid
+  blockNumber       Int
+  sequenceNumber    Int
+  submittedAt       DateTime                 @default(now())
+  storageBucket     String
+  privateStorageKey String                   @unique
+  originalFilename  String?
+  mimeType          String
+  extension         String
+  sizeBytes         Int
+  status            HutVideoSubmissionStatus @default(SUBMITTED)
+  notes             String?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  participant HutParticipant @relation(fields: [participantId], references: [id])
+  block       HutBlock       @relation(fields: [blockId], references: [id])
+
+  @@unique([blockId, sequenceNumber])
+  @@index([participantId, submittedAt])
+  @@index([blockId, status])
+  @@map("hut_video_submissions")
+}
+
+model HutDailyCheck {
+  id                    String              @id @default(uuid()) @db.Uuid
+  participantId         String              @db.Uuid
+  blockId               String              @db.Uuid
+  blockNumber           Int
+  blockDayNumber        Int
+  date                  DateTime
+  expectedVideoSequence Int
+  status                HutDailyCheckStatus
+  reminderSentAt        DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  participant HutParticipant @relation(fields: [participantId], references: [id])
+  block       HutBlock       @relation(fields: [blockId], references: [id])
+
+  @@unique([blockId, blockDayNumber])
+  @@index([participantId, date])
+  @@index([status])
+  @@map("hut_daily_checks")
+}
+
+model HutCallEvaluation {
+  id            String                  @id @default(uuid()) @db.Uuid
+  participantId String                  @db.Uuid
+  blockNumber   Int
+  status        HutCallEvaluationStatus @default(PENDING)
+  scheduledAt   DateTime?
+  completedAt   DateTime?
+  evaluatorName String?
+  notes         String?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  participant HutParticipant @relation(fields: [participantId], references: [id])
+
+  @@unique([participantId, blockNumber])
+  @@index([status])
+  @@map("hut_call_evaluations")
 }
 
 model QuestionnaireDraft {
