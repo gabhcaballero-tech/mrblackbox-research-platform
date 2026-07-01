@@ -122,7 +122,7 @@ describe("HutAdminPage", () => {
     requireCapabilityMock.mockResolvedValue({ id: "user-1", role: "ADMIN" });
   });
 
-  it("shows visible test mode controls on the participant card and keeps missing registration selfie enabled after block 1 started", async () => {
+  it("muestra resumen compacto, identidad colapsada y selfie habilitada cuando falta la selfie base", async () => {
     getAdminDashboardMock.mockResolvedValue(
       createDashboard({
         participants: [
@@ -150,14 +150,17 @@ describe("HutAdminPage", () => {
     render(await HutAdminPage({ params: Promise.resolve({ studyId: "study-hut" }), searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText("Modo prueba: Inactivo")).toBeInTheDocument();
+    expect(screen.getAllByText("Selfie de registro: Faltante").length).toBeGreaterThan(0);
+    expect(screen.getByText("Identidad diaria: Pendiente")).toBeInTheDocument();
+    expect(screen.getByText("Ver revisión de identidad")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Activar modo prueba" })).toBeInTheDocument();
-    expect(screen.getAllByText("Selfie de registro:").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Faltante").length).toBeGreaterThan(0);
-    expect(screen.getByTestId("hut-reference-selfie-upload-participant-1")).toHaveAttribute("data-disabled", "false");
     expect(screen.getByRole("button", { name: "Tomar selfie de registro" })).toBeEnabled();
+    expect(screen.getByTestId("hut-reference-selfie-upload-participant-1")).toHaveAttribute("data-disabled", "false");
+    expect(screen.getByTestId("hut-identity-review-details-participant-1")).not.toHaveAttribute("open");
+    expect(screen.getByTestId("hut-danger-zone-participant-1")).not.toHaveAttribute("open");
   });
 
-  it("shows active test mode state and allows turning it off from the main participant card", async () => {
+  it("mantiene visible el estado de modo prueba activo y permite desactivarlo", async () => {
     getAdminDashboardMock.mockResolvedValue(
       createDashboard({
         participants: [
@@ -176,8 +179,79 @@ describe("HutAdminPage", () => {
     render(await HutAdminPage({ params: Promise.resolve({ studyId: "study-hut" }), searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText("Modo prueba: Activo")).toBeInTheDocument();
-    expect(screen.getByText("Este participante puede avanzar sin esperar 5:00 a.m. ni dias reales.")).toBeInTheDocument();
+    expect(screen.getByText("Este participante puede avanzar sin esperar 5:00 a.m. ni días reales.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Desactivar modo prueba" })).toBeInTheDocument();
+  });
+
+  it("mantiene videos enviados y pendientes en formato compacto sin exponer storage keys", async () => {
+    getAdminDashboardMock.mockResolvedValue(
+      createDashboard({
+        participants: [
+          createParticipant({
+            block1: {
+              blockNumber: 1,
+              disqualificationReason: null,
+              missedDaysCount: 0,
+              status: "IN_PROGRESS",
+              submittedVideosCount: 1,
+              videos: [
+                {
+                  sequenceNumber: 1,
+                  signedUrl: "https://storage.example/video-1.mp4",
+                  status: "SUBMITTED",
+                  submittedAt: new Date("2026-07-01T22:04:00.000Z")
+                },
+                {
+                  sequenceNumber: 2,
+                  signedUrl: null,
+                  status: "PENDING",
+                  submittedAt: null
+                },
+                {
+                  sequenceNumber: 3,
+                  signedUrl: null,
+                  status: "PENDING",
+                  submittedAt: null
+                }
+              ]
+            },
+            identityReview: {
+              items: [
+                {
+                  attemptSignedUrl: "https://storage.example/daily-selfie.jpg",
+                  blockNumber: 1,
+                  reviewLabel: "Revisión requerida",
+                  reviewedAt: null,
+                  reviewedByUserId: null,
+                  reviewNotes: null,
+                  sequenceNumber: 1,
+                  similarityPercentage: 64,
+                  status: "UNCERTAIN",
+                  verificationDate: new Date("2026-07-01T22:03:00.000Z"),
+                  verificationId: "verification-1"
+                }
+              ],
+              lastReviewedAt: null,
+              lastStatus: "Revisión requerida",
+              referenceSignedUrl: "https://storage.example/reference-selfie.jpg",
+              summaryLabel: "REVISION_REQUERIDA"
+            },
+            referenceSelfie: {
+              capturedAt: new Date("2026-07-01T12:00:00.000Z"),
+              signedUrl: "https://storage.example/reference-selfie.jpg",
+              status: "COMPLETE"
+            }
+          })
+        ]
+      })
+    );
+
+    render(await HutAdminPage({ params: Promise.resolve({ studyId: "study-hut" }), searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole("link", { name: "Ver video" })).toHaveAttribute("href", "https://storage.example/video-1.mp4");
+    expect(screen.getByText("Restablecer video")).toBeInTheDocument();
+    expect(screen.getAllByText("Pendiente").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/privateStorageKey/i)).not.toBeInTheDocument();
   });
 });
 
@@ -266,6 +340,7 @@ type TestParticipant = {
   usedToleranceInCurrentBlock: boolean;
   visualOverrideEnabled: boolean;
 };
+
 type TestDashboard = {
   participants: TestParticipant[];
   registrationSlots: [];
