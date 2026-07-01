@@ -163,6 +163,27 @@ export async function createHutSignedReferenceSelfieUpload({
   return createSignedHutSelfie({ metadata: validated, privateStorageKey, storage });
 }
 
+export async function createHutSignedRegistrationSelfieUpload({
+  metadata,
+  slotId,
+  storage = createSupabaseEvidenceStorageClient(),
+  studyId
+}: {
+  metadata: HutSelfieUploadMetadata;
+  slotId: string;
+  storage?: HutStorageClient;
+  studyId: string;
+}): Promise<HutSignedSelfieUpload> {
+  const validated = validateHutSelfieUploadMetadata(metadata);
+  const privateStorageKey = buildHutRegistrationSelfieStorageKey({
+    extension: validated.extension,
+    slotId,
+    studyId
+  });
+
+  return createSignedHutSelfie({ metadata: validated, privateStorageKey, storage });
+}
+
 export async function createHutSignedDailySelfieUpload({
   blockNumber,
   metadata,
@@ -220,6 +241,22 @@ export function assertHutSelfieStorageKey({
 
   if (!privateStorageKey.startsWith(expectedPrefix)) {
     throw new Error("No fue posible validar la selfie cargada.");
+  }
+}
+
+export function assertHutRegistrationSelfieStorageKey({
+  privateStorageKey,
+  slotId,
+  studyId
+}: {
+  privateStorageKey: string;
+  slotId: string;
+  studyId: string;
+}) {
+  const expectedPrefix = ["studies", studyId, "hut-registration-slots", slotId, "reference-selfie", ""].join("/");
+
+  if (!privateStorageKey.startsWith(expectedPrefix)) {
+    throw new Error("No fue posible validar la selfie de registro.");
   }
 }
 
@@ -301,6 +338,27 @@ function buildHutSelfieStorageKey({
     "hut-participants",
     participantId,
     ...folder,
+    `${randomUUID()}.${safeExtension}`
+  ].join("/");
+}
+
+function buildHutRegistrationSelfieStorageKey({
+  extension,
+  slotId,
+  studyId
+}: {
+  extension: string;
+  slotId: string;
+  studyId: string;
+}) {
+  const safeExtension = extension.toLowerCase() === "jpeg" ? "jpg" : extension.toLowerCase();
+
+  return [
+    "studies",
+    studyId,
+    "hut-registration-slots",
+    slotId,
+    "reference-selfie",
     `${randomUUID()}.${safeExtension}`
   ].join("/");
 }
