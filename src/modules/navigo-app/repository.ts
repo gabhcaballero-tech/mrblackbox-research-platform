@@ -13,11 +13,14 @@ import { buildResearchResponseKey } from "@/modules/responses";
 import { NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
 import {
   NAVIGO_ACTIVITY_CODES,
+  NAVIGO_LEGACY_ACTIVITY_CODES,
   NAVIGO_T0_IDENTITY_QUESTION_ID,
   createNavigoMeasurementDefinition,
+  createNavigoScheduleSeeds,
   resolveNavigoTimeZone,
   resolveNavigoVisualVerificationMode,
   type NavigoActivityCode,
+  type NavigoScheduleSeed,
   type NavigoVisualVerificationMode
 } from "./definition";
 import {
@@ -2601,6 +2604,210 @@ async function getNavigoSchedules({
   })) as NavigoScheduleRecord[];
 }
 
+type NavigoScheduleRow = {
+  code: string | null;
+  id: string;
+  name: string;
+  offsetMinutes: number;
+  questionnaireVersionId: string | null;
+  sortOrder: number;
+  status: "ACTIVE" | "ARCHIVED" | "INACTIVE";
+  type: "INTERNAL_FOLLOWUP" | "QUESTIONNAIRE_MEASUREMENT" | "VIDEO_EVIDENCE";
+  windowEndsMinutes: number;
+  windowStartsMinutes: number;
+};
+
+async function ensureCurrentNavigoSchedulesForParticipant({
+  participant,
+  prisma
+}: {
+  participant: ParticipantRecord;
+  prisma: NavigoPrismaClient | NavigoTransactionClient;
+}): Promise<void> {
+  if (participant.study.code !== NAVIGO_STUDY_CODE) {
+    return;
+  }
+
+  const version = (await prisma.questionnaireVersion.findFirst?.({
+    orderBy: { versionNumber: "desc" },
+    select: { id: true },
+    where: {
+      questionnaireDraft: {
+        purpose: "MEASUREMENT"
+      },
+      status: "ACTIVE",
+      studyId: participant.study.id
+    }
+  })) as { id: string } | null;
+
+  if (!version) {
+    return;
+  }
+
+  const seeds = createNavigoScheduleSeeds(version.id);
+  const activeCodes = seeds.map((seed) => seed.code);
+  const existingSchedules = (await prisma.activitySchedule.findMany?.({
+    select: {
+      code: true,
+      id: true,
+      name: true,
+      offsetMinutes: true,
+      questionnaireVersionId: true,
+      sortOrder: true,
+      status: true,
+      type: true,
+      windowEndsMinutes: true,
+      windowStartsMinutes: true
+    },
+    where: {
+      code: {
+        in: [...activeCodes, ...NAVIGO_LEGACY_ACTIVITY_CODES]
+      },
+      studyId: participant.study.id
+    }
+  })) as NavigoScheduleRow[];
+  const schedulesByCode = new Map(
+    existingSchedules
+      .filter((schedule): schedule is NavigoScheduleRow & { code: string } => Boolean(schedule.code))
+      .map((schedule) => [schedule.code, schedule])
+  );
+
+  for (const seed of seeds) {
+    const sortOrder = resolveNavigoScheduleSortOrder({
+      code: seed.code,
+      existingSchedules,
+      preferredSortOrder: seed.sortOrder,
+      type: seed.type
+    });
+    const existing = schedulesByCode.get(seed.code);
+
+    if (!existing) {
+      const created = (await prisma.activitySchedule.create?.({
+        data: toRepositoryScheduleData({
+          seed,
+          sortOrder,
+          studyId: participant.study.id
+        })
+      })) as { id?: string } | undefined;
+      existingSchedules.push({
+        ...toRepositoryScheduleData({
+          seed,
+          sortOrder,
+          studyId: participant.study.id
+        }),
+        id: created?.id ?? `created-${seed.code}`
+      });
+      continue;
+    }
+
+    if (repositoryScheduleNeedsUpdate(existing, seed, sortOrder)) {
+      await prisma.activitySchedule.update?.({
+        data: toRepositoryScheduleUpdateData({ seed, sortOrder }),
+        where: { id: existing.id }
+      });
+      Object.assign(existing, toRepositoryScheduleUpdateData({ seed, sortOrder }));
+    }
+  }
+
+  for (const legacy of existingSchedules.filter((schedule) => NAVIGO_LEGACY_ACTIVITY_CODES.includes(schedule.code as never))) {
+    if (legacy.status === "ACTIVE") {
+      await prisma.activitySchedule.update?.({
+        data: {
+          status: "INACTIVE"
+        },
+        where: { id: legacy.id }
+      });
+      legacy.status = "INACTIVE";
+    }
+  }
+}
+
+function resolveNavigoScheduleSortOrder({
+  code,
+  existingSchedules,
+  preferredSortOrder,
+  type
+}: {
+  code: string;
+  existingSchedules: NavigoScheduleRow[];
+  preferredSortOrder: number;
+  type: NavigoScheduleSeed["type"];
+}): number {
+  const conflicting = existingSchedules.find(
+    (schedule) => schedule.code !== code && schedule.type === type && schedule.sortOrder === preferredSortOrder
+  );
+
+  if (!conflicting) {
+    return preferredSortOrder;
+  }
+
+  return (
+    Math.max(
+      preferredSortOrder,
+      ...existingSchedules.filter((schedule) => schedule.type === type).map((schedule) => schedule.sortOrder)
+    ) + 1
+  );
+}
+
+function repositoryScheduleNeedsUpdate(
+  existing: NavigoScheduleRow,
+  seed: NavigoScheduleSeed,
+  sortOrder: number
+): boolean {
+  return (
+    existing.name !== seed.name ||
+    existing.offsetMinutes !== seed.offsetMinutes ||
+    existing.questionnaireVersionId !== seed.questionnaireVersionId ||
+    existing.sortOrder !== sortOrder ||
+    existing.status !== "ACTIVE" ||
+    existing.type !== seed.type ||
+    existing.windowEndsMinutes !== seed.windowEndsMinutes ||
+    existing.windowStartsMinutes !== seed.windowStartsMinutes
+  );
+}
+
+function toRepositoryScheduleData({
+  seed,
+  sortOrder,
+  studyId
+}: {
+  seed: NavigoScheduleSeed;
+  sortOrder: number;
+  studyId: string;
+}) {
+  return {
+    code: seed.code,
+    name: seed.name,
+    offsetMinutes: seed.offsetMinutes,
+    questionnaireVersionId: seed.questionnaireVersionId,
+    sortOrder,
+    status: "ACTIVE" as const,
+    studyId,
+    type: seed.type,
+    windowEndsMinutes: seed.windowEndsMinutes,
+    windowStartsMinutes: seed.windowStartsMinutes
+  };
+}
+
+function toRepositoryScheduleUpdateData({
+  seed,
+  sortOrder
+}: {
+  seed: NavigoScheduleSeed;
+  sortOrder: number;
+}) {
+  return {
+    name: seed.name,
+    offsetMinutes: seed.offsetMinutes,
+    questionnaireVersionId: seed.questionnaireVersionId,
+    sortOrder,
+    status: "ACTIVE",
+    type: seed.type,
+    windowEndsMinutes: seed.windowEndsMinutes,
+    windowStartsMinutes: seed.windowStartsMinutes
+  };
+}
+
 async function ensureCurrentNavigoActivitiesForParticipant({
   now,
   participant,
@@ -2613,6 +2820,8 @@ async function ensureCurrentNavigoActivitiesForParticipant({
   if (!participant.applicationStartedAt) {
     return participant;
   }
+
+  await ensureCurrentNavigoSchedulesForParticipant({ participant, prisma });
 
   const schedules = await getNavigoSchedules({ participant, prisma });
   const prepared = prepareNavigoParticipantActivities({

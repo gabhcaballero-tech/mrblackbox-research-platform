@@ -336,22 +336,28 @@ export function createNavigoFoundationRepository(
 
         for (const seed of seeds) {
           const existing = schedulesByCode.get(seed.code);
+          const sortOrder = resolveNavigoScheduleSortOrder({
+            code: seed.code,
+            existingSchedules,
+            preferredSortOrder: seed.sortOrder,
+            type: seed.type
+          });
 
           if (!existing) {
             await tx.activitySchedule.create({
-              data: toScheduleCreateData(seed, questionnaireVersionId, study.id)
+              data: toScheduleCreateData(seed, sortOrder, study.id)
             });
             schedulesCreated += 1;
             continue;
           }
 
-          if (scheduleNeedsUpdate(existing, seed, questionnaireVersionId)) {
+          if (scheduleNeedsUpdate(existing, seed, sortOrder)) {
             await tx.activitySchedule.update({
               data: {
                 name: seed.name,
                 offsetMinutes: seed.offsetMinutes,
                 questionnaireVersionId: seed.questionnaireVersionId,
-                sortOrder: seed.sortOrder,
+                sortOrder,
                 status: "ACTIVE",
                 type: seed.type,
                 windowEndsMinutes: seed.windowEndsMinutes,
@@ -400,6 +406,7 @@ export function createNavigoFoundationRepository(
 
 function scheduleNeedsUpdate(
   existing: {
+    code?: string | null;
     name: string;
     offsetMinutes: number;
     questionnaireVersionId: string | null;
@@ -410,34 +417,62 @@ function scheduleNeedsUpdate(
     windowStartsMinutes: number;
   },
   seed: NavigoScheduleSeed,
-  questionnaireVersionId: string
+  sortOrder: number
 ): boolean {
   return (
     existing.name !== seed.name ||
     existing.offsetMinutes !== seed.offsetMinutes ||
     existing.questionnaireVersionId !== seed.questionnaireVersionId ||
-    existing.sortOrder !== seed.sortOrder ||
+    existing.sortOrder !== sortOrder ||
     existing.status !== "ACTIVE" ||
     existing.type !== seed.type ||
     existing.windowEndsMinutes !== seed.windowEndsMinutes ||
-    existing.windowStartsMinutes !== seed.windowStartsMinutes ||
-    (seed.questionnaireVersionId === questionnaireVersionId && existing.questionnaireVersionId !== questionnaireVersionId)
+    existing.windowStartsMinutes !== seed.windowStartsMinutes
+  );
+}
+
+function resolveNavigoScheduleSortOrder({
+  code,
+  existingSchedules,
+  preferredSortOrder,
+  type
+}: {
+  code: string;
+  existingSchedules: Array<{
+    code: string | null;
+    sortOrder: number;
+    type: "INTERNAL_FOLLOWUP" | "QUESTIONNAIRE_MEASUREMENT" | "VIDEO_EVIDENCE";
+  }>;
+  preferredSortOrder: number;
+  type: NavigoScheduleSeed["type"];
+}): number {
+  const conflicting = existingSchedules.find(
+    (schedule) => schedule.code !== code && schedule.type === type && schedule.sortOrder === preferredSortOrder
+  );
+
+  if (!conflicting) {
+    return preferredSortOrder;
+  }
+
+  return (
+    Math.max(
+      preferredSortOrder,
+      ...existingSchedules.filter((schedule) => schedule.type === type).map((schedule) => schedule.sortOrder)
+    ) + 1
   );
 }
 
 function toScheduleCreateData(
   seed: NavigoScheduleSeed,
-  questionnaireVersionId: string,
+  sortOrder: number,
   studyId: string
 ) {
-  void questionnaireVersionId;
-
   return {
     code: seed.code,
     name: seed.name,
     offsetMinutes: seed.offsetMinutes,
     questionnaireVersionId: seed.questionnaireVersionId,
-    sortOrder: seed.sortOrder,
+    sortOrder,
     status: "ACTIVE",
     studyId,
     type: seed.type,

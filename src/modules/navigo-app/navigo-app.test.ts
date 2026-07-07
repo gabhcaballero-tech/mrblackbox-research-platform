@@ -1688,6 +1688,58 @@ describe("navigo app MVP rules", () => {
     expect(state.activities).toHaveLength(4);
   });
 
+  it("creates the T6 schedule from the public portal when production data still only has T0, T2 and T4", async () => {
+    const state = createNavigoParticipantActivityState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    state.activities.splice(
+      state.activities.findIndex((activity) => activity.activitySchedule.code === "T6_HORAS"),
+      1
+    );
+    state.activitySchedules.splice(
+      state.activitySchedules.findIndex((schedule) => schedule.code === "T6_HORAS"),
+      1
+    );
+    state.activitySchedules.push({
+      code: "T8_HORAS",
+      id: "schedule-T8_HORAS",
+      offsetMinutes: 480,
+      questionnaireVersionId: "version-1",
+      sortOrder: 3,
+      status: "ACTIVE",
+      type: "QUESTIONNAIRE_MEASUREMENT",
+      windowEndsMinutes: 120,
+      windowStartsMinutes: -30
+    });
+
+    const result = await repository.getParticipantActivitiesView({
+      now: new Date("2026-06-25T18:00:00.000Z"),
+      testMode: true,
+      token: "token-1"
+    });
+
+    expect(result.ok).toBe(true);
+
+    if (!result.ok) {
+      return;
+    }
+
+    expect(state.activitySchedules.find((schedule) => schedule.code === "T6_HORAS")).toMatchObject({
+      offsetMinutes: 360,
+      status: "ACTIVE"
+    });
+    expect(state.activitySchedules.find((schedule) => schedule.code === "T8_HORAS")).toMatchObject({
+      status: "INACTIVE"
+    });
+    expect(result.data.timeline.map((activity) => activity.code)).toEqual([
+      "T0_SALON",
+      "T2_HORAS",
+      "T4_HORAS",
+      "T6_HORAS"
+    ]);
+    expect(result.data.timeline).toHaveLength(4);
+    expect(result.data.timeline.some((activity) => activity.code === ("T8_HORAS" as never))).toBe(false);
+  });
+
   it("serves the rotation template as a tab-separated file with UTF-8 BOM", () => {
     const route = readWorkspaceFile(
       "src",
@@ -1813,7 +1865,17 @@ function createNavigoParticipantActivityState() {
     createParticipantActivity("T4_HORAS"),
     createParticipantActivity("T6_HORAS")
   ];
-  const activitySchedules = activities.map((activity) => activity.activitySchedule);
+  const activitySchedules: Array<{
+    code: string;
+    id: string;
+    offsetMinutes: number;
+    questionnaireVersionId: string | null;
+    sortOrder: number;
+    status: "ACTIVE" | "ARCHIVED" | "INACTIVE";
+    type: "INTERNAL_FOLLOWUP" | "QUESTIONNAIRE_MEASUREMENT" | "VIDEO_EVIDENCE";
+    windowEndsMinutes: number;
+    windowStartsMinutes: number;
+  }> = activities.map((activity) => activity.activitySchedule);
   const participant = {
     accessTokens: [],
     activities,
@@ -1873,14 +1935,50 @@ function createNavigoParticipantActivityState() {
   }> = [];
   const tx = {
     activitySchedule: {
+      async create(args: {
+        data: {
+          code: string;
+          name: string;
+          offsetMinutes: number;
+          questionnaireVersionId: string | null;
+          sortOrder: number;
+          status: "ACTIVE";
+          studyId: string;
+          type: "INTERNAL_FOLLOWUP" | "QUESTIONNAIRE_MEASUREMENT";
+          windowEndsMinutes: number;
+          windowStartsMinutes: number;
+        };
+      }) {
+        const record = {
+          code: args.data.code,
+          id: `schedule-${args.data.code}`,
+          offsetMinutes: args.data.offsetMinutes,
+          questionnaireVersionId: args.data.questionnaireVersionId,
+          sortOrder: args.data.sortOrder,
+          status: args.data.status,
+          type: args.data.type,
+          windowEndsMinutes: args.data.windowEndsMinutes,
+          windowStartsMinutes: args.data.windowStartsMinutes
+        };
+        activitySchedules.push(record);
+        return { id: record.id };
+      },
       async findMany(args?: { where?: { code?: { in?: string[] }; status?: string; studyId?: string } }) {
-        const requestedCodes = args?.where?.code?.in ?? NAVIGO_ACTIVITY_CODES;
+        const requestedCodes: readonly string[] = args?.where?.code?.in ?? NAVIGO_ACTIVITY_CODES;
         return activitySchedules
           .filter(
             (schedule) =>
               requestedCodes.includes(schedule.code) &&
               (!args?.where?.status || schedule.status === args.where.status)
           );
+      },
+      async update(args: { data: Partial<(typeof activitySchedules)[number]>; where: { id: string } }) {
+        const target = activitySchedules.find((schedule) => schedule.id === args.where.id);
+        if (!target) {
+          throw new Error("schedule not found");
+        }
+        Object.assign(target, args.data);
+        return { id: target.id };
       }
     },
     participantAccessToken: {
@@ -1915,10 +2013,13 @@ function createNavigoParticipantActivityState() {
         if (!schedule) {
           throw new Error("schedule not found");
         }
+        if (!NAVIGO_ACTIVITY_CODES.includes(schedule.code as never)) {
+          throw new Error("legacy schedule cannot create active participant activity");
+        }
 
         const record = {
           ...args.data,
-          activitySchedule: schedule,
+          activitySchedule: schedule as (typeof activities)[number]["activitySchedule"],
           id: `activity-${schedule.code}`,
           participantActivityEvidence: [],
           responses: []
@@ -1964,6 +2065,11 @@ function createNavigoParticipantActivityState() {
           type: args.data.type
         });
         return args.data;
+      }
+    },
+    questionnaireVersion: {
+      async findFirst() {
+        return { id: "version-1" };
       }
     },
     studyParticipant: {
@@ -2020,6 +2126,7 @@ function createNavigoParticipantActivityState() {
 
   return {
     activities,
+    activitySchedules,
     participant,
     prisma,
     responses,
