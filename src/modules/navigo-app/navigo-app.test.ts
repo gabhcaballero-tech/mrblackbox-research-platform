@@ -1647,6 +1647,47 @@ describe("navigo app MVP rules", () => {
     expect(view.ok ? "" : view.message).toBe("No encontramos una foto registrada para comparar. Contacta al supervisor antes de continuar.");
   });
 
+  it("repairs participants that only had T0, T2 and T4 by adding T6 without duplicates", async () => {
+    const state = createNavigoParticipantActivityState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    state.activities.splice(
+      state.activities.findIndex((activity) => activity.activitySchedule.code === "T6_HORAS"),
+      1
+    );
+
+    const first = await repository.getParticipantActivitiesView({
+      now: new Date("2026-06-25T18:00:00.000Z"),
+      testMode: true,
+      token: "token-1"
+    });
+    const second = await repository.getParticipantActivitiesView({
+      now: new Date("2026-06-25T18:00:00.000Z"),
+      testMode: true,
+      token: "token-1"
+    });
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+
+    if (!first.ok || !second.ok) {
+      return;
+    }
+
+    expect(first.data.timeline.map((activity) => activity.code)).toEqual([
+      "T0_SALON",
+      "T2_HORAS",
+      "T4_HORAS",
+      "T6_HORAS"
+    ]);
+    expect(first.data.timeline.find((activity) => activity.code === "T6_HORAS")).toMatchObject({
+      scheduledAt: new Date("2026-06-25T21:00:00.000Z")
+    });
+    expect(navigoActivityLabel("T6_HORAS")).toBe("Evaluacion 6 horas");
+    expect(state.activities.filter((activity) => activity.activitySchedule.code === "T6_HORAS")).toHaveLength(1);
+    expect(second.data.timeline.map((activity) => activity.code)).toEqual(first.data.timeline.map((activity) => activity.code));
+    expect(state.activities).toHaveLength(4);
+  });
+
   it("serves the rotation template as a tab-separated file with UTF-8 BOM", () => {
     const route = readWorkspaceFile(
       "src",
@@ -1772,6 +1813,7 @@ function createNavigoParticipantActivityState() {
     createParticipantActivity("T4_HORAS"),
     createParticipantActivity("T6_HORAS")
   ];
+  const activitySchedules = activities.map((activity) => activity.activitySchedule);
   const participant = {
     accessTokens: [],
     activities,
@@ -1831,8 +1873,14 @@ function createNavigoParticipantActivityState() {
   }> = [];
   const tx = {
     activitySchedule: {
-      async findMany() {
-        return activities.map((activity) => activity.activitySchedule);
+      async findMany(args?: { where?: { code?: { in?: string[] }; status?: string; studyId?: string } }) {
+        const requestedCodes = args?.where?.code?.in ?? NAVIGO_ACTIVITY_CODES;
+        return activitySchedules
+          .filter(
+            (schedule) =>
+              requestedCodes.includes(schedule.code) &&
+              (!args?.where?.status || schedule.status === args.where.status)
+          );
       }
     },
     participantAccessToken: {
@@ -1850,8 +1898,56 @@ function createNavigoParticipantActivityState() {
       }
     },
     participantActivity: {
-      async update(args: { data: Partial<(typeof activities)[number]>; where: { id: string } }) {
-        const target = activities.find((activity) => activity.id === args.where.id);
+      async create(args: {
+        data: {
+          activityScheduleId: string;
+          actualCompletedAt: Date | null;
+          actualStartedAt: Date | null;
+          availableFrom: Date;
+          availableUntil: Date;
+          occurrenceKey: string;
+          scheduledAt: Date;
+          status: "AVAILABLE" | "COMPLETED" | "PENDING" | "STARTED";
+          studyParticipantId: string;
+        };
+      }) {
+        const schedule = activitySchedules.find((item) => item.id === args.data.activityScheduleId);
+        if (!schedule) {
+          throw new Error("schedule not found");
+        }
+
+        const record = {
+          ...args.data,
+          activitySchedule: schedule,
+          id: `activity-${schedule.code}`,
+          participantActivityEvidence: [],
+          responses: []
+        };
+        activities.push(record);
+        participant.activities = activities;
+        return record;
+      },
+      async update(args: {
+        data: Partial<(typeof activities)[number]>;
+        where:
+          | { id: string }
+          | {
+              studyParticipantId_activityScheduleId_occurrenceKey: {
+                activityScheduleId: string;
+                occurrenceKey: string;
+                studyParticipantId: string;
+              };
+            };
+      }) {
+        const where = args.where;
+        const target =
+          "id" in where
+            ? activities.find((activity) => activity.id === where.id)
+            : activities.find(
+                (activity) =>
+                  activity.activityScheduleId === where.studyParticipantId_activityScheduleId_occurrenceKey.activityScheduleId &&
+                  activity.occurrenceKey === where.studyParticipantId_activityScheduleId_occurrenceKey.occurrenceKey
+              );
         if (!target) {
           throw new Error("activity not found");
         }

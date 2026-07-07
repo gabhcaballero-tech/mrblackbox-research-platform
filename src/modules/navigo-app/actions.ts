@@ -65,6 +65,7 @@ export async function generateNavigoParticipantLinkAction(
   forceRegenerate: boolean
 ) {
   const actor = await requireCapability("application-time:record");
+  await ensureNavigoAppFoundation({ actorUserId: actor.id });
   const result = await createNavigoAppRepository().generateParticipantLink({
     actorUserId: actor.id,
     forceRegenerate,
@@ -81,6 +82,7 @@ export async function generateNavigoParticipantLinkAction(
 
 export async function registerNavigoDirectParticipantAction(studyId: string, formData: FormData) {
   const actor = await requireCapability("screening:review");
+  await ensureNavigoAppFoundation({ actorUserId: actor.id });
   const result = await createNavigoAppRepository().registerDirectParticipant({
     actorUserId: actor.id,
     celular: String(formData.get("celular") ?? ""),
@@ -110,6 +112,7 @@ export async function registerNavigoDirectParticipantAction(studyId: string, for
 
 export async function generateNavigoParticipantLinksForStudyAction(studyId: string, formData: FormData) {
   const actor = await requireCapability("screening:review");
+  await ensureNavigoAppFoundation({ actorUserId: actor.id });
   const result = await createNavigoAppRepository().generateParticipantLinksForStudy({
     actorUserId: actor.id,
     forceRegenerate: formData.get("forceRegenerate") === "on",

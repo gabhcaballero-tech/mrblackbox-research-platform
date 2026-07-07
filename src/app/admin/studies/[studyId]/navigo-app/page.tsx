@@ -25,6 +25,7 @@ import {
 import type { QuestionnaireQuestion } from "@/modules/questionnaire-engine";
 import { NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
 import { appendNavigoTestModeParams, createNavigoTestModeParams } from "@/modules/navigo-app/test-mode";
+import { ensureNavigoAppFoundation } from "@/modules/navigo-app/loader";
 import {
   faceVerificationResultLabel,
   parseNavigoFaceVerificationNote
@@ -59,6 +60,7 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
   const query = await searchParams;
   const requestOrigin = resolveRequestOrigin(await headers());
   const actor = await requireCapability("screening:review");
+  await ensureNavigoAppFoundation({ actorUserId: actor.id });
   const result = await createNavigoAppRepository().getAdminDashboard(studyId);
 
   if (!result) {

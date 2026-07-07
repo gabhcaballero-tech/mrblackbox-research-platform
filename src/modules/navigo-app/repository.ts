@@ -1802,7 +1802,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
     async getParticipantActivitiesView(input) {
       const prisma = await getPrisma();
       const now = input.now ?? new Date();
-      const participant = await getParticipantByToken(input.token, prisma, now);
+      let participant = await getParticipantByToken(input.token, prisma, now);
 
       if (!participant) {
         return {
@@ -1815,6 +1815,12 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
       if (!safe.ok) {
         return safe;
       }
+
+      participant = await ensureCurrentNavigoActivitiesForParticipant({
+        now,
+        participant,
+        prisma
+      });
 
       const timeline = buildNavigoActivityTimeline({
         activities: (participant.activities ?? []).map(toNavigoActivityRecord),
@@ -1840,7 +1846,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
     async getActivityCaptureView(input) {
       const prisma = await getPrisma();
       const now = input.now ?? new Date();
-      const participant = await getParticipantByToken(input.token, prisma, now);
+      let participant = await getParticipantByToken(input.token, prisma, now);
 
       if (!participant) {
         return {
@@ -1853,6 +1859,12 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
       if (!safe.ok) {
         return safe;
       }
+
+      participant = await ensureCurrentNavigoActivitiesForParticipant({
+        now,
+        participant,
+        prisma
+      });
 
       const activity = (participant.activities ?? []).find((item) => item.id === input.activityId);
       if (!activity) {
@@ -2566,7 +2578,7 @@ async function getNavigoSchedules({
   prisma
 }: {
   participant: ParticipantRecord;
-  prisma: NavigoTransactionClient;
+  prisma: NavigoPrismaClient | NavigoTransactionClient;
 }): Promise<NavigoScheduleRecord[]> {
   return (await prisma.activitySchedule.findMany?.({
     orderBy: { sortOrder: "asc" },
@@ -2587,6 +2599,77 @@ async function getNavigoSchedules({
       studyId: participant.study.id
     }
   })) as NavigoScheduleRecord[];
+}
+
+async function ensureCurrentNavigoActivitiesForParticipant({
+  now,
+  participant,
+  prisma
+}: {
+  now: Date;
+  participant: ParticipantRecord;
+  prisma: NavigoPrismaClient | NavigoTransactionClient;
+}): Promise<ParticipantRecord> {
+  if (!participant.applicationStartedAt) {
+    return participant;
+  }
+
+  const schedules = await getNavigoSchedules({ participant, prisma });
+  const prepared = prepareNavigoParticipantActivities({
+    existingActivities: (participant.activities ?? []).map(toNavigoActivityRecord),
+    now,
+    participant: {
+      applicationStartedAt: participant.applicationStartedAt,
+      id: participant.id,
+      reviewStatus: participantStatus(participant),
+      studyCode: participant.study.code,
+      timeZoneIana: participant.study.timeZoneIana
+    },
+    schedules
+  });
+
+  if (!prepared.ok || (prepared.created.length === 0 && prepared.updated.length === 0)) {
+    return participant;
+  }
+
+  for (const activity of prepared.created) {
+    await prisma.participantActivity.create?.({
+      data: {
+        activityScheduleId: activity.activityScheduleId,
+        actualCompletedAt: null,
+        actualStartedAt: null,
+        availableFrom: activity.availableFrom,
+        availableUntil: activity.availableUntil,
+        occurrenceKey: activity.occurrenceKey,
+        scheduledAt: activity.scheduledAt,
+        status: activity.status,
+        studyParticipantId: activity.studyParticipantId
+      }
+    });
+  }
+
+  for (const activity of prepared.updated) {
+    await prisma.participantActivity.update?.({
+      data: {
+        availableFrom: activity.availableFrom,
+        availableUntil: activity.availableUntil,
+        scheduledAt: activity.scheduledAt,
+        status: activity.status
+      },
+      where: {
+        studyParticipantId_activityScheduleId_occurrenceKey: {
+          activityScheduleId: activity.activityScheduleId,
+          occurrenceKey: "DEFAULT",
+          studyParticipantId: participant.id
+        }
+      }
+    });
+  }
+
+  return ((await prisma.studyParticipant.findUnique?.({
+    select: participantWithActivitiesSelect,
+    where: { id: participant.id }
+  })) as ParticipantRecord | null) ?? participant;
 }
 
 async function resolveNavigoMeasurementQuestionnaireVersionId({
