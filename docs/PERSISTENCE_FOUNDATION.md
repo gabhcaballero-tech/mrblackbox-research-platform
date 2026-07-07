@@ -72,7 +72,7 @@ El esquema prepara PostgreSQL con Prisma para:
 - `QuotaEvaluation.blocksInterview` existe y queda por defecto en `false`, reflejando la regla V1 de aviso no bloqueante.
 - El orden de atributos tiene `orderKey` para evitar duplicados por participacion, version, bloque y contexto, incluyendo orden compartido.
 - `ActivitySchedule.recurrenceJson` puede describir recurrencia futura, pero cada instancia generada debe persistirse como `ParticipantActivity` con `occurrenceKey` propio.
-- `ActivitySchedule.code` queda nullable para no forzar backfill peligroso, pero la fundacion de Navigo exige `code` en servicio para `T0_SALON`, `T2_HORAS`, `T4_HORAS` y `T8_HORAS`.
+- `ActivitySchedule.code` queda nullable para no forzar backfill peligroso, pero la fundacion de Navigo exige `code` en servicio para `T0_SALON`, `T2_HORAS`, `T4_HORAS` y `T6_HORAS`.
 - Las mediciones no recurrentes deben usar una ocurrencia estandar, como `DEFAULT`.
 - `ResearchResponse.responseKey` debe construirse deterministamente con pregunta, bloque y contexto; no debe contener PII.
 - La consistencia de estudio para rotacion manual queda como regla obligatoria de aplicacion antes de persistir, no como trigger ni SQL manual.
@@ -233,7 +233,7 @@ Resumen:
 - crea `participant_activity_evidence` para evidencias por medicion;
 - reutiliza enums existentes `ParticipantEvidenceType` y `ParticipantEvidenceReviewStatus`;
 - mantiene intacto `participant_evidence` para el screener/portal ya operativo;
-- prepara la base de `T0_SALON`, `T2_HORAS`, `T4_HORAS` y `T8_HORAS` sin abrir todavia una experiencia productiva al participante.
+- prepara la base de `T0_SALON`, `T2_HORAS`, `T4_HORAS` y `T6_HORAS` sin abrir todavia una experiencia productiva al participante.
 
 No se aplico a Supabase ni a ninguna base de datos.
 

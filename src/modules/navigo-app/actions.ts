@@ -23,6 +23,7 @@ import {
   type NavigoParticipantImportRowInput,
   type NavigoRotationImportRowInput
 } from "./service";
+import { NAVIGO_ACTIVITY_CODES, type NavigoActivityCode } from "./definition";
 import type { NavigoRotationImportActionState } from "./rotation-import-state";
 import type { NavigoParticipantImportActionState } from "./participant-import-state";
 import type { EvidenceUploadMetadata } from "@/modules/participant-portal/evidence-storage";
@@ -170,13 +171,13 @@ export async function deleteNavigoParticipantStagesAction(
     redirectWithNavigoMessage(studyId, { error: "Captura el motivo de la correccion." });
   }
 
-  if (!["T0_SALON", "T2_HORAS", "T4_HORAS", "T8_HORAS"].includes(fromCode)) {
+  if (!NAVIGO_ACTIVITY_CODES.includes(fromCode as NavigoActivityCode)) {
     redirectWithNavigoMessage(studyId, { error: "Selecciona una etapa valida." });
   }
 
   const result = await createNavigoAppRepository().deleteParticipantStagesFrom({
     actorUserId: actor.id,
-    fromCode: fromCode as "T0_SALON" | "T2_HORAS" | "T4_HORAS" | "T8_HORAS",
+    fromCode: fromCode as NavigoActivityCode,
     reason,
     studyParticipantId
   });

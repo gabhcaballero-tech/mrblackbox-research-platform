@@ -182,7 +182,7 @@ Tipos iniciales:
 - `video_evidence`: evidencia de video futura.
 - `internal_followup`: recordatorio o seguimiento interno.
 
-Las mediciones actuales son actividades de cuestionario a 15, 120, 240 y 480 minutos desde la hora de aplicación. Las ventanas permitidas son configurables por estudio y no deben estar codificadas de forma fija. La evidencia futura serán videos de aplicación una vez al día durante tres días, sin implementar todavía cámara, carga ni almacenamiento.
+Las mediciones actuales son actividades de cuestionario a 15, 120, 240 y 360 minutos desde la hora de aplicación. Las ventanas permitidas son configurables por estudio y no deben estar codificadas de forma fija. La evidencia futura serán videos de aplicación una vez al día durante tres días, sin implementar todavía cámara, carga ni almacenamiento.
 
 ## Hora Ancla De Medición
 

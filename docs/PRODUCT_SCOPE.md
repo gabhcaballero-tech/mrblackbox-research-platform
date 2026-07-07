@@ -144,7 +144,7 @@ Las mediciones iniciales serán cuestionarios a:
 - 15 minutos.
 - 2 horas.
 - 4 horas.
-- 8 horas.
+- 6 horas.
 
 Cada actividad debe tener:
 

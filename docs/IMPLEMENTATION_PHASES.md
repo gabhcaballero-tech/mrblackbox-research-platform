@@ -30,7 +30,7 @@ Debe incluir:
 - Enlace único sin contraseña.
 - Enlace válido hasta 7 días después de la última actividad programada.
 - Hora de aplicación registrada por encuestador.
-- Actividades de medición a 15 minutos, 2 horas, 4 horas y 8 horas.
+- Actividades de medición a 15 minutos, 2 horas, 4 horas y 6 horas.
 - Ventanas configurables por estudio.
 - Batería de atributos aleatoria persistente.
 - Opción de usar el mismo orden de atributos para ambas fragancias.
@@ -126,7 +126,7 @@ Entregables:
 - Uso desde más de un dispositivo.
 - Registro de `applicationStartedAt` por encuestador.
 - Corrección de hora de aplicación con reglas V1 y auditoría.
-- Cálculo de actividades a 15, 120, 240 y 480 minutos.
+- Cálculo de actividades a 15, 120, 240 y 360 minutos.
 - Estados de actividad.
 - Ventanas de disponibilidad configurables por estudio.
 - Reapertura manual de actividad vencida con auditoría.

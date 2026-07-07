@@ -96,7 +96,7 @@ describe("navigo app definition", () => {
     expect(serializedQuestions).not.toContain("realName");
   });
 
-  it("creates T0, T2, T4 and T8 schedules with expected windows", () => {
+  it("creates T0, T2, T4 and T6 schedules with expected windows", () => {
     const schedules = createNavigoScheduleSeeds("version-1");
 
     expect(schedules.map((schedule) => schedule.code)).toEqual(NAVIGO_ACTIVITY_CODES);
@@ -125,8 +125,8 @@ describe("navigo app definition", () => {
         windowStartsMinutes: -30
       },
       {
-        code: "T8_HORAS",
-        offsetMinutes: 480,
+        code: "T6_HORAS",
+        offsetMinutes: 360,
         questionnaireVersionId: "version-1",
         windowEndsMinutes: 120,
         windowStartsMinutes: -30
@@ -226,7 +226,7 @@ describe("navigo participant activities", () => {
       "2026-06-25T15:00:00.000Z",
       "2026-06-25T17:00:00.000Z",
       "2026-06-25T19:00:00.000Z",
-      "2026-06-25T23:00:00.000Z"
+      "2026-06-25T21:00:00.000Z"
     ]);
     expect(result.timeZoneIana).toBe("America/Mexico_City");
   });
@@ -437,14 +437,14 @@ describe("navigo app MVP rules", () => {
     });
   });
 
-  it("does not allow skipping T4 or T8 when previous measurements are pending", () => {
+  it("does not allow skipping T4 or T6 when previous measurements are pending", () => {
     const t4Blocked = buildNavigoActivityTimeline({
       activities: navigoActivityRecords(),
       now: new Date("2026-06-25T18:40:00.000Z")
     });
-    const t8Blocked = buildNavigoActivityTimeline({
+    const t6Blocked = buildNavigoActivityTimeline({
       activities: navigoActivityRecords({ t2Completed: true }),
-      now: new Date("2026-06-25T22:40:00.000Z")
+      now: new Date("2026-06-25T20:40:00.000Z")
     });
 
     expect(t4Blocked.find((activity) => activity.code === "T4_HORAS")?.availability).toMatchObject({
@@ -452,7 +452,7 @@ describe("navigo app MVP rules", () => {
       canCapture: false,
       reason: "PREVIOUS_REQUIRED"
     });
-    expect(t8Blocked.find((activity) => activity.code === "T8_HORAS")?.availability).toMatchObject({
+    expect(t6Blocked.find((activity) => activity.code === "T6_HORAS")?.availability).toMatchObject({
       blockedByCode: "T4_HORAS",
       canCapture: false,
       reason: "PREVIOUS_REQUIRED"
@@ -1702,7 +1702,7 @@ function navigoActivityRecords({
       selfieCount: t2SelfieCount
     }),
     navigoActivityRecord("T4_HORAS", 240, -30, 360, t4Completed ? "COMPLETED" : "PENDING", null, null),
-    navigoActivityRecord("T8_HORAS", 480, -30, 120, "PENDING", null, null)
+    navigoActivityRecord("T6_HORAS", 360, -30, 120, "PENDING", null, null)
   ];
 }
 
@@ -1770,7 +1770,7 @@ function createNavigoParticipantActivityState() {
       status: "COMPLETED" as const
     }),
     createParticipantActivity("T4_HORAS"),
-    createParticipantActivity("T8_HORAS")
+    createParticipantActivity("T6_HORAS")
   ];
   const participant = {
     accessTokens: [],
@@ -1946,13 +1946,13 @@ function createParticipantActivity(
     T0_SALON: 0,
     T2_HORAS: 120,
     T4_HORAS: 240,
-    T8_HORAS: 480
+    T6_HORAS: 360
   } satisfies Record<(typeof NAVIGO_ACTIVITY_CODES)[number], number>;
   const windows = {
     T0_SALON: [0, 0],
     T2_HORAS: [-30, 480],
     T4_HORAS: [-30, 360],
-    T8_HORAS: [-30, 120]
+    T6_HORAS: [-30, 120]
   } satisfies Record<(typeof NAVIGO_ACTIVITY_CODES)[number], [number, number]>;
   const base = new Date("2026-06-25T15:00:00.000Z");
   const scheduledAt = new Date(base.getTime() + offsets[code] * 60000);

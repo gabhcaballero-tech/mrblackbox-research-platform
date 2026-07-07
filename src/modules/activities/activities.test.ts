@@ -8,7 +8,7 @@ import {
 } from "./scheduler";
 
 describe("scheduled activities", () => {
-  it("calculates activities at 15 minutes, 2 hours, 4 hours, and 8 hours", () => {
+  it("calculates activities at 15 minutes, 2 hours, 4 hours, and 6 hours", () => {
     const applicationStartedAt = new Date("2026-06-22T12:00:00.000Z");
     const activities = calculateParticipantActivities(
       applicationStartedAt,
@@ -20,7 +20,7 @@ describe("scheduled activities", () => {
       "2026-06-22T12:15:00.000Z",
       "2026-06-22T14:00:00.000Z",
       "2026-06-22T16:00:00.000Z",
-      "2026-06-22T20:00:00.000Z"
+      "2026-06-22T18:00:00.000Z"
     ]);
     expect(activities.every((activity) => activity.occurrenceKey === "DEFAULT")).toBe(true);
   });

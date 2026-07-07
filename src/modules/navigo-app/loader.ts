@@ -2,6 +2,7 @@ import {
   createNavigoMeasurementDefinition,
   createNavigoScheduleSeeds,
   hashNavigoMeasurementDefinition,
+  NAVIGO_LEGACY_ACTIVITY_CODES,
   NAVIGO_MEASUREMENT_DRAFT_NAME,
   resolveNavigoTimeZone,
   type NavigoMeasurementDefinition,
@@ -304,6 +305,7 @@ export function createNavigoFoundationRepository(
         }
 
         const seeds = createNavigoScheduleSeeds(questionnaireVersionId);
+        const activeCodes = seeds.map((seed) => seed.code);
         const existingSchedules = await tx.activitySchedule.findMany({
           select: {
             code: true,
@@ -319,7 +321,7 @@ export function createNavigoFoundationRepository(
           },
           where: {
             code: {
-              in: seeds.map((seed) => seed.code)
+              in: [...activeCodes, ...NAVIGO_LEGACY_ACTIVITY_CODES]
             },
             studyId: study.id
           }
@@ -363,6 +365,20 @@ export function createNavigoFoundationRepository(
           }
         }
 
+        for (const legacy of existingSchedules.filter((schedule) => NAVIGO_LEGACY_ACTIVITY_CODES.includes(schedule.code as never))) {
+          if (legacy.status === "ACTIVE") {
+            await tx.activitySchedule.update({
+              data: {
+                status: "INACTIVE"
+              },
+              where: {
+                id: legacy.id
+              }
+            });
+            schedulesUpdated += 1;
+          }
+        }
+
         return {
           draftCreated,
           draftUpdated,
@@ -370,7 +386,7 @@ export function createNavigoFoundationRepository(
           questionnaireVersionId,
           questionnaireVersionReused,
           retiredVersionCount,
-          scheduleCodes: seeds.map((seed) => seed.code),
+          scheduleCodes: activeCodes,
           schedulesCreated,
           schedulesUpdated,
           studyCode: study.code,

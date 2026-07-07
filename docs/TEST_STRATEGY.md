@@ -63,7 +63,7 @@ Flujos principales:
 
 - Admin crea estudio comparativo de fragancias con zona horaria.
 - Admin configura productos, brazo izquierdo/derecho y rotación.
-- Admin configura cuestionarios, actividades de 15 min, 2 h, 4 h y 8 h, y publica versión.
+- Admin configura cuestionarios, actividades de 15 min, 2 h, 4 h y 6 h, y publica versión.
 - Encuestador aplica filtro, calcula NSE, recibe advertencia de cuota llena y continúa.
 - Encuestador registra participante y participación en estudio.
 - Encuestador asigna código de rotación y registra hora de aplicación.
@@ -107,7 +107,7 @@ Debe probar:
 Debe probar:
 
 - Las actividades se calculan desde `applicationStartedAt`.
-- Los offsets 15, 120, 240 y 480 minutos generan horarios correctos.
+- Los offsets 15, 120, 240 y 360 minutos generan horarios correctos.
 - La zona horaria IANA del estudio se respeta.
 - Corregir la hora registra valor anterior, valor nuevo, usuario y motivo.
 - Supervisor puede corregir la hora solo si ninguna actividad ha sido iniciada.
@@ -218,7 +218,7 @@ Crear fixtures pequeñas y legibles:
 - Cuota por ciudad y NSE con etapa de conteo.
 - Participante con dos participaciones en estudios distintos.
 - Batería de 12 atributos agrupados de 5 en 5.
-- Actividades a 15, 120, 240 y 480 minutos.
+- Actividades a 15, 120, 240 y 360 minutos.
 - Actividades futuras de video una vez al día durante tres días, solo como datos de modelo con consentimiento, revisión futura y retención futura.
 
 ## Criterio Mínimo Antes De UI Compleja

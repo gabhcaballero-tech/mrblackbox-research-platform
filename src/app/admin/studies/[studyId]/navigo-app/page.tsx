@@ -16,6 +16,7 @@ import {
   createNavigoAppRepository,
   createNavigoMeasurementDefinition,
   formatNavigoDateTimeLocal,
+  NAVIGO_ACTIVITY_CODES,
   navigoActivityLabel,
   nowInStudyTimezoneForDateTimeLocal,
   type NavigoActivityListItem,
@@ -70,7 +71,7 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
     <AppShell>
       <PageHeader
         actions={<StatusBadge status={isNavigo ? "ready" : "planned"}>{isNavigo ? "Operable" : "No aplica"}</StatusBadge>}
-        description="Inicio de T0 en salon y seguimiento de las mediciones de participante a 2, 4 y 8 horas."
+        description="Inicio de T0 en salon y seguimiento de las mediciones de participante a 2, 4 y 6 horas."
         eyebrow="App Navigo"
         title={`Mediciones de fragancia · ${result.study.name}`}
       />
@@ -271,7 +272,7 @@ function ParticipantRow({
       <div className="space-y-4">
         <RotationPreparation participant={participant} studyId={studyId} />
         <div className="grid gap-3 md:grid-cols-4">
-          {["T0_SALON", "T2_HORAS", "T4_HORAS", "T8_HORAS"].map((code) => (
+          {NAVIGO_ACTIVITY_CODES.map((code) => (
             <ActivitySummary
               activity={participant.activities.find((item) => item.code === code)}
               code={code as NavigoActivityListItem["code"]}
@@ -281,7 +282,7 @@ function ParticipantRow({
           ))}
         </div>
         <div className="space-y-3">
-          {["T0_SALON", "T2_HORAS", "T4_HORAS", "T8_HORAS"].map((code) => (
+          {NAVIGO_ACTIVITY_CODES.map((code) => (
             <ActivityDetail
               activity={participant.activities.find((item) => item.code === code)}
               code={code as NavigoActivityListItem["code"]}
@@ -313,7 +314,7 @@ function ParticipantRow({
           </dl>
           {t0Activity?.identityStatus === "REJECTED" ? (
             <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800">
-              Incidencia de identidad en T0. No continúes con T2/T4/T8 hasta que supervisor revise el caso.
+              Incidencia de identidad en T0. No continúes con T2/T4/T6 hasta que supervisor revise el caso.
             </p>
           ) : null}
           {participantUrl ? (
@@ -422,7 +423,7 @@ function CorrectionActions({
           <option value="T0_SALON">T0 y posteriores</option>
           <option value="T2_HORAS">T2 y posteriores</option>
           <option value="T4_HORAS">T4 y posteriores</option>
-          <option value="T8_HORAS">T8 solamente</option>
+          <option value="T6_HORAS">T6 solamente</option>
         </select>
         <input
           className={inputClass}
@@ -712,7 +713,7 @@ function ActivityIdentityReview({
   return (
     <section>
       <h4 className="text-sm font-semibold text-zinc-950">Revisión visual de identidad</h4>
-      <p className="mt-1 text-xs text-zinc-500">T0 mantiene confirmación visual humana. T2/T4/T8 usan verificación facial automática y permiten revisión manual.</p>
+      <p className="mt-1 text-xs text-zinc-500">T0 mantiene confirmación visual humana. T2/T4/T6 usan verificación facial automática y permiten revisión manual.</p>
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         <SelfiePreview title="Selfie registrada del filtro" url={registeredSelfie?.signedUrl ?? null} />
         {isT0 ? (

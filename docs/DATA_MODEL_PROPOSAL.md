@@ -414,7 +414,7 @@ Campos sugeridos:
 - `sortOrder`
 - `status`
 
-Para mediciones actuales, crear actividades de cuestionario a 15, 120, 240 y 480 minutos desde `applicationStartedAt`. Las ventanas permitidas se configuran por estudio mediante `windowStartsMinutes` y `windowEndsMinutes`; las tolerancias exactas no deben codificarse de forma fija.
+Para mediciones actuales, crear actividades de cuestionario a 15, 120, 240 y 360 minutos desde `applicationStartedAt`. Las ventanas permitidas se configuran por estudio mediante `windowStartsMinutes` y `windowEndsMinutes`; las tolerancias exactas no deben codificarse de forma fija.
 
 Para video futuro, configurar actividades `video_evidence` una vez al día durante tres días. No implica implementar carga, cámara ni almacenamiento.
 

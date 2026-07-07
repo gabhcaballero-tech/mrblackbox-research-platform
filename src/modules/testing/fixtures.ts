@@ -197,11 +197,11 @@ export const measurementSchedules: ActivitySchedule[] = [
     status: "active"
   },
   {
-    id: "measurement-480",
+    id: "measurement-360",
     type: "questionnaire_measurement",
-    name: "Medicion 8 h",
+    name: "Medicion 6 h",
     anchorEvent: "application_started",
-    offsetMinutes: 480,
+    offsetMinutes: 360,
     windowStartsMinutes: 0,
     windowEndsMinutes: 60,
     sortOrder: 4,

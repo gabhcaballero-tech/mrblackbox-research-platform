@@ -38,7 +38,7 @@ export type ActivityOccurrenceValidationResult =
       duplicateKeys: string[];
     };
 
-export const DEFAULT_MEASUREMENT_OFFSETS_MINUTES = [15, 120, 240, 480] as const;
+export const DEFAULT_MEASUREMENT_OFFSETS_MINUTES = [15, 120, 240, 360] as const;
 export const DEFAULT_ACTIVITY_OCCURRENCE_KEY = "DEFAULT";
 
 export function createDefaultMeasurementSchedules(

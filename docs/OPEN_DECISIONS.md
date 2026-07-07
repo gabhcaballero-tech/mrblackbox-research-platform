@@ -21,7 +21,7 @@ Este documento conserva solo decisiones que siguen pendientes antes o durante la
 - Rotación V1: asignación manual mediante carátula o código registrado por el encuestador.
 - Asignación automática queda preparada en arquitectura y modelo, pero no se implementa en V1.
 - Ventanas de medición configurables por estudio.
-- Mediciones iniciales: 15 minutos, 2 horas, 4 horas y 8 horas.
+- Mediciones iniciales: 15 minutos, 2 horas, 4 horas y 6 horas.
 - `applicationStartedAt` es la hora ancla.
 - Antes de iniciar actividades, Supervisor puede corregir `applicationStartedAt` y se recalculan actividades pendientes.
 - Después de iniciar o completar una actividad, solo Admin puede corregir `applicationStartedAt`.

@@ -53,7 +53,7 @@ El estudio actual requiere mediciones a:
 - 15 minutos.
 - 2 horas.
 - 4 horas.
-- 8 horas.
+- 6 horas.
 
 Las tolerancias exactas se definirán posteriormente por estudio.
 
