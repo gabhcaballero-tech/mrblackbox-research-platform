@@ -31,7 +31,13 @@ export default async function ScreeningResultPage({ params }: ScreeningResultPag
       notFound();
     }
 
-    throw new Error(result.message);
+    const fallback = <FieldResultMessage title={result.message} />;
+
+    if (isPublicFieldActor(actor)) {
+      return <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">{fallback}</main>;
+    }
+
+    return <AppShell>{fallback}</AppShell>;
   }
 
   const screen = result.data;
@@ -62,6 +68,18 @@ export default async function ScreeningResultPage({ params }: ScreeningResultPag
   }
 
   return <AppShell>{content}</AppShell>;
+}
+
+function FieldResultMessage({ title }: { title: string }) {
+  return (
+    <section className="rounded-lg border border-amber-200 bg-amber-50 p-6 shadow-sm">
+      <p className="text-sm font-semibold uppercase tracking-wide text-amber-800">Resultado no disponible</p>
+      <h1 className="mt-2 text-xl font-semibold text-zinc-950">{title}</h1>
+      <p className="mt-2 text-sm leading-6 text-zinc-700">
+        Si ya completaste la selfie, espera unos segundos y vuelve a intentar abrir el resultado.
+      </p>
+    </section>
+  );
 }
 
 function FieldPendingSelfieCard({ attemptId }: { attemptId: string }) {

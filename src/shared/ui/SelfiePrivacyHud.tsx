@@ -27,7 +27,7 @@ export function SelfiePrivacyHud({
       <div className="absolute left-1/2 top-[29%] flex w-full -translate-x-1/2 -translate-y-1/2 flex-col items-center px-6">
         {showEyeText ? (
           <p className="rounded-md bg-zinc-950/60 px-3 py-1 text-xs font-semibold text-white shadow-sm">
-            Coloca tus ojos aqui
+            Coloca tus ojos aquí
           </p>
         ) : null}
         <div className="relative mt-3 h-14 w-56 max-w-[76vw]">

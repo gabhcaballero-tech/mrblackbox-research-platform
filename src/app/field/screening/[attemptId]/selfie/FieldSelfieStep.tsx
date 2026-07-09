@@ -8,6 +8,12 @@ import {
 } from "@/modules/field/evidence-actions";
 import type { FieldSelfieScreen } from "@/modules/field/service";
 import { createBrowserSupabaseClient } from "@/shared/auth/supabase/browser";
+import {
+  mirroredSelfiePreviewStyle,
+  selfieMediaClass,
+  selfieMediaFrameClass,
+  SelfiePrivacyHud
+} from "@/shared/ui/SelfiePrivacyHud";
 
 export function FieldSelfieStep({ screen }: { screen: FieldSelfieScreen }) {
   const [selfieCount, setSelfieCount] = useState(screen.counts.selfie);
@@ -276,6 +282,9 @@ export function FieldSelfieStep({ screen }: { screen: FieldSelfieScreen }) {
           <p className="text-sm leading-6 text-zinc-600">
             Toma una selfie clara de identificación. Se usará únicamente para validar que la misma persona continúe durante el estudio.
           </p>
+          <p className="text-sm leading-6 text-zinc-600">
+            Coloca tus ojos dentro de las guías y mira de frente. La capa oscura es solo una ayuda visual; la selfie se guarda completa.
+          </p>
           <p className="text-sm text-zinc-500">Selfie registrada: {selfieCount}/1</p>
         </div>
 
@@ -289,13 +298,18 @@ export function FieldSelfieStep({ screen }: { screen: FieldSelfieScreen }) {
 
         {cameraState !== "idle" ? (
           <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-950 p-3">
-            <video
-              autoPlay
-              className="max-h-[70vh] min-h-64 w-full rounded-md object-cover"
-              muted
-              playsInline
-              ref={videoRef}
-            />
+            <div className={selfieMediaFrameClass}>
+              <video
+                autoPlay
+                className={selfieMediaClass}
+                data-mirrored="true"
+                muted
+                playsInline
+                ref={videoRef}
+                style={mirroredSelfiePreviewStyle}
+              />
+              <SelfiePrivacyHud mode="camera" testIdPrefix="field-selfie" />
+            </div>
             <div className="mt-3 flex flex-col gap-3 sm:flex-row">
               <button
                 className={primaryButtonClass}
@@ -314,8 +328,17 @@ export function FieldSelfieStep({ screen }: { screen: FieldSelfieScreen }) {
 
         {previewUrl ? (
           <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img alt="Vista previa de la selfie capturada" className="max-h-[70vh] w-full rounded-md object-contain" src={previewUrl} />
+            <div className={selfieMediaFrameClass}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                alt="Vista previa de la selfie capturada"
+                className={selfieMediaClass}
+                data-mirrored="true"
+                src={previewUrl}
+                style={mirroredSelfiePreviewStyle}
+              />
+              <SelfiePrivacyHud mode="preview" testIdPrefix="field-selfie" />
+            </div>
             <div className="mt-3 flex flex-col gap-3 sm:flex-row">
               <button className={secondaryButtonClass} disabled={busy} onClick={repeatPhoto} type="button">
                 Repetir foto

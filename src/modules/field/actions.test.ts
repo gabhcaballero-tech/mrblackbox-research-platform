@@ -115,7 +115,7 @@ describe("field actions public access", () => {
     });
   });
 
-  it("generates folio and codes when a public field screening finishes as eligible", async () => {
+  it("generates folio and codes but does not send final WhatsApp before selfie when review is required", async () => {
     const { saveFieldScreeningAnswerAction } = await import("./actions");
     const { PUBLIC_FIELD_ACTOR } = await import("./service");
     const { saveFieldScreeningAnswer } = await import("./service");
@@ -183,13 +183,7 @@ describe("field actions public access", () => {
         attemptId: "attempt-public-1"
       })
     );
-    expect(mocks.sendNavigoConfirmationWhatsApp).toHaveBeenCalledWith(
-      expect.objectContaining({
-        folio: "NAV-001",
-        participantId: "study-participant-1",
-        phone: "5551112222"
-      })
-    );
+    expect(mocks.sendNavigoConfirmationWhatsApp).not.toHaveBeenCalled();
   });
 
   it("goes straight to result when a passed public field study does not require selfie", async () => {
@@ -246,6 +240,13 @@ describe("field actions public access", () => {
 
     await expect(saveFieldScreeningAnswerAction("attempt-detergents-1", "CONSENTIMIENTO", formData)).rejects.toThrow(
       "redirect:/field/screening/attempt-detergents-1/result"
+    );
+    expect(mocks.sendNavigoConfirmationWhatsApp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        folio: "DET-001",
+        participantId: "study-participant-1",
+        phone: "5551112222"
+      })
     );
   });
 

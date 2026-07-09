@@ -772,6 +772,7 @@ describe("field service", () => {
       attemptId,
       repository
     });
+    const completedAttempt = await repository.getAttempt(attemptId);
 
     expect(confirmed).toMatchObject({
       data: {
@@ -787,6 +788,7 @@ describe("field service", () => {
       },
       ok: true
     });
+    expect(completedAttempt?.participantScreeningReview?.status).toBe("PENDING");
   });
 
   it("does not let a public visitor access selfie for an internal field attempt", async () => {

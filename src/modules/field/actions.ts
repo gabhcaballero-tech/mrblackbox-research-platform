@@ -143,9 +143,8 @@ export async function saveFieldScreeningAnswerAction(
         redirect(fieldAttemptPath(attemptId, questionId, confirmation.message));
       }
 
-      const confirmationAttempt = await sendFieldConfirmationWhatsAppBestEffort({
+      const confirmationAttempt = await loadFieldConfirmationAttemptBestEffort({
         attemptId,
-        confirmation: confirmation.confirmation,
         repository: confirmationRepository
       });
 
@@ -155,6 +154,12 @@ export async function saveFieldScreeningAnswerAction(
       ) {
         redirect(`/field/screening/${attemptId}/selfie`);
       }
+
+      await sendFieldConfirmationWhatsAppBestEffort({
+        attempt: confirmationAttempt,
+        attemptId,
+        confirmation: confirmation.confirmation
+      });
     }
 
     redirect(`/field/screening/${attemptId}/result`);
@@ -175,23 +180,40 @@ function logFieldActionError({
   console.error(`public field screening failed: step=${step} code=${code} studyId=${studyId}`);
 }
 
-async function sendFieldConfirmationWhatsAppBestEffort({
+async function loadFieldConfirmationAttemptBestEffort({
   attemptId,
-  confirmation,
   repository
 }: {
+  attemptId: string;
+  repository: ReturnType<typeof createParticipantPortalScreenerRepository>;
+}): Promise<Awaited<ReturnType<ReturnType<typeof createParticipantPortalScreenerRepository>["getAttempt"]>>> {
+  try {
+    return await repository.getAttempt(attemptId);
+  } catch (error) {
+    console.error("public field confirmation lookup failed", {
+      attemptId,
+      code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+      step: "load_confirmation_attempt"
+    });
+    return null;
+  }
+}
+
+async function sendFieldConfirmationWhatsAppBestEffort({
+  attempt,
+  attemptId,
+  confirmation
+}: {
+  attempt: Awaited<ReturnType<ReturnType<typeof createParticipantPortalScreenerRepository>["getAttempt"]>>;
   attemptId: string;
   confirmation: {
     folio: string;
     referenceCodes: Array<{ code: string; slot: number }>;
   };
-  repository: ReturnType<typeof createParticipantPortalScreenerRepository>;
-}): Promise<Awaited<ReturnType<ReturnType<typeof createParticipantPortalScreenerRepository>["getAttempt"]>>> {
+}): Promise<void> {
   try {
-    const attempt = await repository.getAttempt(attemptId);
-
     if (!attempt) {
-      return null;
+      return;
     }
 
     const whatsappRepository = createOneuiWhatsAppRepository();
@@ -218,14 +240,11 @@ async function sendFieldConfirmationWhatsAppBestEffort({
         step: "send_confirmation_template"
       });
     }
-
-    return attempt;
   } catch (error) {
     console.error("public field navigo whatsapp failed", {
       attemptId,
       code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
       step: "send_confirmation_template"
     });
-    return null;
   }
 }

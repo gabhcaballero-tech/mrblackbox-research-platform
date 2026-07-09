@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import ScreeningResultPage from "./page";
-import { PUBLIC_FIELD_ACTOR } from "@/modules/field/service";
+import { getFieldScreeningAttemptScreen, PUBLIC_FIELD_ACTOR, type FieldAttemptScreen } from "@/modules/field/service";
+import type { FieldParticipantEvidenceRecord } from "@/modules/field/repository";
 
 vi.mock("next/navigation", () => ({
   notFound: vi.fn(() => {
@@ -44,9 +45,69 @@ describe("Field screening result page", () => {
     );
     expect(screen.queryByText("Campo no disponible")).not.toBeInTheDocument();
   });
+
+  it("shows pending review after final selfie instead of the generic field error", async () => {
+    vi.mocked(getFieldScreeningAttemptScreen).mockResolvedValueOnce({
+      data: fieldScreen({
+        participantEvidence: [
+          {
+            extension: "jpg",
+            id: "evidence-1",
+            mimeType: "image/jpeg",
+            originalFilename: "selfie.jpg",
+            privateStorageKey: "private/selfie.jpg",
+            relatedQuestionId: null,
+            reviewStatus: "PENDING",
+            sizeBytes: 1200,
+            storageBucket: "participant-evidence",
+            type: "SELFIE_IDENTIFICATION",
+            uploadedAt: new Date("2026-06-23T10:15:00Z")
+          }
+        ],
+        participantScreeningReview: {
+          rejectionReason: null,
+          status: "PENDING"
+        }
+      }),
+      ok: true
+    });
+
+    render(
+      await ScreeningResultPage({
+        params: Promise.resolve({ attemptId: "attempt-1" })
+      })
+    );
+
+    expect(screen.getByText("Revisión pendiente")).toBeInTheDocument();
+    expect(screen.getByText("Gracias. Tus respuestas y evidencias están en revisión.")).toBeInTheDocument();
+    expect(screen.queryByText("Campo no disponible")).not.toBeInTheDocument();
+  });
+
+  it("shows a clear result message instead of the generic field error when the screen cannot be loaded", async () => {
+    vi.mocked(getFieldScreeningAttemptScreen).mockResolvedValueOnce({
+      code: "STUDY_NOT_AVAILABLE",
+      message: "El cuestionario no está disponible.",
+      ok: false
+    });
+
+    render(
+      await ScreeningResultPage({
+        params: Promise.resolve({ attemptId: "attempt-1" })
+      })
+    );
+
+    expect(screen.getByText("Resultado no disponible")).toBeInTheDocument();
+    expect(screen.getByText("El cuestionario no está disponible.")).toBeInTheDocument();
+    expect(screen.queryByText("Campo no disponible")).not.toBeInTheDocument();
+  });
 });
 
-function fieldScreen() {
+function fieldScreen(
+  overrides: {
+    participantEvidence?: FieldParticipantEvidenceRecord[];
+    participantScreeningReview?: { rejectionReason: string | null; status: "APPROVED" | "PENDING" | "REJECTED" } | null;
+  } = {}
+) : FieldAttemptScreen {
   return {
     answers: {},
     attempt: {
@@ -58,8 +119,8 @@ function fieldScreen() {
       id: "attempt-1",
       nseClass: null,
       nseScore: null,
-      participantEvidence: [],
-      participantScreeningReview: null,
+      participantEvidence: overrides.participantEvidence ?? [],
+      participantScreeningReview: overrides.participantScreeningReview ?? null,
       questionnaireVersion: {
         definitionHash: "hash",
         definitionJson: {},
@@ -118,6 +179,7 @@ function fieldScreen() {
       evaluationJson: {
         flags: [],
         missingQuestionIds: [],
+        nse: null,
         reasons: [],
         result: "ELIGIBLE",
         safeExplanation: "Elegible preliminar.",
@@ -126,6 +188,7 @@ function fieldScreen() {
       },
       flags: [],
       missingQuestionIds: [],
+      nse: null,
       result: "ELIGIBLE",
       status: "PASSED"
     },
