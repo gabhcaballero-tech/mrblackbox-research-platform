@@ -80,8 +80,9 @@ function screenFixture(
           timeZoneIana: study.timeZoneIana
         }
       },
-      questionnaireVersionId: "version-1",
-      startedAt: new Date("2026-06-23T10:00:00Z"),
+    questionnaireVersionId: "version-1",
+    source: "FIELD",
+    startedAt: new Date("2026-06-23T10:00:00Z"),
       status: status as FieldAttemptScreen["attempt"]["status"],
       studyParticipant: {
         id: "sp-1",

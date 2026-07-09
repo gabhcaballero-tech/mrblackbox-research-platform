@@ -32,6 +32,13 @@ export type FieldActor = {
   status: InternalUserStatus;
 };
 
+export const PUBLIC_FIELD_ACTOR_ID = "PUBLIC_FIELD";
+export const PUBLIC_FIELD_ACTOR: FieldActor = {
+  id: PUBLIC_FIELD_ACTOR_ID,
+  role: "INTERVIEWER",
+  status: "ACTIVE"
+};
+
 export type FieldServiceErrorCode =
   | "ATTEMPT_CLOSED"
   | "ATTEMPT_NOT_FOUND"
@@ -132,11 +139,19 @@ function isFieldActor(actor: FieldActor | null): actor is FieldActor {
 }
 
 function canReadAttempt(actor: FieldActor, attempt: FieldScreeningAttemptRecord): boolean {
+  if (isPublicFieldActor(actor)) {
+    return attempt.source === "FIELD" && attempt.fieldUserId === null;
+  }
+
   if (actor.role === "ADMIN" || actor.role === "SUPERVISOR") {
     return true;
   }
 
   return attempt.fieldUserId === actor.id;
+}
+
+export function isPublicFieldActor(actor: FieldActor): boolean {
+  return actor.id === PUBLIC_FIELD_ACTOR_ID;
 }
 
 function unauthorizedResult<T>(): FieldServiceResult<T> {
@@ -268,7 +283,7 @@ export async function startFieldScreeningAttempt({
     }
 
     return createAttemptForProfile({
-      actorId: actor.id,
+      actorId: isPublicFieldActor(actor) ? null : actor.id,
       profile,
       repository,
       reusedParticipantProfile: true,
@@ -310,7 +325,7 @@ export async function startFieldScreeningAttempt({
   });
 
   return createAttemptForProfile({
-    actorId: actor.id,
+    actorId: isPublicFieldActor(actor) ? null : actor.id,
     profile,
     repository,
     reusedParticipantProfile: false,
@@ -489,7 +504,7 @@ async function createAttemptForProfile({
   screenerVersionId,
   studyId
 }: {
-  actorId: string;
+  actorId: string | null;
   profile: { id: string };
   repository: FieldRepository;
   reusedParticipantProfile: boolean;

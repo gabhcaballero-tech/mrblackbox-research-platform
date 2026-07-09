@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireCapability } from "@/shared/auth/session";
+import { getFieldActorForRequest } from "@/modules/field/auth";
 import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
@@ -23,7 +23,7 @@ type ScreeningAttemptPageProps = {
 export default async function ScreeningAttemptPage({ params, searchParams }: ScreeningAttemptPageProps) {
   const { attemptId } = await params;
   const resolvedSearchParams = await searchParams;
-  const actor = await requireCapability("screening:apply");
+  const actor = await getFieldActorForRequest();
   const result = await getFieldScreeningAttemptScreen({
     actor,
     attemptId,

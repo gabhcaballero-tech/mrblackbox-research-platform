@@ -4,6 +4,7 @@ import type { InternalUserRole } from "@/shared/auth/permissions";
 import {
   getFieldScreeningAttemptScreen,
   listFieldStudies,
+  PUBLIC_FIELD_ACTOR,
   saveFieldScreeningAnswer,
   startFieldScreeningAttempt,
   type FieldActor
@@ -230,6 +231,7 @@ function createMemoryRepository(studies: FieldStudySummary[] = [study()]): Field
           }
         },
         questionnaireVersionId: input.questionnaireVersionId,
+        source: "FIELD",
         startedAt: new Date("2026-06-23T10:00:00Z"),
         status: "STARTED",
         studyParticipant: {
@@ -408,6 +410,27 @@ describe("field service", () => {
       },
       ok: true
     });
+  });
+
+  it("starts a public field attempt without an internal user", async () => {
+    const repository = createMemoryRepository();
+    const result = await startFieldScreeningAttempt({
+      actor: PUBLIC_FIELD_ACTOR,
+      formInput: { email: "", externalReference: "PUBLIC-1", name: "Persona publica", phone: "5551112222" },
+      repository,
+      studyId
+    });
+    const attempt = result.ok && result.data.kind === "started" ? await repository.getAttempt(result.data.attemptId) : null;
+
+    expect(result).toMatchObject({
+      data: {
+        attemptId: "attempt-1",
+        kind: "started"
+      },
+      ok: true
+    });
+    expect(attempt?.fieldUserId).toBeNull();
+    expect(attempt?.source).toBe("FIELD");
   });
 
   it("starts new attempts with the latest ACTIVE screener version provided by the study", async () => {
@@ -630,6 +653,33 @@ describe("field service", () => {
     const screen = await getFieldScreeningAttemptScreen({ actor: interviewer, attemptId, repository });
 
     expect(screen.ok ? screen.data.answers.F2_EDAD : null).toBe(30);
+  });
+
+  it("lets a public field visitor save answers on a public field attempt", async () => {
+    const repository = createMemoryRepository();
+    const started = await startFieldScreeningAttempt({
+      actor: PUBLIC_FIELD_ACTOR,
+      formInput: { email: "", externalReference: "PUBLIC-2", name: "Persona publica", phone: "5553334444" },
+      repository,
+      studyId
+    });
+    const attemptId = started.ok && started.data.kind === "started" ? started.data.attemptId : "";
+    const result = await saveFieldScreeningAnswer({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      formInput: { value: "SI" },
+      questionId: "CONSENTIMIENTO",
+      repository
+    });
+
+    expect(result).toMatchObject({
+      data: {
+        attemptId,
+        closed: false,
+        nextQuestionId: "F1_GENERO"
+      },
+      ok: true
+    });
   });
 
   it("requires text for Other option", async () => {

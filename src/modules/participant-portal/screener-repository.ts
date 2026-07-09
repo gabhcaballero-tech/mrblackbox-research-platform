@@ -451,7 +451,7 @@ export function createParticipantPortalScreenerRepository(
           };
         }
 
-        if (attempt.source !== "PARTICIPANT_PORTAL" || attempt.status !== "PASSED") {
+        if (attempt.status !== "PASSED") {
           return { message: "El intento no estÃ¡ listo para generar confirmaciÃ³n.", ok: false };
         }
 

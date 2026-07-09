@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getFieldActorForRequest } from "@/modules/field/auth";
 import { createFieldRepository } from "@/modules/field/repository";
-import { getFieldStudy } from "@/modules/field/service";
-import { requireCapability } from "@/shared/auth/session";
+import { getFieldStudy, isPublicFieldActor } from "@/modules/field/service";
 import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
@@ -22,7 +22,7 @@ type NewScreeningPageProps = {
 export default async function NewScreeningPage({ params, searchParams }: NewScreeningPageProps) {
   const { studyId } = await params;
   const resolvedSearchParams = await searchParams;
-  const actor = await requireCapability("screening:apply");
+  const actor = await getFieldActorForRequest();
   const result = await getFieldStudy({
     actor,
     repository: createFieldRepository(),
@@ -37,8 +37,8 @@ export default async function NewScreeningPage({ params, searchParams }: NewScre
     throw new Error(result.message);
   }
 
-  return (
-    <AppShell>
+  const content = (
+    <>
       <PageHeader
         actions={<StatusBadge status="ready">Nuevo intento</StatusBadge>}
         description="Crea o reutiliza un participante mínimo para iniciar la aplicación del filtro."
@@ -46,13 +46,19 @@ export default async function NewScreeningPage({ params, searchParams }: NewScre
         title={`Iniciar filtro · ${result.data.name}`}
       />
 
-      <div className="mb-6">
+      {isPublicFieldActor(actor) ? null : <div className="mb-6">
         <Link className="text-sm font-semibold text-teal-700 transition hover:text-teal-800" href={`/field/studies/${studyId}`}>
           Volver al estudio
         </Link>
-      </div>
+      </div>}
 
       <ParticipantStartForm error={resolvedSearchParams?.error} studyId={studyId} />
-    </AppShell>
+    </>
   );
+
+  if (isPublicFieldActor(actor)) {
+    return <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">{content}</main>;
+  }
+
+  return <AppShell>{content}</AppShell>;
 }

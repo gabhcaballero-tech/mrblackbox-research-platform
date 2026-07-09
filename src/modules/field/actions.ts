@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireCapability } from "@/shared/auth/session";
+import { createParticipantPortalScreenerRepository } from "@/modules/participant-portal/screener-repository";
+import { generateParticipantReferenceCode } from "@/modules/participant-portal/review";
+import { getFieldActorForRequest } from "./auth";
 import { createFieldRepository } from "./repository";
 import {
   saveFieldScreeningAnswer,
@@ -45,7 +47,7 @@ export async function startFieldScreeningAttemptAction(
   _previousState: FieldStartActionState,
   formData: FormData
 ): Promise<FieldStartActionState> {
-  const actor = await requireCapability("screening:apply");
+  const actor = await getFieldActorForRequest();
   const participantInput = getFieldParticipantInputFromFormData(formData);
   const decision = String(formData.get("participantDecision") ?? "");
   const [decisionType, participantProfileId] = decision.split(":");
@@ -86,7 +88,7 @@ export async function saveFieldScreeningAnswerAction(
   questionId: string,
   formData: FormData
 ): Promise<void> {
-  const actor = await requireCapability("screening:apply");
+  const actor = await getFieldActorForRequest();
   const result = await saveFieldScreeningAnswer({
     actor,
     attemptId,
@@ -102,6 +104,13 @@ export async function saveFieldScreeningAnswerAction(
   revalidatePath(`/field/screening/${attemptId}`);
 
   if (result.data.closed) {
+    if (result.data.status === "PASSED") {
+      await createParticipantPortalScreenerRepository().ensureFilterOnlyConfirmation({
+        attemptId,
+        codeGenerator: generateParticipantReferenceCode
+      });
+    }
+
     redirect(`/field/screening/${attemptId}/result`);
   }
 

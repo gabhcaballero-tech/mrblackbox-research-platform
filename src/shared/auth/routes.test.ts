@@ -24,6 +24,20 @@ describe("auth route rules", () => {
       action: "redirect",
       destination: "/login?next=%2Fadmin"
     });
+    expect(getInternalRouteDecision("/field", false)).toEqual({
+      action: "redirect",
+      destination: "/login?next=%2Ffield"
+    });
+    expect(getInternalRouteDecision("/field/studies/study-1", false)).toEqual({
+      action: "redirect",
+      destination: "/login?next=%2Ffield%2Fstudies%2Fstudy-1"
+    });
+  });
+
+  it("keeps public field screening capture routes public without opening all field", () => {
+    expect(getInternalRouteDecision("/field/studies/study-1/screening/new", false)).toEqual({ action: "allow" });
+    expect(getInternalRouteDecision("/field/screening/attempt-1", false)).toEqual({ action: "allow" });
+    expect(getInternalRouteDecision("/field/screening/attempt-1/result", false)).toEqual({ action: "allow" });
   });
 
   it("allows authenticated internal routes through proxy-level checks", () => {

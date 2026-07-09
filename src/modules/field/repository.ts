@@ -54,7 +54,7 @@ export type FieldStudyParticipantRecord = {
 export type FieldScreeningAttemptRecord = {
   completedAt: Date | null;
   evaluationJson: unknown;
-  fieldUserId: string;
+  fieldUserId: string | null;
   id: string;
   nseClass: string | null;
   nseScore: number | null;
@@ -68,6 +68,7 @@ export type FieldScreeningAttemptRecord = {
     };
   };
   questionnaireVersionId: string;
+  source: "FIELD" | "PARTICIPANT_PORTAL";
   startedAt: Date;
   status: FieldScreeningStatus;
   studyParticipant: FieldStudyParticipantRecord & {
@@ -84,7 +85,7 @@ export type FieldScreeningAnswerRecord = {
 };
 
 export type CreateParticipantProfileInput = {
-  createdByUserId: string;
+  createdByUserId: string | null;
   email?: string;
   externalReference?: string;
   name: string;
@@ -92,14 +93,14 @@ export type CreateParticipantProfileInput = {
 };
 
 export type CreateStudyParticipantInput = {
-  createdByUserId: string;
+  createdByUserId: string | null;
   participantProfileId: string;
   screeningStatus: FieldScreeningStatus;
   studyId: string;
 };
 
 export type CreateScreeningAttemptInput = {
-  fieldUserId: string;
+  fieldUserId: string | null;
   questionnaireVersionId: string;
   studyParticipantId: string;
 };
@@ -254,6 +255,7 @@ const attemptSelect = {
     }
   },
   questionnaireVersionId: true,
+  source: true,
   startedAt: true,
   status: true,
   studyParticipant: {

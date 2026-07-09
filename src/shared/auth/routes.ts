@@ -2,6 +2,8 @@ const PUBLIC_FILE_PATTERN =
   /\.(?:avif|css|gif|ico|jpeg|jpg|js|map|png|svg|txt|webmanifest|webp|woff2?)$/i;
 
 const INTERNAL_ENTRY_PATHS = ["/admin", "/field", "/exports"] as const;
+const PUBLIC_FIELD_SCREENING_NEW_PATTERN = /^\/field\/studies\/[^/]+\/screening\/new$/;
+const PUBLIC_FIELD_SCREENING_ATTEMPT_PATTERN = /^\/field\/screening\/[^/]+(?:\/result)?$/;
 
 export type InternalRouteDecision =
   | { action: "allow" }
@@ -15,6 +17,8 @@ export function isPublicPath(pathname: string): boolean {
     pathname === "/api/health" ||
     pathname.startsWith("/p/") ||
     pathname.startsWith("/participar/") ||
+    PUBLIC_FIELD_SCREENING_NEW_PATTERN.test(pathname) ||
+    PUBLIC_FIELD_SCREENING_ATTEMPT_PATTERN.test(pathname) ||
     pathname.startsWith("/_next/") ||
     pathname === "/favicon.ico" ||
     PUBLIC_FILE_PATTERN.test(pathname)
