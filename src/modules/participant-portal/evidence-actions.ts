@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getParticipantPortalAuth } from "@/shared/auth/participant-portal";
+import { allowsDirectParticipantAccess } from "./access-mode";
 import { createParticipantPortalRepository } from "./repository";
 import { createParticipantPortalEvidenceRepository } from "./evidence-repository";
 import {
@@ -184,6 +185,13 @@ async function getParticipantEvidenceActionAuth(studyCode: string): Promise<
   const auth = await getParticipantPortalAuth({ repository: createParticipantPortalRepository(), studyCode });
 
   if (auth.status === "no_session") {
+    if (allowsDirectParticipantAccess(studyCode)) {
+      return {
+        message: "Completa tu registro para continuar.",
+        ok: false
+      };
+    }
+
     return {
       message: "Inicia sesión con el código enviado a tu correo para continuar.",
       ok: false

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { getParticipantPortalAuth } from "@/shared/auth/participant-portal";
+import { allowsDirectParticipantAccess } from "@/modules/participant-portal/access-mode";
 import { createParticipantPortalEvidenceRepository } from "@/modules/participant-portal/evidence-repository";
 import { getParticipantPortalSelfieScreen } from "@/modules/participant-portal/evidence-service";
 import { createParticipantPortalRepository } from "@/modules/participant-portal/repository";
@@ -32,6 +33,19 @@ export default async function ParticipantPortalSelfiePage({ params }: Participan
   const auth = await getParticipantPortalAuth({ repository: createParticipantPortalRepository(), studyCode });
 
   if (auth.status === "no_session") {
+    if (allowsDirectParticipantAccess(studyCode)) {
+      return (
+        <PortalMessage
+          action={
+            <Link className={primaryButtonClass} href={`/participar/${studyCode}/inicio`}>
+              Completar registro
+            </Link>
+          }
+          title="Completa tu registro para continuar."
+        />
+      );
+    }
+
     return <PortalMessage title="Inicia sesión con el código enviado a tu correo para continuar." />;
   }
 

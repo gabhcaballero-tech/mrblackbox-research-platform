@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { getParticipantPortalAuth } from "@/shared/auth/participant-portal";
+import { allowsDirectParticipantAccess } from "@/modules/participant-portal/access-mode";
 import { createParticipantPortalRepository } from "@/modules/participant-portal/repository";
 import { createParticipantPortalEvidenceRepository } from "@/modules/participant-portal/evidence-repository";
 import { getParticipantPortalEvidenceResult } from "@/modules/participant-portal/evidence-service";
@@ -26,6 +27,19 @@ export default async function ParticipantPortalResultPage({ params }: Participan
   const auth = await getParticipantPortalAuth({ repository: portalRepository, studyCode });
 
   if (auth.status === "no_session") {
+    if (allowsDirectParticipantAccess(studyCode)) {
+      return (
+        <PortalMessage
+          action={
+            <Link className={primaryButtonClass} href={`/participar/${studyCode}/inicio`}>
+              Completar registro
+            </Link>
+          }
+          title="Completa tu registro para consultar tu resultado."
+        />
+      );
+    }
+
     return <PortalMessage title="Inicia sesión con el código enviado a tu correo para continuar." />;
   }
 

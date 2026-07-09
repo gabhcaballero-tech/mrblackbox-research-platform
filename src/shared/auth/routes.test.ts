@@ -5,10 +5,15 @@ describe("auth route rules", () => {
   it("keeps participant token routes public", () => {
     expect(isPublicPath("/p/token-generico")).toBe(true);
     expect(getInternalRouteDecision("/p/token-generico", false)).toEqual({ action: "allow" });
+    expect(getInternalRouteDecision("/hut/p/token-generico", false)).toEqual({ action: "allow" });
+    expect(getInternalRouteDecision("/hut/register/token-generico", false)).toEqual({ action: "allow" });
   });
 
   it("keeps participant portal routes public at proxy level", () => {
     expect(isPublicPath("/participar/FMASCULINA-NAVIGO-2026")).toBe(true);
+    expect(getInternalRouteDecision("/participar/FMASCULINA-NAVIGO-2026/filtro", false)).toEqual({
+      action: "allow"
+    });
     expect(getInternalRouteDecision("/participar/FMASCULINA-NAVIGO-2026/verificar", false)).toEqual({
       action: "allow"
     });

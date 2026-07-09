@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { getParticipantPortalAuth } from "@/shared/auth/participant-portal";
+import { allowsDirectParticipantAccess } from "@/modules/participant-portal/access-mode";
 import { createParticipantPortalRepository } from "@/modules/participant-portal/repository";
 import { createParticipantPortalScreenerRepository } from "@/modules/participant-portal/screener-repository";
 import {
@@ -28,10 +29,24 @@ export default async function ParticipantPortalFilterPage({
   }
 
   const studyCode = parsedStudyCode.data;
+  const directMode = allowsDirectParticipantAccess(studyCode);
   const portalRepository = createParticipantPortalRepository();
   const auth = await getParticipantPortalAuth({ repository: portalRepository, studyCode });
 
   if (auth.status === "no_session") {
+    if (directMode) {
+      return (
+        <PortalMessage
+          action={
+            <a className={primaryButtonClass} href={`/participar/${studyCode}/inicio`}>
+              Completar registro
+            </a>
+          }
+          title="Completa tu registro para continuar al filtro."
+        />
+      );
+    }
+
     return <PortalMessage title="Inicia sesión con el código enviado a tu correo para continuar." />;
   }
 

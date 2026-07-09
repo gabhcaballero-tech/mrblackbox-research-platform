@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { getParticipantPortalAuth } from "@/shared/auth/participant-portal";
+import { allowsDirectParticipantAccess } from "@/modules/participant-portal/access-mode";
 import { createParticipantPortalEvidenceRepository } from "@/modules/participant-portal/evidence-repository";
 import { getParticipantPortalEvidenceScreen } from "@/modules/participant-portal/evidence-service";
 import { createParticipantPortalRepository } from "@/modules/participant-portal/repository";
@@ -25,6 +26,19 @@ export default async function ParticipantEvidencePage({ params }: ParticipantEvi
   const auth = await getParticipantPortalAuth({ repository: createParticipantPortalRepository(), studyCode });
 
   if (auth.status === "no_session") {
+    if (allowsDirectParticipantAccess(studyCode)) {
+      return (
+        <PortalMessage
+          action={
+            <Link className={primaryButtonClass} href={`/participar/${studyCode}/inicio`}>
+              Completar registro
+            </Link>
+          }
+          title="Completa tu registro para continuar."
+        />
+      );
+    }
+
     return <PortalMessage title="Inicia sesion con el codigo enviado a tu correo para continuar." />;
   }
 

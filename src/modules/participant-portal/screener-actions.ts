@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getParticipantPortalAuth } from "@/shared/auth/participant-portal";
 import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
+import { allowsDirectParticipantAccess } from "./access-mode";
 import { createParticipantPortalRepository } from "./repository";
 import { createParticipantPortalScreenerRepository } from "./screener-repository";
 import { saveParticipantPortalScreenerAnswer } from "./screener-service";
@@ -35,7 +36,11 @@ export async function saveParticipantPortalScreenerAnswerAction(
   const auth = await getParticipantPortalAuth({ repository: portalRepository, studyCode });
 
   if (auth.status === "no_session") {
-    redirect(`/participar/${encodeURIComponent(studyCode)}`);
+    redirect(
+      allowsDirectParticipantAccess(studyCode)
+        ? `/participar/${encodeURIComponent(studyCode)}/inicio`
+        : `/participar/${encodeURIComponent(studyCode)}`
+    );
   }
 
   if (auth.status === "internal_user_blocked") {
