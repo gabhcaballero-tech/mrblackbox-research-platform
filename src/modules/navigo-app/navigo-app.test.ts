@@ -760,11 +760,17 @@ describe("navigo app MVP rules", () => {
     expect(adminPage).toContain("Acciones de correccion");
     expect(adminPage).toContain("REINICIAR APP");
     expect(adminPage).toContain("ELIMINAR ETAPAS");
+    expect(adminPage).toContain("Eliminar participante Navigo");
+    expect(adminPage).toContain("ELIMINAR PARTICIPANTE");
+    expect(adminPage).toContain("deleteNavigoParticipantAction");
     expect(actions).toContain("resetNavigoParticipantAppAction");
+    expect(actions).toContain("deleteNavigoParticipantAction");
+    expect(actions).toContain("admin:access");
     expect(actions).toContain("Selecciona la hora base T0.");
     expect(repository).toContain("NAVIGO_T0_IDENTITY_QUESTION_ID");
     expect(repository).toContain("resetParticipantApp");
     expect(repository).toContain("deleteParticipantStagesFrom");
+    expect(repository).toContain("deleteParticipant");
   });
 
   it("does not treat T0 as completed only because an application time exists", () => {
@@ -1035,6 +1041,113 @@ describe("navigo app MVP rules", () => {
     expect(state.referenceCodes).toHaveLength(3);
     expect(state.accessTokens).toHaveLength(1);
     expect(state.activities).toHaveLength(1);
+  });
+
+  it("deletes a direct App Navigo participant and frees its folio record", async () => {
+    const state = createNavigoParticipantImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+
+    await repository.applyParticipantImport({
+      actorUserId: "admin-1",
+      generateLinks: true,
+      rows: [
+        {
+          celular: "+525512345678",
+          correo: null,
+          folio: "NAV-010",
+          nombre: "PRUEBA UNO",
+          observaciones: "PRUEBA",
+          primeraFragancia: "AAA",
+          reclutador: "GABY",
+          segundaFragancia: "BBB"
+        }
+      ],
+      studyId: state.study.id
+    });
+
+    const participantId = state.studyParticipants[0]!.id;
+    const attemptId = state.screeningAttempts[0]!.id;
+    const activityId = state.activities[0]!.id;
+
+    state.researchResponses.push({ id: "response-1", participantActivityId: activityId });
+    state.participantActivityEvidence.push({
+      id: "activity-evidence-1",
+      participantActivityId: activityId,
+      studyParticipantId: participantId
+    });
+    state.reminderLogs.push({ id: "reminder-1", participantActivityId: activityId });
+    state.mediaEvidencePlaceholders.push({ id: "media-1", participantActivityId: activityId });
+    state.applicationTimeEvents.push({ id: "event-1", studyParticipantId: participantId });
+    state.participantAttributeOrders.push({ id: "attribute-order-1", studyParticipantId: participantId });
+    state.participantEvidence.push({ id: "evidence-1", screeningAttemptId: attemptId, studyParticipantId: participantId });
+    state.participantScreeningReviews.push({ id: "review-1", screeningAttemptId: attemptId, studyParticipantId: participantId });
+    state.screeningAnswers.push({ id: "answer-1", screeningAttemptId: attemptId });
+
+    const result = await repository.deleteParticipant({
+      actorUserId: "admin-1",
+      reason: "Registro de prueba creado por error.",
+      studyId: state.study.id,
+      studyParticipantId: participantId
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.message : "").toBe("Participante eliminado y folio liberado.");
+    expect(state.studyParticipants).toHaveLength(0);
+    expect(state.participantProfiles).toHaveLength(0);
+    expect(state.confirmations).toHaveLength(0);
+    expect(state.referenceCodes).toHaveLength(0);
+    expect(state.screeningAttempts).toHaveLength(0);
+    expect(state.screeningAnswers).toHaveLength(0);
+    expect(state.participantEvidence).toHaveLength(0);
+    expect(state.participantScreeningReviews).toHaveLength(0);
+    expect(state.activities).toHaveLength(0);
+    expect(state.researchResponses).toHaveLength(0);
+    expect(state.participantActivityEvidence).toHaveLength(0);
+    expect(state.reminderLogs).toHaveLength(0);
+    expect(state.mediaEvidencePlaceholders).toHaveLength(0);
+    expect(state.applicationTimeEvents).toHaveLength(0);
+    expect(state.participantAttributeOrders).toHaveLength(0);
+    expect(state.rotationAssignments).toHaveLength(0);
+    expect(state.armAssignments).toHaveLength(0);
+    expect(state.accessTokens).toHaveLength(0);
+  });
+
+  it("blocks deleting a Navigo participant backed by a real screener attempt", async () => {
+    const state = createNavigoParticipantImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+
+    await repository.applyParticipantImport({
+      actorUserId: "admin-1",
+      generateLinks: false,
+      rows: [
+        {
+          celular: "+525512345678",
+          correo: null,
+          folio: "NAV-010",
+          nombre: "PRUEBA UNO",
+          observaciones: null,
+          primeraFragancia: "AAA",
+          reclutador: "GABY",
+          segundaFragancia: "BBB"
+        }
+      ],
+      studyId: state.study.id
+    });
+
+    state.screeningAttempts[0]!.evaluationJson = { source: "FIELD_SCREENING" };
+
+    const result = await repository.deleteParticipant({
+      actorUserId: "admin-1",
+      reason: "Intento de borrado.",
+      studyId: state.study.id,
+      studyParticipantId: state.studyParticipants[0]!.id
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.message).toContain("screening_attempt real del filtro");
+    expect(state.studyParticipants).toHaveLength(1);
+    expect(state.confirmations).toHaveLength(1);
+    expect(state.screeningAttempts).toHaveLength(1);
   });
 
   it("exports participant links and rotation as clean tabular TSV columns for Excel", async () => {
@@ -1882,11 +1995,13 @@ function createNavigoParticipantActivityState() {
     applicationStartedAt: new Date("2026-06-25T15:00:00.000Z") as Date | null,
     id: "study-participant-1",
     participantConfirmation: {
+      id: "confirmation-1",
       folio: "NAV-001",
       referenceCodes: [],
       screeningAttempt: {
         evaluationJson: null,
-        id: "attempt-1"
+        id: "attempt-1",
+        source: "FIELD"
       }
     },
     participantEvidence: [
@@ -1901,6 +2016,7 @@ function createNavigoParticipantActivityState() {
       email: null,
       id: "profile-1",
       name: "Participante Uno",
+      participantAuthUserId: null,
       phone: null
     },
     participantScreeningReviews: [{ status: "APPROVED" as const }],
@@ -1943,7 +2059,7 @@ function createNavigoParticipantActivityState() {
           questionnaireVersionId: string | null;
           sortOrder: number;
           status: "ACTIVE";
-          studyId: string;
+          studyId?: string;
           type: "INTERNAL_FOLLOWUP" | "QUESTIONNAIRE_MEASUREMENT";
           windowEndsMinutes: number;
           windowStartsMinutes: number;
@@ -2483,6 +2599,7 @@ function createNavigoParticipantImportState(
     email: string | null;
     id: string;
     name: string;
+    participantAuthUserId?: string | null;
     phone: string | null;
     status: "ACTIVE";
   }> = [];
@@ -2529,6 +2646,7 @@ function createNavigoParticipantImportState(
     studyParticipantId: string;
     tokenHash: string;
   }> = [];
+  const applicationTimeEvents: Array<{ id: string; studyParticipantId: string }> = [];
   const activities: Array<{
     activityScheduleId: string;
     actualCompletedAt: Date | null;
@@ -2541,6 +2659,16 @@ function createNavigoParticipantImportState(
     status: "AVAILABLE";
     studyParticipantId: string;
   }> = [];
+  const participantActivityEvidence: Array<{ id: string; participantActivityId: string; studyParticipantId: string }> = [];
+  const participantAttributeOrders: Array<{ id: string; studyParticipantId: string }> = [];
+  const participantEvidence: Array<{ id: string; screeningAttemptId: string; studyParticipantId: string }> = [];
+  const participantScreeningReviews: Array<{ id: string; screeningAttemptId: string; studyParticipantId: string }> = [];
+  const participantConsents: Array<{ id: string; studyParticipantId: string }> = [];
+  const quotaEvaluations: Array<{ id: string; studyParticipantId: string }> = [];
+  const reminderLogs: Array<{ id: string; participantActivityId: string }> = [];
+  const mediaEvidencePlaceholders: Array<{ id: string; participantActivityId: string }> = [];
+  const researchResponses: Array<{ id: string; participantActivityId: string }> = [];
+  const screeningAnswers: Array<{ id: string; screeningAttemptId: string }> = [];
   const arms: Array<{ code: string; id: string; label: string; sortOrder: number; studyId: string }> = [];
   const products: Array<{
     displayLabel: string;
@@ -2573,6 +2701,13 @@ function createNavigoParticipantImportState(
     studyParticipantId: string;
     studyProductId: string;
   }> = [];
+
+  function deleteWhere<T>(items: T[], predicate: (item: T) => boolean) {
+    const retained = items.filter((item) => !predicate(item));
+    const count = items.length - retained.length;
+    items.splice(0, items.length, ...retained);
+    return { count };
+  }
 
   function buildParticipantRecord(studyParticipantId: string) {
     const participant = studyParticipants.find((item) => item.id === studyParticipantId);
@@ -2614,11 +2749,12 @@ function createNavigoParticipantImportState(
       id: participant.id,
       participantConfirmation: confirmation
         ? {
+            id: confirmation.id,
             folio: confirmation.folio,
             referenceCodes: referenceCodes
               .filter((item) => item.confirmationId === confirmation.id)
               .sort((left, right) => left.slot - right.slot),
-            screeningAttempt: attempt ? { evaluationJson: attempt.evaluationJson, id: attempt.id } : null
+            screeningAttempt: attempt ? { evaluationJson: attempt.evaluationJson, id: attempt.id, source: attempt.source } : null
           }
         : null,
       participantEvidence: [],
@@ -2626,6 +2762,7 @@ function createNavigoParticipantImportState(
         email: profile.email,
         id: profile.id,
         name: profile.name,
+        participantAuthUserId: profile.participantAuthUserId,
         phone: profile.phone
       },
       participantScreeningReviews: [],
@@ -2677,6 +2814,9 @@ function createNavigoParticipantImportState(
         accessTokens.push(args.data);
         return args.data;
       },
+      async deleteMany(args: { where: { studyParticipantId: string } }) {
+        return deleteWhere(accessTokens, (token) => token.studyParticipantId === args.where.studyParticipantId);
+      },
       async updateMany(args: { data: Partial<(typeof accessTokens)[number]>; where: { status: string; studyParticipantId: string } }) {
         let count = 0;
         for (const token of accessTokens) {
@@ -2693,9 +2833,25 @@ function createNavigoParticipantImportState(
         const record = { ...args.data, id: `activity-${activities.length + 1}` };
         activities.push(record);
         return { id: record.id };
+      },
+      async deleteMany(args: { where: { id: { in: string[] } } }) {
+        return deleteWhere(activities, (activity) => args.where.id.in.includes(activity.id));
+      },
+      async findMany(args: { where: { studyParticipantId: string } }) {
+        return activities.filter((activity) => activity.studyParticipantId === args.where.studyParticipantId);
+      }
+    },
+    participantActivityEvidence: {
+      async deleteMany(args: { where: { participantActivityId: { in: string[] } } }) {
+        return deleteWhere(participantActivityEvidence, (evidence) =>
+          args.where.participantActivityId.in.includes(evidence.participantActivityId)
+        );
       }
     },
     participantArmAssignment: {
+      async deleteMany(args: { where: { studyParticipantId: string } }) {
+        return deleteWhere(armAssignments, (assignment) => assignment.studyParticipantId === args.where.studyParticipantId);
+      },
       async upsert(args: {
         create: Omit<(typeof armAssignments)[number], "id">;
         update: Partial<(typeof armAssignments)[number]>;
@@ -2717,11 +2873,24 @@ function createNavigoParticipantImportState(
         return record;
       }
     },
+    participantAttributeOrder: {
+      async deleteMany(args: { where: { studyParticipantId: string } }) {
+        return deleteWhere(participantAttributeOrders, (order) => order.studyParticipantId === args.where.studyParticipantId);
+      }
+    },
+    participantConsent: {
+      async findMany(args: { where: { studyParticipantId: string } }) {
+        return participantConsents.filter((consent) => consent.studyParticipantId === args.where.studyParticipantId);
+      }
+    },
     participantConfirmation: {
       async create(args: { data: Omit<(typeof confirmations)[number], "id">; select: { id: true } }) {
         const record = { ...args.data, id: `confirmation-${confirmations.length + 1}` };
         confirmations.push(record);
         return { id: record.id };
+      },
+      async deleteMany(args: { where: { id: string } }) {
+        return deleteWhere(confirmations, (confirmation) => confirmation.id === args.where.id);
       },
       async findMany(args: { where: { folio?: { in: string[] }; studyId: string } }) {
         if (failExistingLookup) {
@@ -2740,6 +2909,23 @@ function createNavigoParticipantImportState(
           }));
       }
     },
+    participantEvidence: {
+      async deleteMany(args: { where: { screeningAttemptId: string; studyParticipantId: string } }) {
+        return deleteWhere(
+          participantEvidence,
+          (evidence) =>
+            evidence.screeningAttemptId === args.where.screeningAttemptId &&
+            evidence.studyParticipantId === args.where.studyParticipantId
+        );
+      },
+      async findMany(args: { where: { screeningAttemptId: { not: string }; studyParticipantId: string } }) {
+        return participantEvidence.filter(
+          (evidence) =>
+            evidence.studyParticipantId === args.where.studyParticipantId &&
+            evidence.screeningAttemptId !== args.where.screeningAttemptId.not
+        );
+      }
+    },
     participantProfile: {
       async create(args: {
         data: Omit<(typeof participantProfiles)[number], "id">;
@@ -2756,6 +2942,9 @@ function createNavigoParticipantImportState(
         }
         Object.assign(target, args.data);
         return target;
+      },
+      async deleteMany(args: { where: { id: string } }) {
+        return deleteWhere(participantProfiles, (profile) => profile.id === args.where.id);
       }
     },
     participantReferenceCode: {
@@ -2763,11 +2952,20 @@ function createNavigoParticipantImportState(
         referenceCodes.push(...args.data);
         return { count: args.data.length };
       },
+      async deleteMany(args: { where: { confirmationId: string } }) {
+        return deleteWhere(referenceCodes, (code) => code.confirmationId === args.where.confirmationId);
+      },
       async findMany() {
         return referenceCodes.map((item) => ({ code: item.code }));
       }
     },
     participantRotationAssignment: {
+      async deleteMany(args: { where: { studyParticipantId: string } }) {
+        return deleteWhere(
+          rotationAssignments,
+          (assignment) => assignment.studyParticipantId === args.where.studyParticipantId
+        );
+      },
       async upsert(args: {
         create: {
           rotationCode: string;
@@ -2790,6 +2988,19 @@ function createNavigoParticipantImportState(
         const record = { ...args.create, id: `rotation-assignment-${rotationAssignments.length + 1}` };
         rotationAssignments.push(record);
         return { id: record.id };
+      }
+    },
+    participantScreeningReview: {
+      async deleteMany(args: { where: { screeningAttemptId: string } }) {
+        return deleteWhere(
+          participantScreeningReviews,
+          (review) => review.screeningAttemptId === args.where.screeningAttemptId
+        );
+      }
+    },
+    quotaEvaluation: {
+      async findMany(args: { where: { studyParticipantId: string } }) {
+        return quotaEvaluations.filter((evaluation) => evaluation.studyParticipantId === args.where.studyParticipantId);
       }
     },
     questionnaireVersion: {
@@ -2835,6 +3046,35 @@ function createNavigoParticipantImportState(
         return { count };
       }
     },
+    reminderLog: {
+      async deleteMany(args: { where: { participantActivityId: { in: string[] } } }) {
+        return deleteWhere(reminderLogs, (log) => args.where.participantActivityId.in.includes(log.participantActivityId));
+      }
+    },
+    researchResponse: {
+      async deleteMany(args: { where: { participantActivityId: { in: string[] } } }) {
+        return deleteWhere(researchResponses, (response) =>
+          args.where.participantActivityId.in.includes(response.participantActivityId)
+        );
+      }
+    },
+    mediaEvidencePlaceholder: {
+      async deleteMany(args: { where: { participantActivityId: { in: string[] } } }) {
+        return deleteWhere(mediaEvidencePlaceholders, (placeholder) =>
+          args.where.participantActivityId.in.includes(placeholder.participantActivityId)
+        );
+      }
+    },
+    applicationTimeEvent: {
+      async deleteMany(args: { where: { studyParticipantId: string } }) {
+        return deleteWhere(applicationTimeEvents, (event) => event.studyParticipantId === args.where.studyParticipantId);
+      }
+    },
+    screeningAnswer: {
+      async deleteMany(args: { where: { screeningAttemptId: string } }) {
+        return deleteWhere(screeningAnswers, (answer) => answer.screeningAttemptId === args.where.screeningAttemptId);
+      }
+    },
     screeningAttempt: {
       async create(args: {
         data: Omit<(typeof screeningAttempts)[number], "id">;
@@ -2843,6 +3083,14 @@ function createNavigoParticipantImportState(
         const record = { ...args.data, id: `attempt-${screeningAttempts.length + 1}` };
         screeningAttempts.push(record);
         return { id: record.id };
+      },
+      async deleteMany(args: { where: { id: string } }) {
+        return deleteWhere(screeningAttempts, (attempt) => attempt.id === args.where.id);
+      },
+      async findMany(args: { where: { id: { not: string }; studyParticipantId: string } }) {
+        return screeningAttempts.filter(
+          (attempt) => attempt.studyParticipantId === args.where.studyParticipantId && attempt.id !== args.where.id.not
+        );
       }
     },
     study: {
@@ -2888,6 +3136,7 @@ function createNavigoParticipantImportState(
         orderBy?: unknown;
         where: {
           participantConfirmation?: { isNot: null };
+          participantProfileId?: string;
           participantProfile?: { is: { phone: { in: string[] } } };
           studyId: string;
         };
@@ -2905,6 +3154,16 @@ function createNavigoParticipantImportState(
               const rightConfirmation = confirmations.find((confirmation) => confirmation.studyParticipantId === right.id);
               return (leftConfirmation?.folioSequence ?? 0) - (rightConfirmation?.folioSequence ?? 0);
             })
+            .map((item) => buildParticipantRecord(item.id));
+        }
+
+        if (args.where.participantProfileId) {
+          return studyParticipants
+            .filter(
+              (item) =>
+                (args.where.studyId === undefined || item.studyId === args.where.studyId) &&
+                item.participantProfileId === args.where.participantProfileId
+            )
             .map((item) => buildParticipantRecord(item.id));
         }
 
@@ -2937,6 +3196,9 @@ function createNavigoParticipantImportState(
         }
         Object.assign(target, args.data);
         return target;
+      },
+      async deleteMany(args: { where: { id: string } }) {
+        return deleteWhere(studyParticipants, (participant) => participant.id === args.where.id);
       }
     },
     studyProduct: {
@@ -2976,17 +3238,28 @@ function createNavigoParticipantImportState(
 
   return {
     accessTokens,
+    applicationTimeEvents,
     activities,
     armAssignments,
     arms,
     confirmations,
+    mediaEvidencePlaceholders,
+    participantActivityEvidence,
+    participantAttributeOrders,
+    participantConsents,
+    participantEvidence,
     participantProfiles,
+    participantScreeningReviews,
     prisma,
+    quotaEvaluations,
     referenceCodes,
+    reminderLogs,
+    researchResponses,
     rotationAssignments,
     rotationPlanArms,
     rotationPlans,
     schedules,
+    screeningAnswers,
     screeningAttempts,
     study,
     studyParticipants
@@ -3007,11 +3280,13 @@ function createNavigoRotationImportState({ failProductUpsert = false }: { failPr
     applicationStartedAt: null as Date | null,
     id: "study-participant-1",
     participantConfirmation: {
+      id: "confirmation-1",
       folio: "NAV-001",
       referenceCodes: [],
       screeningAttempt: {
         evaluationJson: null,
-        id: "attempt-1"
+        id: "attempt-1",
+        source: "FIELD"
       }
     },
     participantEvidence: [],
@@ -3019,6 +3294,7 @@ function createNavigoRotationImportState({ failProductUpsert = false }: { failPr
       email: null,
       id: "profile-1",
       name: "Participante Uno",
+      participantAuthUserId: null,
       phone: null
     },
     participantScreeningReviews: [{ status: "APPROVED" as const }],

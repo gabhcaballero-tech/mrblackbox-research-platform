@@ -442,6 +442,12 @@ export type NavigoAppRepository = {
     reason: string;
     studyParticipantId: string;
   }) => Promise<NavigoMaintenanceResult>;
+  deleteParticipant: (input: {
+    actorUserId: string;
+    reason: string;
+    studyId: string;
+    studyParticipantId: string;
+  }) => Promise<NavigoMaintenanceResult>;
   deleteParticipantStagesFrom: (input: {
     actorUserId: string;
     fromCode: NavigoActivityCode;
@@ -467,6 +473,7 @@ export type NavigoAppRepository = {
 type Delegate = {
   create?: (args: unknown) => Promise<unknown>;
   createMany?: (args: unknown) => Promise<unknown>;
+  delete?: (args: unknown) => Promise<unknown>;
   deleteMany?: (args: unknown) => Promise<unknown>;
   findFirst?: (args: unknown) => Promise<unknown>;
   findMany?: (args: unknown) => Promise<unknown[]>;
@@ -484,15 +491,22 @@ type NavigoPrismaClient = PrismaClientLike & {
   participantActivity: Delegate;
   participantActivityEvidence: Delegate;
   participantArmAssignment: Delegate;
+  participantAttributeOrder?: Delegate;
+  participantConsent?: Delegate;
   participantConfirmation: Delegate;
   participantEvidence: Delegate;
   participantProfile: Delegate;
   participantReferenceCode: Delegate;
   participantRotationAssignment: Delegate;
+  participantScreeningReview?: Delegate;
+  quotaEvaluation?: Delegate;
   questionnaireVersion: Delegate;
+  reminderLog?: Delegate;
   researchResponse: Delegate;
   rotationPlan: Delegate;
   rotationPlanArm: Delegate;
+  mediaEvidencePlaceholder?: Delegate;
+  screeningAnswer?: Delegate;
   screeningAttempt: Delegate;
   studyArm: Delegate;
   study: Delegate;
@@ -563,11 +577,13 @@ const participantSelect = {
   visualVerificationMode: true,
   participantConfirmation: {
     select: {
+      id: true,
       folio: true,
       screeningAttempt: {
         select: {
           id: true,
-          evaluationJson: true
+          evaluationJson: true,
+          source: true
         }
       },
       referenceCodes: {
@@ -584,6 +600,7 @@ const participantSelect = {
       email: true,
       id: true,
       name: true,
+      participantAuthUserId: true,
       phone: true
     }
   },
@@ -735,9 +752,10 @@ type ParticipantRecord = {
   applicationStartedAt: Date | null;
   id: string;
   participantConfirmation: {
+    id: string;
     folio: string;
     referenceCodes: Array<{ code: string; slot: number }>;
-    screeningAttempt?: { evaluationJson: unknown; id: string } | null;
+    screeningAttempt?: { evaluationJson: unknown; id: string; source?: string } | null;
   } | null;
   participantEvidence: Array<{
     id: string;
@@ -745,7 +763,13 @@ type ParticipantRecord = {
     storageBucket: string;
     type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION";
   }>;
-  participantProfile: { email: string | null; id: string; name: string; phone: string | null };
+  participantProfile: {
+    email: string | null;
+    id: string;
+    name: string;
+    participantAuthUserId?: string | null;
+    phone: string | null;
+  };
   participantScreeningReviews: Array<{ status: "APPROVED" | "PENDING" | "REJECTED" }>;
   rotationAssignment: {
     rotationCode: string;
@@ -932,6 +956,93 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         ok: true
       };
     });
+  }
+
+  async function deleteParticipantFromNavigo({
+    actorUserId,
+    reason,
+    studyId,
+    studyParticipantId
+  }: {
+    actorUserId: string;
+    reason: string;
+    studyId: string;
+    studyParticipantId: string;
+  }): Promise<NavigoMaintenanceResult> {
+    void actorUserId;
+    void reason;
+    const prisma = await getPrisma();
+
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const participant = (await tx.studyParticipant.findUnique?.({
+          select: participantWithActivitiesSelect,
+          where: { id: studyParticipantId }
+        })) as ParticipantRecord | null;
+
+        if (!participant) {
+          return { message: "No encontramos el participante.", ok: false };
+        }
+
+        if (participant.study.id !== studyId) {
+          return { message: "No se puede eliminar porque el participante pertenece a otro estudio.", ok: false };
+        }
+
+        if (participant.study.code !== NAVIGO_STUDY_CODE) {
+          return { message: "Solo el estudio Navigo permite eliminar participantes desde App Navigo.", ok: false };
+        }
+
+        const confirmation = participant.participantConfirmation;
+        const attemptId = confirmation?.screeningAttempt?.id ?? null;
+        const directNavigoAttempt = isNavigoDirectScreeningAttempt(confirmation?.screeningAttempt ?? null);
+
+        if (!confirmation || !attemptId || !directNavigoAttempt) {
+          return {
+            message: "No se puede eliminar porque existen relaciones fuera de App Navigo: screening_attempt real del filtro.",
+            ok: false
+          };
+        }
+
+        const unsupportedRelations = await findUnsupportedNavigoParticipantDeleteRelations(tx, {
+          screeningAttemptId: attemptId,
+          studyParticipantId: participant.id
+        });
+
+        if (unsupportedRelations.length > 0) {
+          return {
+            message: `No se puede eliminar porque existen relaciones fuera de App Navigo: ${unsupportedRelations.join(", ")}.`,
+            ok: false
+          };
+        }
+
+        await deleteNavigoAppOwnedRelations(tx, participant.id);
+        await deleteDirectNavigoScreeningRelations(tx, {
+          confirmationId: confirmation.id,
+          screeningAttemptId: attemptId,
+          studyParticipantId: participant.id
+        });
+
+        await tx.studyParticipant.deleteMany?.({
+          where: { id: participant.id }
+        });
+
+        const profilePreserved = await deleteParticipantProfileIfOrphan(tx, participant.participantProfile);
+
+        return {
+          message: profilePreserved
+            ? "Participante eliminado y folio liberado. El perfil global se conservó por seguridad."
+            : "Participante eliminado y folio liberado.",
+          ok: true
+        };
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No fue posible eliminar el participante.";
+
+      return {
+        message: `No se pudo eliminar el participante Navigo: ${message}`,
+        ok: false
+      };
+    }
   }
 
   return {
@@ -1307,6 +1418,10 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         reason: input.reason,
         studyParticipantId: input.studyParticipantId
       });
+    },
+
+    async deleteParticipant(input) {
+      return deleteParticipantFromNavigo(input);
     },
 
     async deleteParticipantStagesFrom(input) {
@@ -4267,6 +4382,176 @@ async function listExistingReferenceCodes(prisma: NavigoPrismaClient | NavigoTra
   })) as Array<{ code: string }>;
 
   return codes.map((code) => code.code);
+}
+
+async function deleteNavigoAppOwnedRelations(
+  tx: NavigoTransactionClient,
+  studyParticipantId: string
+) {
+  const activities = (await tx.participantActivity.findMany?.({
+    select: { id: true },
+    where: { studyParticipantId }
+  })) as Array<{ id: string }> | undefined;
+  const activityIds = (activities ?? []).map((activity) => activity.id);
+
+  if (activityIds.length > 0) {
+    await tx.researchResponse.deleteMany?.({
+      where: { participantActivityId: { in: activityIds } }
+    });
+    await tx.participantActivityEvidence.deleteMany?.({
+      where: { participantActivityId: { in: activityIds } }
+    });
+    await tx.reminderLog?.deleteMany?.({
+      where: { participantActivityId: { in: activityIds } }
+    });
+    await tx.mediaEvidencePlaceholder?.deleteMany?.({
+      where: { participantActivityId: { in: activityIds } }
+    });
+    await tx.participantActivity.deleteMany?.({
+      where: { id: { in: activityIds } }
+    });
+  }
+
+  await tx.applicationTimeEvent.deleteMany?.({
+    where: { studyParticipantId }
+  });
+  await tx.participantAttributeOrder?.deleteMany?.({
+    where: { studyParticipantId }
+  });
+  await tx.participantArmAssignment.deleteMany?.({
+    where: { studyParticipantId }
+  });
+  await tx.participantRotationAssignment.deleteMany?.({
+    where: { studyParticipantId }
+  });
+  await tx.participantAccessToken.deleteMany?.({
+    where: { studyParticipantId }
+  });
+}
+
+async function deleteDirectNavigoScreeningRelations(
+  tx: NavigoTransactionClient,
+  input: {
+    confirmationId: string;
+    screeningAttemptId: string;
+    studyParticipantId: string;
+  }
+) {
+  await tx.participantReferenceCode.deleteMany?.({
+    where: { confirmationId: input.confirmationId }
+  });
+  await tx.participantConfirmation.deleteMany?.({
+    where: { id: input.confirmationId }
+  });
+  await tx.participantScreeningReview?.deleteMany?.({
+    where: { screeningAttemptId: input.screeningAttemptId }
+  });
+  await tx.participantEvidence.deleteMany?.({
+    where: {
+      screeningAttemptId: input.screeningAttemptId,
+      studyParticipantId: input.studyParticipantId
+    }
+  });
+  await tx.screeningAnswer?.deleteMany?.({
+    where: { screeningAttemptId: input.screeningAttemptId }
+  });
+  await tx.screeningAttempt.deleteMany?.({
+    where: { id: input.screeningAttemptId }
+  });
+}
+
+async function findUnsupportedNavigoParticipantDeleteRelations(
+  tx: NavigoTransactionClient,
+  input: {
+    screeningAttemptId: string;
+    studyParticipantId: string;
+  }
+): Promise<string[]> {
+  const blockers: string[] = [];
+  const extraAttempts = (await tx.screeningAttempt.findMany?.({
+    select: { id: true },
+    where: {
+      id: { not: input.screeningAttemptId },
+      studyParticipantId: input.studyParticipantId
+    }
+  })) as Array<{ id: string }> | undefined;
+
+  if ((extraAttempts ?? []).length > 0) {
+    blockers.push("screening_attempts adicionales");
+  }
+
+  const extraParticipantEvidence = (await tx.participantEvidence.findMany?.({
+    select: { id: true },
+    where: {
+      screeningAttemptId: { not: input.screeningAttemptId },
+      studyParticipantId: input.studyParticipantId
+    }
+  })) as Array<{ id: string }> | undefined;
+
+  if ((extraParticipantEvidence ?? []).length > 0) {
+    blockers.push("participant_evidence fuera de App Navigo");
+  }
+
+  const participantConsents = (await tx.participantConsent?.findMany?.({
+    select: { id: true },
+    where: { studyParticipantId: input.studyParticipantId }
+  })) as Array<{ id: string }> | undefined;
+
+  if ((participantConsents ?? []).length > 0) {
+    blockers.push("participant_consents");
+  }
+
+  const quotaEvaluations = (await tx.quotaEvaluation?.findMany?.({
+    select: { id: true },
+    where: { studyParticipantId: input.studyParticipantId }
+  })) as Array<{ id: string }> | undefined;
+
+  if ((quotaEvaluations ?? []).length > 0) {
+    blockers.push("quota_evaluations");
+  }
+
+  return blockers;
+}
+
+async function deleteParticipantProfileIfOrphan(
+  tx: NavigoTransactionClient,
+  participantProfile: ParticipantRecord["participantProfile"]
+): Promise<boolean> {
+  if (participantProfile.participantAuthUserId) {
+    return true;
+  }
+
+  const remainingParticipations = (await tx.studyParticipant.findMany?.({
+    select: { id: true },
+    where: { participantProfileId: participantProfile.id }
+  })) as Array<{ id: string }> | undefined;
+
+  if ((remainingParticipations ?? []).length > 0) {
+    return true;
+  }
+
+  await tx.participantProfile.deleteMany?.({
+    where: { id: participantProfile.id }
+  });
+
+  return false;
+}
+
+function isNavigoDirectScreeningAttempt(
+  screeningAttempt: { evaluationJson: unknown; id: string; source?: string } | null
+): boolean {
+  if (!screeningAttempt || screeningAttempt.source !== "FIELD") {
+    return false;
+  }
+
+  const metadata = screeningAttempt.evaluationJson;
+
+  return (
+    typeof metadata === "object" &&
+    metadata !== null &&
+    "directSource" in metadata &&
+    metadata.directSource === "APP_NAVIGO_DIRECT"
+  );
 }
 
 function parseFolioSequence(folio: string): number {

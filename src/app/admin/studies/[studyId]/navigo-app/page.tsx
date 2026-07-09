@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
   configureNavigoRotationAction,
+  deleteNavigoParticipantAction,
   deleteNavigoParticipantStagesAction,
   generateNavigoParticipantLinksForStudyAction,
   generateNavigoParticipantLinkAction,
@@ -398,7 +399,7 @@ function CorrectionActions({
     <details className="rounded-md border border-rose-200 bg-rose-50 p-3">
       <summary className="cursor-pointer text-sm font-semibold text-rose-800">Acciones de correccion</summary>
       <p className="mt-2 text-xs leading-5 text-rose-900">
-        Usa estas acciones solo ante errores de operacion o pruebas. Se conserva participante, folio, screening y rotacion.
+        Usa estas acciones solo ante errores de operacion o pruebas. Reiniciar conserva participante, folio, screening y rotacion.
       </p>
 
       <form action={resetNavigoParticipantAppAction.bind(null, studyId, participant.id)} className="mt-4 space-y-2">
@@ -441,6 +442,31 @@ function CorrectionActions({
           rows={2}
         />
         <SubmitButton pendingLabel="Eliminando etapas...">Eliminar etapas</SubmitButton>
+      </form>
+
+      <form action={deleteNavigoParticipantAction.bind(null, studyId, participant.id)} className="mt-5 space-y-2 border-t border-rose-200 pt-4">
+        <p className="text-sm font-semibold text-rose-950">Eliminar participante Navigo</p>
+        <p className="text-xs leading-5 text-rose-900">
+          Eliminar este participante borrará sus actividades, evidencias, selfies, verificaciones, asignaciones,
+          respuestas y estados de App Navigo. Esta acción no se puede deshacer.
+        </p>
+        <p className="text-xs leading-5 text-rose-900">
+          Si el participante viene de un filtro real, no se borrará el screening automáticamente; se bloqueará con una causa específica.
+        </p>
+        <input
+          className={inputClass}
+          name="confirmation"
+          placeholder="ELIMINAR PARTICIPANTE"
+          required
+        />
+        <textarea
+          className={inputClass}
+          name="reason"
+          placeholder="Motivo obligatorio"
+          required
+          rows={2}
+        />
+        <SubmitButton pendingLabel="Eliminando participante...">Eliminar participante</SubmitButton>
       </form>
     </details>
   );

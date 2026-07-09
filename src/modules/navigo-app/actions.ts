@@ -156,6 +156,34 @@ export async function resetNavigoParticipantAppAction(studyId: string, studyPart
   redirectWithNavigoMessage(studyId, { message: result.message });
 }
 
+export async function deleteNavigoParticipantAction(studyId: string, studyParticipantId: string, formData: FormData) {
+  const actor = await requireCapability("admin:access");
+  const confirmation = String(formData.get("confirmation") ?? "").trim();
+  const reason = String(formData.get("reason") ?? "").trim();
+
+  if (confirmation !== "ELIMINAR PARTICIPANTE") {
+    redirectWithNavigoMessage(studyId, { error: "Escribe ELIMINAR PARTICIPANTE para confirmar." });
+  }
+
+  if (!reason) {
+    redirectWithNavigoMessage(studyId, { error: "Captura el motivo de la eliminacion." });
+  }
+
+  const result = await createNavigoAppRepository().deleteParticipant({
+    actorUserId: actor.id,
+    reason,
+    studyId,
+    studyParticipantId
+  });
+
+  if (!result.ok) {
+    redirectWithNavigoMessage(studyId, { error: result.message });
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+  redirectWithNavigoMessage(studyId, { message: result.message });
+}
+
 export async function deleteNavigoParticipantStagesAction(
   studyId: string,
   studyParticipantId: string,
