@@ -30,6 +30,7 @@ export type FieldScreenerVersionSummary = {
 export type FieldStudySummary = {
   activeScreenerVersion: FieldScreenerVersionSummary;
   code: string;
+  createdByUserId: string;
   id: string;
   name: string;
   status: FieldStudyStatus;
@@ -201,6 +202,7 @@ const screenerVersionSelect = {
 
 const studySelect = {
   code: true,
+  createdByUserId: true,
   id: true,
   name: true,
   questionnaireVersions: {
@@ -290,6 +292,7 @@ function toFieldStudy(study: StudyWithVersions): FieldStudySummary {
   return {
     activeScreenerVersion,
     code: study.code,
+    createdByUserId: study.createdByUserId,
     id: study.id,
     name: study.name,
     status: study.status,

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getFieldActorForRequest } from "@/modules/field/auth";
+import { isPublicFieldActor } from "@/modules/field/service";
 import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
@@ -34,8 +35,8 @@ export default async function ScreeningResultPage({ params }: ScreeningResultPag
 
   const screen = result.data;
 
-  return (
-    <AppShell>
+  const content = (
+    <>
       <PageHeader
         actions={<StatusBadge status="ready">{fieldAttemptStatusLabel(screen.attempt.status)}</StatusBadge>}
         description={`Participante: ${screen.attempt.studyParticipant.participantProfile.name}`}
@@ -44,6 +45,12 @@ export default async function ScreeningResultPage({ params }: ScreeningResultPag
       />
 
       <ScreeningResultCard screen={screen} />
-    </AppShell>
+    </>
   );
+
+  if (isPublicFieldActor(actor)) {
+    return <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">{content}</main>;
+  }
+
+  return <AppShell>{content}</AppShell>;
 }

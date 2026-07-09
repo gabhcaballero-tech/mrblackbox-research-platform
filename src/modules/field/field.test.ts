@@ -185,6 +185,7 @@ function study(status: "ACTIVE" | "DRAFT" = "ACTIVE", definition = screenerDefin
   return {
     activeScreenerVersion: version(definition),
     code: "FMASCULINA-NAVIGO-2026",
+    createdByUserId: "admin-1",
     id: studyId,
     name: "Fragancia Masculina — Navigo Homme",
     status,

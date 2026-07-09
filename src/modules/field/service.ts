@@ -202,7 +202,15 @@ export async function getFieldStudy({
     };
   }
 
-  parseScreenerDefinition(study.activeScreenerVersion.definitionJson);
+  try {
+    parseScreenerDefinition(study.activeScreenerVersion.definitionJson);
+  } catch {
+    return {
+      code: "STUDY_NOT_AVAILABLE",
+      message: "El cuestionario no está disponible.",
+      ok: false
+    };
+  }
 
   return {
     data: study,
@@ -247,7 +255,15 @@ export async function startFieldScreeningAttempt({
     };
   }
 
-  parseScreenerDefinition(study.activeScreenerVersion.definitionJson);
+  try {
+    parseScreenerDefinition(study.activeScreenerVersion.definitionJson);
+  } catch {
+    return {
+      code: "STUDY_NOT_AVAILABLE",
+      message: "El cuestionario no está disponible.",
+      ok: false
+    };
+  }
 
   if (confirmation?.participantProfileId) {
     const profile = await repository.findParticipantProfileById(confirmation.participantProfileId);
@@ -283,7 +299,8 @@ export async function startFieldScreeningAttempt({
     }
 
     return createAttemptForProfile({
-      actorId: isPublicFieldActor(actor) ? null : actor.id,
+      createdByUserId: isPublicFieldActor(actor) ? study.createdByUserId : actor.id,
+      fieldUserId: isPublicFieldActor(actor) ? null : actor.id,
       profile,
       repository,
       reusedParticipantProfile: true,
@@ -317,7 +334,7 @@ export async function startFieldScreeningAttempt({
   }
 
   const profile = await repository.createParticipantProfile({
-    createdByUserId: actor.id,
+    createdByUserId: isPublicFieldActor(actor) ? study.createdByUserId : actor.id,
     email: parsed.data.email,
     externalReference: parsed.data.externalReference,
     name: parsed.data.name,
@@ -325,7 +342,8 @@ export async function startFieldScreeningAttempt({
   });
 
   return createAttemptForProfile({
-    actorId: isPublicFieldActor(actor) ? null : actor.id,
+    createdByUserId: isPublicFieldActor(actor) ? study.createdByUserId : actor.id,
+    fieldUserId: isPublicFieldActor(actor) ? null : actor.id,
     profile,
     repository,
     reusedParticipantProfile: false,
@@ -497,14 +515,16 @@ export async function saveFieldScreeningAnswer({
 }
 
 async function createAttemptForProfile({
-  actorId,
+  createdByUserId,
+  fieldUserId,
   profile,
   repository,
   reusedParticipantProfile,
   screenerVersionId,
   studyId
 }: {
-  actorId: string | null;
+  createdByUserId: string;
+  fieldUserId: string | null;
   profile: { id: string };
   repository: FieldRepository;
   reusedParticipantProfile: boolean;
@@ -517,7 +537,7 @@ async function createAttemptForProfile({
       studyId
     })) ??
     (await repository.createStudyParticipant({
-      createdByUserId: actorId,
+      createdByUserId,
       participantProfileId: profile.id,
       screeningStatus: "STARTED",
       studyId
@@ -530,7 +550,7 @@ async function createAttemptForProfile({
   });
 
   const attempt = await repository.createScreeningAttempt({
-    fieldUserId: actorId,
+    fieldUserId,
     questionnaireVersionId: screenerVersionId,
     studyParticipantId: studyParticipant.id
   });
@@ -694,7 +714,17 @@ async function loadAttemptContext({
     };
   }
 
-  const definition = parseScreenerDefinition(attempt.questionnaireVersion.definitionJson);
+  let definition: ScreenerDefinition;
+
+  try {
+    definition = parseScreenerDefinition(attempt.questionnaireVersion.definitionJson);
+  } catch {
+    return {
+      code: "STUDY_NOT_AVAILABLE",
+      message: "El cuestionario no está disponible.",
+      ok: false
+    };
+  }
   const answerRecords = await repository.listAnswers(attemptId);
 
   return {

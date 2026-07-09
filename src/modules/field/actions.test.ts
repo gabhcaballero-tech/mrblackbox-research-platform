@@ -1,9 +1,11 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import {
-  saveFieldScreeningAnswerAction,
-  startFieldScreeningAttemptAction
-} from "./actions";
-import { PUBLIC_FIELD_ACTOR } from "./service";
+
+const mocks = vi.hoisted(() => ({
+  ensureFilterOnlyConfirmation: vi.fn(),
+  findLatestOutboundTemplateMessage: vi.fn(),
+  getAttempt: vi.fn(),
+  sendNavigoConfirmationWhatsApp: vi.fn()
+}));
 
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((path: string) => {
@@ -16,7 +18,11 @@ vi.mock("next/cache", () => ({
 }));
 
 vi.mock("./auth", () => ({
-  getFieldActorForRequest: vi.fn(async () => PUBLIC_FIELD_ACTOR)
+  getFieldActorForRequest: vi.fn(async () => ({
+    id: "PUBLIC_FIELD",
+    role: "INTERVIEWER",
+    status: "ACTIVE"
+  }))
 }));
 
 vi.mock("./repository", () => ({
@@ -33,11 +39,17 @@ vi.mock("./service", async (importOriginal) => {
   };
 });
 
-const ensureFilterOnlyConfirmation = vi.fn();
+vi.mock("@/modules/oneui-whatsapp", () => ({
+  createOneuiWhatsAppRepository: vi.fn(() => ({
+    findLatestOutboundTemplateMessage: mocks.findLatestOutboundTemplateMessage
+  })),
+  sendNavigoConfirmationWhatsApp: mocks.sendNavigoConfirmationWhatsApp
+}));
 
 vi.mock("@/modules/participant-portal/screener-repository", () => ({
   createParticipantPortalScreenerRepository: vi.fn(() => ({
-    ensureFilterOnlyConfirmation
+    ensureFilterOnlyConfirmation: mocks.ensureFilterOnlyConfirmation,
+    getAttempt: mocks.getAttempt
   }))
 }));
 
@@ -51,6 +63,8 @@ describe("field actions public access", () => {
   });
 
   it("starts a field screening attempt without an internal session", async () => {
+    const { startFieldScreeningAttemptAction } = await import("./actions");
+    const { PUBLIC_FIELD_ACTOR } = await import("./service");
     const { startFieldScreeningAttempt } = await import("./service");
 
     vi.mocked(startFieldScreeningAttempt).mockResolvedValueOnce({
@@ -80,7 +94,30 @@ describe("field actions public access", () => {
     );
   });
 
+  it("returns a visible error instead of throwing the field error boundary when start fails", async () => {
+    const { startFieldScreeningAttemptAction } = await import("./actions");
+    const { startFieldScreeningAttempt } = await import("./service");
+
+    vi.mocked(startFieldScreeningAttempt).mockRejectedValueOnce(new Error("database unavailable"));
+
+    const formData = new FormData();
+    formData.set("name", "Persona publica");
+    formData.set("phone", "5551112222");
+
+    await expect(startFieldScreeningAttemptAction("study-1", {}, formData)).resolves.toEqual({
+      error: "No fue posible iniciar el filtro. Intenta nuevamente.",
+      values: {
+        email: "",
+        externalReference: "",
+        name: "Persona publica",
+        phone: "5551112222"
+      }
+    });
+  });
+
   it("generates folio and codes when a public field screening finishes as eligible", async () => {
+    const { saveFieldScreeningAnswerAction } = await import("./actions");
+    const { PUBLIC_FIELD_ACTOR } = await import("./service");
     const { saveFieldScreeningAnswer } = await import("./service");
 
     vi.mocked(saveFieldScreeningAnswer).mockResolvedValueOnce({
@@ -92,7 +129,7 @@ describe("field actions public access", () => {
       },
       ok: true
     });
-    ensureFilterOnlyConfirmation.mockResolvedValueOnce({
+    mocks.ensureFilterOnlyConfirmation.mockResolvedValueOnce({
       confirmation: {
         folio: "NAV-001",
         folioSequence: 1,
@@ -104,6 +141,27 @@ describe("field actions public access", () => {
       },
       created: true,
       ok: true
+    });
+    mocks.getAttempt.mockResolvedValueOnce({
+      id: "attempt-public-1",
+      questionnaireVersion: {
+        study: {
+          id: "study-1"
+        }
+      },
+      studyParticipant: {
+        participantProfile: {
+          name: "Persona publica",
+          phone: "5551112222"
+        }
+      },
+      studyParticipantId: "study-participant-1"
+    });
+    mocks.findLatestOutboundTemplateMessage.mockResolvedValueOnce(null);
+    mocks.sendNavigoConfirmationWhatsApp.mockResolvedValueOnce({
+      code: "SKIPPED",
+      message: "WhatsApp rechazado en prueba.",
+      ok: false
     });
 
     const formData = new FormData();
@@ -119,9 +177,16 @@ describe("field actions public access", () => {
         attemptId: "attempt-public-1"
       })
     );
-    expect(ensureFilterOnlyConfirmation).toHaveBeenCalledWith(
+    expect(mocks.ensureFilterOnlyConfirmation).toHaveBeenCalledWith(
       expect.objectContaining({
         attemptId: "attempt-public-1"
+      })
+    );
+    expect(mocks.sendNavigoConfirmationWhatsApp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        folio: "NAV-001",
+        participantId: "study-participant-1",
+        phone: "5551112222"
       })
     );
   });

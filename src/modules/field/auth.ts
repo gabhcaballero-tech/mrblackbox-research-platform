@@ -9,7 +9,7 @@ export async function getFieldActorForRequest(): Promise<FieldActor> {
     return access.internalUser;
   }
 
-  if (access.code === "NO_SESSION") {
+  if (access.code === "NO_SESSION" || access.code === "NO_INTERNAL_USER") {
     return PUBLIC_FIELD_ACTOR;
   }
 

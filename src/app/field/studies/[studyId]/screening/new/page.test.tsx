@@ -27,6 +27,7 @@ vi.mock("@/modules/field/service", async (importOriginal) => {
           versionNumber: 1
         },
         code: "FMASCULINA-NAVIGO-2026",
+        createdByUserId: "admin-1",
         id: "study-1",
         name: "Fragancia Masculina",
         status: "ACTIVE",
@@ -55,5 +56,25 @@ describe("NewScreeningPage public access", () => {
     expect(screen.getByText("Iniciar filtro · Fragancia Masculina")).toBeInTheDocument();
     expect(screen.getByTestId("participant-start-form")).toHaveTextContent("Inicio publico study-1");
     expect(screen.queryByText("Volver al estudio")).not.toBeInTheDocument();
+  });
+
+  it("shows a clear unavailable message instead of the generic field error", async () => {
+    const { getFieldStudy } = await import("@/modules/field/service");
+
+    vi.mocked(getFieldStudy).mockResolvedValueOnce({
+      code: "STUDY_NOT_AVAILABLE",
+      message: "El cuestionario no está disponible.",
+      ok: false
+    });
+
+    render(
+      await NewScreeningPage({
+        params: Promise.resolve({ studyId: "study-1" }),
+        searchParams: Promise.resolve({})
+      })
+    );
+
+    expect(screen.getByText("El cuestionario no está disponible.")).toBeInTheDocument();
+    expect(screen.queryByText("Campo no disponible")).not.toBeInTheDocument();
   });
 });

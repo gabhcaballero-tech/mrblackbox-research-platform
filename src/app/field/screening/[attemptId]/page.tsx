@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getFieldActorForRequest } from "@/modules/field/auth";
+import { isPublicFieldActor } from "@/modules/field/service";
 import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
@@ -41,8 +42,8 @@ export default async function ScreeningAttemptPage({ params, searchParams }: Scr
 
   const screen = result.data;
 
-  return (
-    <AppShell>
+  const content = (
+    <>
       <PageHeader
         actions={<StatusBadge status="ready">{`Versión ${screen.attempt.questionnaireVersion.versionNumber}`}</StatusBadge>}
         description={`Participante: ${screen.attempt.studyParticipant.participantProfile.name}`}
@@ -51,9 +52,11 @@ export default async function ScreeningAttemptPage({ params, searchParams }: Scr
       />
 
       <div className="mb-6 flex flex-wrap gap-3">
-        <Link className="text-sm font-semibold text-teal-700 transition hover:text-teal-800" href="/field">
-          Volver a Campo
-        </Link>
+        {isPublicFieldActor(actor) ? null : (
+          <Link className="text-sm font-semibold text-teal-700 transition hover:text-teal-800" href="/field">
+            Volver a Campo
+          </Link>
+        )}
         <Link
           className="text-sm font-semibold text-zinc-700 transition hover:text-zinc-950"
           href={`/field/screening/${attemptId}/result`}
@@ -75,6 +78,12 @@ export default async function ScreeningAttemptPage({ params, searchParams }: Scr
       </div>
 
       <ScreeningQuestionForm error={resolvedSearchParams?.error} screen={screen} />
-    </AppShell>
+    </>
   );
+
+  if (isPublicFieldActor(actor)) {
+    return <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">{content}</main>;
+  }
+
+  return <AppShell>{content}</AppShell>;
 }

@@ -27,6 +27,7 @@ const study: FieldStudySummary = {
     versionNumber: 1
   },
   code: "FMASCULINA-NAVIGO-2026",
+  createdByUserId: "admin-1",
   id: "study-1",
   name: "Fragancia Masculina - Navigo Homme",
   status: "ACTIVE",

@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { getFieldActorForRequest } from "@/modules/field/auth";
 import { createFieldRepository } from "@/modules/field/repository";
 import { getFieldStudy, isPublicFieldActor } from "@/modules/field/service";
@@ -31,7 +30,7 @@ export default async function NewScreeningPage({ params, searchParams }: NewScre
 
   if (!result.ok) {
     if (result.code === "STUDY_NOT_AVAILABLE") {
-      notFound();
+      return <FieldPublicMessage title="El cuestionario no está disponible." />;
     }
 
     throw new Error(result.message);
@@ -61,4 +60,15 @@ export default async function NewScreeningPage({ params, searchParams }: NewScre
   }
 
   return <AppShell>{content}</AppShell>;
+}
+
+function FieldPublicMessage({ title }: { title: string }) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-10">
+      <section className="w-full max-w-md rounded-lg border border-zinc-200 bg-white p-6 text-center shadow-sm">
+        <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Campo</p>
+        <h1 className="mt-2 text-2xl font-semibold text-zinc-950">{title}</h1>
+      </section>
+    </main>
+  );
 }
