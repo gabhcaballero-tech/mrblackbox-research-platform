@@ -104,6 +104,7 @@ export type EvidenceReviewRepository = {
     deletedByUserId: string;
     reason: string;
   }) => Promise<EvidenceReviewDeleteResult>;
+  getBulkDeletePreview: (attemptId: string) => Promise<EvidenceReviewBulkDeletePreview | null>;
   rejectEvidence: (input: {
     attemptId: string;
     internalNote?: string | null;
@@ -193,6 +194,7 @@ export type EvidenceReviewUpdateParticipantResult =
 
 export type EvidenceReviewDeleteResult =
   | {
+      deletedAttemptCount?: number;
       evidenceToDelete: Array<{ bucket: string; privateStorageKey: string }>;
       preservedInternalProfile: boolean;
       ok: true;
@@ -203,8 +205,23 @@ export type EvidenceReviewDeleteResult =
       ok: false;
     };
 
+export type EvidenceReviewBulkDeletePreview = {
+  attemptIds: string[];
+  blockerMessage: string | null;
+  studyParticipantId: string;
+};
+
 type EvidenceReviewPrismaClient = PrismaClientLike & {
   $transaction: <T>(callback: (tx: EvidenceReviewTransactionClient) => Promise<T>) => Promise<T>;
+  participantActivity: {
+    findMany: (args: unknown) => Promise<Array<{
+      actualCompletedAt: Date | null;
+      actualStartedAt: Date | null;
+      id: string;
+      lastSavedAt: Date | null;
+      status: string;
+    }>>;
+  };
   screeningAttempt: {
     findUnique: (args: unknown) => Promise<EvidenceReviewAttemptRecord | null>;
   };
@@ -852,6 +869,7 @@ export function createEvidenceReviewRepository(
           void input.reason;
 
           return {
+            deletedAttemptCount: 1,
             evidenceToDelete,
             preservedInternalProfile,
             ok: true,
@@ -1021,6 +1039,7 @@ export function createEvidenceReviewRepository(
           void input.reason;
 
           return {
+            deletedAttemptCount: attemptIds.length,
             evidenceToDelete,
             preservedInternalProfile,
             ok: true,
@@ -1034,6 +1053,48 @@ export function createEvidenceReviewRepository(
           ok: false
         };
       }
+    },
+    async getBulkDeletePreview(attemptId) {
+      const prisma = await getPrisma();
+      const attempt = await prisma.screeningAttempt.findUnique({
+        select: attemptReviewSelect,
+        where: { id: attemptId }
+      });
+
+      if (!attempt) {
+        return null;
+      }
+
+      const activities = await prisma.participantActivity.findMany({
+        select: {
+          actualCompletedAt: true,
+          actualStartedAt: true,
+          id: true,
+          lastSavedAt: true,
+          status: true
+        },
+        where: {
+          studyParticipantId: attempt.studyParticipantId
+        }
+      });
+      const hasStartedNavigoActivity = activities.some((activity) =>
+        activity.actualStartedAt ||
+        activity.actualCompletedAt ||
+        activity.lastSavedAt ||
+        activity.status === "STARTED" ||
+        activity.status === "INCOMPLETE" ||
+        activity.status === "COMPLETED" ||
+        activity.status === "EXPIRED" ||
+        activity.status === "REOPENED"
+      );
+
+      return {
+        attemptIds: getStudyParticipantCleanupAttempts(attempt).map((item) => item.id),
+        blockerMessage: hasStartedNavigoActivity
+          ? "No se puede eliminar porque el participante ya inició actividades Navigo. Restablece el participante desde App Navigo."
+          : null,
+        studyParticipantId: attempt.studyParticipantId
+      };
     },
     async rejectEvidence(input) {
       const prisma = await getPrisma();

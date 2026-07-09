@@ -16,6 +16,7 @@ import {
   reopenParticipantEvidenceReviewAction,
   updateParticipantEvidenceParticipantAction
 } from "@/modules/participant-portal/evidence-review-actions";
+import { ScreeningAttemptBulkTable } from "./ScreeningAttemptBulkTable";
 import { EvidenceReplacementForm } from "./EvidenceReplacementForm";
 import { ExportCsvButton } from "./ExportCsvButton";
 import { WhatsAppManualBlock } from "./WhatsAppManualBlock";
@@ -76,26 +77,6 @@ function badgeToneForAttempt(status: ScreeningAttemptListItem["status"], label: 
   }
 
   return badgeTone(status);
-}
-
-function compactNse(attempt: ScreeningAttemptListItem): string {
-  if (attempt.nseScore === null) {
-    return "No calculado";
-  }
-
-  return attempt.nseClassLabel ? `${attempt.nseScore} · ${attempt.nseClassLabel}` : String(attempt.nseScore);
-}
-
-function interviewerLabel(attempt: ScreeningAttemptListItem): string {
-  return attempt.fieldUser?.name.trim() || attempt.fieldUser?.email || "Portal participante";
-}
-
-function referenceLabel(reference: string | null): string {
-  return reference?.trim() || "—";
-}
-
-function compactVersion(version: number): string {
-  return `v${version}`;
 }
 
 function exportHref(data: ScreeningAttemptListData): string {
@@ -207,85 +188,8 @@ export function ScreeningAttemptTable({ attempts, studyId }: { attempts: Screeni
     );
   }
 
-  return (
-    <section className="rounded-lg border border-zinc-200 bg-white shadow-sm" aria-label="Intentos de screener">
-      <div className="overflow-x-auto">
-        <table className="min-w-[920px] divide-y divide-zinc-200 text-left text-sm">
-          <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            <tr>
-              <th className={`${thClass} w-[220px]`}>Participante</th>
-              <th className={`${thClass} w-[92px]`}>Referencia</th>
-              <th className={`${thClass} w-[140px]`}>Entrevistador</th>
-              <th className={`${thClass} w-[110px]`}>Estado</th>
-              <th className={`${thClass} w-[120px]`}>Código</th>
-              <th className={`${thClass} min-w-[260px]`}>Motivo</th>
-              <th className={`${thClass} w-[130px]`}>NSE</th>
-              <th className={`${thClass} w-[150px]`}>Inicio</th>
-              <th className={`${thClass} w-[150px]`}>Cierre</th>
-              <th className={`${thClass} w-[76px]`}>Versión</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
-            {attempts.map((attempt) => (
-              <tr key={attempt.id} className="align-top">
-                <td className={`${tdClass} min-w-[220px]`}>
-                  <div className="space-y-1.5">
-                    <p className="line-clamp-2 text-sm font-medium text-zinc-950" title={attempt.participant.name}>
-                      {attempt.participant.name}
-                    </p>
-                    {attempt.recruiterName ? (
-                      <p
-                        className="line-clamp-1 text-xs text-zinc-500"
-                        title={`Reclutador: ${attempt.recruiterName}`}
-                      >
-                        Reclutador: {attempt.recruiterName}
-                      </p>
-                    ) : null}
-                    <Link
-                      className="inline-flex w-fit rounded-md border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700 transition hover:border-teal-300 hover:bg-teal-100"
-                      href={`/admin/screening-attempts/${attempt.id}`}
-                    >
-                      Ver detalle
-                    </Link>
-                  </div>
-                </td>
-                <td className={`${tdClass} whitespace-nowrap`}>{referenceLabel(attempt.participant.externalReference)}</td>
-                <td className={`${tdClass} max-w-[140px]`}>
-                  <span className="block truncate" title={interviewerLabel(attempt)}>
-                    {interviewerLabel(attempt)}
-                  </span>
-                </td>
-                <td className={`${tdClass} whitespace-nowrap`}>
-                  <StatusBadge status={badgeToneForAttempt(attempt.status, attempt.statusLabel)}>{attempt.statusLabel}</StatusBadge>
-                </td>
-                <td className={`${tdClass} max-w-[120px] font-mono text-xs`}>
-                  <span className="block truncate" title={attempt.terminationCode ?? "No aplica"}>
-                    {attempt.terminationCode ?? "—"}
-                  </span>
-                </td>
-                <td className={`${tdClass} min-w-[260px]`}>
-                  <span className="block line-clamp-2 leading-5" title={attempt.terminationReason ?? "No aplica"}>
-                    {attempt.terminationReason ?? "—"}
-                  </span>
-                </td>
-                <td className={`${tdClass} whitespace-nowrap`}>{compactNse(attempt)}</td>
-                <td className={`${tdClass} whitespace-nowrap`}>{formatDate(attempt.startedAt, attempt.study.timeZoneIana)}</td>
-                <td className={`${tdClass} whitespace-nowrap`}>{formatDate(attempt.closedAt, attempt.study.timeZoneIana)}</td>
-                <td className={`${tdClass} whitespace-nowrap`}>{compactVersion(attempt.screenerVersionNumber)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="border-t border-zinc-100 px-4 py-3">
-        <Link className="text-sm font-semibold text-zinc-700 hover:text-zinc-950" href={`/admin/studies/${studyId}`}>
-          Volver al estudio
-        </Link>
-      </div>
-    </section>
-  );
+  return <ScreeningAttemptBulkTable attempts={attempts} studyId={studyId} />;
 }
-
 export function ScreeningAttemptDetailView({ detail }: { detail: ScreeningAttemptDetail }) {
   return (
     <div className="space-y-6">
@@ -946,5 +850,5 @@ const primaryButtonClass =
   "inline-flex w-fit rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800";
 const secondaryButtonClass =
   "inline-flex w-fit rounded-md border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50";
-const thClass = "px-3 py-3";
-const tdClass = "px-3 py-4 text-zinc-700";
+
+

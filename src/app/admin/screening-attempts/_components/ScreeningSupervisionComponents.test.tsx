@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type {
   ScreeningAttemptDetail,
@@ -179,6 +179,56 @@ describe("ScreeningSupervisionComponents", () => {
     expect(screen.queryByText("Acción")).not.toBeInTheDocument();
   });
 
+  it("renders row checkboxes and shows the bulk delete confirmation after selecting a record", () => {
+    render(<ScreeningAttemptTable attempts={listData.attempts} studyId={study.id} />);
+
+    expect(screen.getByText("0 seleccionados")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Seleccionar Gabriela Uno"));
+
+    expect(screen.getByText("1 seleccionados")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Eliminar y liberar folios" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Eliminar y liberar folios" }));
+
+    expect(screen.getByText("Eliminar registros seleccionados")).toBeInTheDocument();
+    expect(screen.getByText(/registros seleccionados del cuestionario filtro/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Escribe ELIMINAR para confirmar")).toBeInTheDocument();
+    expect(screen.getByLabelText("Motivo obligatorio")).toBeInTheDocument();
+  });
+
+  it("selects all visible attempts and enables bulk delete only after strong confirmation", () => {
+    render(
+      <ScreeningAttemptTable
+        attempts={[
+          listItem,
+          {
+            ...listItem,
+            id: "attempt-2",
+            participant: {
+              ...listItem.participant,
+              id: "profile-2",
+              name: "Gabriela Dos"
+            }
+          }
+        ]}
+        studyId={study.id}
+      />
+    );
+
+    fireEvent.click(screen.getByLabelText("Seleccionar todos los visibles"));
+
+    expect(screen.getByText("2 seleccionados")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Eliminar y liberar folios" }));
+
+    const submit = screen.getByRole("button", { name: "Eliminar seleccionados" });
+    expect(submit).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("Escribe ELIMINAR para confirmar"), { target: { value: "ELIMINAR" } });
+    fireEvent.change(screen.getByLabelText("Motivo obligatorio"), { target: { value: "REGISTROS DE PRUEBA" } });
+
+    expect(submit).toBeEnabled();
+    expect(document.querySelectorAll('input[name="attemptIds"]')).toHaveLength(2);
+  });
   it("renders compact cells for reference, NSE and version", () => {
     render(<ScreeningAttemptTable attempts={listData.attempts} studyId={study.id} />);
 
@@ -601,3 +651,4 @@ describe("ScreeningSupervisionComponents", () => {
     );
   });
 });
+

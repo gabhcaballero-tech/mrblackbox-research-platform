@@ -10,6 +10,7 @@ import {
   buildWhatsAppUrl,
   canReviewParticipantEvidence,
   confirmParticipantEvidenceReplacement,
+  deleteParticipantEvidenceSelectedTestRecords,
   deleteParticipantEvidenceStudyParticipantTestRecords,
   deleteParticipantEvidenceTestRecord,
   generateReferenceCode,
@@ -107,6 +108,7 @@ function repository(currentAttempt = attempt()) {
       studyId: "study-1"
     })),
     deleteStudyParticipantTestRecords: vi.fn(async () => ({
+      deletedAttemptCount: 1,
       evidenceToDelete: [
         { bucket: "participant-evidence", privateStorageKey: "private/selfie.jpg" },
         { bucket: "participant-evidence", privateStorageKey: "private/perfume.jpg" }
@@ -116,6 +118,11 @@ function repository(currentAttempt = attempt()) {
       studyId: "study-1"
     })),
     getAttemptReview: vi.fn(async () => currentAttempt),
+    getBulkDeletePreview: vi.fn(async (attemptId: string) => ({
+      attemptIds: [attemptId],
+      blockerMessage: null,
+      studyParticipantId: `study-participant-${attemptId}`
+    })),
     markManualMessageSent: vi.fn(async () => undefined),
     rejectEvidence: vi.fn(async () => undefined),
     reopenEvidenceReview: vi.fn(async () => ({
@@ -619,6 +626,76 @@ describe("participant evidence review service", () => {
       ok: false
     });
     expect(result.ok ? "" : result.message).not.toContain("screening_attempts adicionales");
+  });
+
+  it("deletes selected records, deduplicates participant cleanup and reports partial skips", async () => {
+    const repo = repository();
+    vi.mocked(repo.getBulkDeletePreview)
+      .mockResolvedValueOnce({
+        attemptIds: ["attempt-1", "attempt-2"],
+        blockerMessage: null,
+        studyParticipantId: "study-participant-1"
+      })
+      .mockResolvedValueOnce({
+        attemptIds: ["attempt-3"],
+        blockerMessage: "No se puede eliminar porque el participante ya inició actividades Navigo. Restablece el participante desde App Navigo.",
+        studyParticipantId: "study-participant-2"
+      });
+    vi.mocked(repo.deleteStudyParticipantTestRecords).mockResolvedValueOnce({
+      deletedAttemptCount: 2,
+      evidenceToDelete: [{ bucket: "participant-evidence", privateStorageKey: "private/selfie.jpg" }],
+      ok: true,
+      preservedInternalProfile: false,
+      studyId: "study-1"
+    });
+    const storage = {
+      createSignedReadUrl: vi.fn(),
+      createSignedUploadUrl: vi.fn(),
+      deleteObjects: vi.fn(async () => undefined)
+    };
+
+    const result = await deleteParticipantEvidenceSelectedTestRecords({
+      actor: admin,
+      attemptIds: ["attempt-1", "attempt-3"],
+      confirmationText: "ELIMINAR",
+      reason: "Registros de prueba",
+      repository: repo,
+      storage
+    });
+
+    expect(result.ok).toBe(true);
+    expect(repo.deleteStudyParticipantTestRecords).toHaveBeenCalledTimes(1);
+    expect(result.ok ? result.data.deletedCount : 0).toBe(2);
+    expect(result.ok ? result.data.skipped : []).toEqual([
+      {
+        attemptId: "attempt-3",
+        message: "No se puede eliminar porque el participante ya inició actividades Navigo. Restablece el participante desde App Navigo."
+      }
+    ]);
+    expect(result.ok ? result.data.successMessage : "").toContain("Se eliminaron 2 registros");
+    expect(storage.deleteObjects).toHaveBeenCalledWith({
+      bucket: "participant-evidence",
+      privateStorageKeys: ["private/selfie.jpg"]
+    });
+  });
+
+  it("requires strong confirmation for selected record cleanup", async () => {
+    const result = await deleteParticipantEvidenceSelectedTestRecords({
+      actor: admin,
+      attemptIds: ["attempt-1"],
+      confirmationText: "ELIMINAR PRUEBA",
+      reason: "Registros de prueba",
+      repository: repository(),
+      storage: {
+        createSignedReadUrl: vi.fn(),
+        createSignedUploadUrl: vi.fn()
+      }
+    });
+
+    expect(result).toMatchObject({
+      message: "Escribe ELIMINAR para confirmar esta accion.",
+      ok: false
+    });
   });
 
   it("shows the specific repository blocker when test-record deletion is not safe", async () => {

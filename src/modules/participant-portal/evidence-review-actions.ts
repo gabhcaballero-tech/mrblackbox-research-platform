@@ -6,6 +6,7 @@ import { requireCapability } from "@/shared/auth/session";
 import { createEvidenceReviewRepository } from "./evidence-review-repository";
 import {
   approveParticipantEvidenceReview,
+  deleteParticipantEvidenceSelectedTestRecords,
   deleteParticipantEvidenceStudyParticipantTestRecords,
   deleteParticipantEvidenceTestRecord,
   markParticipantManualMessageSent,
@@ -173,6 +174,27 @@ export async function deleteParticipantEvidenceStudyParticipantTestRecordsAction
       result.data.storageWarning ?? result.data.successMessage
     )}`
   );
+}
+
+export async function deleteSelectedParticipantEvidenceTestRecordsAction(studyId: string, formData: FormData): Promise<void> {
+  const actor = await requireCapability("screening:review");
+  const result = await deleteParticipantEvidenceSelectedTestRecords({
+    actor,
+    attemptIds: formData.getAll("attemptIds").map(String),
+    confirmationText: String(formData.get("confirmationText") ?? ""),
+    reason: String(formData.get("deleteReason") ?? ""),
+    repository: createEvidenceReviewRepository(),
+    storage: createSupabaseEvidenceStorageClient()
+  });
+
+  revalidatePath(`/admin/studies/${studyId}/screening-attempts`);
+
+  if (!result.ok) {
+    redirect(`/admin/studies/${studyId}/screening-attempts?evidenceError=${encodeURIComponent(result.message)}`);
+  }
+
+  const message = result.data.storageWarning ?? result.data.successMessage;
+  redirect(`/admin/studies/${studyId}/screening-attempts?evidenceMessage=${encodeURIComponent(message)}`);
 }
 
 export async function rejectParticipantEvidenceAction(

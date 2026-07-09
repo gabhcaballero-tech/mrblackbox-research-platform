@@ -510,6 +510,124 @@ export async function deleteParticipantEvidenceStudyParticipantTestRecords({
   };
 }
 
+export async function deleteParticipantEvidenceSelectedTestRecords({
+  actor,
+  attemptIds,
+  confirmationText,
+  reason,
+  repository,
+  storage
+}: {
+  actor: EvidenceReviewActor | null;
+  attemptIds: string[];
+  confirmationText: string;
+  reason: string;
+  repository: EvidenceReviewRepository;
+  storage: EvidenceStorageClient;
+}): Promise<
+  EvidenceReviewResult<{
+    deletedCount: number;
+    skipped: Array<{ attemptId: string; message: string }>;
+    storageWarning: string | null;
+    studyId: string | null;
+    successMessage: string;
+  }>
+> {
+  if (!actor || actor.status !== "ACTIVE" || actor.role !== "ADMIN") {
+    return {
+      message: "Solo ADMIN puede eliminar registros seleccionados.",
+      ok: false
+    };
+  }
+
+  if (confirmationText.trim() !== "ELIMINAR") {
+    return {
+      message: "Escribe ELIMINAR para confirmar esta accion.",
+      ok: false
+    };
+  }
+
+  const normalizedReason = normalizeParticipantTextInput(reason);
+  if (!normalizedReason) {
+    return {
+      message: "Captura el motivo de eliminacion.",
+      ok: false
+    };
+  }
+
+  const uniqueAttemptIds = [...new Set(attemptIds.map((id) => id.trim()).filter(Boolean))];
+  if (uniqueAttemptIds.length === 0) {
+    return {
+      message: "Selecciona al menos un registro para eliminar.",
+      ok: false
+    };
+  }
+
+  const processedStudyParticipants = new Set<string>();
+  const skipped: Array<{ attemptId: string; message: string }> = [];
+  const evidenceToDelete: Array<{ bucket: string; privateStorageKey: string }> = [];
+  let deletedCount = 0;
+  let studyId: string | null = null;
+
+  for (const attemptId of uniqueAttemptIds) {
+    const preview = await repository.getBulkDeletePreview(attemptId);
+
+    if (!preview) {
+      skipped.push({ attemptId, message: "El intento no existe." });
+      continue;
+    }
+
+    if (processedStudyParticipants.has(preview.studyParticipantId)) {
+      skipped.push({
+        attemptId,
+        message: "Este participante ya fue incluido en otro registro seleccionado."
+      });
+      continue;
+    }
+
+    if (preview.blockerMessage) {
+      skipped.push({ attemptId, message: preview.blockerMessage });
+      continue;
+    }
+
+    const result = await repository.deleteStudyParticipantTestRecords({
+      attemptId,
+      deletedByUserId: actor.id,
+      reason: normalizedReason
+    });
+
+    if (!result.ok) {
+      skipped.push({ attemptId, message: result.message });
+      continue;
+    }
+
+    processedStudyParticipants.add(preview.studyParticipantId);
+    deletedCount += result.deletedAttemptCount ?? preview.attemptIds.length;
+    studyId = result.studyId;
+    evidenceToDelete.push(...result.evidenceToDelete);
+  }
+
+  const storageWarning = await deleteEvidenceObjects({
+    evidenceToDelete,
+    storage
+  });
+  const skippedMessage =
+    skipped.length > 0
+      ? ` ${skipped.length} no pudieron eliminarse: ${skipped.map((item) => item.message).join(" ")}`
+      : "";
+
+  return {
+    data: {
+      deletedCount,
+      skipped,
+      storageWarning,
+      studyId,
+      successMessage: `Se eliminaron ${deletedCount} registros.${skippedMessage}`.trim()
+    },
+    ok: true
+  };
+}
+
 export async function rejectParticipantEvidenceReview({
   actor,
   attemptId,
