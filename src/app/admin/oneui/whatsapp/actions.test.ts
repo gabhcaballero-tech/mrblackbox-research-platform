@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { initialOneuiWhatsAppReplyActionState, sendOneuiWhatsAppReplyAction } from "./actions";
+import { initialOneuiWhatsAppReplyActionState } from "./action-state";
+import { sendOneuiWhatsAppReplyAction } from "./actions";
 
 const { requireInternalUserMock, revalidatePathMock, sendReplyMock } = vi.hoisted(() => ({
   requireInternalUserMock: vi.fn(),

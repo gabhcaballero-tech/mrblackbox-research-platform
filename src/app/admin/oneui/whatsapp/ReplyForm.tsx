@@ -1,10 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import {
-  initialOneuiWhatsAppReplyActionState,
-  sendOneuiWhatsAppReplyAction
-} from "./actions";
+import { initialOneuiWhatsAppReplyActionState } from "./action-state";
+import { sendOneuiWhatsAppReplyAction } from "./actions";
 
 type ReplyFormProps = {
   conversationId: string | null;

@@ -3,16 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { sendOneuiWhatsAppTextReply } from "@/modules/oneui-whatsapp";
 import { requireInternalUser } from "@/shared/auth/session";
-
-export type OneuiWhatsAppReplyActionState = {
-  error: string | null;
-  ok: boolean;
-};
-
-export const initialOneuiWhatsAppReplyActionState: OneuiWhatsAppReplyActionState = {
-  error: null,
-  ok: false
-};
+import type { OneuiWhatsAppReplyActionState } from "./action-state";
 
 export async function sendOneuiWhatsAppReplyAction(
   _previousState: OneuiWhatsAppReplyActionState,
