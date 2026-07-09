@@ -14,6 +14,7 @@ import {
   regenerateParticipantReferenceCodes,
   rejectParticipantEvidenceReview,
   requestParticipantEvidenceReplacementUpload,
+  sendParticipantConfirmationWhatsApp,
   updateParticipantEvidenceParticipant
 } from "./evidence-review-service";
 import {
@@ -291,6 +292,24 @@ export async function markParticipantManualMessageSentAction(attemptId: string):
   }
 
   redirect(reviewPath(attemptId, "evidenceMessage", "Mensaje marcado como enviado.", "whatsapp"));
+}
+
+export async function sendParticipantConfirmationWhatsAppAction(attemptId: string): Promise<void> {
+  const actor = await requireCapability("screening:review");
+  const result = await sendParticipantConfirmationWhatsApp({
+    actor,
+    attemptId,
+    force: true,
+    repository: createEvidenceReviewRepository()
+  });
+
+  revalidatePath(`/admin/screening-attempts/${attemptId}`);
+
+  if (!result.ok) {
+    redirect(reviewPath(attemptId, "evidenceError", result.message, "whatsapp"));
+  }
+
+  redirect(reviewPath(attemptId, "evidenceMessage", "WhatsApp enviado correctamente.", "whatsapp"));
 }
 
 function reviewPath(

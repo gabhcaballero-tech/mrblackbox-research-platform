@@ -37,13 +37,13 @@ import {
   type HutStorageClient,
   type HutVideoUploadMetadata
 } from "./storage";
-import {
-  createSupabaseEvidenceStorageClient,
-} from "@/modules/participant-portal/evidence-storage";
+import { createSupabaseEvidenceStorageClient } from "@/modules/participant-portal/evidence-storage";
 import {
   normalizeNavigoFaceVerificationForStorage,
   type NavigoFaceVerificationClientResult
 } from "@/modules/navigo-app/face-verification-contract";
+import { createOneuiWhatsAppRepository, sendHutRegistrationWhatsApp, type OneuiWhatsAppRepository } from "@/modules/oneui-whatsapp";
+import { whatsappAutomationStatusFromMessage, type WhatsAppAutomationStatus } from "@/modules/oneui-whatsapp/templates";
 
 export type HutActionResult<T = void> =
   | { ok: true; data: T; message?: string }
@@ -96,6 +96,7 @@ export type HutAdminParticipant = {
   token: string;
   usedToleranceInCurrentBlock: boolean;
   visualOverrideEnabled: boolean;
+  whatsappRegistration: WhatsAppAutomationStatus;
 };
 
 export type HutRegistrationSlotAdmin = {
@@ -325,6 +326,12 @@ export type HutRepository = {
     requestOrigin: string;
     token: string;
   }) => Promise<HutActionResult<{ participantLink: string; participantId: string }>>;
+  sendRegistrationWhatsApp: (input: {
+    force?: boolean;
+    participantId: string;
+    requestOrigin: string;
+    studyId: string;
+  }) => Promise<HutActionResult<{ participantId: string }>>;
   requestDailySelfieUpload: (input: {
     metadata: HutSelfieUploadMetadata;
     storage?: HutStorageClient;
@@ -623,9 +630,19 @@ const registrationSlotSelect = {
   studyId: true
 } as const;
 
-export function createHutRepository(prismaClient?: HutPrismaClient): HutRepository {
+export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepository?: OneuiWhatsAppRepository): HutRepository {
   async function getPrisma() {
     return prismaClient ?? ((await createPrismaClient()) as HutPrismaClient);
+  }
+
+  function getWhatsAppRepository() {
+    if (whatsappRepository) {
+      return whatsappRepository;
+    }
+    if (prismaClient) {
+      return createNoopOneuiWhatsAppRepository();
+    }
+    return whatsappRepository ?? createOneuiWhatsAppRepository();
   }
 
   async function findParticipant(prisma: HutPrismaClient, participantId: string) {
@@ -663,7 +680,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
       }
       const prisma = await getPrisma();
 
-      return prisma.$transaction(async (tx) => {
+      const result: HutActionResult<{ link: string; participantId: string }> = await prisma.$transaction(async (tx) => {
         const study = (await tx.study.findUnique?.({
           select: studySelect,
           where: { id: input.studyId }
@@ -768,6 +785,17 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
           ok: true
         };
       });
+
+      if (result.ok) {
+        await sendHutRegistrationWhatsAppForParticipant({
+          link: result.data.link,
+          participantId: result.data.participantId,
+          prisma,
+          whatsappRepository: getWhatsAppRepository()
+        });
+      }
+
+      return result;
     },
 
     async createRegistrationSlot(input) {
@@ -842,7 +870,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
 
     async importParticipants(input) {
       const rows = parseHutParticipantImportText(input.text);
-      const repository = createHutRepository(await getPrisma());
+      const repository = createHutRepository(await getPrisma(), getWhatsAppRepository());
       let created = 0;
       let skipped = 0;
 
@@ -870,7 +898,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
 
     async importRegistrationSlots(input) {
       const rows = parseHutRegistrationSlotImportText(input.text);
-      const repository = createHutRepository(await getPrisma());
+      const repository = createHutRepository(await getPrisma(), getWhatsAppRepository());
       let created = 0;
       let skipped = 0;
 
@@ -919,7 +947,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
 
       return {
         participants: await Promise.all(
-          participants.map((participant) => toAdminParticipant(participant, input.requestOrigin, input.storage))
+        participants.map((participant) => toAdminParticipant(participant, input.requestOrigin, input.storage, getWhatsAppRepository()))
         ),
         registrationSlots: registrationSlots.map((slot) => toAdminRegistrationSlot(slot, input.requestOrigin)),
         study
@@ -969,7 +997,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
     async startBlock(input) {
       const prisma = await getPrisma();
 
-      return prisma.$transaction(async (tx) => {
+      const result: HutActionResult<{ participantId: string }> = await prisma.$transaction(async (tx) => {
         const participant = await findParticipant(tx, input.participantId);
 
         if (!participant || participant.studyId !== input.studyId) {
@@ -1012,6 +1040,8 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
           ok: true
         };
       });
+
+      return result;
     },
 
     async markMissedDay(input) {
@@ -1184,7 +1214,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
 
       const prisma = await getPrisma();
 
-      return prisma.$transaction(async (tx) => {
+      const result: HutActionResult<{ participantId: string }> = await prisma.$transaction(async (tx) => {
         const participant = await findParticipant(tx, input.participantId);
 
         if (!participant || participant.studyId !== input.studyId) {
@@ -1206,6 +1236,36 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
           ok: true
         };
       });
+
+      return result;
+    },
+
+    async sendRegistrationWhatsApp(input) {
+      const prisma = await getPrisma();
+      const participant = await findParticipant(prisma, input.participantId);
+
+      if (!participant || participant.studyId !== input.studyId) {
+        return { message: "No encontramos el participante HUT.", ok: false };
+      }
+
+      const link = participantLink(input.requestOrigin, participant.token);
+      const result = await sendHutRegistrationWhatsAppForParticipant({
+        force: input.force ?? true,
+        link,
+        participantId: participant.id,
+        prisma,
+        whatsappRepository: getWhatsAppRepository()
+      });
+
+      if (!result.ok) {
+        return { message: result.message, ok: false };
+      }
+
+      return {
+        data: { participantId: participant.id },
+        message: "WhatsApp de registro HUT enviado correctamente.",
+        ok: true
+      };
     },
 
     async resetReferenceSelfie(input) {
@@ -1680,7 +1740,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
       const prisma = await getPrisma();
       const now = new Date();
 
-      return prisma.$transaction(async (tx) => {
+      const result: HutActionResult<{ participantId: string; participantLink: string }> = await prisma.$transaction(async (tx) => {
         const slot = (await tx.hutRegistrationSlot.findUnique?.({
           select: registrationSlotSelect,
           where: { registrationToken: input.token }
@@ -1768,6 +1828,17 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
           ok: true
         };
       });
+
+      if (result.ok) {
+        await sendHutRegistrationWhatsAppForParticipant({
+          link: result.data.participantLink,
+          participantId: result.data.participantId,
+          prisma,
+          whatsappRepository: getWhatsAppRepository()
+        });
+      }
+
+      return result;
     },
 
     async requestDailySelfieUpload(input) {
@@ -2104,7 +2175,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient): HutReposito
     },
 
     async exportProgress(input) {
-      const dashboard = await createHutRepository(await getPrisma()).getAdminDashboard({
+      const dashboard = await createHutRepository(await getPrisma(), getWhatsAppRepository()).getAdminDashboard({
         requestOrigin: input.requestOrigin,
         studyId: input.studyId
       });
@@ -2282,7 +2353,8 @@ async function releaseParticipantRegistrationSlot(tx: HutPrismaClient, participa
 async function toAdminParticipant(
   participant: HutParticipantRecord,
   requestOrigin: string,
-  storage?: HutStorageClient
+  storage?: HutStorageClient,
+  whatsappRepository?: OneuiWhatsAppRepository
 ): Promise<HutAdminParticipant> {
   const block1 = blockByNumber(participant, 1);
   const block2 = blockByNumber(participant, 2);
@@ -2296,6 +2368,14 @@ async function toAdminParticipant(
     ? await signedStorageUrl(participant.referenceSelfie.privateStorageKey, participant.referenceSelfie.storageBucket, storage)
     : null;
   const identityReview = await buildIdentityReviewSummary(participant, referenceSignedUrl, storage);
+  const repository = whatsappRepository ?? createOneuiWhatsAppRepository();
+  const whatsappRegistration = whatsappAutomationStatusFromMessage(
+    await repository.findLatestOutboundTemplateMessage({
+      linkedParticipantId: participant.id,
+      linkedStudyId: participant.studyId,
+      sourceModule: "HUT"
+    })
+  );
 
   return {
     availability: {
@@ -2343,8 +2423,68 @@ async function toAdminParticipant(
     testMode: participant.testMode,
     token: participant.token,
     usedToleranceInCurrentBlock: Boolean(block && block.missedDaysCount >= block.maxMissedDaysAllowed),
-    visualOverrideEnabled: participant.visualOverrideEnabled
+    visualOverrideEnabled: participant.visualOverrideEnabled,
+    whatsappRegistration
   };
+}
+
+async function sendHutRegistrationWhatsAppForParticipant({
+  force,
+  link,
+  participantId,
+  prisma,
+  whatsappRepository
+}: {
+  force?: boolean;
+  link: string;
+  participantId: string;
+  prisma: HutPrismaClient;
+  whatsappRepository?: OneuiWhatsAppRepository;
+}): Promise<HutActionResult<{ participantId: string }>> {
+  const participant = (await prisma.hutParticipant.findUnique?.({
+    select: participantSelect,
+    where: { id: participantId }
+  })) as HutParticipantRecord | null;
+  if (!participant) {
+    return { message: "No encontramos el participante HUT.", ok: false };
+  }
+
+  try {
+    const repository = whatsappRepository ?? createOneuiWhatsAppRepository();
+    const existingMessage = await repository.findLatestOutboundTemplateMessage({
+      linkedParticipantId: participant.id,
+      linkedStudyId: participant.studyId,
+      sourceModule: "HUT"
+    });
+
+    const result = await sendHutRegistrationWhatsApp({
+      existingMessage,
+      firstFragranceLeftArm: participant.firstFragranceLeftArm,
+      folio: participant.folio,
+      force,
+      link,
+      participantId: participant.id,
+      participantName: participant.name,
+      phone: participant.phone,
+      repository,
+      secondFragranceRightArm: participant.secondFragranceRightArm,
+      studyId: participant.studyId
+    });
+
+    if (!result.ok) {
+      return { message: result.message, ok: false };
+    }
+
+    return { data: { participantId: participant.id }, ok: true };
+  } catch (error) {
+    console.error("hut whatsapp automation failed", {
+      code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+      participantId: participant.id,
+      step: "send_registration_template",
+      studyId: participant.studyId
+    });
+    return { message: "No fue posible enviar el WhatsApp de registro HUT.", ok: false };
+  }
 }
 
 function toAdminRegistrationSlot(slot: HutRegistrationSlotRecord, requestOrigin: string): HutRegistrationSlotAdmin {
@@ -2746,4 +2886,135 @@ function extensionFromFilename(filename: string): string {
 
 function dateForFilename(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+function createNoopOneuiWhatsAppRepository(): OneuiWhatsAppRepository {
+  return {
+    async createOutboundMessage(input) {
+      const now = new Date();
+      return {
+        bodyText: input.bodyText,
+        conversationId: input.conversationId,
+        createdAt: now,
+        direction: "OUTBOUND",
+        fromPhone: input.fromPhone,
+        id: "noop-whatsapp-message",
+        messageType: input.messageType ?? "template",
+        metaMessageId: null,
+        rawPayload: input.rawPayload,
+        status: "pending",
+        timestamp: input.timestamp,
+        toPhone: input.toPhone,
+        updatedAt: now
+      };
+    },
+    async findLatestOutboundTemplateMessage() {
+      return null;
+    },
+    async getConversationWithMessages() {
+      return null;
+    },
+    async listConversations() {
+      return [];
+    },
+    async markOutboundMessageAccepted(input) {
+      const now = new Date();
+      return {
+        bodyText: null,
+        conversationId: "noop-whatsapp-conversation",
+        createdAt: now,
+        direction: "OUTBOUND",
+        fromPhone: "",
+        id: input.messageId,
+        messageType: "template",
+        metaMessageId: input.metaMessageId,
+        rawPayload: input.rawPayload,
+        status: input.status,
+        timestamp: input.timestamp,
+        toPhone: "",
+        updatedAt: now
+      };
+    },
+    async markOutboundMessageFailed(input) {
+      const now = new Date();
+      return {
+        bodyText: null,
+        conversationId: "noop-whatsapp-conversation",
+        createdAt: now,
+        direction: "OUTBOUND",
+        fromPhone: "",
+        id: input.messageId,
+        messageType: "template",
+        metaMessageId: null,
+        rawPayload: input.rawPayload,
+        status: input.status,
+        timestamp: now,
+        toPhone: "",
+        updatedAt: now
+      };
+    },
+    async saveInboundMessage(input) {
+      const now = new Date();
+      return {
+        bodyText: input.bodyText,
+        conversationId: input.conversationId,
+        createdAt: now,
+        direction: "INBOUND",
+        fromPhone: input.fromPhone,
+        id: "noop-whatsapp-inbound-message",
+        messageType: input.messageType,
+        metaMessageId: input.metaMessageId,
+        rawPayload: input.rawPayload,
+        status: null,
+        timestamp: input.timestamp,
+        toPhone: input.toPhone,
+        updatedAt: now
+      };
+    },
+    async saveStatusEvent(input) {
+      return {
+        createdAt: new Date(),
+        id: "noop-whatsapp-status-event",
+        messageId: null,
+        metaMessageId: input.metaMessageId,
+        rawPayload: input.rawPayload,
+        status: input.status,
+        timestamp: input.timestamp
+      };
+    },
+    async upsertInboundConversation(input) {
+      const now = new Date();
+      return {
+        createdAt: now,
+        id: "noop-whatsapp-conversation",
+        lastInboundAt: input.lastInboundAt,
+        lastMessageAt: input.lastInboundAt,
+        lastOutboundAt: null,
+        linkedParticipantId: null,
+        linkedStudyId: null,
+        phoneNumber: input.phoneNumber,
+        profileName: input.profileName,
+        sourceModule: "GENERAL",
+        updatedAt: now,
+        waId: input.waId
+      };
+    },
+    async upsertOutboundConversation(input) {
+      const now = new Date();
+      return {
+        createdAt: now,
+        id: "noop-whatsapp-conversation",
+        lastInboundAt: null,
+        lastMessageAt: now,
+        lastOutboundAt: now,
+        linkedParticipantId: input.linkedParticipantId ?? null,
+        linkedStudyId: input.linkedStudyId ?? null,
+        phoneNumber: input.phoneNumber,
+        profileName: input.profileName ?? null,
+        sourceModule: input.sourceModule,
+        updatedAt: now,
+        waId: input.waId
+      };
+    }
+  };
 }

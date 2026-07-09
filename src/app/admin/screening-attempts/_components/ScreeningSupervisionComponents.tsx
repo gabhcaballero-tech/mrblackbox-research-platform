@@ -618,6 +618,7 @@ export function EvidenceReviewPanel({
             {focus === "whatsapp" ? <ActionFeedback error={error} message={message} /> : null}
             <WhatsAppManualBlock
               attemptId={detail.attemptId}
+              automationStatus={detail.confirmation.whatsappAutomation}
               manualMessageStatus={detail.confirmation.manualMessageStatus}
               message={detail.confirmation.whatsappMessage}
               whatsappUrl={detail.confirmation.whatsappUrl}

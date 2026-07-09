@@ -76,6 +76,18 @@ export async function assignHutParticipantRotationAction(studyId: string, partic
   redirectWithHutMessage(studyId, result, participantId);
 }
 
+export async function sendHutRegistrationWhatsAppAction(studyId: string, participantId: string, formData: FormData) {
+  await requireCapability("screening:review");
+  const result = await createHutRepository().sendRegistrationWhatsApp({
+    force: true,
+    participantId,
+    requestOrigin: String(formData.get("requestOrigin") ?? ""),
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
 export async function deleteHutParticipantAction(studyId: string, participantId: string, formData: FormData) {
   await requireCapability("screening:review");
   const result = await createHutRepository().deleteParticipant({

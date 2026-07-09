@@ -13,11 +13,13 @@ import {
   resetHutCallEvaluationAction,
   resetHutReferenceSelfieAction,
   resetHutVideoSubmissionAction,
+  sendHutRegistrationWhatsAppAction,
   setHutTestModeAction,
   setHutVisualOverrideAction,
   startHutBlockAction
 } from "@/modules/hut/actions";
 import { createHutRepository, type HutAdminParticipant, type HutRegistrationSlotAdmin } from "@/modules/hut";
+import { normalizeWhatsAppRecipient } from "@/modules/oneui-whatsapp";
 import { SubmitButton } from "@/app/admin/_components/SubmitButton";
 import { requireCapability } from "@/shared/auth/session";
 import { AppShell } from "@/shared/ui/AppShell";
@@ -28,6 +30,7 @@ import { resolveRequestOrigin } from "@/shared/utils/request-origin";
 import { HutParticipantImportPanel } from "./_components/HutParticipantImportPanel";
 import { HutRegistrationSlotImportPanel } from "./_components/HutRegistrationSlotImportPanel";
 import { HutReferenceSelfieUpload } from "./_components/HutReferenceSelfieUpload";
+import { HutWhatsAppManualBlock } from "./_components/HutWhatsAppManualBlock";
 
 export const dynamic = "force-dynamic";
 
@@ -129,6 +132,7 @@ export default async function HutAdminPage({ params, searchParams }: HutAdminPag
                 availableSlots={dashboard.registrationSlots.filter((slot) => slot.status === "AVAILABLE")}
                 key={participant.id}
                 participant={participant}
+                requestOrigin={requestOrigin}
                 studyId={studyId}
                 studyTimeZone={dashboard.study.timeZoneIana || "America/Mexico_City"}
               />
@@ -290,11 +294,13 @@ function CreateHutParticipantForm({
 function HutParticipantCard({
   availableSlots,
   participant,
+  requestOrigin,
   studyId,
   studyTimeZone
 }: {
   availableSlots: HutRegistrationSlotAdmin[];
   participant: HutAdminParticipant;
+  requestOrigin: string;
   studyId: string;
   studyTimeZone: string;
 }) {
@@ -304,6 +310,11 @@ function HutParticipantCard({
     : null;
   const summarySelfieLabel = participant.referenceSelfie.status === "COMPLETE" ? "Completa" : "Faltante";
   const nextAvailability = formatAvailability(participant.availability.nextAvailableAt, studyTimeZone);
+  const hutWhatsAppManualMessage = buildHutRegistrationWhatsAppMessage(participant);
+  const hutWhatsAppUrl = buildHutWhatsAppUrl({
+    message: hutWhatsAppManualMessage,
+    phone: participant.phone
+  });
 
   return (
     <article className="p-4 lg:p-5">
@@ -354,12 +365,40 @@ function HutParticipantCard({
               <Field label="Folio" value={participant.folio ?? "No asignado"} />
               <Field label="Primera fragancia / brazo izquierdo" value={participant.firstFragranceLeftArm ?? "No asignada"} />
               <Field label="Segunda fragancia / brazo derecho" value={participant.secondFragranceRightArm ?? "No asignada"} />
+              <Field label="WhatsApp registro" value={whatsappAutomationLabel(participant.whatsappRegistration.status)} />
+              <Field label="WhatsApp Meta ID" value={participant.whatsappRegistration.metaMessageId ?? "Sin ID"} />
+              <Field
+                label="WhatsApp enviado"
+                value={participant.whatsappRegistration.sentAt ? formatDateTime(participant.whatsappRegistration.sentAt, studyTimeZone) : "Sin envío"}
+              />
               <Field
                 label="Origen del folio"
                 value={participant.registrationSlot ? `Slot ${participant.registrationSlot.folio}` : participant.folio ? "Manual" : "No asignado"}
               />
               <Field label="Modo prueba" value={participant.testMode ? "Activo" : "Inactivo"} />
             </div>
+            {participant.whatsappRegistration.error ? (
+              <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">
+                Error WhatsApp: {participant.whatsappRegistration.error}
+              </p>
+            ) : null}
+            <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-emerald-950">Confirmación por WhatsApp</p>
+                  <p className="mt-1 text-xs leading-5 text-emerald-900">
+                    Envío automático: {whatsappAutomationLabel(participant.whatsappRegistration.status)}. El enlace manual sigue disponible como respaldo.
+                  </p>
+                </div>
+                <form action={sendHutRegistrationWhatsAppAction.bind(null, studyId, participant.id)}>
+                  <input name="requestOrigin" type="hidden" value={requestOrigin} />
+                  <SubmitButton pendingLabel="Enviando WhatsApp...">
+                    {participant.whatsappRegistration.status === "NO_ENVIADO" ? "Enviar WhatsApp" : "Reenviar WhatsApp"}
+                  </SubmitButton>
+                </form>
+              </div>
+            </div>
+            <HutWhatsAppManualBlock message={hutWhatsAppManualMessage} whatsappUrl={hutWhatsAppUrl} />
             <div className="mt-4 rounded-md border border-zinc-200 bg-white p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Link participante</p>
               <a className="mt-2 block break-all text-sm font-semibold text-teal-700" href={participant.link} rel="noreferrer" target="_blank">
@@ -554,6 +593,47 @@ function HutParticipantCard({
       </div>
     </article>
   );
+}
+
+function whatsappAutomationLabel(status: "ERROR" | "NO_ENVIADO" | "ENVIADO"): string {
+  switch (status) {
+    case "ENVIADO":
+      return "Enviado";
+    case "ERROR":
+      return "Error";
+    default:
+      return "No enviado";
+  }
+}
+
+function buildHutRegistrationWhatsAppMessage(participant: HutAdminParticipant): string {
+  return [
+    `Hola, ${participant.name}. ONEUI Research confirma tu registro para el estudio HUT.`,
+    "",
+    `Folio de participación: ${participant.folio ?? "Pendiente"}`,
+    "",
+    "Rotación asignada:",
+    `Brazo izquierdo: ${participant.firstFragranceLeftArm ?? "Pendiente"}`,
+    `Brazo derecho: ${participant.secondFragranceRightArm ?? "Pendiente"}`,
+    "",
+    "Link de participante:",
+    participant.link,
+    "",
+    "Conserva este mensaje. Usarás este enlace para subir tus videos durante el estudio."
+  ].join("\n");
+}
+
+function buildHutWhatsAppUrl({ message, phone }: { message: string; phone: string | null }): string | null {
+  if (!phone) {
+    return null;
+  }
+
+  const normalizedPhone = normalizeWhatsAppRecipient(phone);
+  if (!normalizedPhone) {
+    return null;
+  }
+
+  return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`;
 }
 
 function SelfieRegistrationCard({

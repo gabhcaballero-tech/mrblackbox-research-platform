@@ -13,6 +13,8 @@ import type {
   EvidenceReviewRepository
 } from "./evidence-review-repository";
 import { buildManualWhatsAppMessage, generateParticipantReferenceCode } from "./review";
+import { createOneuiWhatsAppRepository, sendNavigoConfirmationWhatsApp } from "@/modules/oneui-whatsapp";
+import { whatsappAutomationStatusFromMessage, type WhatsAppAutomationStatus } from "@/modules/oneui-whatsapp/templates";
 import {
   isMexicoPhone,
   normalizeMexicoPhone,
@@ -76,6 +78,7 @@ export type ParticipantEvidenceReviewDetail = {
     folio: string;
     manualMessageStatus: "MARKED_SENT" | "NOT_SENT";
     referenceCodes: Array<{ code: string; slot: number }>;
+    whatsappAutomation: WhatsAppAutomationStatus;
     whatsappMessage: string;
     whatsappUrl: string | null;
   } | null;
@@ -181,12 +184,61 @@ export async function approveParticipantEvidenceReview({
     return result;
   }
 
+  await sendNavigoConfirmationWhatsAppForAttempt({
+    attemptId,
+    codes: result.confirmation.referenceCodes,
+    folio: result.confirmation.folio,
+    repository
+  });
+
   return {
     data: {
       created: result.created
     },
     ok: true
   };
+}
+
+export async function sendParticipantConfirmationWhatsApp({
+  actor,
+  attemptId,
+  force,
+  repository
+}: {
+  actor: EvidenceReviewActor | null;
+  attemptId: string;
+  force?: boolean;
+  repository: EvidenceReviewRepository;
+}): Promise<EvidenceReviewResult<null>> {
+  if (!canReviewParticipantEvidence(actor)) {
+    return {
+      message: "No tienes permiso para enviar WhatsApp.",
+      ok: false
+    };
+  }
+
+  const attempt = await repository.getAttemptReview(attemptId);
+  if (!attempt || !attempt.participantConfirmation) {
+    return {
+      message: "No encontramos una confirmación final para enviar por WhatsApp.",
+      ok: false
+    };
+  }
+
+  const result = await sendNavigoConfirmationWhatsAppForAttempt({
+    attemptId,
+    codes: attempt.participantConfirmation.referenceCodes,
+    folio: attempt.participantConfirmation.folio,
+    force: force ?? true,
+    loadedAttempt: attempt,
+    repository
+  });
+
+  if (!result.ok) {
+    return { message: result.message, ok: false };
+  }
+
+  return { data: null, ok: true };
 }
 
 export async function reopenParticipantEvidenceReview({
@@ -736,6 +788,13 @@ async function toReviewDetail(
         folio: attempt.participantConfirmation.folio,
         manualMessageStatus: attempt.participantConfirmation.manualMessageStatus,
         referenceCodes: attempt.participantConfirmation.referenceCodes,
+        whatsappAutomation: whatsappAutomationStatusFromMessage(
+          await createOneuiWhatsAppRepository().findLatestOutboundTemplateMessage({
+            linkedParticipantId: attempt.studyParticipantId,
+            linkedStudyId: study.id,
+            sourceModule: "NAVIGO"
+          })
+        ),
         whatsappMessage: buildManualWhatsAppMessage({
           codes: attempt.participantConfirmation.referenceCodes,
           folio: attempt.participantConfirmation.folio,
@@ -805,6 +864,61 @@ async function toReviewDetail(
       name: study.name
     }
   };
+}
+
+async function sendNavigoConfirmationWhatsAppForAttempt({
+  attemptId,
+  codes,
+  folio,
+  force,
+  loadedAttempt,
+  repository
+}: {
+  attemptId: string;
+  codes: Array<{ code: string; slot: number }>;
+  folio: string;
+  force?: boolean;
+  loadedAttempt?: EvidenceReviewAttemptRecord | null;
+  repository: EvidenceReviewRepository;
+}): Promise<EvidenceReviewResult<null>> {
+  try {
+    const attempt = loadedAttempt ?? (await repository.getAttemptReview(attemptId));
+    if (!attempt) {
+      return { message: "No encontramos el intento para enviar WhatsApp.", ok: false };
+    }
+
+    const whatsappRepository = createOneuiWhatsAppRepository();
+    const existingMessage = await whatsappRepository.findLatestOutboundTemplateMessage({
+      linkedParticipantId: attempt.studyParticipantId,
+      linkedStudyId: attempt.questionnaireVersion.study.id,
+      sourceModule: "NAVIGO"
+    });
+
+    const result = await sendNavigoConfirmationWhatsApp({
+      codes,
+      existingMessage,
+      folio,
+      force,
+      participantId: attempt.studyParticipantId,
+      participantName: attempt.studyParticipant.participantProfile.name,
+      phone: attempt.studyParticipant.participantProfile.phone,
+      repository: whatsappRepository,
+      studyId: attempt.questionnaireVersion.study.id
+    });
+
+    if (!result.ok) {
+      return { message: result.message, ok: false };
+    }
+
+    return { data: null, ok: true };
+  } catch (error) {
+    console.error("navigo whatsapp automation failed", {
+      attemptId,
+      code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+      step: "send_confirmation_template"
+    });
+    return { message: "No fue posible enviar el WhatsApp automático.", ok: false };
+  }
 }
 
 export function buildWhatsAppUrl({

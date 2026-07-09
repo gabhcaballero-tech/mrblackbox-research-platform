@@ -36,6 +36,23 @@ export type OneuiWhatsAppSendReplyResult =
       data?: OneuiWhatsAppMessageRecord;
     };
 
+export type OneuiWhatsAppTemplateParameter = {
+  text: string;
+  type: "text";
+};
+
+export type OneuiWhatsAppSendTemplateResult =
+  | {
+      ok: true;
+      data: OneuiWhatsAppMessageRecord;
+    }
+  | {
+      ok: false;
+      code: "AUTOMATION_DISABLED" | "CONFIGURATION_ERROR" | "META_API_ERROR";
+      data?: OneuiWhatsAppMessageRecord;
+      message: string;
+    };
+
 export type OneuiWhatsAppInboxResult =
   | {
       ok: true;
@@ -108,6 +125,158 @@ export function normalizeWhatsAppRecipient(value: string): string {
   }
 
   return digits;
+}
+
+export async function sendOneuiWhatsAppTemplate(input: {
+  bodyText: string;
+  env?: NodeJS.ProcessEnv;
+  fetcher?: WhatsAppApiFetch;
+  language: string;
+  linkedParticipantId?: string | null;
+  linkedStudyId?: string | null;
+  now?: Date;
+  parameters: OneuiWhatsAppTemplateParameter[];
+  profileName?: string | null;
+  repository?: OneuiWhatsAppRepository;
+  sourceModule: OneuiWhatsAppSourceModule;
+  templateName: string;
+  toPhone: string;
+}): Promise<OneuiWhatsAppSendTemplateResult> {
+  const env = input.env ?? process.env;
+
+  if (env.WHATSAPP_AUTOMATION_ENABLED === "false") {
+    return {
+      code: "AUTOMATION_DISABLED",
+      message: "El envio automatico de WhatsApp esta desactivado.",
+      ok: false
+    };
+  }
+
+  const accessToken = env.WHATSAPP_ACCESS_TOKEN;
+  const phoneNumberId = env.WHATSAPP_PHONE_NUMBER_ID;
+  const fromPhone = env.WHATSAPP_ONEUI_PHONE_NUMBER ?? phoneNumberId ?? "UNKNOWN";
+  const toPhone = normalizeWhatsAppRecipient(input.toPhone);
+  const now = input.now ?? new Date();
+  const repository = input.repository ?? createOneuiWhatsAppRepository();
+
+  if (!accessToken || !phoneNumberId) {
+    const conversation = await repository.upsertOutboundConversation({
+      linkedParticipantId: input.linkedParticipantId ?? null,
+      linkedStudyId: input.linkedStudyId ?? null,
+      phoneNumber: toPhone,
+      profileName: input.profileName ?? null,
+      sourceModule: input.sourceModule,
+      waId: toPhone
+    });
+    const pending = await repository.createOutboundMessage({
+      bodyText: input.bodyText,
+      conversationId: conversation.id,
+      fromPhone,
+      messageType: "template",
+      rawPayload: {
+        error: {
+          message: "WhatsApp API environment variables are not configured."
+        }
+      },
+      timestamp: now,
+      toPhone
+    });
+    const failed = await repository.markOutboundMessageFailed({
+      messageId: pending.id,
+      rawPayload: pending.rawPayload,
+      status: "failed"
+    });
+
+    return {
+      code: "CONFIGURATION_ERROR",
+      data: failed,
+      message: "Faltan variables de entorno para enviar por WhatsApp.",
+      ok: false
+    };
+  }
+
+  const requestPayload = {
+    messaging_product: "whatsapp",
+    template: {
+      components: [
+        {
+          parameters: input.parameters,
+          type: "body"
+        }
+      ],
+      language: {
+        code: input.language
+      },
+      name: input.templateName
+    },
+    to: toPhone,
+    type: "template"
+  };
+  const conversation = await repository.upsertOutboundConversation({
+    linkedParticipantId: input.linkedParticipantId ?? null,
+    linkedStudyId: input.linkedStudyId ?? null,
+    phoneNumber: toPhone,
+    profileName: input.profileName ?? null,
+    sourceModule: input.sourceModule,
+    waId: toPhone
+  });
+  const pendingMessage = await repository.createOutboundMessage({
+    bodyText: input.bodyText,
+    conversationId: conversation.id,
+    fromPhone,
+    messageType: "template",
+    rawPayload: {
+      request: requestPayload
+    },
+    timestamp: now,
+    toPhone
+  });
+  const fetcher = input.fetcher ?? fetch;
+  const response = await fetcher(`https://graph.facebook.com/v25.0/${phoneNumberId}/messages`, {
+    body: JSON.stringify(requestPayload),
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    method: "POST"
+  });
+  const responsePayload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const failedMessage = await repository.markOutboundMessageFailed({
+      messageId: pendingMessage.id,
+      rawPayload: {
+        request: requestPayload,
+        response: responsePayload,
+        status: response.status
+      },
+      status: "failed"
+    });
+
+    return {
+      code: "META_API_ERROR",
+      data: failedMessage,
+      message: getMetaErrorMessage(responsePayload) ?? "No se pudo enviar la plantilla por WhatsApp.",
+      ok: false
+    };
+  }
+
+  const acceptedMessage = await repository.markOutboundMessageAccepted({
+    messageId: pendingMessage.id,
+    metaMessageId: getMetaResponseMessageId(responsePayload),
+    rawPayload: {
+      request: requestPayload,
+      response: responsePayload,
+      status: response.status
+    },
+    status: getMetaResponseMessageStatus(responsePayload) ?? "accepted",
+    timestamp: now
+  });
+
+  return {
+    data: acceptedMessage,
+    ok: true
+  };
 }
 
 export async function getOneuiWhatsAppInbox(input: {

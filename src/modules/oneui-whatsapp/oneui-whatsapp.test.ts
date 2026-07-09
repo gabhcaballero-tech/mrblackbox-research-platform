@@ -11,14 +11,18 @@ import type {
   MarkOutboundMessageFailedInput,
   SaveInboundMessageInput,
   SaveStatusEventInput,
-  UpsertInboundConversationInput
+  UpsertInboundConversationInput,
+  UpsertOutboundConversationInput
 } from "./repository";
 import {
   canAccessOneuiWhatsAppInbox,
   getOneuiWhatsAppInbox,
+  normalizeWhatsAppRecipient,
   processOneuiWhatsAppWebhookPayload,
+  sendOneuiWhatsAppTemplate,
   sendOneuiWhatsAppTextReply
 } from "./service";
+import { sendHutRegistrationWhatsApp, sendNavigoConfirmationWhatsApp } from "./templates";
 
 describe("ONEUI WhatsApp webhook processing", () => {
   it("crea conversación GENERAL y guarda mensaje inbound", async () => {
@@ -245,6 +249,183 @@ describe("ONEUI WhatsApp manual replies", () => {
   });
 });
 
+describe("ONEUI WhatsApp template sending", () => {
+  it("normaliza moviles Mexico de 10 digitos a 521 + 10 digitos", () => {
+    expect(normalizeWhatsAppRecipient("9511273419")).toBe("5219511273419");
+    expect(normalizeWhatsAppRecipient("+52 1 55 1130 3411")).toBe("5215511303411");
+  });
+
+  it("arma payload de plantilla Navigo y guarda OUTBOUND NAVIGO", async () => {
+    const repository = createFakeRepository();
+    const fetcher = viFetch({
+      contacts: [{ wa_id: "5215512345678" }],
+      messages: [{ id: "wamid.navigo-1", message_status: "accepted" }]
+    });
+
+    const result = await sendOneuiWhatsAppTemplate({
+      bodyText: "Confirmacion Navigo",
+      env: whatsappEnv(),
+      fetcher,
+      language: "es",
+      linkedParticipantId: "participant-1",
+      linkedStudyId: "study-1",
+      parameters: [
+        { text: "ANA", type: "text" },
+        { text: "NAV-001", type: "text" },
+        { text: "A7K4", type: "text" },
+        { text: "M3P9", type: "text" },
+        { text: "T8R2", type: "text" }
+      ],
+      profileName: "ANA",
+      repository,
+      sourceModule: "NAVIGO",
+      templateName: "oneui_navigo_confirmacion_participacion",
+      toPhone: "5512345678"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(JSON.parse(fetcher.calls[0]?.init.body ?? "{}")).toEqual({
+      messaging_product: "whatsapp",
+      template: {
+        components: [
+          {
+            parameters: [
+              { text: "ANA", type: "text" },
+              { text: "NAV-001", type: "text" },
+              { text: "A7K4", type: "text" },
+              { text: "M3P9", type: "text" },
+              { text: "T8R2", type: "text" }
+            ],
+            type: "body"
+          }
+        ],
+        language: { code: "es" },
+        name: "oneui_navigo_confirmacion_participacion"
+      },
+      to: "5215512345678",
+      type: "template"
+    });
+    expect(repository.conversations[0]).toMatchObject({
+      linkedParticipantId: "participant-1",
+      linkedStudyId: "study-1",
+      sourceModule: "NAVIGO"
+    });
+    expect(repository.messages[0]).toMatchObject({
+      messageType: "template",
+      metaMessageId: "wamid.navigo-1",
+      status: "accepted"
+    });
+  });
+
+  it("arma payload de plantilla HUT", async () => {
+    const repository = createFakeRepository();
+    const fetcher = viFetch({
+      messages: [{ id: "wamid.hut-1", message_status: "accepted" }]
+    });
+
+    await sendOneuiWhatsAppTemplate({
+      bodyText: "Confirmacion HUT",
+      env: whatsappEnv(),
+      fetcher,
+      language: "es",
+      linkedParticipantId: "hut-participant-1",
+      linkedStudyId: "study-1",
+      parameters: [
+        { text: "ANA", type: "text" },
+        { text: "HUT-001", type: "text" },
+        { text: "Fragancia A", type: "text" },
+        { text: "Fragancia B", type: "text" },
+        { text: "https://example.com/hut/p/token", type: "text" }
+      ],
+      repository,
+      sourceModule: "HUT",
+      templateName: "oneui_hut_confirmacion_registro",
+      toPhone: "5215512345678"
+    });
+
+    expect(JSON.parse(fetcher.calls[0]?.init.body ?? "{}").template.name).toBe("oneui_hut_confirmacion_registro");
+    expect(repository.conversations[0]?.sourceModule).toBe("HUT");
+    expect(repository.messages[0]?.messageType).toBe("template");
+  });
+
+  it("maneja error de Meta sin exponer token en rawPayload", async () => {
+    const repository = createFakeRepository();
+    const fetcher = viFetch({ error: { message: "Template not found" } }, false, 400);
+
+    const result = await sendOneuiWhatsAppTemplate({
+      bodyText: "Confirmacion",
+      env: whatsappEnv(),
+      fetcher,
+      language: "es",
+      parameters: [{ text: "ANA", type: "text" }],
+      repository,
+      sourceModule: "NAVIGO",
+      templateName: "missing_template",
+      toPhone: "5512345678"
+    });
+
+    expect(result).toMatchObject({ code: "META_API_ERROR", message: "Template not found", ok: false });
+    expect(JSON.stringify(repository.messages[0]?.rawPayload)).not.toContain("secret-token");
+  });
+
+  it("no duplica confirmacion Navigo cuando ya existe template enviado", async () => {
+    const repository = createFakeRepository();
+    const conversation = createConversation({
+      linkedParticipantId: "participant-1",
+      linkedStudyId: "study-1",
+      sourceModule: "NAVIGO"
+    });
+    repository.conversations.push(conversation);
+    repository.messages.push(createMessage({
+      conversationId: conversation.id,
+      direction: "OUTBOUND",
+      messageType: "template",
+      status: "accepted"
+    }));
+
+    const result = await sendNavigoConfirmationWhatsApp({
+      codes: [{ code: "A7K4", slot: 1 }, { code: "M3P9", slot: 2 }, { code: "T8R2", slot: 3 }],
+      existingMessage: await repository.findLatestOutboundTemplateMessage({
+        linkedParticipantId: "participant-1",
+        linkedStudyId: "study-1",
+        sourceModule: "NAVIGO"
+      }),
+      folio: "NAV-001",
+      participantId: "participant-1",
+      participantName: "ANA",
+      phone: "5512345678",
+      repository,
+      studyId: "study-1"
+    });
+
+    expect(result).toMatchObject({ code: "SKIPPED", ok: false });
+  });
+
+  it("prepara variables de template HUT", async () => {
+    const calls: unknown[] = [];
+    const result = await sendHutRegistrationWhatsApp({
+      firstFragranceLeftArm: "Fragancia A",
+      folio: "HUT-001",
+      link: "https://example.com/hut/p/token",
+      participantId: "hut-1",
+      participantName: "ANA",
+      phone: "5512345678",
+      secondFragranceRightArm: "Fragancia B",
+      sender: async (input) => {
+        calls.push(input);
+        return { data: createMessage({ direction: "OUTBOUND", messageType: "template" }), ok: true };
+      },
+      studyId: "study-1"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(calls[0]).toMatchObject({
+      sourceModule: "HUT",
+      templateName: "oneui_hut_confirmacion_registro"
+    });
+  });
+});
+
 describe("ONEUI WhatsApp inbox access", () => {
   it("permite admin y supervisor, pero no otros roles", () => {
     expect(canAccessOneuiWhatsAppInbox({ role: "ADMIN", status: "ACTIVE" })).toBe(true);
@@ -350,7 +531,7 @@ function createFakeRepository() {
         direction: "OUTBOUND",
         fromPhone: input.fromPhone,
         id: `message-${messages.length + 1}`,
-        messageType: "text",
+        messageType: input.messageType ?? "text",
         metaMessageId: null,
         rawPayload: input.rawPayload,
         status: "pending",
@@ -359,6 +540,27 @@ function createFakeRepository() {
       });
       messages.push(message);
       return message;
+    },
+    async findLatestOutboundTemplateMessage(input): Promise<OneuiWhatsAppMessageRecord | null> {
+      const conversationIds = conversations
+        .filter(
+          (conversation) =>
+            conversation.linkedParticipantId === input.linkedParticipantId &&
+            conversation.linkedStudyId === input.linkedStudyId &&
+            conversation.sourceModule === input.sourceModule
+        )
+        .map((conversation) => conversation.id);
+
+      return (
+        [...messages]
+          .filter(
+            (message) =>
+              conversationIds.includes(message.conversationId) &&
+              message.direction === "OUTBOUND" &&
+              message.messageType === "template"
+          )
+          .sort((left, right) => (right.timestamp?.getTime() ?? 0) - (left.timestamp?.getTime() ?? 0))[0] ?? null
+      );
     },
     async getConversationWithMessages(conversationId): Promise<OneuiWhatsAppConversationDetail | null> {
       const conversation = conversations.find((item) => item.id === conversationId);
@@ -473,6 +675,30 @@ function createFakeRepository() {
         lastMessageAt: input.lastInboundAt,
         phoneNumber: input.phoneNumber,
         profileName: input.profileName,
+        waId: input.waId
+      });
+      conversations.push(conversation);
+      return conversation;
+    },
+    async upsertOutboundConversation(input: UpsertOutboundConversationInput): Promise<OneuiWhatsAppConversationRecord> {
+      const existing = conversations.find((conversation) => conversation.waId === input.waId);
+
+      if (existing) {
+        existing.linkedParticipantId = input.linkedParticipantId ?? existing.linkedParticipantId;
+        existing.linkedStudyId = input.linkedStudyId ?? existing.linkedStudyId;
+        existing.phoneNumber = input.phoneNumber;
+        existing.profileName = input.profileName ?? existing.profileName;
+        existing.sourceModule = input.sourceModule;
+        return existing;
+      }
+
+      const conversation = createConversation({
+        id: `conversation-${conversations.length + 1}`,
+        linkedParticipantId: input.linkedParticipantId ?? null,
+        linkedStudyId: input.linkedStudyId ?? null,
+        phoneNumber: input.phoneNumber,
+        profileName: input.profileName ?? null,
+        sourceModule: input.sourceModule,
         waId: input.waId
       });
       conversations.push(conversation);

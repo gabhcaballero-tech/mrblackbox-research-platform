@@ -59,6 +59,15 @@ export type UpsertInboundConversationInput = {
   waId: string;
 };
 
+export type UpsertOutboundConversationInput = {
+  linkedParticipantId?: string | null;
+  linkedStudyId?: string | null;
+  phoneNumber: string;
+  profileName?: string | null;
+  sourceModule: OneuiWhatsAppSourceModule;
+  waId: string;
+};
+
 export type SaveInboundMessageInput = {
   bodyText: string | null;
   conversationId: string;
@@ -81,6 +90,7 @@ export type CreateOutboundMessageInput = {
   bodyText: string;
   conversationId: string;
   fromPhone: string;
+  messageType?: string;
   rawPayload: unknown;
   timestamp: Date;
   toPhone: string;
@@ -102,6 +112,11 @@ export type MarkOutboundMessageFailedInput = {
 
 export type OneuiWhatsAppRepository = {
   createOutboundMessage: (input: CreateOutboundMessageInput) => Promise<OneuiWhatsAppMessageRecord>;
+  findLatestOutboundTemplateMessage: (input: {
+    linkedParticipantId: string;
+    linkedStudyId: string;
+    sourceModule: OneuiWhatsAppSourceModule;
+  }) => Promise<OneuiWhatsAppMessageRecord | null>;
   getConversationWithMessages: (conversationId: string) => Promise<OneuiWhatsAppConversationDetail | null>;
   listConversations: () => Promise<OneuiWhatsAppConversationSummary[]>;
   markOutboundMessageAccepted: (input: MarkOutboundMessageAcceptedInput) => Promise<OneuiWhatsAppMessageRecord>;
@@ -109,6 +124,7 @@ export type OneuiWhatsAppRepository = {
   saveInboundMessage: (input: SaveInboundMessageInput) => Promise<OneuiWhatsAppMessageRecord>;
   saveStatusEvent: (input: SaveStatusEventInput) => Promise<OneuiWhatsAppStatusEventRecord>;
   upsertInboundConversation: (input: UpsertInboundConversationInput) => Promise<OneuiWhatsAppConversationRecord>;
+  upsertOutboundConversation: (input: UpsertOutboundConversationInput) => Promise<OneuiWhatsAppConversationRecord>;
 };
 
 type PrismaConversationDelegate = {
@@ -193,7 +209,7 @@ export function createOneuiWhatsAppRepository(
           conversationId: input.conversationId,
           direction: "OUTBOUND",
           fromPhone: input.fromPhone,
-          messageType: "text",
+          messageType: input.messageType ?? "text",
           metaMessageId: null,
           rawPayload: input.rawPayload,
           status: "pending",
@@ -202,6 +218,32 @@ export function createOneuiWhatsAppRepository(
         },
         select: messageSelect
       });
+    },
+    async findLatestOutboundTemplateMessage(input) {
+      const prisma = await getPrisma();
+      const conversations = await prisma.oneuiWhatsAppConversation.findMany({
+        orderBy: [{ lastMessageAt: "desc" }, { updatedAt: "desc" }],
+        select: {
+          ...conversationSelect,
+          messages: {
+            orderBy: [{ timestamp: "desc" }, { createdAt: "desc" }],
+            select: messageSelect,
+            take: 1,
+            where: {
+              direction: "OUTBOUND",
+              messageType: "template"
+            }
+          }
+        },
+        take: 1,
+        where: {
+          linkedParticipantId: input.linkedParticipantId,
+          linkedStudyId: input.linkedStudyId,
+          sourceModule: input.sourceModule
+        }
+      });
+
+      return conversations[0]?.messages[0] ?? null;
     },
     async getConversationWithMessages(conversationId) {
       const prisma = await getPrisma();
@@ -350,6 +392,29 @@ export function createOneuiWhatsAppRepository(
           lastMessageAt,
           phoneNumber: input.phoneNumber,
           profileName: input.profileName ?? undefined
+        },
+        where: { waId: input.waId }
+      });
+    },
+    async upsertOutboundConversation(input) {
+      const prisma = await getPrisma();
+
+      return prisma.oneuiWhatsAppConversation.upsert({
+        create: {
+          linkedParticipantId: input.linkedParticipantId ?? null,
+          linkedStudyId: input.linkedStudyId ?? null,
+          phoneNumber: input.phoneNumber,
+          profileName: input.profileName ?? null,
+          sourceModule: input.sourceModule,
+          waId: input.waId
+        },
+        select: conversationSelect,
+        update: {
+          linkedParticipantId: input.linkedParticipantId ?? undefined,
+          linkedStudyId: input.linkedStudyId ?? undefined,
+          phoneNumber: input.phoneNumber,
+          profileName: input.profileName ?? undefined,
+          sourceModule: input.sourceModule
         },
         where: { waId: input.waId }
       });

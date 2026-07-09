@@ -38,6 +38,7 @@ vi.mock("@/modules/hut/actions", () => {
     resetHutCallEvaluationAction: action,
     resetHutReferenceSelfieAction: action,
     resetHutVideoSubmissionAction: action,
+    sendHutRegistrationWhatsAppAction: action,
     setHutTestModeAction: action,
     setHutVisualOverrideAction: action,
     startHutBlockAction: action
@@ -150,6 +151,11 @@ describe("HutAdminPage", () => {
     render(await HutAdminPage({ params: Promise.resolve({ studyId: "study-hut" }), searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText("Modo prueba: Inactivo")).toBeInTheDocument();
+    expect(screen.getByText("WhatsApp registro")).toBeInTheDocument();
+    expect(screen.getByText("Confirmación por WhatsApp")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enviar WhatsApp" })).toBeInTheDocument();
+    expect(screen.getByText("Mensaje manual de respaldo")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copiar mensaje" })).toBeInTheDocument();
     expect(screen.getAllByText("Selfie de registro: Faltante").length).toBeGreaterThan(0);
     expect(screen.getByText("Identidad diaria: Pendiente")).toBeInTheDocument();
     expect(screen.getByText("Ver revisión de identidad")).toBeInTheDocument();
@@ -339,6 +345,12 @@ type TestParticipant = {
   token: string;
   usedToleranceInCurrentBlock: boolean;
   visualOverrideEnabled: boolean;
+  whatsappRegistration: {
+    error: string | null;
+    metaMessageId: string | null;
+    sentAt: Date | null;
+    status: "ERROR" | "NO_ENVIADO" | "ENVIADO";
+  };
 };
 
 type TestDashboard = {
@@ -443,7 +455,13 @@ function baseParticipant() {
     testMode: false,
     token: "token-1",
     usedToleranceInCurrentBlock: false,
-    visualOverrideEnabled: false
+    visualOverrideEnabled: false,
+    whatsappRegistration: {
+      error: null,
+      metaMessageId: null,
+      sentAt: null,
+      status: "NO_ENVIADO" as const
+    }
   };
 }
 

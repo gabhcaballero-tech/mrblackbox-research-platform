@@ -403,6 +403,12 @@ describe("ScreeningSupervisionComponents", () => {
               { code: "7710", slot: 2 },
               { code: "9034", slot: 3 }
             ],
+            whatsappAutomation: {
+              error: null,
+              metaMessageId: null,
+              sentAt: null,
+              status: "NO_ENVIADO"
+            },
             whatsappMessage: "Mensaje WhatsApp",
             whatsappUrl: null
           },
@@ -440,6 +446,8 @@ describe("ScreeningSupervisionComponents", () => {
 
     expect(screen.getByText("Datos del participante")).toBeInTheDocument();
     expect(screen.getByText("Confirmacion final")).toBeInTheDocument();
+    expect(screen.getByText("Envío automático: No enviado")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enviar automático" })).toBeInTheDocument();
     expect(screen.getByText("4821")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Regenerar codigos de 4 caracteres" })).toBeInTheDocument();
     expect(screen.getAllByText("Eliminar registro de prueba y liberar folio").length).toBeGreaterThan(0);
@@ -483,6 +491,12 @@ describe("ScreeningSupervisionComponents", () => {
             folio: "NAV-001",
             manualMessageStatus: "NOT_SENT",
             referenceCodes: [{ code: "4821", slot: 1 }],
+            whatsappAutomation: {
+              error: null,
+              metaMessageId: null,
+              sentAt: null,
+              status: "NO_ENVIADO"
+            },
             whatsappMessage: "Mensaje WhatsApp",
             whatsappUrl: null
           },
