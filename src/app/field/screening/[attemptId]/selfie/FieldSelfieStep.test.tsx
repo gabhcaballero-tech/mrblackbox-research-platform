@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FieldSelfieStep } from "./FieldSelfieStep";
+import { completeFieldEvidenceSubmissionAction } from "@/modules/field/evidence-actions";
 
 vi.mock("@/modules/field/evidence-actions", () => ({
   completeFieldEvidenceSubmissionAction: vi.fn(),
@@ -21,6 +22,10 @@ vi.mock("@/shared/auth/supabase/browser", () => ({
 describe("FieldSelfieStep", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { href: "" }
+    });
     Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,
       value: {
@@ -75,16 +80,29 @@ describe("FieldSelfieStep", () => {
     expect(HTMLCanvasElement.prototype.getContext).toHaveBeenCalled();
     expect(HTMLCanvasElement.prototype.toBlob).toHaveBeenCalled();
   });
+
+  it("continues to perfume photos when the evidence action returns that route", async () => {
+    vi.mocked(completeFieldEvidenceSubmissionAction).mockResolvedValueOnce({
+      data: {
+        redirectTo: "/field/screening/attempt-1/evidences"
+      },
+      ok: true
+    });
+    render(<FieldSelfieStep screen={fieldSelfieScreen({ perfumePhotos: 0, selfie: 1 })} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Enviar a revisión" }));
+
+    await waitFor(() => {
+      expect(window.location.href).toBe("/field/screening/attempt-1/evidences");
+    });
+  });
 });
 
-function fieldSelfieScreen() {
+function fieldSelfieScreen(counts = { perfumePhotos: 0, selfie: 0 }) {
   return {
     attemptId: "attempt-1",
-    counts: {
-      perfumePhotos: 0,
-      selfie: 0
-    },
-    selfieComplete: false,
+    counts,
+    selfieComplete: counts.selfie === 1,
     study: {
       code: "FMASCULINA-NAVIGO-2026",
       id: "study-1",

@@ -3,7 +3,7 @@ const PUBLIC_FILE_PATTERN =
 
 const INTERNAL_ENTRY_PATHS = ["/admin", "/field", "/exports"] as const;
 const PUBLIC_FIELD_SCREENING_NEW_PATTERN = /^\/field\/studies\/[^/]+\/screening\/new$/;
-const PUBLIC_FIELD_SCREENING_ATTEMPT_PATTERN = /^\/field\/screening\/[^/]+(?:\/result|\/selfie)?$/;
+const PUBLIC_FIELD_SCREENING_ATTEMPT_PATTERN = /^\/field\/screening\/[^/]+(?:\/result|\/selfie|\/evidences)?$/;
 
 export type InternalRouteDecision =
   | { action: "allow" }

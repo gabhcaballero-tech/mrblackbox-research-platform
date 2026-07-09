@@ -19,6 +19,7 @@ import {
 } from "./validation";
 import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
 import {
+  F6_PERFUME_EVIDENCE_QUESTION_ID,
   PARTICIPANT_EVIDENCE_BUCKET,
   assertEvidenceStorageKeyBelongsToAttempt,
   createSignedEvidenceUpload,
@@ -151,6 +152,24 @@ export type FieldSelfieScreen = {
   attemptId: string;
   counts: FieldEvidenceCounts;
   selfieComplete: boolean;
+  study: {
+    code: string;
+    id: string;
+    name: string;
+  };
+};
+
+export type FieldEvidenceScreen = {
+  attemptId: string;
+  canFinalizeReview: boolean;
+  config: {
+    maxImageBytes: number;
+    maxPerfumePhotos: number;
+    minPerfumePhotos: number;
+  };
+  counts: FieldEvidenceCounts;
+  evidenceComplete: boolean;
+  status: FieldScreeningAttemptRecord["status"];
   study: {
     code: string;
     id: string;
@@ -576,6 +595,35 @@ export async function getFieldSelfieScreen({
   };
 }
 
+export async function getFieldEvidenceScreen({
+  actor,
+  attemptId,
+  repository
+}: {
+  actor: FieldActor | null;
+  attemptId: string;
+  repository: FieldRepository;
+}): Promise<FieldServiceResult<FieldEvidenceScreen>> {
+  const context = await loadEvidenceAttemptContext({ actor, attemptId, repository });
+
+  if (!context.ok) {
+    return context;
+  }
+
+  if (!getStudyBehavior(context.data.questionnaireVersion.study.code).requiresFinalSelfie) {
+    return {
+      code: "EVIDENCE_NOT_REQUIRED",
+      message: "Este estudio no requiere evidencias.",
+      ok: false
+    };
+  }
+
+  return {
+    data: toFieldEvidenceScreen(context.data),
+    ok: true
+  };
+}
+
 export async function requestFieldEvidenceUpload({
   actor,
   attemptId,
@@ -595,7 +643,7 @@ export async function requestFieldEvidenceUpload({
     return context;
   }
 
-  const validation = validateCanAddFieldSelfie(context.data, metadata.evidenceType);
+  const validation = validateCanAddFieldEvidence(context.data, metadata.evidenceType);
 
   if (!validation.ok) {
     return validation;
@@ -645,7 +693,7 @@ export async function confirmFieldEvidenceUpload({
     return context;
   }
 
-  const validation = validateCanAddFieldSelfie(context.data, input.evidenceType);
+  const validation = validateCanAddFieldEvidence(context.data, input.evidenceType);
 
   if (!validation.ok) {
     return validation;
@@ -674,7 +722,7 @@ export async function confirmFieldEvidenceUpload({
       mimeType: metadata.mimeType,
       originalFilename: metadata.originalFilename,
       privateStorageKey: input.privateStorageKey,
-      relatedQuestionId: null,
+      relatedQuestionId: metadata.evidenceType === "PERFUME_PHOTO" ? F6_PERFUME_EVIDENCE_QUESTION_ID : null,
       screeningAttemptId: context.data.id,
       sizeBytes: metadata.sizeBytes,
       storageBucket: input.storageBucket,
@@ -720,10 +768,12 @@ export async function completeFieldEvidenceSubmission({
     };
   }
 
-  if (countFieldEvidence(context.data.participantEvidence).selfie !== 1) {
+  const evidenceValidation = validateFieldEvidenceCounts(context.data);
+
+  if (!evidenceValidation.ok) {
     return {
       code: "EVIDENCE_INCOMPLETE",
-      message: "Antes de enviar a revisión necesitamos exactamente una selfie.",
+      message: evidenceValidation.message,
       ok: false
     };
   }
@@ -1020,30 +1070,73 @@ function toFieldSelfieScreen(attempt: FieldScreeningAttemptRecord): FieldSelfieS
   };
 }
 
-function validateCanAddFieldSelfie(
+function toFieldEvidenceScreen(attempt: FieldScreeningAttemptRecord): FieldEvidenceScreen {
+  const counts = countFieldEvidence(attempt.participantEvidence);
+  const config = attempt.questionnaireVersion.study.participantPortalConfig!;
+  const evidenceComplete = validateFieldEvidenceCounts(attempt).ok;
+
+  return {
+    attemptId: attempt.id,
+    canFinalizeReview: evidenceComplete,
+    config: {
+      maxImageBytes: config.maxImageBytes,
+      maxPerfumePhotos: config.maxPerfumePhotos,
+      minPerfumePhotos: config.minPerfumePhotos
+    },
+    counts,
+    evidenceComplete,
+    status: attempt.status,
+    study: {
+      code: attempt.questionnaireVersion.study.code,
+      id: attempt.questionnaireVersion.study.id,
+      name: attempt.questionnaireVersion.study.name
+    }
+  };
+}
+
+function validateCanAddFieldEvidence(
   attempt: FieldScreeningAttemptRecord,
   evidenceType: ParticipantEvidenceKind
 ): FieldServiceResult<true> {
   if (!getStudyBehavior(attempt.questionnaireVersion.study.code).requiresFinalSelfie) {
     return {
       code: "EVIDENCE_NOT_REQUIRED",
-      message: "Este estudio no requiere selfie.",
+      message: "Este estudio no requiere evidencias.",
       ok: false
     };
   }
 
-  if (evidenceType !== "SELFIE_IDENTIFICATION") {
+  if (evidenceType !== "SELFIE_IDENTIFICATION" && evidenceType !== "PERFUME_PHOTO") {
     return {
       code: "VALIDATION_ERROR",
-      message: "Este paso solo permite registrar la selfie final.",
+      message: "Este paso solo permite registrar evidencias del filtro.",
       ok: false
     };
   }
 
-  if (countFieldEvidence(attempt.participantEvidence).selfie >= 1) {
+  const config = attempt.questionnaireVersion.study.participantPortalConfig;
+  const counts = countFieldEvidence(attempt.participantEvidence);
+
+  if (!config) {
+    return {
+      code: "STUDY_NOT_AVAILABLE",
+      message: "La captura de evidencias no está configurada para este estudio.",
+      ok: false
+    };
+  }
+
+  if (evidenceType === "SELFIE_IDENTIFICATION" && counts.selfie >= 1) {
     return {
       code: "VALIDATION_ERROR",
       message: "Ya existe una selfie registrada para este intento.",
+      ok: false
+    };
+  }
+
+  if (evidenceType === "PERFUME_PHOTO" && counts.perfumePhotos >= config.maxPerfumePhotos) {
+    return {
+      code: "VALIDATION_ERROR",
+      message: `Ya registraste el máximo de ${config.maxPerfumePhotos} fotos de perfumes.`,
       ok: false
     };
   }
@@ -1062,10 +1155,56 @@ export function fieldAttemptHasFinalSelfie(attempt: FieldScreeningAttemptRecord)
   return countFieldEvidence(attempt.participantEvidence).selfie === 1;
 }
 
+export function fieldAttemptHasRequiredPerfumePhotos(attempt: FieldScreeningAttemptRecord): boolean {
+  const config = attempt.questionnaireVersion.study.participantPortalConfig;
+
+  if (!config) {
+    return false;
+  }
+
+  const count = countFieldEvidence(attempt.participantEvidence).perfumePhotos;
+  return count >= config.minPerfumePhotos && count <= config.maxPerfumePhotos;
+}
+
 export function countFieldEvidence(evidence: FieldScreeningAttemptRecord["participantEvidence"]): FieldEvidenceCounts {
   return {
     perfumePhotos: evidence.filter((item) => item.type === "PERFUME_PHOTO").length,
     selfie: evidence.filter((item) => item.type === "SELFIE_IDENTIFICATION").length
+  };
+}
+
+function validateFieldEvidenceCounts(attempt: FieldScreeningAttemptRecord): FieldServiceResult<true> {
+  const config = attempt.questionnaireVersion.study.participantPortalConfig;
+
+  if (!config) {
+    return {
+      code: "STUDY_NOT_AVAILABLE",
+      message: "La captura de evidencias no está configurada para este estudio.",
+      ok: false
+    };
+  }
+
+  const counts = countFieldEvidence(attempt.participantEvidence);
+
+  if (counts.selfie !== 1) {
+    return {
+      code: "EVIDENCE_INCOMPLETE",
+      message: "Antes de enviar a revisión necesitamos exactamente una selfie.",
+      ok: false
+    };
+  }
+
+  if (counts.perfumePhotos < config.minPerfumePhotos || counts.perfumePhotos > config.maxPerfumePhotos) {
+    return {
+      code: "EVIDENCE_INCOMPLETE",
+      message: `Captura entre ${config.minPerfumePhotos} y ${config.maxPerfumePhotos} fotos de perfumes.`,
+      ok: false
+    };
+  }
+
+  return {
+    data: true,
+    ok: true
   };
 }
 

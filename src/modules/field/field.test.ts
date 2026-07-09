@@ -3,6 +3,7 @@ import type { ScreenerDefinition } from "@/modules/screener";
 import type { InternalUserRole } from "@/shared/auth/permissions";
 import {
   getFieldScreeningAttemptScreen,
+  getFieldEvidenceScreen,
   getFieldSelfieScreen,
   confirmFieldEvidenceUpload,
   completeFieldEvidenceSubmission,
@@ -729,7 +730,7 @@ describe("field service", () => {
     });
   });
 
-  it("lets a public field visitor complete the final selfie for a public passed attempt", async () => {
+  it("requires selfie and perfume photos before sending a public passed attempt to review", async () => {
     const repository = createMemoryRepository();
     const started = await startFieldScreeningAttempt({
       actor: PUBLIC_FIELD_ACTOR,
@@ -772,7 +773,6 @@ describe("field service", () => {
       attemptId,
       repository
     });
-    const completedAttempt = await repository.getAttempt(attemptId);
 
     expect(confirmed).toMatchObject({
       data: {
@@ -783,12 +783,132 @@ describe("field service", () => {
       ok: true
     });
     expect(completed).toMatchObject({
+      code: "EVIDENCE_INCOMPLETE",
+      message: "Captura entre 1 y 5 fotos de perfumes.",
+      ok: false
+    });
+
+    const perfume = await confirmFieldEvidenceUpload({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      input: {
+        evidenceType: "PERFUME_PHOTO",
+        mimeType: "image/jpeg",
+        originalFilename: "perfume.jpg",
+        privateStorageKey: `studies/${studyId}/participants/profile-1/screening-attempts/${attemptId}/perfume_photo/perfume.jpg`,
+        sizeBytes: 1200,
+        storageBucket: "participant-evidence"
+      },
+      repository
+    });
+    const completedWithPerfume = await completeFieldEvidenceSubmission({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      repository
+    });
+    const completedAttempt = await repository.getAttempt(attemptId);
+
+    expect(perfume).toMatchObject({
+      data: {
+        counts: {
+          perfumePhotos: 1
+        }
+      },
+      ok: true
+    });
+    expect(completedWithPerfume).toMatchObject({
       data: {
         selfieComplete: true
       },
       ok: true
     });
+    expect(completedAttempt?.participantEvidence.find((item) => item.type === "PERFUME_PHOTO")?.relatedQuestionId).toBe(
+      "F6_MARCAS_UTILIZA"
+    );
     expect(completedAttempt?.participantScreeningReview?.status).toBe("PENDING");
+  });
+
+  it("exposes perfume evidence state and blocks adding more than five perfume photos", async () => {
+    const repository = createMemoryRepository();
+    const started = await startFieldScreeningAttempt({
+      actor: PUBLIC_FIELD_ACTOR,
+      formInput: { email: "", externalReference: "PUBLIC-4", name: "Persona publica", phone: "5554446666" },
+      repository,
+      studyId
+    });
+    const attemptId = started.ok && started.data.kind === "started" ? started.data.attemptId : "";
+
+    await answerEligibleBase(repository, attemptId, "HIGH", PUBLIC_FIELD_ACTOR);
+
+    for (let index = 1; index <= 5; index += 1) {
+      await confirmFieldEvidenceUpload({
+        actor: PUBLIC_FIELD_ACTOR,
+        attemptId,
+        input: {
+          evidenceType: "PERFUME_PHOTO",
+          mimeType: "image/jpeg",
+          originalFilename: `perfume-${index}.jpg`,
+          privateStorageKey: `studies/${studyId}/participants/profile-1/screening-attempts/${attemptId}/perfume_photo/perfume-${index}.jpg`,
+          sizeBytes: 1200,
+          storageBucket: "participant-evidence"
+        },
+        repository
+      });
+    }
+
+    const screen = await getFieldEvidenceScreen({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      repository
+    });
+    const tooMany = await confirmFieldEvidenceUpload({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      input: {
+        evidenceType: "PERFUME_PHOTO",
+        mimeType: "image/jpeg",
+        originalFilename: "perfume-6.jpg",
+        privateStorageKey: `studies/${studyId}/participants/profile-1/screening-attempts/${attemptId}/perfume_photo/perfume-6.jpg`,
+        sizeBytes: 1200,
+        storageBucket: "participant-evidence"
+      },
+      repository
+    });
+
+    expect(screen).toMatchObject({
+      data: {
+        counts: {
+          perfumePhotos: 5
+        },
+        config: {
+          maxPerfumePhotos: 5,
+          minPerfumePhotos: 1
+        }
+      },
+      ok: true
+    });
+    expect(tooMany).toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Ya registraste el máximo de 5 fotos de perfumes.",
+      ok: false
+    });
+  });
+
+  it("does not let a public visitor access evidences for an internal field attempt", async () => {
+    const repository = createMemoryRepository();
+    const attemptId = await startAttempt(repository, interviewer);
+    await answerEligibleBase(repository, attemptId);
+
+    const result = await getFieldEvidenceScreen({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      repository
+    });
+
+    expect(result).toMatchObject({
+      code: "ATTEMPT_NOT_FOUND",
+      ok: false
+    });
   });
 
   it("does not let a public visitor access selfie for an internal field attempt", async () => {

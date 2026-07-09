@@ -67,7 +67,7 @@ export async function confirmFieldEvidenceUploadAction(
     privateStorageKey: string;
     storageBucket: string;
   }
-): Promise<FieldEvidenceActionResult<{ selfieCount: number }>> {
+): Promise<FieldEvidenceActionResult<{ counts: { perfumePhotos: number; selfie: number }; perfumePhotoCount: number; selfieCount: number }>> {
   const actor = await getFieldActorForRequest();
   const result = await confirmFieldEvidenceUpload({
     actor,
@@ -85,6 +85,8 @@ export async function confirmFieldEvidenceUploadAction(
 
   return {
     data: {
+      counts: result.data.counts,
+      perfumePhotoCount: result.data.counts.perfumePhotos,
       selfieCount: result.data.counts.selfie
     },
     ok: true
@@ -102,6 +104,19 @@ export async function completeFieldEvidenceSubmissionAction(
   });
 
   if (!result.ok) {
+    if (result.code === "EVIDENCE_INCOMPLETE") {
+      const evidenceScreen = await getFieldEvidenceRedirect(attemptId);
+
+      if (evidenceScreen) {
+        return {
+          data: {
+            redirectTo: evidenceScreen
+          },
+          ok: true
+        };
+      }
+    }
+
     return { message: result.message, ok: false };
   }
 
@@ -114,4 +129,28 @@ export async function completeFieldEvidenceSubmissionAction(
     },
     ok: true
   };
+}
+
+async function getFieldEvidenceRedirect(attemptId: string): Promise<string | null> {
+  const actor = await getFieldActorForRequest();
+  const { getFieldEvidenceScreen } = await import("./service");
+  const screen = await getFieldEvidenceScreen({
+    actor,
+    attemptId,
+    repository: createFieldRepository()
+  });
+
+  if (!screen.ok) {
+    return null;
+  }
+
+  if (screen.data.counts.selfie < 1) {
+    return `/field/screening/${attemptId}/selfie`;
+  }
+
+  if (screen.data.counts.perfumePhotos < screen.data.config.minPerfumePhotos) {
+    return `/field/screening/${attemptId}/evidences`;
+  }
+
+  return null;
 }

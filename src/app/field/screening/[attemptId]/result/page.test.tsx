@@ -31,7 +31,7 @@ vi.mock("@/modules/field/service", async (importOriginal) => {
 });
 
 describe("Field screening result page", () => {
-  it("shows a clear selfie CTA instead of the generic field error when evidence is pending", async () => {
+  it("shows a clear selfie CTA instead of the generic field error when selfie is pending", async () => {
     render(
       await ScreeningResultPage({
         params: Promise.resolve({ attemptId: "attempt-1" })
@@ -46,23 +46,34 @@ describe("Field screening result page", () => {
     expect(screen.queryByText("Campo no disponible")).not.toBeInTheDocument();
   });
 
-  it("shows pending review after final selfie instead of the generic field error", async () => {
+  it("shows a perfume photos CTA after final selfie when perfume photos are pending", async () => {
+    vi.mocked(getFieldScreeningAttemptScreen).mockResolvedValueOnce({
+      data: fieldScreen({
+        participantEvidence: [evidenceRecord("evidence-1", "SELFIE_IDENTIFICATION")]
+      }),
+      ok: true
+    });
+
+    render(
+      await ScreeningResultPage({
+        params: Promise.resolve({ attemptId: "attempt-1" })
+      })
+    );
+
+    expect(screen.getByText("Agrega fotos de marcas de perfumes")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Agregar fotos de marcas de perfumes" })).toHaveAttribute(
+      "href",
+      "/field/screening/attempt-1/evidences"
+    );
+    expect(screen.queryByText("Campo no disponible")).not.toBeInTheDocument();
+  });
+
+  it("shows profile review after selfie and perfume photos are complete instead of the generic field error", async () => {
     vi.mocked(getFieldScreeningAttemptScreen).mockResolvedValueOnce({
       data: fieldScreen({
         participantEvidence: [
-          {
-            extension: "jpg",
-            id: "evidence-1",
-            mimeType: "image/jpeg",
-            originalFilename: "selfie.jpg",
-            privateStorageKey: "private/selfie.jpg",
-            relatedQuestionId: null,
-            reviewStatus: "PENDING",
-            sizeBytes: 1200,
-            storageBucket: "participant-evidence",
-            type: "SELFIE_IDENTIFICATION",
-            uploadedAt: new Date("2026-06-23T10:15:00Z")
-          }
+          evidenceRecord("evidence-1", "SELFIE_IDENTIFICATION"),
+          evidenceRecord("evidence-2", "PERFUME_PHOTO")
         ],
         participantScreeningReview: {
           rejectionReason: null,
@@ -78,8 +89,9 @@ describe("Field screening result page", () => {
       })
     );
 
-    expect(screen.getByText("Revisión pendiente")).toBeInTheDocument();
-    expect(screen.getByText("Gracias. Tus respuestas y evidencias están en revisión.")).toBeInTheDocument();
+    expect(screen.getByText("Registro recibido")).toBeInTheDocument();
+    expect(screen.getByText("Tu perfil está en revisión.")).toBeInTheDocument();
+    expect(screen.getByText("Te enviaremos la confirmación después de la revisión.")).toBeInTheDocument();
     expect(screen.queryByText("Campo no disponible")).not.toBeInTheDocument();
   });
 
@@ -102,12 +114,31 @@ describe("Field screening result page", () => {
   });
 });
 
+function evidenceRecord(
+  id: string,
+  type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION"
+): FieldParticipantEvidenceRecord {
+  return {
+    extension: "jpg",
+    id,
+    mimeType: "image/jpeg",
+    originalFilename: `${id}.jpg`,
+    privateStorageKey: `private/${id}.jpg`,
+    relatedQuestionId: type === "PERFUME_PHOTO" ? "F6_MARCAS_UTILIZA" : null,
+    reviewStatus: "PENDING",
+    sizeBytes: 1200,
+    storageBucket: "participant-evidence",
+    type,
+    uploadedAt: new Date("2026-06-23T10:15:00Z")
+  };
+}
+
 function fieldScreen(
   overrides: {
     participantEvidence?: FieldParticipantEvidenceRecord[];
     participantScreeningReview?: { rejectionReason: string | null; status: "APPROVED" | "PENDING" | "REJECTED" } | null;
   } = {}
-) : FieldAttemptScreen {
+): FieldAttemptScreen {
   return {
     answers: {},
     attempt: {

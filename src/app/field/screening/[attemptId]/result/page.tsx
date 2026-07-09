@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getFieldActorForRequest } from "@/modules/field/auth";
-import { fieldAttemptHasFinalSelfie, fieldAttemptRequiresFinalSelfie, isPublicFieldActor } from "@/modules/field/service";
+import {
+  fieldAttemptHasFinalSelfie,
+  fieldAttemptHasRequiredPerfumePhotos,
+  fieldAttemptRequiresFinalSelfie,
+  isPublicFieldActor
+} from "@/modules/field/service";
 import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
@@ -42,6 +47,10 @@ export default async function ScreeningResultPage({ params }: ScreeningResultPag
 
   const screen = result.data;
   const needsSelfie = fieldAttemptRequiresFinalSelfie(screen.attempt) && !fieldAttemptHasFinalSelfie(screen.attempt);
+  const needsPerfumePhotos =
+    fieldAttemptRequiresFinalSelfie(screen.attempt) &&
+    fieldAttemptHasFinalSelfie(screen.attempt) &&
+    !fieldAttemptHasRequiredPerfumePhotos(screen.attempt);
   const pendingReview = screen.attempt.participantScreeningReview?.status === "PENDING";
 
   const content = (
@@ -55,6 +64,8 @@ export default async function ScreeningResultPage({ params }: ScreeningResultPag
 
       {needsSelfie ? (
         <FieldPendingSelfieCard attemptId={attemptId} />
+      ) : needsPerfumePhotos ? (
+        <FieldPendingPerfumePhotosCard attemptId={attemptId} />
       ) : pendingReview ? (
         <FieldPendingReviewCard />
       ) : (
@@ -97,13 +108,28 @@ function FieldPendingSelfieCard({ attemptId }: { attemptId: string }) {
   );
 }
 
+function FieldPendingPerfumePhotosCard({ attemptId }: { attemptId: string }) {
+  return (
+    <section className="rounded-lg border border-amber-200 bg-amber-50 p-6 shadow-sm">
+      <p className="text-sm font-semibold uppercase tracking-wide text-amber-800">Fotos pendientes</p>
+      <h2 className="mt-2 text-xl font-semibold text-zinc-950">Agrega fotos de marcas de perfumes</h2>
+      <p className="mt-2 text-sm leading-6 text-zinc-700">
+        Ya registraste la selfie final. Falta agregar al menos una foto de las marcas de perfumes antes de enviar el perfil a revisión.
+      </p>
+      <Link className={primaryButtonClass} href={`/field/screening/${attemptId}/evidences`}>
+        Agregar fotos de marcas de perfumes
+      </Link>
+    </section>
+  );
+}
+
 function FieldPendingReviewCard() {
   return (
     <section className="rounded-lg border border-teal-200 bg-teal-50 p-6 shadow-sm">
-      <p className="text-sm font-semibold uppercase tracking-wide text-teal-800">Revisión pendiente</p>
-      <h2 className="mt-2 text-xl font-semibold text-zinc-950">Gracias. Tus respuestas y evidencias están en revisión.</h2>
+      <p className="text-sm font-semibold uppercase tracking-wide text-teal-800">Registro recibido</p>
+      <h2 className="mt-2 text-xl font-semibold text-zinc-950">Tu perfil está en revisión.</h2>
       <p className="mt-2 text-sm leading-6 text-zinc-700">
-        Recibirás seguimiento de tu reclutador cuando la evidencia sea revisada.
+        Te enviaremos la confirmación después de la revisión.
       </p>
     </section>
   );
