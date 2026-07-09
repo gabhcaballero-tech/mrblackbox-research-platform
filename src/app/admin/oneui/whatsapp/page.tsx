@@ -1,5 +1,9 @@
 import { redirect } from "next/navigation";
-import { getOneuiWhatsAppInbox, ONEUI_WHATSAPP_SOURCE_LABELS } from "@/modules/oneui-whatsapp";
+import {
+  getOneuiWhatsAppInbox,
+  isWithinOneuiWhatsAppCustomerServiceWindow,
+  ONEUI_WHATSAPP_SOURCE_LABELS
+} from "@/modules/oneui-whatsapp";
 import type {
   OneuiWhatsAppConversationDetail,
   OneuiWhatsAppConversationSummary,
@@ -9,6 +13,7 @@ import { requireInternalUser } from "@/shared/auth/session";
 import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { ReplyForm } from "./ReplyForm";
 
 export const dynamic = "force-dynamic";
 
@@ -122,12 +127,19 @@ function ConversationList({
 function ConversationDetail({ conversation }: { conversation: OneuiWhatsAppConversationDetail | null }) {
   if (!conversation) {
     return (
-      <section className="rounded-lg border border-zinc-200 bg-white px-5 py-10 text-center">
+      <section className="rounded-lg border border-zinc-200 bg-white">
+        <div className="px-5 py-10 text-center">
         <h2 className="text-lg font-semibold text-zinc-950">Sin conversación seleccionada</h2>
         <p className="mt-2 text-sm text-zinc-600">Cuando llegue un mensaje, aparecerá aquí el historial.</p>
+        </div>
+        <ReplyForm conversationId={null} disabled />
       </section>
     );
   }
+
+  const withinCustomerServiceWindow = isWithinOneuiWhatsAppCustomerServiceWindow(conversation.lastInboundAt);
+  const closedWindowMessage =
+    "La ventana de atención de 24 horas terminó. Para escribir a este contacto se requiere una plantilla aprobada.";
 
   return (
     <section className="rounded-lg border border-zinc-200 bg-white">
@@ -154,6 +166,11 @@ function ConversationDetail({ conversation }: { conversation: OneuiWhatsAppConve
           conversation.messages.map((message) => <MessageBubble key={message.id} message={message} />)
         )}
       </div>
+      <ReplyForm
+        conversationId={conversation.id}
+        disabled={!withinCustomerServiceWindow}
+        disabledMessage={withinCustomerServiceWindow ? null : closedWindowMessage}
+      />
     </section>
   );
 }

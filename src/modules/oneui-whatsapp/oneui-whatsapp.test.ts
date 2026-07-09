@@ -6,6 +6,9 @@ import type {
   OneuiWhatsAppMessageRecord,
   OneuiWhatsAppRepository,
   OneuiWhatsAppStatusEventRecord,
+  CreateOutboundMessageInput,
+  MarkOutboundMessageAcceptedInput,
+  MarkOutboundMessageFailedInput,
   SaveInboundMessageInput,
   SaveStatusEventInput,
   UpsertInboundConversationInput
@@ -13,7 +16,8 @@ import type {
 import {
   canAccessOneuiWhatsAppInbox,
   getOneuiWhatsAppInbox,
-  processOneuiWhatsAppWebhookPayload
+  processOneuiWhatsAppWebhookPayload,
+  sendOneuiWhatsAppTextReply
 } from "./service";
 
 describe("ONEUI WhatsApp webhook processing", () => {
@@ -44,7 +48,9 @@ describe("ONEUI WhatsApp webhook processing", () => {
 
   it("guarda eventos de estado sent, delivered, read y failed", async () => {
     const repository = createFakeRepository();
-    repository.messages.push(createMessage({ id: "message-1", metaMessageId: "wamid.outbound-1" }));
+    repository.messages.push(
+      createMessage({ direction: "OUTBOUND", id: "message-1", metaMessageId: "wamid.outbound-1" })
+    );
 
     const result = await processOneuiWhatsAppWebhookPayload({
       payload: statusPayload(["sent", "delivered", "read", "failed"]),
@@ -85,6 +91,156 @@ describe("ONEUI WhatsApp webhook processing", () => {
 
     expect(result).toMatchObject({ inboundMessages: 0, statusEvents: 0, unknownEvents: 1 });
     expect(repository.conversations).toHaveLength(0);
+    expect(repository.messages).toHaveLength(0);
+  });
+});
+
+describe("ONEUI WhatsApp manual replies", () => {
+  it("envía texto por API, guarda OUTBOUND con metaMessageId y actualiza conversación", async () => {
+    const repository = createFakeRepository();
+    const conversation = createConversation({
+      id: "conversation-1",
+      lastInboundAt: new Date("2026-07-09T16:00:00.000Z")
+    });
+    repository.conversations.push(conversation);
+    const fetcher = viFetch({
+      messaging_product: "whatsapp",
+      messages: [{ id: "wamid.outbound-1", message_status: "accepted" }]
+    });
+
+    const result = await sendOneuiWhatsAppTextReply({
+      actor: { role: "SUPERVISOR", status: "ACTIVE" },
+      bodyText: "Gracias, quedamos atentos.",
+      conversationId: conversation.id,
+      env: whatsappEnv(),
+      fetcher,
+      now: new Date("2026-07-09T17:00:00.000Z"),
+      repository
+    });
+
+    expect(result.ok).toBe(true);
+    expect(fetcher.calls[0]).toMatchObject({
+      input: "https://graph.facebook.com/v25.0/1230538790140150/messages"
+    });
+    expect(JSON.parse(fetcher.calls[0]?.init.body ?? "{}")).toEqual({
+      messaging_product: "whatsapp",
+      text: {
+        body: "Gracias, quedamos atentos.",
+        preview_url: false
+      },
+      to: "5215512345678",
+      type: "text"
+    });
+    expect(fetcher.calls[0]?.init.headers.Authorization).toBe("Bearer secret-token");
+    expect(repository.messages[0]).toMatchObject({
+      bodyText: "Gracias, quedamos atentos.",
+      direction: "OUTBOUND",
+      metaMessageId: "wamid.outbound-1",
+      status: "accepted",
+      toPhone: "5215512345678"
+    });
+    expect(repository.conversations[0]).toMatchObject({
+      lastMessageAt: new Date("2026-07-09T17:00:00.000Z"),
+      lastOutboundAt: new Date("2026-07-09T17:00:00.000Z")
+    });
+  });
+
+  it("normaliza móviles México de 10 dígitos a 521 + 10 dígitos", async () => {
+    const repository = createFakeRepository();
+    const conversation = createConversation({
+      id: "conversation-1",
+      lastInboundAt: new Date("2026-07-09T16:00:00.000Z"),
+      phoneNumber: "55 1234 5678",
+      waId: "55 1234 5678"
+    });
+    repository.conversations.push(conversation);
+    const fetcher = viFetch({
+      messages: [{ id: "wamid.outbound-2", message_status: "accepted" }]
+    });
+
+    await sendOneuiWhatsAppTextReply({
+      actor: { role: "ADMIN", status: "ACTIVE" },
+      bodyText: "Mensaje de prueba",
+      conversationId: conversation.id,
+      env: whatsappEnv(),
+      fetcher,
+      now: new Date("2026-07-09T17:00:00.000Z"),
+      repository
+    });
+
+    expect(JSON.parse(fetcher.calls[0]?.init.body ?? "{}").to).toBe("5215512345678");
+  });
+
+  it("si Meta falla, guarda failed y devuelve error", async () => {
+    const repository = createFakeRepository();
+    const conversation = createConversation({
+      id: "conversation-1",
+      lastInboundAt: new Date("2026-07-09T16:00:00.000Z")
+    });
+    repository.conversations.push(conversation);
+    const fetcher = viFetch(
+      {
+        error: {
+          message: "Invalid recipient"
+        }
+      },
+      false,
+      400
+    );
+
+    const result = await sendOneuiWhatsAppTextReply({
+      actor: { role: "ADMIN", status: "ACTIVE" },
+      bodyText: "Hola",
+      conversationId: conversation.id,
+      env: whatsappEnv(),
+      fetcher,
+      now: new Date("2026-07-09T17:00:00.000Z"),
+      repository
+    });
+
+    expect(result).toMatchObject({
+      code: "META_API_ERROR",
+      message: "Invalid recipient",
+      ok: false
+    });
+    expect(repository.messages[0]).toMatchObject({
+      direction: "OUTBOUND",
+      status: "failed"
+    });
+    expect(repository.messages[0]?.rawPayload).toMatchObject({
+      response: {
+        error: {
+          message: "Invalid recipient"
+        }
+      },
+      status: 400
+    });
+  });
+
+  it("bloquea texto libre fuera de la ventana de 24 horas", async () => {
+    const repository = createFakeRepository();
+    const conversation = createConversation({
+      id: "conversation-1",
+      lastInboundAt: new Date("2026-07-08T16:59:00.000Z")
+    });
+    repository.conversations.push(conversation);
+    const fetcher = viFetch({ messages: [] });
+
+    const result = await sendOneuiWhatsAppTextReply({
+      actor: { role: "ADMIN", status: "ACTIVE" },
+      bodyText: "Hola",
+      conversationId: conversation.id,
+      env: whatsappEnv(),
+      fetcher,
+      now: new Date("2026-07-09T17:00:00.000Z"),
+      repository
+    });
+
+    expect(result).toMatchObject({
+      code: "OUTSIDE_CUSTOMER_SERVICE_WINDOW",
+      ok: false
+    });
+    expect(fetcher.calls).toHaveLength(0);
     expect(repository.messages).toHaveLength(0);
   });
 });
@@ -187,6 +343,23 @@ function createFakeRepository() {
     statusEvents: OneuiWhatsAppStatusEventRecord[];
   } = {
     conversations,
+    async createOutboundMessage(input: CreateOutboundMessageInput): Promise<OneuiWhatsAppMessageRecord> {
+      const message = createMessage({
+        bodyText: input.bodyText,
+        conversationId: input.conversationId,
+        direction: "OUTBOUND",
+        fromPhone: input.fromPhone,
+        id: `message-${messages.length + 1}`,
+        messageType: "text",
+        metaMessageId: null,
+        rawPayload: input.rawPayload,
+        status: "pending",
+        timestamp: input.timestamp,
+        toPhone: input.toPhone
+      });
+      messages.push(message);
+      return message;
+    },
     async getConversationWithMessages(conversationId): Promise<OneuiWhatsAppConversationDetail | null> {
       const conversation = conversations.find((item) => item.id === conversationId);
 
@@ -207,6 +380,38 @@ function createFakeRepository() {
           .sort((left, right) => (right.timestamp?.getTime() ?? 0) - (left.timestamp?.getTime() ?? 0))
           .slice(0, 1)
       }));
+    },
+    async markOutboundMessageAccepted(input: MarkOutboundMessageAcceptedInput): Promise<OneuiWhatsAppMessageRecord> {
+      const message = messages.find((item) => item.id === input.messageId);
+
+      if (!message) {
+        throw new Error("Message not found.");
+      }
+
+      message.metaMessageId = input.metaMessageId;
+      message.rawPayload = input.rawPayload;
+      message.status = input.status;
+      message.timestamp = input.timestamp;
+
+      const conversation = conversations.find((item) => item.id === message.conversationId);
+
+      if (conversation) {
+        conversation.lastMessageAt = input.timestamp;
+        conversation.lastOutboundAt = input.timestamp;
+      }
+
+      return message;
+    },
+    async markOutboundMessageFailed(input: MarkOutboundMessageFailedInput): Promise<OneuiWhatsAppMessageRecord> {
+      const message = messages.find((item) => item.id === input.messageId);
+
+      if (!message) {
+        throw new Error("Message not found.");
+      }
+
+      message.rawPayload = input.rawPayload;
+      message.status = input.status;
+      return message;
     },
     messages,
     async saveInboundMessage(input: SaveInboundMessageInput): Promise<OneuiWhatsAppMessageRecord> {
@@ -276,6 +481,45 @@ function createFakeRepository() {
   };
 
   return repository;
+}
+
+function viFetch(payload: unknown, ok = true, status = 200) {
+  const calls: Array<{
+    input: string;
+    init: {
+      body: string;
+      headers: Record<string, string>;
+      method: "POST";
+    };
+  }> = [];
+  const fetcher = async (
+    input: string,
+    init: {
+      body: string;
+      headers: Record<string, string>;
+      method: "POST";
+    }
+  ) => {
+    calls.push({ input, init });
+
+    return {
+      async json() {
+        return payload;
+      },
+      ok,
+      status
+    };
+  };
+
+  return Object.assign(fetcher, { calls });
+}
+
+function whatsappEnv(): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    WHATSAPP_ACCESS_TOKEN: "secret-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1230538790140150"
+  };
 }
 
 function createConversation(

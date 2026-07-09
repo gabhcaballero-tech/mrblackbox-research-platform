@@ -77,13 +77,38 @@ describe("OneuiWhatsAppPage", () => {
     expect(screen.getAllByText("delivered").length).toBeGreaterThan(0);
     expect(screen.getByText("Raw payload")).toBeInTheDocument();
   });
+
+  it("muestra caja de respuesta y no permite enviar vacío", async () => {
+    render(await OneuiWhatsAppPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByPlaceholderText("Escribe una respuesta…")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enviar respuesta" })).toBeDisabled();
+  });
+
+  it("bloquea respuesta libre cuando la ventana de 24 horas terminó", async () => {
+    getInboxMock.mockResolvedValue({
+      data: createInboxData({
+        lastInboundAt: new Date("2026-07-07T21:00:00.000Z")
+      }),
+      ok: true
+    });
+
+    render(await OneuiWhatsAppPage({ searchParams: Promise.resolve({}) }));
+
+    expect(
+      screen.getByText(
+        "La ventana de atención de 24 horas terminó. Para escribir a este contacto se requiere una plantilla aprobada."
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Escribe una respuesta…")).toBeDisabled();
+  });
 });
 
-function createInboxData() {
+function createInboxData(conversationOverrides: Record<string, unknown> = {}) {
   const conversation = {
     createdAt: new Date("2026-07-08T21:00:00.000Z"),
     id: "conversation-1",
-    lastInboundAt: new Date("2026-07-08T21:00:00.000Z"),
+    lastInboundAt: new Date(),
     lastMessageAt: new Date("2026-07-08T21:00:00.000Z"),
     lastOutboundAt: null,
     linkedParticipantId: null,
@@ -92,7 +117,8 @@ function createInboxData() {
     profileName: "Participante Uno",
     sourceModule: "GENERAL" as const,
     updatedAt: new Date("2026-07-08T21:00:00.000Z"),
-    waId: "5215512345678"
+    waId: "5215512345678",
+    ...conversationOverrides
   };
   const message = {
     bodyText: "Hola, confirmo asistencia",

@@ -2,6 +2,7 @@ import {
   createOneuiWhatsAppRepository,
   type OneuiWhatsAppConversationDetail,
   type OneuiWhatsAppConversationSummary,
+  type OneuiWhatsAppMessageRecord,
   type OneuiWhatsAppRepository,
   type OneuiWhatsAppSourceModule
 } from "./repository";
@@ -16,6 +17,24 @@ export type OneuiWhatsAppWebhookResult = {
   statusEvents: number;
   unknownEvents: number;
 };
+
+export type OneuiWhatsAppSendReplyResult =
+  | {
+      ok: true;
+      data: OneuiWhatsAppMessageRecord;
+    }
+  | {
+      ok: false;
+      code:
+        | "CONFIGURATION_ERROR"
+        | "CONVERSATION_NOT_FOUND"
+        | "EMPTY_MESSAGE"
+        | "META_API_ERROR"
+        | "OUTSIDE_CUSTOMER_SERVICE_WINDOW"
+        | "UNAUTHORIZED";
+      message: string;
+      data?: OneuiWhatsAppMessageRecord;
+    };
 
 export type OneuiWhatsAppInboxResult =
   | {
@@ -32,6 +51,19 @@ export type OneuiWhatsAppInboxResult =
     };
 
 type MetaWebhookPayload = Record<string, unknown>;
+
+type WhatsAppApiFetch = (
+  input: string,
+  init: {
+    body: string;
+    headers: Record<string, string>;
+    method: "POST";
+  }
+) => Promise<{
+  json: () => Promise<unknown>;
+  ok: boolean;
+  status: number;
+}>;
 
 type MetaChangeContext = {
   change: Record<string, unknown>;
@@ -50,6 +82,32 @@ export const ONEUI_WHATSAPP_SOURCE_LABELS: Record<OneuiWhatsAppSourceModule, str
 
 export function canAccessOneuiWhatsAppInbox(actor: OneuiWhatsAppInboxActor): boolean {
   return Boolean(actor && actor.status !== "INACTIVE" && (actor.role === "ADMIN" || actor.role === "SUPERVISOR"));
+}
+
+export function isWithinOneuiWhatsAppCustomerServiceWindow(lastInboundAt: Date | null, now = new Date()): boolean {
+  if (!lastInboundAt) {
+    return false;
+  }
+
+  return now.getTime() - lastInboundAt.getTime() <= 24 * 60 * 60 * 1000;
+}
+
+export function normalizeWhatsAppRecipient(value: string): string {
+  const digits = value.replace(/\D/g, "");
+
+  if (/^521\d{10}$/.test(digits)) {
+    return digits;
+  }
+
+  if (/^52\d{10}$/.test(digits)) {
+    return `521${digits.slice(2)}`;
+  }
+
+  if (/^\d{10}$/.test(digits)) {
+    return `521${digits}`;
+  }
+
+  return digits;
 }
 
 export async function getOneuiWhatsAppInbox(input: {
@@ -77,6 +135,154 @@ export async function getOneuiWhatsAppInbox(input: {
       conversations,
       selectedConversation
     },
+    ok: true
+  };
+}
+
+export async function sendOneuiWhatsAppTextReply(input: {
+  actor: OneuiWhatsAppInboxActor;
+  bodyText: string;
+  conversationId: string;
+  fetcher?: WhatsAppApiFetch;
+  now?: Date;
+  repository?: OneuiWhatsAppRepository;
+  env?: NodeJS.ProcessEnv;
+}): Promise<OneuiWhatsAppSendReplyResult> {
+  if (!canAccessOneuiWhatsAppInbox(input.actor)) {
+    return {
+      code: "UNAUTHORIZED",
+      message: "Solo administradores y supervisores pueden responder WhatsApp.",
+      ok: false
+    };
+  }
+
+  const bodyText = input.bodyText.trim();
+
+  if (!bodyText) {
+    return {
+      code: "EMPTY_MESSAGE",
+      message: "Escribe una respuesta antes de enviarla.",
+      ok: false
+    };
+  }
+
+  const repository = input.repository ?? createOneuiWhatsAppRepository();
+  const conversation = await repository.getConversationWithMessages(input.conversationId);
+
+  if (!conversation) {
+    return {
+      code: "CONVERSATION_NOT_FOUND",
+      message: "No se encontró la conversación seleccionada.",
+      ok: false
+    };
+  }
+
+  const now = input.now ?? new Date();
+
+  if (!isWithinOneuiWhatsAppCustomerServiceWindow(conversation.lastInboundAt, now)) {
+    return {
+      code: "OUTSIDE_CUSTOMER_SERVICE_WINDOW",
+      message:
+        "La ventana de atención de 24 horas terminó. Para escribir a este contacto se requiere una plantilla aprobada.",
+      ok: false
+    };
+  }
+
+  const env = input.env ?? process.env;
+  const accessToken = env.WHATSAPP_ACCESS_TOKEN;
+  const phoneNumberId = env.WHATSAPP_PHONE_NUMBER_ID;
+  const fromPhone = env.WHATSAPP_ONEUI_PHONE_NUMBER ?? env.WHATSAPP_PHONE_NUMBER_ID ?? "UNKNOWN";
+  const toPhone = normalizeWhatsAppRecipient(conversation.waId || conversation.phoneNumber);
+  const pendingMessage = await repository.createOutboundMessage({
+    bodyText,
+    conversationId: conversation.id,
+    fromPhone,
+    rawPayload: {
+      request: {
+        messaging_product: "whatsapp",
+        text: {
+          preview_url: false
+        },
+        to: toPhone,
+        type: "text"
+      }
+    },
+    timestamp: now,
+    toPhone
+  });
+
+  if (!accessToken || !phoneNumberId) {
+    const failedMessage = await repository.markOutboundMessageFailed({
+      messageId: pendingMessage.id,
+      rawPayload: {
+        error: {
+          message: "WhatsApp API environment variables are not configured."
+        }
+      },
+      status: "failed"
+    });
+
+    return {
+      code: "CONFIGURATION_ERROR",
+      data: failedMessage,
+      message: "Faltan variables de entorno para enviar por WhatsApp.",
+      ok: false
+    };
+  }
+
+  const requestPayload = {
+    messaging_product: "whatsapp",
+    text: {
+      body: bodyText,
+      preview_url: false
+    },
+    to: toPhone,
+    type: "text"
+  };
+  const fetcher = input.fetcher ?? fetch;
+  const response = await fetcher(`https://graph.facebook.com/v25.0/${phoneNumberId}/messages`, {
+    body: JSON.stringify(requestPayload),
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    method: "POST"
+  });
+  const responsePayload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const failedMessage = await repository.markOutboundMessageFailed({
+      messageId: pendingMessage.id,
+      rawPayload: {
+        request: requestPayload,
+        response: responsePayload,
+        status: response.status
+      },
+      status: "failed"
+    });
+
+    return {
+      code: "META_API_ERROR",
+      data: failedMessage,
+      message: getMetaErrorMessage(responsePayload) ?? "No se pudo enviar la respuesta por WhatsApp.",
+      ok: false
+    };
+  }
+
+  const acceptedMessage = await repository.markOutboundMessageAccepted({
+    messageId: pendingMessage.id,
+    metaMessageId: getMetaResponseMessageId(responsePayload),
+    rawPayload: {
+      request: requestPayload,
+      response: responsePayload,
+      status: response.status
+    },
+    status: getMetaResponseMessageStatus(responsePayload) ?? "accepted",
+    timestamp: now
+  });
+
+  return {
+    data: acceptedMessage,
     ok: true
   };
 }
@@ -246,6 +452,24 @@ function findProfileName(contacts: unknown, waId: string): string | null {
   const profile = asRecord(contact?.profile);
 
   return stringValue(profile?.name);
+}
+
+function getMetaResponseMessageId(payload: unknown): string | null {
+  const messages = arrayOfRecords(asRecord(payload)?.messages);
+
+  return stringValue(messages[0]?.id);
+}
+
+function getMetaResponseMessageStatus(payload: unknown): string | null {
+  const messages = arrayOfRecords(asRecord(payload)?.messages);
+
+  return stringValue(messages[0]?.message_status);
+}
+
+function getMetaErrorMessage(payload: unknown): string | null {
+  const error = asRecord(asRecord(payload)?.error);
+
+  return stringValue(error?.message);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
