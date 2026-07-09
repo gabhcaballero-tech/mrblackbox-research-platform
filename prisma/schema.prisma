@@ -357,6 +357,19 @@ enum AuditAction {
   QUOTA_CHANGED
 }
 
+enum OneuiWhatsAppSourceModule {
+  GENERAL
+  NAVIGO
+  HUT
+  BLACK_BOX
+  OTHER
+}
+
+enum OneuiWhatsAppMessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
 model InternalUser {
   id           String     @id @default(uuid()) @db.Uuid
   name         String
@@ -1471,4 +1484,67 @@ model AuditLog {
   @@index([actorUserId, createdAt])
   @@index([action, createdAt])
   @@map("audit_logs")
+}
+
+model OneuiWhatsAppConversation {
+  id                  String                     @id @default(uuid()) @db.Uuid
+  waId                String                     @unique
+  phoneNumber         String
+  profileName         String?
+  sourceModule        OneuiWhatsAppSourceModule @default(GENERAL)
+  linkedStudyId       String?                    @db.Uuid
+  linkedParticipantId String?                    @db.Uuid
+  lastMessageAt       DateTime?
+  lastInboundAt       DateTime?
+  lastOutboundAt      DateTime?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  messages OneuiWhatsAppMessage[]
+
+  @@index([sourceModule, lastMessageAt])
+  @@index([linkedStudyId])
+  @@index([linkedParticipantId])
+  @@map("oneui_whatsapp_conversations")
+}
+
+model OneuiWhatsAppMessage {
+  id             String                         @id @default(uuid()) @db.Uuid
+  conversationId String                         @db.Uuid
+  metaMessageId  String?                        @unique
+  direction      OneuiWhatsAppMessageDirection
+  fromPhone      String
+  toPhone        String
+  messageType    String
+  bodyText       String?
+  status         String?
+  timestamp      DateTime?
+  rawPayload     Json
+  createdAt      DateTime                       @default(now())
+  updatedAt      DateTime                       @updatedAt
+
+  conversation OneuiWhatsAppConversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  statusEvents OneuiWhatsAppMessageStatusEvent[]
+
+  @@index([conversationId, timestamp])
+  @@index([direction, timestamp])
+  @@index([status])
+  @@map("oneui_whatsapp_messages")
+}
+
+model OneuiWhatsAppMessageStatusEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  messageId     String?  @db.Uuid
+  metaMessageId String
+  status        String
+  timestamp     DateTime?
+  rawPayload    Json
+  createdAt     DateTime @default(now())
+
+  message OneuiWhatsAppMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([messageId, timestamp])
+  @@index([metaMessageId, timestamp])
+  @@index([status])
+  @@map("oneui_whatsapp_message_status_events")
 }
