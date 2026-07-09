@@ -190,4 +190,21 @@ describe("field actions public access", () => {
       })
     );
   });
+
+  it("redirects back to the field question with a clear error when saving fails unexpectedly", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { saveFieldScreeningAnswerAction } = await import("./actions");
+    const { saveFieldScreeningAnswer } = await import("./service");
+
+    vi.mocked(saveFieldScreeningAnswer).mockRejectedValueOnce(new Error("database unavailable"));
+
+    const formData = new FormData();
+    formData.set("value", "SI");
+
+    await expect(saveFieldScreeningAnswerAction("attempt-public-1", "OP1_RECLUTADOR", formData)).rejects.toThrow(
+      "redirect:/field/screening/attempt-public-1?question=OP1_RECLUTADOR&error=No+se+pudo+guardar+la+respuesta.+Intenta+nuevamente."
+    );
+
+    consoleErrorSpy.mockRestore();
+  });
 });

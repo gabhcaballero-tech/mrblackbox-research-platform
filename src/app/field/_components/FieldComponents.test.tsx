@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScreenerDefinition, ScreenerQuestion } from "@/modules/screener";
 import type { FieldAttemptScreen } from "@/modules/field/service";
@@ -376,17 +376,15 @@ describe("FieldComponents", () => {
     expect(screen.getByRole("button", { name: "Guardando..." })).toBeDisabled();
   });
 
-  it("shows a clear error and re-enables the field button when saving fails", async () => {
-    vi.mocked(saveFieldScreeningAnswerAction).mockRejectedValueOnce(new Error("network"));
-    render(<ScreeningQuestionForm screen={screenFixture(shortTextQuestion())} />);
+  it("renders the save error returned by the field action redirect", () => {
+    render(
+      <ScreeningQuestionForm
+        error="No se pudo guardar la respuesta. Intenta nuevamente."
+        screen={screenFixture(shortTextQuestion())}
+      />
+    );
 
-    fireEvent.change(screen.getByLabelText("Respuesta"), { target: { value: "hace 2 meses" } });
-    fireEvent.click(screen.getByRole("button", { name: "Guardar y continuar" }));
-
-    await waitFor(() => {
-      expect(screen.getByRole("alert")).toHaveTextContent("No se pudo guardar la respuesta. Intenta nuevamente.");
-    });
-
+    expect(screen.getByRole("alert")).toHaveTextContent("No se pudo guardar la respuesta. Intenta nuevamente.");
     expect(screen.getByRole("button", { name: "Guardar y continuar" })).toBeEnabled();
   });
 

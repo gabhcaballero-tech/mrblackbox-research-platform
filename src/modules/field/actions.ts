@@ -105,13 +105,24 @@ export async function saveFieldScreeningAnswerAction(
   formData: FormData
 ): Promise<void> {
   const actor = await getFieldActorForRequest();
-  const result = await saveFieldScreeningAnswer({
-    actor,
-    attemptId,
-    formInput: getFieldAnswerInputFromFormData(formData),
-    questionId,
-    repository: createFieldRepository()
-  });
+  let result: Awaited<ReturnType<typeof saveFieldScreeningAnswer>>;
+
+  try {
+    result = await saveFieldScreeningAnswer({
+      actor,
+      attemptId,
+      formInput: getFieldAnswerInputFromFormData(formData),
+      questionId,
+      repository: createFieldRepository()
+    });
+  } catch (error) {
+    logFieldActionError({
+      code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+      step: "save",
+      studyId: "unknown"
+    });
+    redirect(fieldAttemptPath(attemptId, questionId, "No se pudo guardar la respuesta. Intenta nuevamente."));
+  }
 
   if (!result.ok) {
     redirect(fieldAttemptPath(attemptId, questionId, result.message));
@@ -150,7 +161,7 @@ function logFieldActionError({
   studyId
 }: {
   code: string;
-  step: "start";
+  step: "save" | "start";
   studyId: string;
 }) {
   console.error(`public field screening failed: step=${step} code=${code} studyId=${studyId}`);

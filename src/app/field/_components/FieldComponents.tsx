@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type FormEvent, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 import type { ScreenerAnswer, ScreenerQuestion } from "@/modules/screener";
 import type { FieldStudySummary } from "@/modules/field/repository";
 import type { FieldAttemptScreen } from "@/modules/field/service";
@@ -49,9 +49,6 @@ export function FieldStudyCard({ study }: { study: FieldStudySummary }) {
 
 export function ScreeningQuestionForm({ error, screen }: ScreeningQuestionFormProps) {
   const question = screen.currentQuestion;
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const isSubmittingRef = useRef(false);
 
   if (!question) {
     return (
@@ -71,38 +68,6 @@ export function ScreeningQuestionForm({ error, screen }: ScreeningQuestionFormPr
   const isLastVisibleQuestion = screen.progress.currentIndex >= screen.progress.totalVisibleQuestions;
   const pendingLabel = isLastVisibleQuestion ? "Finalizando evaluación..." : "Guardando...";
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (isSubmittingRef.current) {
-      return;
-    }
-
-    const form = event.currentTarget;
-
-    if (!form.reportValidity()) {
-      return;
-    }
-
-    setSubmitError(null);
-    isSubmittingRef.current = true;
-    setIsSubmitting(true);
-
-    try {
-      await saveFieldScreeningAnswerAction(screen.attempt.id, activeQuestion.id, new FormData(form));
-      isSubmittingRef.current = false;
-      setIsSubmitting(false);
-    } catch (submissionError) {
-      if (isNextRedirectError(submissionError)) {
-        throw submissionError;
-      }
-
-      isSubmittingRef.current = false;
-      setSubmitError("No se pudo guardar la respuesta. Intenta nuevamente.");
-      setIsSubmitting(false);
-    }
-  }
-
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
       <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -116,13 +81,13 @@ export function ScreeningQuestionForm({ error, screen }: ScreeningQuestionFormPr
         <StatusBadge status="ready">{question.required ? "Obligatoria" : "Opcional"}</StatusBadge>
       </div>
 
-      {error || submitError ? (
+      {error ? (
         <p className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800" role="alert">
-          {submitError ?? error}
+          {error}
         </p>
       ) : null}
 
-      <form className="space-y-5" onSubmit={handleSubmit}>
+      <form action={saveFieldScreeningAnswerAction.bind(null, screen.attempt.id, activeQuestion.id)} className="space-y-5">
         <QuestionControl answer={answer} question={question} />
         <div className="flex flex-wrap gap-3">
           {previousQuestion ? (
@@ -133,21 +98,20 @@ export function ScreeningQuestionForm({ error, screen }: ScreeningQuestionFormPr
               Volver
             </Link>
           ) : null}
-          <button className={primaryButtonClass} disabled={isSubmitting} type="submit">
-            {isSubmitting ? pendingLabel : "Guardar y continuar"}
-          </button>
+          <FieldSubmitButton pendingLabel={pendingLabel} />
         </div>
       </form>
     </section>
   );
 }
 
-function isNextRedirectError(error: unknown): boolean {
+function FieldSubmitButton({ pendingLabel }: { pendingLabel: string }) {
+  const { pending } = useFormStatus();
+
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "digest" in error &&
-    String((error as { digest?: unknown }).digest).startsWith("NEXT_REDIRECT")
+    <button className={primaryButtonClass} disabled={pending} type="submit">
+      {pending ? pendingLabel : "Guardar y continuar"}
+    </button>
   );
 }
 
