@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createOneuiWhatsAppRepository, sendNavigoConfirmationWhatsApp } from "@/modules/oneui-whatsapp";
 import { createParticipantPortalScreenerRepository } from "@/modules/participant-portal/screener-repository";
 import { generateParticipantReferenceCode } from "@/modules/participant-portal/review";
+import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
 import { getFieldActorForRequest } from "./auth";
 import { createFieldRepository } from "./repository";
 import {
@@ -142,11 +143,18 @@ export async function saveFieldScreeningAnswerAction(
         redirect(fieldAttemptPath(attemptId, questionId, confirmation.message));
       }
 
-      await sendFieldConfirmationWhatsAppBestEffort({
+      const confirmationAttempt = await sendFieldConfirmationWhatsAppBestEffort({
         attemptId,
         confirmation: confirmation.confirmation,
         repository: confirmationRepository
       });
+
+      if (
+        confirmationAttempt &&
+        getStudyBehavior(confirmationAttempt.questionnaireVersion.study.code).requiresFinalSelfie
+      ) {
+        redirect(`/field/screening/${attemptId}/selfie`);
+      }
     }
 
     redirect(`/field/screening/${attemptId}/result`);
@@ -178,12 +186,12 @@ async function sendFieldConfirmationWhatsAppBestEffort({
     referenceCodes: Array<{ code: string; slot: number }>;
   };
   repository: ReturnType<typeof createParticipantPortalScreenerRepository>;
-}) {
+}): Promise<Awaited<ReturnType<ReturnType<typeof createParticipantPortalScreenerRepository>["getAttempt"]>>> {
   try {
     const attempt = await repository.getAttempt(attemptId);
 
     if (!attempt) {
-      return;
+      return null;
     }
 
     const whatsappRepository = createOneuiWhatsAppRepository();
@@ -210,11 +218,14 @@ async function sendFieldConfirmationWhatsAppBestEffort({
         step: "send_confirmation_template"
       });
     }
+
+    return attempt;
   } catch (error) {
     console.error("public field navigo whatsapp failed", {
       attemptId,
       code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
       step: "send_confirmation_template"
     });
+    return null;
   }
 }

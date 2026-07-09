@@ -146,6 +146,7 @@ describe("field actions public access", () => {
       id: "attempt-public-1",
       questionnaireVersion: {
         study: {
+          code: "FMASCULINA-NAVIGO-2026",
           id: "study-1"
         }
       },
@@ -168,7 +169,7 @@ describe("field actions public access", () => {
     formData.set("value", "SI");
 
     await expect(saveFieldScreeningAnswerAction("attempt-public-1", "CONSENTIMIENTO", formData)).rejects.toThrow(
-      "redirect:/field/screening/attempt-public-1/result"
+      "redirect:/field/screening/attempt-public-1/selfie"
     );
 
     expect(saveFieldScreeningAnswer).toHaveBeenCalledWith(
@@ -188,6 +189,63 @@ describe("field actions public access", () => {
         participantId: "study-participant-1",
         phone: "5551112222"
       })
+    );
+  });
+
+  it("goes straight to result when a passed public field study does not require selfie", async () => {
+    const { saveFieldScreeningAnswerAction } = await import("./actions");
+    const { saveFieldScreeningAnswer } = await import("./service");
+
+    vi.mocked(saveFieldScreeningAnswer).mockResolvedValueOnce({
+      data: {
+        attemptId: "attempt-detergents-1",
+        closed: true,
+        nextQuestionId: null,
+        status: "PASSED"
+      },
+      ok: true
+    });
+    mocks.ensureFilterOnlyConfirmation.mockResolvedValueOnce({
+      confirmation: {
+        folio: "DET-001",
+        folioSequence: 1,
+        referenceCodes: [
+          { code: "A7K4", slot: 1 },
+          { code: "M3P9", slot: 2 },
+          { code: "T8R2", slot: 3 }
+        ]
+      },
+      created: true,
+      ok: true
+    });
+    mocks.getAttempt.mockResolvedValueOnce({
+      id: "attempt-detergents-1",
+      questionnaireVersion: {
+        study: {
+          code: "DETERGENTES-ROPA-2026",
+          id: "study-detergents"
+        }
+      },
+      studyParticipant: {
+        participantProfile: {
+          name: "Persona publica",
+          phone: "5551112222"
+        }
+      },
+      studyParticipantId: "study-participant-1"
+    });
+    mocks.findLatestOutboundTemplateMessage.mockResolvedValueOnce(null);
+    mocks.sendNavigoConfirmationWhatsApp.mockResolvedValueOnce({
+      code: "SKIPPED",
+      message: "WhatsApp rechazado en prueba.",
+      ok: false
+    });
+
+    const formData = new FormData();
+    formData.set("value", "SI");
+
+    await expect(saveFieldScreeningAnswerAction("attempt-detergents-1", "CONSENTIMIENTO", formData)).rejects.toThrow(
+      "redirect:/field/screening/attempt-detergents-1/result"
     );
   });
 

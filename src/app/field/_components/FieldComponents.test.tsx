@@ -78,10 +78,17 @@ function screenFixture(
           code: study.code,
           id: study.id,
           name: study.name,
+          participantPortalConfig: {
+            maxImageBytes: 8388608,
+            maxPerfumePhotos: 5,
+            minPerfumePhotos: 1
+          },
           status: study.status,
           timeZoneIana: study.timeZoneIana
         }
       },
+      participantEvidence: [],
+      participantScreeningReview: null,
     questionnaireVersionId: "version-1",
     source: "FIELD",
     startedAt: new Date("2026-06-23T10:00:00Z"),

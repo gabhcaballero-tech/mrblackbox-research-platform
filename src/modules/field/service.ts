@@ -17,6 +17,17 @@ import {
   type FieldAnswerInput,
   type FieldParticipantInput
 } from "./validation";
+import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
+import {
+  PARTICIPANT_EVIDENCE_BUCKET,
+  assertEvidenceStorageKeyBelongsToAttempt,
+  createSignedEvidenceUpload,
+  validateEvidenceUploadMetadata,
+  type EvidenceStorageClient,
+  type EvidenceUploadMetadata,
+  type ParticipantEvidenceKind,
+  type SignedEvidenceUpload
+} from "@/modules/participant-portal/evidence-storage";
 import type {
   FieldOperationalStatus,
   FieldRepository,
@@ -42,6 +53,8 @@ export const PUBLIC_FIELD_ACTOR: FieldActor = {
 export type FieldServiceErrorCode =
   | "ATTEMPT_CLOSED"
   | "ATTEMPT_NOT_FOUND"
+  | "EVIDENCE_INCOMPLETE"
+  | "EVIDENCE_NOT_REQUIRED"
   | "OPEN_ATTEMPT_EXISTS"
   | "QUESTION_HIDDEN"
   | "QUESTION_NOT_FOUND"
@@ -127,6 +140,26 @@ export type FieldAnswerSaveResult = {
   closed: boolean;
   nextQuestionId: string | null;
   status: FieldScreeningStatus;
+};
+
+export type FieldEvidenceCounts = {
+  perfumePhotos: number;
+  selfie: number;
+};
+
+export type FieldSelfieScreen = {
+  attemptId: string;
+  counts: FieldEvidenceCounts;
+  selfieComplete: boolean;
+  study: {
+    code: string;
+    id: string;
+    name: string;
+  };
+};
+
+export type FieldEvidenceUploadConfirmation = {
+  counts: FieldEvidenceCounts;
 };
 
 type FieldStartConfirmation = {
@@ -514,6 +547,198 @@ export async function saveFieldScreeningAnswer({
   };
 }
 
+export async function getFieldSelfieScreen({
+  actor,
+  attemptId,
+  repository
+}: {
+  actor: FieldActor | null;
+  attemptId: string;
+  repository: FieldRepository;
+}): Promise<FieldServiceResult<FieldSelfieScreen>> {
+  const context = await loadEvidenceAttemptContext({ actor, attemptId, repository });
+
+  if (!context.ok) {
+    return context;
+  }
+
+  if (!getStudyBehavior(context.data.questionnaireVersion.study.code).requiresFinalSelfie) {
+    return {
+      code: "EVIDENCE_NOT_REQUIRED",
+      message: "Este estudio no requiere selfie.",
+      ok: false
+    };
+  }
+
+  return {
+    data: toFieldSelfieScreen(context.data),
+    ok: true
+  };
+}
+
+export async function requestFieldEvidenceUpload({
+  actor,
+  attemptId,
+  metadata,
+  repository,
+  storage
+}: {
+  actor: FieldActor | null;
+  attemptId: string;
+  metadata: EvidenceUploadMetadata;
+  repository: FieldRepository;
+  storage: EvidenceStorageClient;
+}): Promise<FieldServiceResult<SignedEvidenceUpload & { metadata: EvidenceUploadMetadata }>> {
+  const context = await loadEvidenceAttemptContext({ actor, attemptId, repository });
+
+  if (!context.ok) {
+    return context;
+  }
+
+  const validation = validateCanAddFieldSelfie(context.data, metadata.evidenceType);
+
+  if (!validation.ok) {
+    return validation;
+  }
+
+  try {
+    const config = context.data.questionnaireVersion.study.participantPortalConfig!;
+    const signed = await createSignedEvidenceUpload({
+      attemptId: context.data.id,
+      maxImageBytes: config.maxImageBytes,
+      metadata,
+      participantProfileId: context.data.studyParticipant.participantProfile.id,
+      storage,
+      studyId: context.data.questionnaireVersion.study.id
+    });
+
+    return {
+      data: signed,
+      ok: true
+    };
+  } catch (error) {
+    return {
+      code: "VALIDATION_ERROR",
+      message: error instanceof Error ? error.message : "No fue posible preparar la evidencia.",
+      ok: false
+    };
+  }
+}
+
+export async function confirmFieldEvidenceUpload({
+  actor,
+  attemptId,
+  input,
+  repository
+}: {
+  actor: FieldActor | null;
+  attemptId: string;
+  input: EvidenceUploadMetadata & {
+    privateStorageKey: string;
+    storageBucket: string;
+  };
+  repository: FieldRepository;
+}): Promise<FieldServiceResult<FieldEvidenceUploadConfirmation>> {
+  const context = await loadEvidenceAttemptContext({ actor, attemptId, repository });
+
+  if (!context.ok) {
+    return context;
+  }
+
+  const validation = validateCanAddFieldSelfie(context.data, input.evidenceType);
+
+  if (!validation.ok) {
+    return validation;
+  }
+
+  try {
+    const config = context.data.questionnaireVersion.study.participantPortalConfig!;
+    const metadata = validateEvidenceUploadMetadata({
+      maxImageBytes: config.maxImageBytes,
+      metadata: input
+    });
+
+    if (input.storageBucket !== PARTICIPANT_EVIDENCE_BUCKET) {
+      throw new Error("No fue posible validar la evidencia cargada.");
+    }
+
+    assertEvidenceStorageKeyBelongsToAttempt({
+      attemptId: context.data.id,
+      participantProfileId: context.data.studyParticipant.participantProfile.id,
+      privateStorageKey: input.privateStorageKey,
+      studyId: context.data.questionnaireVersion.study.id
+    });
+
+    const evidence = await repository.createEvidence({
+      extension: metadata.extension,
+      mimeType: metadata.mimeType,
+      originalFilename: metadata.originalFilename,
+      privateStorageKey: input.privateStorageKey,
+      relatedQuestionId: null,
+      screeningAttemptId: context.data.id,
+      sizeBytes: metadata.sizeBytes,
+      storageBucket: input.storageBucket,
+      studyParticipantId: context.data.studyParticipantId,
+      type: metadata.evidenceType
+    });
+
+    return {
+      data: {
+        counts: countFieldEvidence(withNewFieldEvidence(context.data.participantEvidence, evidence))
+      },
+      ok: true
+    };
+  } catch (error) {
+    return {
+      code: "VALIDATION_ERROR",
+      message: error instanceof Error ? error.message : "No fue posible registrar la evidencia.",
+      ok: false
+    };
+  }
+}
+
+export async function completeFieldEvidenceSubmission({
+  actor,
+  attemptId,
+  repository
+}: {
+  actor: FieldActor | null;
+  attemptId: string;
+  repository: FieldRepository;
+}): Promise<FieldServiceResult<FieldSelfieScreen>> {
+  const context = await loadEvidenceAttemptContext({ actor, attemptId, repository });
+
+  if (!context.ok) {
+    return context;
+  }
+
+  if (!getStudyBehavior(context.data.questionnaireVersion.study.code).requiresFinalSelfie) {
+    return {
+      code: "EVIDENCE_NOT_REQUIRED",
+      message: "Este estudio no requiere selfie.",
+      ok: false
+    };
+  }
+
+  if (countFieldEvidence(context.data.participantEvidence).selfie !== 1) {
+    return {
+      code: "EVIDENCE_INCOMPLETE",
+      message: "Antes de enviar a revisión necesitamos exactamente una selfie.",
+      ok: false
+    };
+  }
+
+  await repository.upsertPendingReview({
+    screeningAttemptId: context.data.id,
+    studyParticipantId: context.data.studyParticipantId
+  });
+
+  return {
+    data: toFieldSelfieScreen(context.data),
+    ok: true
+  };
+}
+
 async function createAttemptForProfile({
   createdByUserId,
   fieldUserId,
@@ -735,6 +960,120 @@ async function loadAttemptContext({
     },
     ok: true
   };
+}
+
+async function loadEvidenceAttemptContext({
+  actor,
+  attemptId,
+  repository
+}: {
+  actor: FieldActor | null;
+  attemptId: string;
+  repository: FieldRepository;
+}): Promise<FieldServiceResult<FieldScreeningAttemptRecord>> {
+  if (!isFieldActor(actor)) {
+    return unauthorizedResult();
+  }
+
+  const attempt = await repository.getAttempt(attemptId);
+
+  if (!attempt || !canReadAttempt(actor, attempt)) {
+    return {
+      code: "ATTEMPT_NOT_FOUND",
+      message: "El intento de filtro no existe o no está disponible.",
+      ok: false
+    };
+  }
+
+  if (attempt.status !== "PASSED" && attempt.status !== "PENDING_REVIEW") {
+    return {
+      code: "ATTEMPT_CLOSED",
+      message: "Completa el filtro antes de capturar evidencia.",
+      ok: false
+    };
+  }
+
+  if (!attempt.questionnaireVersion.study.participantPortalConfig) {
+    return {
+      code: "STUDY_NOT_AVAILABLE",
+      message: "La captura de evidencias no está configurada para este estudio.",
+      ok: false
+    };
+  }
+
+  return {
+    data: attempt,
+    ok: true
+  };
+}
+
+function toFieldSelfieScreen(attempt: FieldScreeningAttemptRecord): FieldSelfieScreen {
+  return {
+    attemptId: attempt.id,
+    counts: countFieldEvidence(attempt.participantEvidence),
+    selfieComplete: countFieldEvidence(attempt.participantEvidence).selfie === 1,
+    study: {
+      code: attempt.questionnaireVersion.study.code,
+      id: attempt.questionnaireVersion.study.id,
+      name: attempt.questionnaireVersion.study.name
+    }
+  };
+}
+
+function validateCanAddFieldSelfie(
+  attempt: FieldScreeningAttemptRecord,
+  evidenceType: ParticipantEvidenceKind
+): FieldServiceResult<true> {
+  if (!getStudyBehavior(attempt.questionnaireVersion.study.code).requiresFinalSelfie) {
+    return {
+      code: "EVIDENCE_NOT_REQUIRED",
+      message: "Este estudio no requiere selfie.",
+      ok: false
+    };
+  }
+
+  if (evidenceType !== "SELFIE_IDENTIFICATION") {
+    return {
+      code: "VALIDATION_ERROR",
+      message: "Este paso solo permite registrar la selfie final.",
+      ok: false
+    };
+  }
+
+  if (countFieldEvidence(attempt.participantEvidence).selfie >= 1) {
+    return {
+      code: "VALIDATION_ERROR",
+      message: "Ya existe una selfie registrada para este intento.",
+      ok: false
+    };
+  }
+
+  return {
+    data: true,
+    ok: true
+  };
+}
+
+export function fieldAttemptRequiresFinalSelfie(attempt: FieldScreeningAttemptRecord): boolean {
+  return attempt.status === "PASSED" && getStudyBehavior(attempt.questionnaireVersion.study.code).requiresFinalSelfie;
+}
+
+export function fieldAttemptHasFinalSelfie(attempt: FieldScreeningAttemptRecord): boolean {
+  return countFieldEvidence(attempt.participantEvidence).selfie === 1;
+}
+
+export function countFieldEvidence(evidence: FieldScreeningAttemptRecord["participantEvidence"]): FieldEvidenceCounts {
+  return {
+    perfumePhotos: evidence.filter((item) => item.type === "PERFUME_PHOTO").length,
+    selfie: evidence.filter((item) => item.type === "SELFIE_IDENTIFICATION").length
+  };
+}
+
+function withNewFieldEvidence(
+  evidence: FieldScreeningAttemptRecord["participantEvidence"],
+  newEvidence: FieldScreeningAttemptRecord["participantEvidence"][number]
+): FieldScreeningAttemptRecord["participantEvidence"] {
+  return evidence.some((item) => item.id === newEvidence.id) ? evidence : [...evidence, newEvidence];
 }
 
 function buildAttemptScreen(

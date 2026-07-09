@@ -38,6 +38,7 @@ describe("auth route rules", () => {
     expect(getInternalRouteDecision("/field/studies/study-1/screening/new", false)).toEqual({ action: "allow" });
     expect(getInternalRouteDecision("/field/screening/attempt-1", false)).toEqual({ action: "allow" });
     expect(getInternalRouteDecision("/field/screening/attempt-1/result", false)).toEqual({ action: "allow" });
+    expect(getInternalRouteDecision("/field/screening/attempt-1/selfie", false)).toEqual({ action: "allow" });
   });
 
   it("allows authenticated internal routes through proxy-level checks", () => {

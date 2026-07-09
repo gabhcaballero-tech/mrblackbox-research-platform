@@ -3,6 +3,9 @@ import type { ScreenerDefinition } from "@/modules/screener";
 import type { InternalUserRole } from "@/shared/auth/permissions";
 import {
   getFieldScreeningAttemptScreen,
+  getFieldSelfieScreen,
+  confirmFieldEvidenceUpload,
+  completeFieldEvidenceSubmission,
   listFieldStudies,
   PUBLIC_FIELD_ACTOR,
   saveFieldScreeningAnswer,
@@ -200,6 +203,24 @@ function createMemoryRepository(studies: FieldStudySummary[] = [study()]): Field
   const answers = new Map<string, FieldScreeningAnswerRecord[]>();
 
   return {
+    async createEvidence(input) {
+      const attempt = attempts.find((item) => item.id === input.screeningAttemptId)!;
+      const evidence = {
+        extension: input.extension,
+        id: `evidence-${attempt.participantEvidence.length + 1}`,
+        mimeType: input.mimeType,
+        originalFilename: input.originalFilename,
+        privateStorageKey: input.privateStorageKey,
+        relatedQuestionId: input.relatedQuestionId,
+        reviewStatus: "PENDING" as const,
+        sizeBytes: input.sizeBytes,
+        storageBucket: input.storageBucket,
+        type: input.type,
+        uploadedAt: new Date("2026-06-23T10:30:00Z")
+      };
+      attempt.participantEvidence.push(evidence);
+      return evidence;
+    },
     async createParticipantProfile(input) {
       const profile = {
         email: input.email ?? null,
@@ -227,10 +248,17 @@ function createMemoryRepository(studies: FieldStudySummary[] = [study()]): Field
             code: currentStudy.code,
             id: currentStudy.id,
             name: currentStudy.name,
+            participantPortalConfig: {
+              maxImageBytes: 8388608,
+              maxPerfumePhotos: 5,
+              minPerfumePhotos: 1
+            },
             status: currentStudy.status,
             timeZoneIana: currentStudy.timeZoneIana
           }
         },
+        participantEvidence: [],
+        participantScreeningReview: null,
         questionnaireVersionId: input.questionnaireVersionId,
         source: "FIELD",
         startedAt: new Date("2026-06-23T10:00:00Z"),
@@ -316,6 +344,13 @@ function createMemoryRepository(studies: FieldStudySummary[] = [study()]): Field
       const participant = participants.find((item) => item.id === input.studyParticipantId)!;
       participant.screeningStatus = input.screeningStatus;
     },
+    async upsertPendingReview(input) {
+      const attempt = attempts.find((item) => item.id === input.screeningAttemptId)!;
+      attempt.participantScreeningReview = {
+        rejectionReason: null,
+        status: "PENDING"
+      };
+    },
     async upsertAnswer(input) {
       const currentAnswers = answers.get(input.screeningAttemptId) ?? [];
       const existing = currentAnswers.find((answer) => answer.questionId === input.questionId);
@@ -354,9 +389,15 @@ async function startAttempt(repository: FieldRepository, currentActor = intervie
   return result.ok && result.data.kind === "started" ? result.data.attemptId : "";
 }
 
-async function answer(repository: FieldRepository, attemptId: string, questionId: string, value: string | string[]) {
+async function answer(
+  repository: FieldRepository,
+  attemptId: string,
+  questionId: string,
+  value: string | string[],
+  currentActor = interviewer
+) {
   return saveFieldScreeningAnswer({
-    actor: interviewer,
+    actor: currentActor,
     attemptId,
     formInput: { value },
     questionId,
@@ -364,15 +405,20 @@ async function answer(repository: FieldRepository, attemptId: string, questionId
   });
 }
 
-async function answerEligibleBase(repository: FieldRepository, attemptId: string, nseValue: "HIGH" | "LOW" = "HIGH") {
-  await answer(repository, attemptId, "CONSENTIMIENTO", "SI");
-  await answer(repository, attemptId, "F1_GENERO", "HOMBRE");
-  await answer(repository, attemptId, "F2_EDAD", "25");
-  await answer(repository, attemptId, "F9_FRECUENCIA_SEMANAL", "MAS_DE_UNA_VEZ_DIA");
-  await answer(repository, attemptId, "F9A_VECES_AL_DIA", "3");
+async function answerEligibleBase(
+  repository: FieldRepository,
+  attemptId: string,
+  nseValue: "HIGH" | "LOW" = "HIGH",
+  currentActor = interviewer
+) {
+  await answer(repository, attemptId, "CONSENTIMIENTO", "SI", currentActor);
+  await answer(repository, attemptId, "F1_GENERO", "HOMBRE", currentActor);
+  await answer(repository, attemptId, "F2_EDAD", "25", currentActor);
+  await answer(repository, attemptId, "F9_FRECUENCIA_SEMANAL", "MAS_DE_UNA_VEZ_DIA", currentActor);
+  await answer(repository, attemptId, "F9A_VECES_AL_DIA", "3", currentActor);
 
   for (const questionId of ["D1", "D2", "D3", "D4", "D5", "D6"]) {
-    await answer(repository, attemptId, questionId, nseValue);
+    await answer(repository, attemptId, questionId, nseValue, currentActor);
   }
 }
 
@@ -680,6 +726,83 @@ describe("field service", () => {
         nextQuestionId: "F1_GENERO"
       },
       ok: true
+    });
+  });
+
+  it("lets a public field visitor complete the final selfie for a public passed attempt", async () => {
+    const repository = createMemoryRepository();
+    const started = await startFieldScreeningAttempt({
+      actor: PUBLIC_FIELD_ACTOR,
+      formInput: { email: "", externalReference: "PUBLIC-3", name: "Persona publica", phone: "5554445555" },
+      repository,
+      studyId
+    });
+    const attemptId = started.ok && started.data.kind === "started" ? started.data.attemptId : "";
+
+    await answerEligibleBase(repository, attemptId, "HIGH", PUBLIC_FIELD_ACTOR);
+
+    const pendingSelfie = await getFieldSelfieScreen({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      repository
+    });
+
+    expect(pendingSelfie).toMatchObject({
+      data: {
+        selfieComplete: false
+      },
+      ok: true
+    });
+
+    const confirmed = await confirmFieldEvidenceUpload({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      input: {
+        evidenceType: "SELFIE_IDENTIFICATION",
+        mimeType: "image/jpeg",
+        originalFilename: "selfie.jpg",
+        privateStorageKey: `studies/${studyId}/participants/profile-1/screening-attempts/${attemptId}/selfie_identification/selfie.jpg`,
+        sizeBytes: 1200,
+        storageBucket: "participant-evidence"
+      },
+      repository
+    });
+    const completed = await completeFieldEvidenceSubmission({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      repository
+    });
+
+    expect(confirmed).toMatchObject({
+      data: {
+        counts: {
+          selfie: 1
+        }
+      },
+      ok: true
+    });
+    expect(completed).toMatchObject({
+      data: {
+        selfieComplete: true
+      },
+      ok: true
+    });
+  });
+
+  it("does not let a public visitor access selfie for an internal field attempt", async () => {
+    const repository = createMemoryRepository();
+    const attemptId = await startAttempt(repository, interviewer);
+    await answerEligibleBase(repository, attemptId);
+
+    const result = await getFieldSelfieScreen({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      repository
+    });
+
+    expect(result).toMatchObject({
+      code: "ATTEMPT_NOT_FOUND",
+      ok: false
     });
   });
 

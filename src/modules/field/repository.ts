@@ -27,6 +27,12 @@ export type FieldScreenerVersionSummary = {
   versionNumber: number;
 };
 
+export type FieldParticipantPortalConfigSummary = {
+  maxImageBytes: number;
+  maxPerfumePhotos: number;
+  minPerfumePhotos: number;
+};
+
 export type FieldStudySummary = {
   activeScreenerVersion: FieldScreenerVersionSummary;
   code: string;
@@ -59,11 +65,17 @@ export type FieldScreeningAttemptRecord = {
   id: string;
   nseClass: string | null;
   nseScore: number | null;
+  participantEvidence: FieldParticipantEvidenceRecord[];
+  participantScreeningReview: {
+    rejectionReason: string | null;
+    status: "APPROVED" | "PENDING" | "REJECTED";
+  } | null;
   questionnaireVersion: FieldScreenerVersionSummary & {
     study: {
       code: string;
       id: string;
       name: string;
+      participantPortalConfig: FieldParticipantPortalConfigSummary | null;
       status: FieldStudyStatus;
       timeZoneIana: string;
     };
@@ -83,6 +95,20 @@ export type FieldScreeningAttemptRecord = {
 export type FieldScreeningAnswerRecord = {
   answerJson: unknown;
   questionId: string;
+};
+
+export type FieldParticipantEvidenceRecord = {
+  id: string;
+  extension: string;
+  mimeType: string;
+  originalFilename: string | null;
+  privateStorageKey: string;
+  relatedQuestionId: string | null;
+  reviewStatus: "APPROVED" | "PENDING" | "REJECTED";
+  sizeBytes: number;
+  storageBucket: string;
+  type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION";
+  uploadedAt: Date;
 };
 
 export type CreateParticipantProfileInput = {
@@ -106,6 +132,19 @@ export type CreateScreeningAttemptInput = {
   studyParticipantId: string;
 };
 
+export type CreateFieldEvidenceInput = {
+  extension: string;
+  mimeType: string;
+  originalFilename: string;
+  privateStorageKey: string;
+  relatedQuestionId: string | null;
+  screeningAttemptId: string;
+  sizeBytes: number;
+  storageBucket: string;
+  studyParticipantId: string;
+  type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION";
+};
+
 export type UpsertScreeningAnswerInput = {
   answerJson: unknown;
   questionId: string;
@@ -127,6 +166,7 @@ export type CompleteScreeningAttemptInput = {
 };
 
 export type FieldRepository = {
+  createEvidence: (input: CreateFieldEvidenceInput) => Promise<FieldParticipantEvidenceRecord>;
   createParticipantProfile: (input: CreateParticipantProfileInput) => Promise<FieldParticipantProfileRecord>;
   createScreeningAttempt: (input: CreateScreeningAttemptInput) => Promise<FieldScreeningAttemptRecord>;
   createStudyParticipant: (input: CreateStudyParticipantInput) => Promise<FieldStudyParticipantRecord>;
@@ -159,15 +199,25 @@ export type FieldRepository = {
     screeningStatus: FieldScreeningStatus;
     studyParticipantId: string;
   }) => Promise<void>;
+  upsertPendingReview: (input: {
+    screeningAttemptId: string;
+    studyParticipantId: string;
+  }) => Promise<void>;
   upsertAnswer: (input: UpsertScreeningAnswerInput) => Promise<FieldScreeningAnswerRecord>;
 };
 
 type FieldPrismaClient = PrismaClientLike & {
+  participantEvidence: {
+    create: (args: unknown) => Promise<FieldParticipantEvidenceRecord>;
+  };
   participantProfile: {
     create: (args: unknown) => Promise<FieldParticipantProfileRecord>;
     findMany: (args: unknown) => Promise<FieldParticipantProfileRecord[]>;
     findFirst: (args: unknown) => Promise<FieldParticipantProfileRecord | null>;
     findUnique: (args: unknown) => Promise<FieldParticipantProfileRecord | null>;
+  };
+  participantScreeningReview: {
+    upsert: (args: unknown) => Promise<unknown>;
   };
   screeningAnswer: {
     findMany: (args: unknown) => Promise<FieldScreeningAnswerRecord[]>;
@@ -235,6 +285,20 @@ const studyParticipantSelect = {
   studyId: true
 } as const;
 
+const evidenceSelect = {
+  extension: true,
+  id: true,
+  mimeType: true,
+  originalFilename: true,
+  privateStorageKey: true,
+  relatedQuestionId: true,
+  reviewStatus: true,
+  sizeBytes: true,
+  storageBucket: true,
+  type: true,
+  uploadedAt: true
+} as const;
+
 const attemptSelect = {
   completedAt: true,
   evaluationJson: true,
@@ -242,6 +306,16 @@ const attemptSelect = {
   id: true,
   nseClass: true,
   nseScore: true,
+  participantEvidence: {
+    orderBy: { uploadedAt: "asc" },
+    select: evidenceSelect
+  },
+  participantScreeningReview: {
+    select: {
+      rejectionReason: true,
+      status: true
+    }
+  },
   questionnaireVersion: {
     select: {
       ...screenerVersionSelect,
@@ -250,6 +324,13 @@ const attemptSelect = {
           code: true,
           id: true,
           name: true,
+          participantPortalConfig: {
+            select: {
+              maxImageBytes: true,
+              maxPerfumePhotos: true,
+              minPerfumePhotos: true
+            }
+          },
           status: true,
           timeZoneIana: true
         }
@@ -318,6 +399,25 @@ export function createFieldRepository(prismaClient?: FieldPrismaClient): FieldRe
   }
 
   return {
+    async createEvidence(input) {
+      const prisma = await getPrisma();
+
+      return prisma.participantEvidence.create({
+        data: {
+          extension: input.extension,
+          mimeType: input.mimeType,
+          originalFilename: input.originalFilename,
+          privateStorageKey: input.privateStorageKey,
+          relatedQuestionId: input.relatedQuestionId,
+          screeningAttemptId: input.screeningAttemptId,
+          sizeBytes: input.sizeBytes,
+          storageBucket: input.storageBucket,
+          studyParticipantId: input.studyParticipantId,
+          type: input.type
+        },
+        select: evidenceSelect
+      });
+    },
     async createParticipantProfile(input) {
       const prisma = await getPrisma();
 
@@ -512,6 +612,26 @@ export function createFieldRepository(prismaClient?: FieldPrismaClient): FieldRe
         },
         select: studyParticipantSelect,
         where: { id: input.studyParticipantId }
+      });
+    },
+    async upsertPendingReview(input) {
+      const prisma = await getPrisma();
+
+      await prisma.participantScreeningReview.upsert({
+        create: {
+          screeningAttemptId: input.screeningAttemptId,
+          status: "PENDING",
+          studyParticipantId: input.studyParticipantId
+        },
+        update: {
+          rejectionReason: null,
+          reviewedAt: null,
+          reviewedByUserId: null,
+          status: "PENDING"
+        },
+        where: {
+          screeningAttemptId: input.screeningAttemptId
+        }
       });
     },
     async upsertAnswer(input) {
