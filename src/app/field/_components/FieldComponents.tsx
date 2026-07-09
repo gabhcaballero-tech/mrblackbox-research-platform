@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { type FormEvent, useRef, useState } from "react";
 import type { ScreenerAnswer, ScreenerQuestion } from "@/modules/screener";
 import type { FieldStudySummary } from "@/modules/field/repository";
 import type { FieldAttemptScreen } from "@/modules/field/service";
@@ -46,6 +49,9 @@ export function FieldStudyCard({ study }: { study: FieldStudySummary }) {
 
 export function ScreeningQuestionForm({ error, screen }: ScreeningQuestionFormProps) {
   const question = screen.currentQuestion;
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   if (!question) {
     return (
@@ -59,8 +65,43 @@ export function ScreeningQuestionForm({ error, screen }: ScreeningQuestionFormPr
     );
   }
 
-  const previousQuestion = getPreviousVisibleQuestion(screen.visibleQuestions, question.id);
-  const answer = screen.answers[question.id];
+  const activeQuestion = question;
+  const previousQuestion = getPreviousVisibleQuestion(screen.visibleQuestions, activeQuestion.id);
+  const answer = screen.answers[activeQuestion.id];
+  const isLastVisibleQuestion = screen.progress.currentIndex >= screen.progress.totalVisibleQuestions;
+  const pendingLabel = isLastVisibleQuestion ? "Finalizando evaluación..." : "Guardando...";
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (isSubmittingRef.current) {
+      return;
+    }
+
+    const form = event.currentTarget;
+
+    if (!form.reportValidity()) {
+      return;
+    }
+
+    setSubmitError(null);
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+
+    try {
+      await saveFieldScreeningAnswerAction(screen.attempt.id, activeQuestion.id, new FormData(form));
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+    } catch (submissionError) {
+      if (isNextRedirectError(submissionError)) {
+        throw submissionError;
+      }
+
+      isSubmittingRef.current = false;
+      setSubmitError("No se pudo guardar la respuesta. Intenta nuevamente.");
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
@@ -75,13 +116,13 @@ export function ScreeningQuestionForm({ error, screen }: ScreeningQuestionFormPr
         <StatusBadge status="ready">{question.required ? "Obligatoria" : "Opcional"}</StatusBadge>
       </div>
 
-      {error ? (
+      {error || submitError ? (
         <p className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800" role="alert">
-          {error}
+          {submitError ?? error}
         </p>
       ) : null}
 
-      <form action={saveFieldScreeningAnswerAction.bind(null, screen.attempt.id, question.id)} className="space-y-5">
+      <form className="space-y-5" onSubmit={handleSubmit}>
         <QuestionControl answer={answer} question={question} />
         <div className="flex flex-wrap gap-3">
           {previousQuestion ? (
@@ -92,12 +133,21 @@ export function ScreeningQuestionForm({ error, screen }: ScreeningQuestionFormPr
               Volver
             </Link>
           ) : null}
-          <button className={primaryButtonClass} type="submit">
-            Guardar y continuar
+          <button className={primaryButtonClass} disabled={isSubmitting} type="submit">
+            {isSubmitting ? pendingLabel : "Guardar y continuar"}
           </button>
         </div>
       </form>
     </section>
+  );
+}
+
+function isNextRedirectError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "digest" in error &&
+    String((error as { digest?: unknown }).digest).startsWith("NEXT_REDIRECT")
   );
 }
 
@@ -330,6 +380,6 @@ const labelClass = "flex flex-col gap-1 text-sm font-medium text-zinc-700";
 const inputClass =
   "min-h-10 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-950 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100";
 const primaryButtonClass =
-  "inline-flex w-fit rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800";
+  "inline-flex w-fit rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300";
 const secondaryButtonClass =
   "inline-flex w-fit rounded-md border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50";

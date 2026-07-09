@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScreenerDefinition, ScreenerQuestion } from "@/modules/screener";
 import type { FieldAttemptScreen } from "@/modules/field/service";
 import type { FieldStudySummary } from "@/modules/field/repository";
+import { saveFieldScreeningAnswerAction } from "@/modules/field/actions";
 import {
   FieldStudyCard,
   ScreeningQuestionForm,
@@ -180,7 +181,34 @@ function singleChoiceQuestion() {
   };
 }
 
+function shortTextQuestion() {
+  return {
+    dataDestination: "SCREENING" as const,
+    id: "F10_ULTIMA_COMPRA",
+    order: 1,
+    required: true,
+    text: "Ultima compra",
+    type: "SHORT_TEXT" as const,
+    validation: {}
+  };
+}
+
+function finalQuestionScreen(): FieldAttemptScreen {
+  return {
+    ...screenFixture(shortTextQuestion()),
+    progress: {
+      answeredVisibleQuestions: 2,
+      currentIndex: 3,
+      totalVisibleQuestions: 3
+    }
+  };
+}
+
 describe("FieldComponents", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("renders active field study cards", () => {
     render(<FieldStudyCard study={study} />);
 
@@ -311,6 +339,55 @@ describe("FieldComponents", () => {
     expect(screen.getByText("Pregunta 1 de 3")).toBeInTheDocument();
     expect(screen.getByLabelText("Hombre")).toBeInTheDocument();
     expect(screen.getByLabelText("Mujer")).toBeInTheDocument();
+  });
+
+  it("shows Guardando... and disables the button while saving an intermediate field answer", () => {
+    vi.mocked(saveFieldScreeningAnswerAction).mockReturnValue(new Promise(() => {}));
+    render(<ScreeningQuestionForm screen={screenFixture(shortTextQuestion())} />);
+
+    fireEvent.change(screen.getByLabelText("Respuesta"), { target: { value: "hace 2 meses" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y continuar" }));
+
+    expect(screen.getByRole("button", { name: "Guardando..." })).toBeDisabled();
+    expect(saveFieldScreeningAnswerAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows Finalizando evaluación... on the last field question", () => {
+    vi.mocked(saveFieldScreeningAnswerAction).mockReturnValue(new Promise(() => {}));
+    render(<ScreeningQuestionForm screen={finalQuestionScreen()} />);
+
+    fireEvent.change(screen.getByLabelText("Respuesta"), { target: { value: "hace 2 meses" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y continuar" }));
+
+    expect(screen.getByRole("button", { name: "Finalizando evaluación..." })).toBeDisabled();
+  });
+
+  it("blocks double submit while the field answer is saving", () => {
+    vi.mocked(saveFieldScreeningAnswerAction).mockReturnValue(new Promise(() => {}));
+    render(<ScreeningQuestionForm screen={screenFixture(shortTextQuestion())} />);
+
+    fireEvent.change(screen.getByLabelText("Respuesta"), { target: { value: "hace 2 meses" } });
+    const button = screen.getByRole("button", { name: "Guardar y continuar" });
+
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(saveFieldScreeningAnswerAction).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Guardando..." })).toBeDisabled();
+  });
+
+  it("shows a clear error and re-enables the field button when saving fails", async () => {
+    vi.mocked(saveFieldScreeningAnswerAction).mockRejectedValueOnce(new Error("network"));
+    render(<ScreeningQuestionForm screen={screenFixture(shortTextQuestion())} />);
+
+    fireEvent.change(screen.getByLabelText("Respuesta"), { target: { value: "hace 2 meses" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y continuar" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("No se pudo guardar la respuesta. Intenta nuevamente.");
+    });
+
+    expect(screen.getByRole("button", { name: "Guardar y continuar" })).toBeEnabled();
   });
 
   it("renders integer, text and Other controls", () => {
