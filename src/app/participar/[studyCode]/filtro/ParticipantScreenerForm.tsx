@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { type FormEvent, useState } from "react";
 import type { ScreenerAnswer, ScreenerQuestion } from "@/modules/screener";
 import type {
   ParticipantPortalAttemptScreen,
@@ -12,7 +12,7 @@ import {
   NormalizedParticipantTextArea,
   NormalizedParticipantTextInput
 } from "../_components/NormalizedParticipantTextField";
-import { PendingSubmitButton } from "../_components/PendingSubmitButton";
+import { LoadingLabel } from "../_components/PendingSubmitButton";
 import { PortalEvidenceCapture } from "../_components/PortalEvidenceCapture";
 
 type ParticipantScreenerFormProps = {
@@ -23,6 +23,8 @@ type ParticipantScreenerFormProps = {
 export function ParticipantScreenerForm({ error, screen }: ParticipantScreenerFormProps) {
   const question = screen.currentQuestion;
   const [perfumePhotoCount, setPerfumePhotoCount] = useState(screen.evidence.perfumePhotos);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!question) {
     return (
@@ -36,11 +38,47 @@ export function ParticipantScreenerForm({ error, screen }: ParticipantScreenerFo
     );
   }
 
+  const activeQuestion = question;
   const answer = screen.answers[question.id];
   const isPerfumeQuestion = Boolean(screen.photoNotice);
   const hasMinimumPerfumePhotos = perfumePhotoCount >= screen.evidence.minPerfumePhotos;
   const canSubmit = !isPerfumeQuestion || hasMinimumPerfumePhotos;
   const isLastVisibleQuestion = screen.progress.currentIndex >= screen.progress.totalVisibleQuestions;
+  const pendingLabel = isLastVisibleQuestion ? "Finalizando evaluación..." : "Guardando...";
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!canSubmit || isSubmitting) {
+      return;
+    }
+
+    const form = event.currentTarget;
+
+    if (!form.reportValidity()) {
+      return;
+    }
+
+    setSubmitError(null);
+    setIsSubmitting(true);
+
+    try {
+      await saveParticipantPortalScreenerAnswerAction(
+        screen.study.code,
+        screen.attempt.id,
+        activeQuestion.id,
+        new FormData(form)
+      );
+      setIsSubmitting(false);
+    } catch (submissionError) {
+      if (isNextRedirectError(submissionError)) {
+        throw submissionError;
+      }
+
+      setSubmitError("No se pudo guardar la respuesta. Intenta nuevamente.");
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
@@ -52,20 +90,15 @@ export function ParticipantScreenerForm({ error, screen }: ParticipantScreenerFo
         {question.helpText ? <p className="mt-2 text-sm leading-6 text-zinc-600">{question.helpText}</p> : null}
       </div>
 
-      {error ? (
+      {error || submitError ? (
         <p className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800" role="alert">
-          {error}
+          {submitError ?? error}
         </p>
       ) : null}
 
       <form
-        action={saveParticipantPortalScreenerAnswerAction.bind(
-          null,
-          screen.study.code,
-          screen.attempt.id,
-          question.id
-        )}
         className="space-y-5"
+        onSubmit={handleSubmit}
       >
         <QuestionControl answer={answer} question={question} />
         {screen.photoNotice ? (
@@ -93,14 +126,24 @@ export function ParticipantScreenerForm({ error, screen }: ParticipantScreenerFo
             Debes registrar al menos {screen.evidence.minPerfumePhotos} foto de perfume antes de continuar.
           </p>
         ) : null}
-        <PendingSubmitButton
+        <button
           className={primaryButtonClass}
-          disabled={!canSubmit}
-          label="Guardar y continuar"
-          pendingLabel={isLastVisibleQuestion ? "Finalizando evaluación..." : "Guardando..."}
-        />
+          disabled={!canSubmit || isSubmitting}
+          type="submit"
+        >
+          {isSubmitting ? <LoadingLabel label={pendingLabel} /> : "Guardar y continuar"}
+        </button>
       </form>
     </section>
+  );
+}
+
+function isNextRedirectError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "digest" in error &&
+    String((error as { digest?: unknown }).digest).startsWith("NEXT_REDIRECT")
   );
 }
 

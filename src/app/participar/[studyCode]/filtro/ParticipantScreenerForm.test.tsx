@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScreenerDefinition } from "@/modules/screener";
 import type { ParticipantPortalAttemptScreen } from "@/modules/participant-portal/screener-service";
+import { saveParticipantPortalScreenerAnswerAction } from "@/modules/participant-portal/screener-actions";
 import {
   PARTICIPANT_PORTAL_PUBLIC_PENDING_REVIEW_MESSAGE,
   PARTICIPANT_PORTAL_PUBLIC_TERMINATED_MESSAGE
@@ -166,14 +167,90 @@ function screenData(overrides: Partial<ParticipantPortalAttemptScreen> = {}): Pa
 }
 
 describe("ParticipantScreenerForm", () => {
+  beforeEach(() => {
+    vi.mocked(saveParticipantPortalScreenerAnswerAction).mockReset();
+    vi.mocked(saveParticipantPortalScreenerAnswerAction).mockResolvedValue(undefined);
+  });
+
   it("wires the submit button with saving and finalizing feedback", () => {
     const source = readFileSync("src/app/participar/[studyCode]/filtro/ParticipantScreenerForm.tsx", "utf8");
     const pendingButtonSource = readFileSync("src/app/participar/[studyCode]/_components/PendingSubmitButton.tsx", "utf8");
 
-    expect(source).toContain('label="Guardar y continuar"');
+    expect(source).toContain('"Guardar y continuar"');
     expect(source).toContain('"Finalizando evaluación..."');
     expect(source).toContain('"Guardando..."');
     expect(pendingButtonSource).toContain("disabled={disabled || pending}");
+  });
+
+  it("shows saving feedback immediately while an intermediate answer is saved", async () => {
+    const pending = createDeferred<void>();
+    vi.mocked(saveParticipantPortalScreenerAnswerAction).mockReturnValueOnce(pending.promise);
+    render(<ParticipantScreenerForm screen={screenData()} />);
+
+    fireEvent.change(screen.getByLabelText("Respuesta"), { target: { value: "navigo homme azul" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y continuar" }));
+
+    expect(screen.getByRole("button", { name: "Guardando..." })).toBeDisabled();
+    expect(saveParticipantPortalScreenerAnswerAction).toHaveBeenCalledTimes(1);
+
+    pending.resolve(undefined);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Guardar y continuar" })).toBeEnabled();
+    });
+  });
+
+  it("shows finalizing feedback immediately while the last answer is saved", async () => {
+    const pending = createDeferred<void>();
+    vi.mocked(saveParticipantPortalScreenerAnswerAction).mockReturnValueOnce(pending.promise);
+    render(
+      <ParticipantScreenerForm
+        screen={screenData({
+          progress: {
+            answeredVisibleQuestions: 1,
+            currentIndex: 2,
+            totalVisibleQuestions: 2
+          }
+        })}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Respuesta"), { target: { value: "navigo homme azul" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y continuar" }));
+
+    expect(screen.getByRole("button", { name: "Finalizando evaluación..." })).toBeDisabled();
+    expect(saveParticipantPortalScreenerAnswerAction).toHaveBeenCalledTimes(1);
+
+    pending.resolve(undefined);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Guardar y continuar" })).toBeEnabled();
+    });
+  });
+
+  it("prevents double submit while an answer is being saved", () => {
+    const pending = createDeferred<void>();
+    vi.mocked(saveParticipantPortalScreenerAnswerAction).mockReturnValueOnce(pending.promise);
+    render(<ParticipantScreenerForm screen={screenData()} />);
+
+    fireEvent.change(screen.getByLabelText("Respuesta"), { target: { value: "navigo homme azul" } });
+    const button = screen.getByRole("button", { name: "Guardar y continuar" });
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(saveParticipantPortalScreenerAnswerAction).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Guardando..." })).toBeDisabled();
+  });
+
+  it("shows an error and re-enables the button when saving fails", async () => {
+    vi.mocked(saveParticipantPortalScreenerAnswerAction).mockRejectedValueOnce(new Error("server failed"));
+    render(<ParticipantScreenerForm screen={screenData()} />);
+
+    fireEvent.change(screen.getByLabelText("Respuesta"), { target: { value: "navigo homme azul" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y continuar" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo guardar la respuesta. Intenta nuevamente.");
+    expect(screen.getByRole("button", { name: "Guardar y continuar" })).toBeEnabled();
   });
 
   it("renders one visible question at a time", () => {
@@ -278,3 +355,14 @@ describe("ParticipantScreenerForm", () => {
     expect(screen.queryByRole("link", { name: "Continuar con selfie" })).not.toBeInTheDocument();
   });
 });
+
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+
+  return { promise, reject, resolve };
+}
