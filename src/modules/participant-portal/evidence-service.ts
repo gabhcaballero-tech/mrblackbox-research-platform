@@ -1,4 +1,4 @@
-import { PARTICIPANT_PORTAL_UNAVAILABLE_MESSAGE } from "./access";
+﻿import { PARTICIPANT_PORTAL_UNAVAILABLE_MESSAGE } from "./access";
 import {
   PARTICIPANT_PORTAL_PUBLIC_REJECTED_MESSAGE,
   PARTICIPANT_PORTAL_PUBLIC_TERMINATED_MESSAGE,
@@ -148,7 +148,7 @@ export async function getParticipantPortalEvidenceScreen({
   if (context.data.attempt.participantConfirmation) {
     return {
       code: "ATTEMPT_NOT_READY",
-      message: "Tu participación ya fue confirmada.",
+      message: "Tu participaciÃ³n ya fue confirmada.",
       ok: false
     };
   }
@@ -400,23 +400,13 @@ export async function getParticipantPortalEvidenceResult({
   }
 
   const { attempt, study } = context.data;
-
-  if (attempt.participantConfirmation) {
-    return {
-      data: {
-        confirmation: {
-          codes: attempt.participantConfirmation.referenceCodes,
-          folio: attempt.participantConfirmation.folio,
-          participantName: context.data.participantProfile.name
-        },
-        kind: "APPROVED",
-        message: "Conserva estos códigos. Te serán solicitados durante tu evaluación.",
-        showEvidenceLink: false,
-        study: publicStudy(study)
-      },
-      ok: true
-    };
-  }
+  const confirmation = attempt.participantConfirmation
+    ? {
+        codes: attempt.participantConfirmation.referenceCodes,
+        folio: attempt.participantConfirmation.folio,
+        participantName: context.data.participantProfile.name
+      }
+    : undefined;
 
   if (attempt.status === "TERMINATED" || attempt.participantScreeningReview?.status === "REJECTED") {
     const rejected = attempt.participantScreeningReview?.status === "REJECTED";
@@ -436,7 +426,7 @@ export async function getParticipantPortalEvidenceResult({
     return {
       data: {
         kind: "IN_PROGRESS",
-        message: "Continúa el filtro para completar tus respuestas.",
+        message: "Continua el filtro para completar tus respuestas.",
         showEvidenceLink: false,
         study: publicStudy(study)
       },
@@ -446,12 +436,20 @@ export async function getParticipantPortalEvidenceResult({
 
   if (!requiresParticipantEvidence(study.code)) {
     return {
-      data: {
-        kind: "COMPLETED",
-        message: PARTICIPANT_PORTAL_PUBLIC_FILTER_ONLY_PASSED_MESSAGE,
-        showEvidenceLink: false,
-        study: publicStudy(study)
-      },
+      data: confirmation
+        ? {
+            confirmation,
+            kind: "APPROVED",
+            message: "Conserva estos codigos. Te seran solicitados durante tu evaluacion.",
+            showEvidenceLink: false,
+            study: publicStudy(study)
+          }
+        : {
+            kind: "COMPLETED",
+            message: PARTICIPANT_PORTAL_PUBLIC_FILTER_ONLY_PASSED_MESSAGE,
+            showEvidenceLink: false,
+            study: publicStudy(study)
+          },
       ok: true
     };
   }
@@ -461,13 +459,38 @@ export async function getParticipantPortalEvidenceResult({
     evidence: attempt.participantEvidence
   }).ok;
 
+  if (!evidenceComplete) {
+    return {
+      data: {
+        confirmation,
+        kind: "PENDING_EVIDENCE",
+        message: PARTICIPANT_PORTAL_EVIDENCE_REQUIRED_MESSAGE,
+        showEvidenceLink: true,
+        study: publicStudy(study)
+      },
+      ok: true
+    };
+  }
+
+  if (confirmation && attempt.participantScreeningReview?.status === "APPROVED") {
+    return {
+      data: {
+        confirmation,
+        kind: "APPROVED",
+        message: "Conserva estos codigos. Te seran solicitados durante tu evaluacion.",
+        showEvidenceLink: false,
+        study: publicStudy(study)
+      },
+      ok: true
+    };
+  }
+
   return {
     data: {
-      kind: evidenceComplete ? "PENDING_REVIEW" : "PENDING_EVIDENCE",
-      message: evidenceComplete
-        ? PARTICIPANT_PORTAL_EVIDENCE_REVIEW_MESSAGE
-        : PARTICIPANT_PORTAL_EVIDENCE_REQUIRED_MESSAGE,
-      showEvidenceLink: !evidenceComplete,
+      confirmation,
+      kind: "PENDING_REVIEW",
+      message: PARTICIPANT_PORTAL_EVIDENCE_REVIEW_MESSAGE,
+      showEvidenceLink: false,
       study: publicStudy(study)
     },
     ok: true
@@ -777,7 +800,7 @@ export function validateEvidenceCounts({
 
   if (counts.selfie !== 1) {
     return {
-      message: "Debes subir exactamente una selfie de identificación.",
+      message: "Debes subir exactamente una selfie de identificaciÃ³n.",
       ok: false
     };
   }
@@ -791,7 +814,7 @@ export function validateEvidenceCounts({
 
   if (counts.perfumePhotos > config.maxPerfumePhotos) {
     return {
-      message: `Puedes subir máximo ${config.maxPerfumePhotos} fotos de perfumes.`,
+      message: `Puedes subir mÃ¡ximo ${config.maxPerfumePhotos} fotos de perfumes.`,
       ok: false
     };
   }
@@ -811,7 +834,7 @@ function assertCanAddEvidence(
   }
 
   if (evidenceType === "PERFUME_PHOTO" && counts.perfumePhotos >= config.maxPerfumePhotos) {
-    throw new Error(`Puedes subir máximo ${config.maxPerfumePhotos} fotos de perfumes.`);
+    throw new Error(`Puedes subir mÃ¡ximo ${config.maxPerfumePhotos} fotos de perfumes.`);
   }
 }
 

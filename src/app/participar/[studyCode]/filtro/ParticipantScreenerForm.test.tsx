@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ScreenerDefinition } from "@/modules/screener";
@@ -165,6 +166,16 @@ function screenData(overrides: Partial<ParticipantPortalAttemptScreen> = {}): Pa
 }
 
 describe("ParticipantScreenerForm", () => {
+  it("wires the submit button with saving and finalizing feedback", () => {
+    const source = readFileSync("src/app/participar/[studyCode]/filtro/ParticipantScreenerForm.tsx", "utf8");
+    const pendingButtonSource = readFileSync("src/app/participar/[studyCode]/_components/PendingSubmitButton.tsx", "utf8");
+
+    expect(source).toContain('label="Guardar y continuar"');
+    expect(source).toContain('"Finalizando evaluación..."');
+    expect(source).toContain('"Guardando..."');
+    expect(pendingButtonSource).toContain("disabled={disabled || pending}");
+  });
+
   it("renders one visible question at a time", () => {
     render(<ParticipantScreenerForm screen={screenData()} />);
 

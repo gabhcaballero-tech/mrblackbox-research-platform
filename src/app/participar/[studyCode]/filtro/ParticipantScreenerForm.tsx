@@ -40,6 +40,7 @@ export function ParticipantScreenerForm({ error, screen }: ParticipantScreenerFo
   const isPerfumeQuestion = Boolean(screen.photoNotice);
   const hasMinimumPerfumePhotos = perfumePhotoCount >= screen.evidence.minPerfumePhotos;
   const canSubmit = !isPerfumeQuestion || hasMinimumPerfumePhotos;
+  const isLastVisibleQuestion = screen.progress.currentIndex >= screen.progress.totalVisibleQuestions;
 
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
@@ -96,7 +97,7 @@ export function ParticipantScreenerForm({ error, screen }: ParticipantScreenerFo
           className={primaryButtonClass}
           disabled={!canSubmit}
           label="Guardar y continuar"
-          pendingLabel="Guardando..."
+          pendingLabel={isLastVisibleQuestion ? "Finalizando evaluación..." : "Guardando..."}
         />
       </form>
     </section>

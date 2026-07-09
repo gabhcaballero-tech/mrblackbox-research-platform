@@ -462,7 +462,11 @@ async function answer(
   questionId: string,
   value: string | string[],
   otherText = "",
-  studyCode = "FMASCULINA-NAVIGO-2026"
+  studyCode = "FMASCULINA-NAVIGO-2026",
+  options: {
+    sendWhatsApp?: boolean;
+    whatsappSender?: Parameters<typeof saveParticipantPortalScreenerAnswer>[0]["whatsappSender"];
+  } = {}
 ) {
   return saveParticipantPortalScreenerAnswer({
     attemptId,
@@ -470,7 +474,9 @@ async function answer(
     identity,
     questionId,
     repository,
-    studyCode
+    sendWhatsApp: options.sendWhatsApp,
+    studyCode,
+    whatsappSender: options.whatsappSender
   });
 }
 
@@ -834,7 +840,7 @@ describe("participant portal screener service", () => {
   });
 
   it("keeps a preliminary eligible result in PASSED until the final selfie is completed", async () => {
-    const { attempts, repository, reviews } = createMemoryRepository();
+    const { attempts, confirmations, repository, reviews } = createMemoryRepository();
     const attemptId = await start(repository);
 
     await answerEligible(repository, attemptId);
@@ -848,6 +854,17 @@ describe("participant portal screener service", () => {
       terminationReason: null
     });
     expect(reviews).toEqual([]);
+    expect(confirmations).toHaveLength(1);
+    expect(confirmations[0]).toMatchObject({
+      attemptId,
+      folio: "NAV-001",
+      referenceCodes: [
+        { code: "A7K4", slot: 1 },
+        { code: "M3P9", slot: 2 },
+        { code: "T8R2", slot: 3 }
+      ]
+    });
+    expect(attempts[0].participantConfirmation?.folio).toBe("NAV-001");
 
     const result = await getParticipantPortalPublicResult({
       identity,
@@ -857,6 +874,57 @@ describe("participant portal screener service", () => {
 
     expect(result.ok ? result.data.kind : "").toBe("PENDING_EVIDENCE");
     expect(result.ok ? result.data.message : "").toContain("Falta tu selfie");
+  });
+
+  it("sends Navigo WhatsApp only after creating folio and keeps confirmation if WhatsApp fails", async () => {
+    const { attempts, confirmations, repository } = createMemoryRepository();
+    const attemptId = await start(repository);
+    const whatsappSender = vi.fn(async () => ({
+      code: "SKIPPED" as const,
+      message: "WhatsApp rechazado en prueba.",
+      ok: false as const
+    }));
+
+    await answer(repository, attemptId, "CONSENTIMIENTO", "SI");
+    await answer(repository, attemptId, "F1_GENERO", "HOMBRE");
+    await answer(repository, attemptId, "F6_MARCAS_UTILIZA", "Uso varias fragancias.");
+    await answer(repository, attemptId, "F9_FRECUENCIA_SEMANAL", "MAS_DE_UNA_VEZ_DIA");
+    await answer(repository, attemptId, "F9A_VECES_AL_DIA", "3");
+
+    for (const questionId of ["D1", "D2", "D3", "D4", "D5"]) {
+      await answer(repository, attemptId, questionId, "HIGH");
+    }
+
+    const saved = await answer(repository, attemptId, "D6", "HIGH", "", "FMASCULINA-NAVIGO-2026", {
+      sendWhatsApp: true,
+      whatsappSender
+    });
+
+    expect(saved.ok).toBe(true);
+    expect(confirmations).toHaveLength(1);
+    expect(attempts[0].participantConfirmation?.folio).toBe("NAV-001");
+    expect(attempts[0].participantConfirmation?.referenceCodes).toHaveLength(3);
+    expect(whatsappSender).toHaveBeenCalledOnce();
+    expect(whatsappSender).toHaveBeenCalledWith(
+      expect.objectContaining({
+        codes: [
+          { code: "A7K4", slot: 1 },
+          { code: "M3P9", slot: 2 },
+          { code: "T8R2", slot: 3 }
+        ],
+        folio: "NAV-001",
+        participantName: "Persona Participante",
+        phone: "+525512345678"
+      })
+    );
+
+    const retry = await answer(repository, attemptId, "D6", "HIGH", "", "FMASCULINA-NAVIGO-2026", {
+      sendWhatsApp: true,
+      whatsappSender
+    });
+
+    expect(retry.ok).toBe(false);
+    expect(confirmations).toHaveLength(1);
   });
 
   it("creates folio and codes immediately for a filter-only passed attempt", async () => {
