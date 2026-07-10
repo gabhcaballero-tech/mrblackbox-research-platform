@@ -6,6 +6,7 @@ import { createFieldRepository } from "./repository";
 import {
   completeFieldEvidenceSubmission,
   confirmFieldEvidenceUpload,
+  getFieldScreeningReviewReadiness,
   requestFieldEvidenceUpload
 } from "./service";
 import {
@@ -81,7 +82,16 @@ export async function confirmFieldEvidenceUploadAction(
   }
 
   revalidatePath(`/field/screening/${attemptId}/selfie`);
+  revalidatePath(`/field/screening/${attemptId}`);
   revalidatePath(`/field/screening/${attemptId}/result`);
+
+  if (input.evidenceType === "SELFIE_IDENTIFICATION") {
+    await logFieldSelfieReviewFlow({
+      actor,
+      attemptId,
+      step: "after_confirm_selfie"
+    });
+  }
 
   return {
     data: {
@@ -111,6 +121,12 @@ export async function completeFieldEvidenceSubmissionAction(
       code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
       step: "complete_evidence_submission"
     });
+    await logFieldSelfieReviewFlow({
+      actor,
+      attemptId,
+      error: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+      step: "complete_submission_exception"
+    });
 
     return {
       message: "No fue posible enviar tu perfil a revisión. Intenta nuevamente.",
@@ -119,6 +135,13 @@ export async function completeFieldEvidenceSubmissionAction(
   }
 
   if (!result.ok) {
+    await logFieldSelfieReviewFlow({
+      actor,
+      attemptId,
+      error: result.message,
+      step: "complete_submission_not_ok"
+    });
+
     if (result.code === "EVIDENCE_INCOMPLETE") {
       const evidenceScreen = await getFieldEvidenceRedirect(attemptId);
 
@@ -136,7 +159,15 @@ export async function completeFieldEvidenceSubmissionAction(
   }
 
   revalidatePath(`/field/screening/${attemptId}/selfie`);
+  revalidatePath(`/field/screening/${attemptId}`);
   revalidatePath(`/field/screening/${attemptId}/result`);
+
+  await logFieldSelfieReviewFlow({
+    actor,
+    attemptId,
+    redirectTo: `/field/screening/${attemptId}/result`,
+    step: "after_complete_submission"
+  });
 
   return {
     data: {
@@ -144,6 +175,57 @@ export async function completeFieldEvidenceSubmissionAction(
     },
     ok: true
   };
+}
+
+async function logFieldSelfieReviewFlow({
+  actor,
+  attemptId,
+  error,
+  redirectTo,
+  step
+}: {
+  actor: Awaited<ReturnType<typeof getFieldActorForRequest>>;
+  attemptId: string;
+  error?: string;
+  redirectTo?: string;
+  step: string;
+}) {
+  try {
+    const readiness = await getFieldScreeningReviewReadiness({
+      actor,
+      attemptId,
+      repository: createFieldRepository()
+    });
+
+    console.info("[FIELD_SELFIE_REVIEW_FLOW]", {
+      attemptExists: readiness.attemptExists,
+      attemptId,
+      blockingReason: readiness.blockingReason,
+      error,
+      fieldUserId: readiness.fieldUserId,
+      hasConfirmation: readiness.hasConfirmation,
+      hasPendingReview: readiness.hasPendingReview,
+      hasRequiredPerfumePhotos: readiness.hasRequiredPerfumePhotos,
+      hasStudyParticipant: readiness.hasStudyParticipant,
+      isPublicFieldAttempt: readiness.isPublicFieldAttempt,
+      nextStep: readiness.nextStep,
+      perfumePhotoCount: readiness.perfumePhotoCount,
+      perfumePhotoRelatedQuestionIds: readiness.perfumePhotoRelatedQuestionIds,
+      redirectTo,
+      reviewStatus: readiness.reviewStatus,
+      selfieCount: readiness.selfieCount,
+      source: readiness.source,
+      status: readiness.status,
+      step,
+      studyParticipantId: readiness.studyParticipantId
+    });
+  } catch (logError) {
+    console.error("[FIELD_SELFIE_REVIEW_FLOW]", {
+      attemptId,
+      code: logError instanceof Error ? logError.name : "UNKNOWN_ERROR",
+      step: `${step}_log_failed`
+    });
+  }
 }
 
 async function getFieldEvidenceRedirect(attemptId: string): Promise<string | null> {

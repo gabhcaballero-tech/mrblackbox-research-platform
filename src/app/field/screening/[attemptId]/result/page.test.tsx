@@ -1,7 +1,13 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import ScreeningResultPage from "./page";
-import { getFieldScreeningAttemptScreen, PUBLIC_FIELD_ACTOR, type FieldAttemptScreen } from "@/modules/field/service";
+import {
+  getFieldScreeningAttemptScreen,
+  getFieldScreeningReviewReadiness,
+  PUBLIC_FIELD_ACTOR,
+  type FieldAttemptScreen,
+  type FieldScreeningReviewReadiness
+} from "@/modules/field/service";
 import type { FieldParticipantEvidenceRecord } from "@/modules/field/repository";
 
 vi.mock("next/navigation", () => ({
@@ -26,7 +32,8 @@ vi.mock("@/modules/field/service", async (importOriginal) => {
     getFieldScreeningAttemptScreen: vi.fn(async () => ({
       data: fieldScreen(),
       ok: true
-    }))
+    })),
+    getFieldScreeningReviewReadiness: vi.fn(async () => readinessFixture({ nextStep: "PERFUME_PHOTOS" }))
   };
 });
 
@@ -47,12 +54,14 @@ describe("Field screening result page", () => {
   });
 
   it("shows a clear selfie CTA after F6 perfume photos are complete", async () => {
-    vi.mocked(getFieldScreeningAttemptScreen).mockResolvedValueOnce({
-      data: fieldScreen({
-        participantEvidence: [evidenceRecord("evidence-1", "PERFUME_PHOTO")]
-      }),
-      ok: true
-    });
+    vi.mocked(getFieldScreeningReviewReadiness).mockResolvedValueOnce(
+      readinessFixture({
+        hasRequiredPerfumePhotos: true,
+        nextStep: "SELFIE",
+        perfumePhotoCount: 1,
+        perfumePhotoRelatedQuestionIds: ["F6_MARCAS_UTILIZA"]
+      })
+    );
 
     render(
       await ScreeningResultPage({
@@ -69,19 +78,18 @@ describe("Field screening result page", () => {
   });
 
   it("shows profile review after selfie and perfume photos are complete instead of the generic field error", async () => {
-    vi.mocked(getFieldScreeningAttemptScreen).mockResolvedValueOnce({
-      data: fieldScreen({
-        participantEvidence: [
-          evidenceRecord("evidence-1", "SELFIE_IDENTIFICATION"),
-          evidenceRecord("evidence-2", "PERFUME_PHOTO")
-        ],
-        participantScreeningReview: {
-          rejectionReason: null,
-          status: "PENDING"
-        }
-      }),
-      ok: true
-    });
+    vi.mocked(getFieldScreeningReviewReadiness).mockResolvedValueOnce(
+      readinessFixture({
+        hasPendingReview: true,
+        hasRequiredPerfumePhotos: true,
+        nextStep: "PENDING_REVIEW",
+        perfumePhotoCount: 1,
+        perfumePhotoRelatedQuestionIds: ["F6_MARCAS_UTILIZA"],
+        reviewStatus: "PENDING",
+        selfieCount: 1,
+        status: "PENDING_REVIEW"
+      })
+    );
 
     render(
       await ScreeningResultPage({
@@ -95,21 +103,19 @@ describe("Field screening result page", () => {
     expect(screen.queryByText("Campo no disponible")).not.toBeInTheDocument();
   });
 
-  it("shows profile review when the attempt status is already PENDING_REVIEW", async () => {
-    vi.mocked(getFieldScreeningAttemptScreen).mockResolvedValueOnce({
-      data: fieldScreen({
-        participantEvidence: [
-          evidenceRecord("evidence-1", "SELFIE_IDENTIFICATION"),
-          evidenceRecord("evidence-2", "PERFUME_PHOTO")
-        ],
-        participantScreeningReview: {
-          rejectionReason: null,
-          status: "PENDING"
-        },
-        status: "PENDING_REVIEW"
-      }),
-      ok: true
-    });
+  it("shows profile review for legacy PASSED attempts that already have pending review", async () => {
+    vi.mocked(getFieldScreeningReviewReadiness).mockResolvedValueOnce(
+      readinessFixture({
+        hasPendingReview: true,
+        hasRequiredPerfumePhotos: true,
+        nextStep: "PENDING_REVIEW",
+        perfumePhotoCount: 1,
+        perfumePhotoRelatedQuestionIds: ["F6_MARCAS_UTILIZA"],
+        reviewStatus: "PENDING",
+        selfieCount: 1,
+        status: "PASSED"
+      })
+    );
 
     render(
       await ScreeningResultPage({
@@ -122,6 +128,11 @@ describe("Field screening result page", () => {
   });
 
   it("shows a clear result message instead of the generic field error when the screen cannot be loaded", async () => {
+    vi.mocked(getFieldScreeningReviewReadiness).mockResolvedValueOnce(
+      readinessFixture({
+        nextStep: "RESULT"
+      })
+    );
     vi.mocked(getFieldScreeningAttemptScreen).mockResolvedValueOnce({
       code: "STUDY_NOT_AVAILABLE",
       message: "El cuestionario no está disponible.",
@@ -140,22 +151,26 @@ describe("Field screening result page", () => {
   });
 });
 
-function evidenceRecord(
-  id: string,
-  type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION"
-): FieldParticipantEvidenceRecord {
+function readinessFixture(
+  overrides: Partial<FieldScreeningReviewReadiness> = {}
+): FieldScreeningReviewReadiness {
   return {
-    extension: "jpg",
-    id,
-    mimeType: "image/jpeg",
-    originalFilename: `${id}.jpg`,
-    privateStorageKey: `private/${id}.jpg`,
-    relatedQuestionId: type === "PERFUME_PHOTO" ? "F6_MARCAS_UTILIZA" : null,
-    reviewStatus: "PENDING",
-    sizeBytes: 1200,
-    storageBucket: "participant-evidence",
-    type,
-    uploadedAt: new Date("2026-06-23T10:15:00Z")
+    attemptExists: true,
+    fieldUserId: null,
+    hasConfirmation: true,
+    hasPendingReview: false,
+    hasRequiredPerfumePhotos: false,
+    hasStudyParticipant: true,
+    isPublicFieldAttempt: true,
+    nextStep: "PERFUME_PHOTOS",
+    perfumePhotoCount: 0,
+    perfumePhotoRelatedQuestionIds: [],
+    reviewStatus: null,
+    selfieCount: 0,
+    source: "FIELD",
+    status: "PASSED",
+    studyParticipantId: "sp-1",
+    ...overrides
   };
 }
 

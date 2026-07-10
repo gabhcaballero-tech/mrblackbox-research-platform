@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import type React from "react";
 import { getFieldActorForRequest } from "@/modules/field/auth";
 import {
-  fieldAttemptHasFinalSelfie,
-  fieldAttemptHasRequiredPerfumePhotos,
-  fieldAttemptRequiresFinalSelfie,
-  isPublicFieldActor
+  getFieldScreeningReviewReadiness,
+  isPublicFieldActor,
+  type FieldAttemptScreen
 } from "@/modules/field/service";
 import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
@@ -25,10 +25,55 @@ type ScreeningResultPageProps = {
 export default async function ScreeningResultPage({ params }: ScreeningResultPageProps) {
   const { attemptId } = await params;
   const actor = await getFieldActorForRequest();
+  const repository = createFieldRepository();
+  const readiness = await getFieldScreeningReviewReadiness({
+    actor,
+    attemptId,
+    repository
+  });
+
+  logFieldResultReadiness(attemptId, readiness);
+
+  if (!readiness.attemptExists || readiness.blockingReason === "attempt_not_available_for_actor") {
+    notFound();
+  }
+
+  if (readiness.nextStep === "PERFUME_PHOTOS") {
+    return renderFieldResultContent({
+      actor,
+      content: <FieldPendingPerfumePhotosCard attemptId={attemptId} />,
+      readiness
+    });
+  }
+
+  if (readiness.nextStep === "SELFIE") {
+    return renderFieldResultContent({
+      actor,
+      content: <FieldPendingSelfieCard attemptId={attemptId} />,
+      readiness
+    });
+  }
+
+  if (readiness.nextStep === "PENDING_REVIEW") {
+    return renderFieldResultContent({
+      actor,
+      content: <FieldPendingReviewCard />,
+      readiness
+    });
+  }
+
+  if (readiness.nextStep === "ERROR") {
+    return renderFieldResultContent({
+      actor,
+      content: <FieldResultMessage title="El cuestionario no está disponible." />,
+      readiness
+    });
+  }
+
   const result = await getFieldScreeningAttemptScreen({
     actor,
     attemptId,
-    repository: createFieldRepository()
+    repository
   });
 
   if (!result.ok) {
@@ -36,47 +81,54 @@ export default async function ScreeningResultPage({ params }: ScreeningResultPag
       notFound();
     }
 
-    const fallback = <FieldResultMessage title={result.message} />;
-
-    if (isPublicFieldActor(actor)) {
-      return <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">{fallback}</main>;
-    }
-
-    return <AppShell>{fallback}</AppShell>;
+    return renderFieldResultContent({
+      actor,
+      content: <FieldResultMessage title={result.message} />,
+      readiness
+    });
   }
 
-  const screen = result.data;
-  const requiresFinalEvidence = fieldAttemptRequiresFinalSelfie(screen.attempt);
-  const needsPerfumePhotos = requiresFinalEvidence && !fieldAttemptHasRequiredPerfumePhotos(screen.attempt);
-  const needsSelfie = requiresFinalEvidence && !needsPerfumePhotos && !fieldAttemptHasFinalSelfie(screen.attempt);
-  const pendingReview = screen.attempt.participantScreeningReview?.status === "PENDING";
+  return renderFieldResultContent({
+    actor,
+    content: <ScreeningResultCard screen={result.data} />,
+    readiness,
+    screen: result.data
+  });
+}
 
-  const content = (
+function renderFieldResultContent({
+  actor,
+  content,
+  readiness,
+  screen
+}: {
+  actor: Awaited<ReturnType<typeof getFieldActorForRequest>>;
+  content: React.ReactNode;
+  readiness: Awaited<ReturnType<typeof getFieldScreeningReviewReadiness>>;
+  screen?: FieldAttemptScreen;
+}) {
+  const title = screen?.attempt.questionnaireVersion.study.name ?? "Resultado del filtro";
+  const participantName = screen?.attempt.studyParticipant.participantProfile.name;
+  const description = participantName ? `Participante: ${participantName}` : "Participante registrado";
+
+  const pageContent = (
     <>
       <PageHeader
-        actions={<StatusBadge status="ready">{fieldAttemptStatusLabel(screen.attempt.status)}</StatusBadge>}
-        description={`Participante: ${screen.attempt.studyParticipant.participantProfile.name}`}
+        actions={<StatusBadge status="ready">{fieldAttemptStatusLabel(readiness.status ?? "STARTED")}</StatusBadge>}
+        description={description}
         eyebrow="Campo"
-        title={screen.attempt.questionnaireVersion.study.name}
+        title={title}
       />
 
-      {needsPerfumePhotos ? (
-        <FieldPendingPerfumePhotosCard attemptId={attemptId} />
-      ) : needsSelfie ? (
-        <FieldPendingSelfieCard attemptId={attemptId} />
-      ) : pendingReview ? (
-        <FieldPendingReviewCard />
-      ) : (
-        <ScreeningResultCard screen={screen} />
-      )}
+      {content}
     </>
   );
 
   if (isPublicFieldActor(actor)) {
-    return <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">{content}</main>;
+    return <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">{pageContent}</main>;
   }
 
-  return <AppShell>{content}</AppShell>;
+  return <AppShell>{pageContent}</AppShell>;
 }
 
 function FieldResultMessage({ title }: { title: string }) {
@@ -131,6 +183,33 @@ function FieldPendingReviewCard() {
       </p>
     </section>
   );
+}
+
+function logFieldResultReadiness(
+  attemptId: string,
+  readiness: Awaited<ReturnType<typeof getFieldScreeningReviewReadiness>>
+) {
+  console.info("[FIELD_SELFIE_REVIEW_FLOW]", {
+    attemptExists: readiness.attemptExists,
+    attemptId,
+    blockingReason: readiness.blockingReason,
+    fieldUserId: readiness.fieldUserId,
+    hasConfirmation: readiness.hasConfirmation,
+    hasPendingReview: readiness.hasPendingReview,
+    hasRequiredPerfumePhotos: readiness.hasRequiredPerfumePhotos,
+    hasStudyParticipant: readiness.hasStudyParticipant,
+    isPublicFieldAttempt: readiness.isPublicFieldAttempt,
+    nextStep: readiness.nextStep,
+    perfumePhotoCount: readiness.perfumePhotoCount,
+    perfumePhotoRelatedQuestionIds: readiness.perfumePhotoRelatedQuestionIds,
+    redirectTo: `/field/screening/${attemptId}/result`,
+    reviewStatus: readiness.reviewStatus,
+    selfieCount: readiness.selfieCount,
+    source: readiness.source,
+    status: readiness.status,
+    step: "result_page_readiness",
+    studyParticipantId: readiness.studyParticipantId
+  });
 }
 
 const primaryButtonClass =

@@ -70,6 +70,10 @@ export type FieldScreeningAttemptRecord = {
     rejectionReason: string | null;
     status: "APPROVED" | "PENDING" | "REJECTED";
   } | null;
+  participantConfirmation?: {
+    folio: string;
+    referenceCodes: Array<{ code: string; slot: number }>;
+  } | null;
   questionnaireVersion: FieldScreenerVersionSummary & {
     study: {
       code: string;
@@ -314,6 +318,18 @@ const attemptSelect = {
     select: {
       rejectionReason: true,
       status: true
+    }
+  },
+  participantConfirmation: {
+    select: {
+      folio: true,
+      referenceCodes: {
+        orderBy: { slot: "asc" },
+        select: {
+          code: true,
+          slot: true
+        }
+      }
     }
   },
   questionnaireVersion: {

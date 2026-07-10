@@ -4,6 +4,7 @@ import type { InternalUserRole } from "@/shared/auth/permissions";
 import {
   getFieldScreeningAttemptScreen,
   getFieldEvidenceScreen,
+  getFieldScreeningReviewReadiness,
   getFieldSelfieScreen,
   confirmFieldEvidenceUpload,
   completeFieldEvidenceSubmission,
@@ -893,6 +894,109 @@ describe("field service", () => {
       status: "PENDING"
     });
     expect(completedAttempt?.status).toBe("PENDING_REVIEW");
+  });
+
+  it("reports review readiness after selfie with F6 photos is complete", async () => {
+    const repository = createMemoryRepository();
+    const attemptId = await startAttempt(repository, PUBLIC_FIELD_ACTOR);
+
+    await answerEligibleBase(repository, attemptId, "HIGH", PUBLIC_FIELD_ACTOR);
+    await confirmFieldEvidenceUpload({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      input: {
+        evidenceType: "SELFIE_IDENTIFICATION",
+        mimeType: "image/jpeg",
+        originalFilename: "selfie.jpg",
+        privateStorageKey: `studies/${studyId}/participants/profile-1/screening-attempts/${attemptId}/selfie_identification/selfie.jpg`,
+        sizeBytes: 1200,
+        storageBucket: "participant-evidence"
+      },
+      repository
+    });
+    await completeFieldEvidenceSubmission({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      repository
+    });
+
+    const readiness = await getFieldScreeningReviewReadiness({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      repository
+    });
+
+    expect(readiness).toMatchObject({
+      attemptExists: true,
+      fieldUserId: null,
+      hasPendingReview: true,
+      hasRequiredPerfumePhotos: true,
+      isPublicFieldAttempt: true,
+      nextStep: "PENDING_REVIEW",
+      perfumePhotoCount: 1,
+      reviewStatus: "PENDING",
+      selfieCount: 1,
+      source: "FIELD",
+      status: "PENDING_REVIEW"
+    });
+    expect(readiness.perfumePhotoRelatedQuestionIds).toEqual(["F6_MARCAS_UTILIZA"]);
+  });
+
+  it("reports selfie and perfume photo CTAs without throwing generic field errors", async () => {
+    const selfieRepository = createMemoryRepository();
+    const selfieAttempt = await startAttempt(selfieRepository, PUBLIC_FIELD_ACTOR);
+    await answerEligibleBase(selfieRepository, selfieAttempt, "HIGH", PUBLIC_FIELD_ACTOR);
+    const selfieReadiness = await getFieldScreeningReviewReadiness({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId: selfieAttempt,
+      repository: selfieRepository
+    });
+
+    const perfumeRepository = createMemoryRepository();
+    const perfumeAttempt = await startAttempt(perfumeRepository, PUBLIC_FIELD_ACTOR);
+    await answerEligibleBase(perfumeRepository, perfumeAttempt, "HIGH", PUBLIC_FIELD_ACTOR);
+    const perfumeAttemptRecord = await perfumeRepository.getAttempt(perfumeAttempt);
+    if (perfumeAttemptRecord) {
+      perfumeAttemptRecord.participantEvidence = perfumeAttemptRecord.participantEvidence.filter(
+        (item) => item.type !== "PERFUME_PHOTO"
+      );
+    }
+    const perfumeReadiness = await getFieldScreeningReviewReadiness({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId: perfumeAttempt,
+      repository: perfumeRepository
+    });
+
+    expect(selfieReadiness).toMatchObject({
+      blockingReason: "missing_required_selfie",
+      nextStep: "SELFIE",
+      perfumePhotoCount: 1,
+      selfieCount: 0
+    });
+    expect(perfumeReadiness).toMatchObject({
+      blockingReason: "missing_required_perfume_photos",
+      nextStep: "PERFUME_PHOTOS",
+      perfumePhotoCount: 0
+    });
+  });
+
+  it("does not expose internal field attempts through review readiness to public visitors", async () => {
+    const repository = createMemoryRepository();
+    const attemptId = await startAttempt(repository, interviewer);
+    await answerEligibleBase(repository, attemptId);
+
+    const readiness = await getFieldScreeningReviewReadiness({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      repository
+    });
+
+    expect(readiness).toMatchObject({
+      attemptExists: true,
+      blockingReason: "attempt_not_available_for_actor",
+      isPublicFieldAttempt: false,
+      nextStep: "ERROR"
+    });
   });
 
   it("exposes perfume evidence state and blocks adding more than five perfume photos", async () => {

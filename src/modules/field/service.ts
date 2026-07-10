@@ -181,6 +181,25 @@ export type FieldEvidenceUploadConfirmation = {
   counts: FieldEvidenceCounts;
 };
 
+export type FieldScreeningReviewReadiness = {
+  attemptExists: boolean;
+  blockingReason?: string;
+  fieldUserId: string | null;
+  hasConfirmation: boolean;
+  hasPendingReview: boolean;
+  hasRequiredPerfumePhotos: boolean;
+  hasStudyParticipant: boolean;
+  isPublicFieldAttempt: boolean;
+  nextStep: "SELFIE" | "PERFUME_PHOTOS" | "PENDING_REVIEW" | "RESULT" | "ERROR";
+  perfumePhotoCount: number;
+  perfumePhotoRelatedQuestionIds: Array<string | null>;
+  reviewStatus: "APPROVED" | "PENDING" | "REJECTED" | null;
+  selfieCount: number;
+  source: FieldScreeningAttemptRecord["source"] | null;
+  status: FieldScreeningAttemptRecord["status"] | null;
+  studyParticipantId: string | null;
+};
+
 type FieldStartConfirmation = {
   allowOpenAttemptOverride?: boolean;
   participantProfileId?: string;
@@ -211,6 +230,26 @@ function unauthorizedResult<T>(): FieldServiceResult<T> {
     code: "UNAUTHORIZED",
     message: "No tienes permiso para aplicar filtros de campo.",
     ok: false
+  };
+}
+
+function emptyReviewReadiness(): FieldScreeningReviewReadiness {
+  return {
+    attemptExists: false,
+    fieldUserId: null,
+    hasConfirmation: false,
+    hasPendingReview: false,
+    hasRequiredPerfumePhotos: false,
+    hasStudyParticipant: false,
+    isPublicFieldAttempt: false,
+    nextStep: "ERROR",
+    perfumePhotoCount: 0,
+    perfumePhotoRelatedQuestionIds: [],
+    reviewStatus: null,
+    selfieCount: 0,
+    source: null,
+    status: null,
+    studyParticipantId: null
   };
 }
 
@@ -424,6 +463,86 @@ export async function getFieldScreeningAttemptScreen({
   return {
     data: buildAttemptScreen(loaded.data.attempt, loaded.data.definition, loaded.data.answers, questionId),
     ok: true
+  };
+}
+
+export async function getFieldScreeningReviewReadiness({
+  actor,
+  attemptId,
+  repository
+}: {
+  actor: FieldActor | null;
+  attemptId: string;
+  repository: FieldRepository;
+}): Promise<FieldScreeningReviewReadiness> {
+  const fallback = emptyReviewReadiness();
+
+  if (!isFieldActor(actor)) {
+    return {
+      ...fallback,
+      blockingReason: "unauthorized",
+      nextStep: "ERROR"
+    };
+  }
+
+  const attempt = await repository.getAttempt(attemptId);
+
+  if (!attempt) {
+    return {
+      ...fallback,
+      blockingReason: "attempt_not_found",
+      nextStep: "ERROR"
+    };
+  }
+
+  const counts = countFieldEvidence(attempt.participantEvidence);
+  const behavior = getStudyBehavior(attempt.questionnaireVersion.study.code);
+  const hasRequiredPerfumePhotos =
+    !behavior.requiresPerfumeEvidence || fieldAttemptHasRequiredPerfumePhotos(attempt);
+  const hasRequiredSelfie = !behavior.requiresFinalSelfie || counts.selfie === 1;
+  const canRead = canReadAttempt(actor, attempt);
+  const hasPendingReview = attempt.participantScreeningReview?.status === "PENDING";
+  const reviewStatus = attempt.participantScreeningReview?.status ?? null;
+  let nextStep: FieldScreeningReviewReadiness["nextStep"] = "RESULT";
+  let blockingReason: string | undefined;
+
+  if (!canRead) {
+    nextStep = "ERROR";
+    blockingReason = "attempt_not_available_for_actor";
+  } else if (attempt.status === "TERMINATED") {
+    nextStep = "RESULT";
+  } else if (!hasRequiredPerfumePhotos) {
+    nextStep = "PERFUME_PHOTOS";
+    blockingReason = "missing_required_perfume_photos";
+  } else if (!hasRequiredSelfie) {
+    nextStep = "SELFIE";
+    blockingReason = "missing_required_selfie";
+  } else if (hasPendingReview || attempt.status === "PENDING_REVIEW") {
+    nextStep = "PENDING_REVIEW";
+  } else if (attempt.status === "PASSED" && behavior.requiresFinalSelfie) {
+    nextStep = "PENDING_REVIEW";
+    blockingReason = "review_not_found_after_complete_evidence";
+  }
+
+  return {
+    attemptExists: true,
+    blockingReason,
+    fieldUserId: attempt.fieldUserId,
+    hasConfirmation: Boolean(attempt.participantConfirmation),
+    hasPendingReview,
+    hasRequiredPerfumePhotos,
+    hasStudyParticipant: Boolean(attempt.studyParticipantId),
+    isPublicFieldAttempt: attempt.source === "FIELD" && attempt.fieldUserId === null,
+    nextStep,
+    perfumePhotoCount: counts.perfumePhotos,
+    perfumePhotoRelatedQuestionIds: attempt.participantEvidence
+      .filter((item) => item.type === "PERFUME_PHOTO")
+      .map((item) => item.relatedQuestionId),
+    reviewStatus,
+    selfieCount: counts.selfie,
+    source: attempt.source,
+    status: attempt.status,
+    studyParticipantId: attempt.studyParticipantId
   };
 }
 
