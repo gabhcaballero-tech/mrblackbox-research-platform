@@ -74,7 +74,16 @@ function screenerDefinition(): ScreenerDefinition {
         type: "INTEGER",
         validation: { max: 120, min: 0 }
       },
-      choiceQuestion("F9_FRECUENCIA_SEMANAL", 4, "Frecuencia semanal", [
+      {
+        dataDestination: "SCREENING",
+        id: "F6_MARCAS_UTILIZA",
+        order: 4,
+        required: true,
+        text: "¿Qué marcas de perfume utiliza?",
+        type: "LONG_TEXT",
+        validation: {}
+      },
+      choiceQuestion("F9_FRECUENCIA_SEMANAL", 5, "Frecuencia semanal", [
         option("UN_DIA", "Un día", "TERMINATE", "FRECUENCIA_INSUFICIENTE", "Frecuencia insuficiente."),
         option("DOS_DIAS", "Dos días", "TERMINATE", "FRECUENCIA_INSUFICIENTE", "Frecuencia insuficiente."),
         option("MAS_DE_UNA_VEZ_DIA", "Más de una vez al día")
@@ -82,7 +91,7 @@ function screenerDefinition(): ScreenerDefinition {
       {
         dataDestination: "SCREENING",
         id: "F9A_VECES_AL_DIA",
-        order: 5,
+        order: 6,
         required: true,
         text: "Veces al día",
         type: "INTEGER",
@@ -94,7 +103,7 @@ function screenerDefinition(): ScreenerDefinition {
         }
       },
       ...["D1", "D2", "D3", "D4", "D5", "D6"].map((id, index) =>
-        choiceQuestion(id, 6 + index, `Pregunta NSE ${index + 1}`, [
+        choiceQuestion(id, 7 + index, `Pregunta NSE ${index + 1}`, [
           option("HIGH", "Alto"),
           option("LOW", "Bajo")
         ])
@@ -112,7 +121,7 @@ function screenerDefinition(): ScreenerDefinition {
             value: "OTRA"
           }
         ],
-        order: 12,
+        order: 13,
         required: false,
         text: "Otra opción",
         type: "SINGLE_CHOICE",
@@ -406,6 +415,27 @@ async function answer(
   });
 }
 
+async function addPerfumePhoto(
+  repository: FieldRepository,
+  attemptId: string,
+  currentActor = interviewer,
+  index = 1
+) {
+  return confirmFieldEvidenceUpload({
+    actor: currentActor,
+    attemptId,
+    input: {
+      evidenceType: "PERFUME_PHOTO",
+      mimeType: "image/jpeg",
+      originalFilename: `perfume-${index}.jpg`,
+      privateStorageKey: `studies/${studyId}/participants/profile-1/screening-attempts/${attemptId}/perfume_photo/perfume-${index}.jpg`,
+      sizeBytes: 1200,
+      storageBucket: "participant-evidence"
+    },
+    repository
+  });
+}
+
 async function answerEligibleBase(
   repository: FieldRepository,
   attemptId: string,
@@ -415,6 +445,8 @@ async function answerEligibleBase(
   await answer(repository, attemptId, "CONSENTIMIENTO", "SI", currentActor);
   await answer(repository, attemptId, "F1_GENERO", "HOMBRE", currentActor);
   await answer(repository, attemptId, "F2_EDAD", "25", currentActor);
+  await addPerfumePhoto(repository, attemptId, currentActor);
+  await answer(repository, attemptId, "F6_MARCAS_UTILIZA", "NAVIGO HOMME AZUL", currentActor);
   await answer(repository, attemptId, "F9_FRECUENCIA_SEMANAL", "MAS_DE_UNA_VEZ_DIA", currentActor);
   await answer(repository, attemptId, "F9A_VECES_AL_DIA", "3", currentActor);
 
@@ -730,7 +762,33 @@ describe("field service", () => {
     });
   });
 
-  it("requires selfie and perfume photos before sending a public passed attempt to review", async () => {
+  it("blocks F6 until at least one perfume photo is registered", async () => {
+    const repository = createMemoryRepository();
+    const attemptId = await startAttempt(repository, PUBLIC_FIELD_ACTOR);
+
+    await answer(repository, attemptId, "CONSENTIMIENTO", "SI", PUBLIC_FIELD_ACTOR);
+    await answer(repository, attemptId, "F1_GENERO", "HOMBRE", PUBLIC_FIELD_ACTOR);
+    await answer(repository, attemptId, "F2_EDAD", "25", PUBLIC_FIELD_ACTOR);
+
+    const withoutPhoto = await answer(repository, attemptId, "F6_MARCAS_UTILIZA", "NAVIGO HOMME", PUBLIC_FIELD_ACTOR);
+    await addPerfumePhoto(repository, attemptId, PUBLIC_FIELD_ACTOR);
+    const withPhoto = await answer(repository, attemptId, "F6_MARCAS_UTILIZA", "NAVIGO HOMME", PUBLIC_FIELD_ACTOR);
+
+    expect(withoutPhoto).toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Debes registrar al menos 1 foto de perfume antes de continuar.",
+      ok: false
+    });
+    expect(withPhoto).toMatchObject({
+      data: {
+        closed: false,
+        nextQuestionId: "F9_FRECUENCIA_SEMANAL"
+      },
+      ok: true
+    });
+  });
+
+  it("sends a public passed attempt to review after F6 photos and selfie are complete", async () => {
     const repository = createMemoryRepository();
     const started = await startFieldScreeningAttempt({
       actor: PUBLIC_FIELD_ACTOR,
@@ -782,41 +840,9 @@ describe("field service", () => {
       },
       ok: true
     });
-    expect(completed).toMatchObject({
-      code: "EVIDENCE_INCOMPLETE",
-      message: "Captura entre 1 y 5 fotos de perfumes.",
-      ok: false
-    });
-
-    const perfume = await confirmFieldEvidenceUpload({
-      actor: PUBLIC_FIELD_ACTOR,
-      attemptId,
-      input: {
-        evidenceType: "PERFUME_PHOTO",
-        mimeType: "image/jpeg",
-        originalFilename: "perfume.jpg",
-        privateStorageKey: `studies/${studyId}/participants/profile-1/screening-attempts/${attemptId}/perfume_photo/perfume.jpg`,
-        sizeBytes: 1200,
-        storageBucket: "participant-evidence"
-      },
-      repository
-    });
-    const completedWithPerfume = await completeFieldEvidenceSubmission({
-      actor: PUBLIC_FIELD_ACTOR,
-      attemptId,
-      repository
-    });
     const completedAttempt = await repository.getAttempt(attemptId);
 
-    expect(perfume).toMatchObject({
-      data: {
-        counts: {
-          perfumePhotos: 1
-        }
-      },
-      ok: true
-    });
-    expect(completedWithPerfume).toMatchObject({
+    expect(completed).toMatchObject({
       data: {
         selfieComplete: true
       },
@@ -840,20 +866,8 @@ describe("field service", () => {
 
     await answerEligibleBase(repository, attemptId, "HIGH", PUBLIC_FIELD_ACTOR);
 
-    for (let index = 1; index <= 5; index += 1) {
-      await confirmFieldEvidenceUpload({
-        actor: PUBLIC_FIELD_ACTOR,
-        attemptId,
-        input: {
-          evidenceType: "PERFUME_PHOTO",
-          mimeType: "image/jpeg",
-          originalFilename: `perfume-${index}.jpg`,
-          privateStorageKey: `studies/${studyId}/participants/profile-1/screening-attempts/${attemptId}/perfume_photo/perfume-${index}.jpg`,
-          sizeBytes: 1200,
-          storageBucket: "participant-evidence"
-        },
-        repository
-      });
+    for (let index = 2; index <= 5; index += 1) {
+      await addPerfumePhoto(repository, attemptId, PUBLIC_FIELD_ACTOR, index);
     }
 
     const screen = await getFieldEvidenceScreen({

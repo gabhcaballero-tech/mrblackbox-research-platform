@@ -31,29 +31,7 @@ vi.mock("@/modules/field/service", async (importOriginal) => {
 });
 
 describe("Field screening result page", () => {
-  it("shows a clear selfie CTA instead of the generic field error when selfie is pending", async () => {
-    render(
-      await ScreeningResultPage({
-        params: Promise.resolve({ attemptId: "attempt-1" })
-      })
-    );
-
-    expect(screen.getByText("Completa la selfie para enviar a revisión")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Completar selfie" })).toHaveAttribute(
-      "href",
-      "/field/screening/attempt-1/selfie"
-    );
-    expect(screen.queryByText("Campo no disponible")).not.toBeInTheDocument();
-  });
-
-  it("shows a perfume photos CTA after final selfie when perfume photos are pending", async () => {
-    vi.mocked(getFieldScreeningAttemptScreen).mockResolvedValueOnce({
-      data: fieldScreen({
-        participantEvidence: [evidenceRecord("evidence-1", "SELFIE_IDENTIFICATION")]
-      }),
-      ok: true
-    });
-
+  it("shows the perfume photos CTA first when final evidence is incomplete", async () => {
     render(
       await ScreeningResultPage({
         params: Promise.resolve({ attemptId: "attempt-1" })
@@ -64,6 +42,28 @@ describe("Field screening result page", () => {
     expect(screen.getByRole("link", { name: "Agregar fotos de marcas de perfumes" })).toHaveAttribute(
       "href",
       "/field/screening/attempt-1/evidences"
+    );
+    expect(screen.queryByText("Campo no disponible")).not.toBeInTheDocument();
+  });
+
+  it("shows a clear selfie CTA after F6 perfume photos are complete", async () => {
+    vi.mocked(getFieldScreeningAttemptScreen).mockResolvedValueOnce({
+      data: fieldScreen({
+        participantEvidence: [evidenceRecord("evidence-1", "PERFUME_PHOTO")]
+      }),
+      ok: true
+    });
+
+    render(
+      await ScreeningResultPage({
+        params: Promise.resolve({ attemptId: "attempt-1" })
+      })
+    );
+
+    expect(screen.getByText("Completa la selfie para enviar a revisión")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Completar selfie" })).toHaveAttribute(
+      "href",
+      "/field/screening/attempt-1/selfie"
     );
     expect(screen.queryByText("Campo no disponible")).not.toBeInTheDocument();
   });

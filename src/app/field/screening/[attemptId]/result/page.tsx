@@ -46,11 +46,9 @@ export default async function ScreeningResultPage({ params }: ScreeningResultPag
   }
 
   const screen = result.data;
-  const needsSelfie = fieldAttemptRequiresFinalSelfie(screen.attempt) && !fieldAttemptHasFinalSelfie(screen.attempt);
-  const needsPerfumePhotos =
-    fieldAttemptRequiresFinalSelfie(screen.attempt) &&
-    fieldAttemptHasFinalSelfie(screen.attempt) &&
-    !fieldAttemptHasRequiredPerfumePhotos(screen.attempt);
+  const requiresFinalEvidence = fieldAttemptRequiresFinalSelfie(screen.attempt);
+  const needsPerfumePhotos = requiresFinalEvidence && !fieldAttemptHasRequiredPerfumePhotos(screen.attempt);
+  const needsSelfie = requiresFinalEvidence && !needsPerfumePhotos && !fieldAttemptHasFinalSelfie(screen.attempt);
   const pendingReview = screen.attempt.participantScreeningReview?.status === "PENDING";
 
   const content = (
@@ -62,10 +60,10 @@ export default async function ScreeningResultPage({ params }: ScreeningResultPag
         title={screen.attempt.questionnaireVersion.study.name}
       />
 
-      {needsSelfie ? (
-        <FieldPendingSelfieCard attemptId={attemptId} />
-      ) : needsPerfumePhotos ? (
+      {needsPerfumePhotos ? (
         <FieldPendingPerfumePhotosCard attemptId={attemptId} />
+      ) : needsSelfie ? (
+        <FieldPendingSelfieCard attemptId={attemptId} />
       ) : pendingReview ? (
         <FieldPendingReviewCard />
       ) : (
@@ -114,7 +112,7 @@ function FieldPendingPerfumePhotosCard({ attemptId }: { attemptId: string }) {
       <p className="text-sm font-semibold uppercase tracking-wide text-amber-800">Fotos pendientes</p>
       <h2 className="mt-2 text-xl font-semibold text-zinc-950">Agrega fotos de marcas de perfumes</h2>
       <p className="mt-2 text-sm leading-6 text-zinc-700">
-        Ya registraste la selfie final. Falta agregar al menos una foto de las marcas de perfumes antes de enviar el perfil a revisión.
+        Falta agregar al menos una foto de las marcas de perfumes antes de enviar el perfil a revisión.
       </p>
       <Link className={primaryButtonClass} href={`/field/screening/${attemptId}/evidences`}>
         Agregar fotos de marcas de perfumes

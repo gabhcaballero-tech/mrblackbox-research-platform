@@ -491,6 +491,12 @@ export async function saveFieldScreeningAnswer({
     };
   }
 
+  const perfumeEvidenceValidation = validatePerfumeEvidenceForQuestion(loaded.data.attempt, question.id);
+
+  if (!perfumeEvidenceValidation.ok) {
+    return perfumeEvidenceValidation;
+  }
+
   await repository.upsertAnswer({
     answerJson: answer,
     questionId,
@@ -637,7 +643,7 @@ export async function requestFieldEvidenceUpload({
   repository: FieldRepository;
   storage: EvidenceStorageClient;
 }): Promise<FieldServiceResult<SignedEvidenceUpload & { metadata: EvidenceUploadMetadata }>> {
-  const context = await loadEvidenceAttemptContext({ actor, attemptId, repository });
+  const context = await loadEvidenceAttemptContext({ actor, attemptId, evidenceType: metadata.evidenceType, repository });
 
   if (!context.ok) {
     return context;
@@ -687,7 +693,7 @@ export async function confirmFieldEvidenceUpload({
   };
   repository: FieldRepository;
 }): Promise<FieldServiceResult<FieldEvidenceUploadConfirmation>> {
-  const context = await loadEvidenceAttemptContext({ actor, attemptId, repository });
+  const context = await loadEvidenceAttemptContext({ actor, attemptId, evidenceType: input.evidenceType, repository });
 
   if (!context.ok) {
     return context;
@@ -1014,10 +1020,12 @@ async function loadAttemptContext({
 
 async function loadEvidenceAttemptContext({
   actor,
+  evidenceType,
   attemptId,
   repository
 }: {
   actor: FieldActor | null;
+  evidenceType?: ParticipantEvidenceKind;
   attemptId: string;
   repository: FieldRepository;
 }): Promise<FieldServiceResult<FieldScreeningAttemptRecord>> {
@@ -1035,7 +1043,10 @@ async function loadEvidenceAttemptContext({
     };
   }
 
-  if (attempt.status !== "PASSED" && attempt.status !== "PENDING_REVIEW") {
+  const isOpenPerfumeEvidence =
+    evidenceType === "PERFUME_PHOTO" && (attempt.status === "STARTED" || attempt.status === "INCOMPLETE");
+
+  if (attempt.status !== "PASSED" && attempt.status !== "PENDING_REVIEW" && !isOpenPerfumeEvidence) {
     return {
       code: "ATTEMPT_CLOSED",
       message: "Completa el filtro antes de capturar evidencia.",
@@ -1098,10 +1109,20 @@ function validateCanAddFieldEvidence(
   attempt: FieldScreeningAttemptRecord,
   evidenceType: ParticipantEvidenceKind
 ): FieldServiceResult<true> {
-  if (!getStudyBehavior(attempt.questionnaireVersion.study.code).requiresFinalSelfie) {
+  const behavior = getStudyBehavior(attempt.questionnaireVersion.study.code);
+
+  if (evidenceType === "SELFIE_IDENTIFICATION" && !behavior.requiresFinalSelfie) {
     return {
       code: "EVIDENCE_NOT_REQUIRED",
-      message: "Este estudio no requiere evidencias.",
+      message: "Este estudio no requiere selfie.",
+      ok: false
+    };
+  }
+
+  if (evidenceType === "PERFUME_PHOTO" && !behavior.requiresPerfumeEvidence) {
+    return {
+      code: "EVIDENCE_NOT_REQUIRED",
+      message: "Este estudio no requiere fotos de perfumes.",
       ok: false
     };
   }
@@ -1134,6 +1155,58 @@ function validateCanAddFieldEvidence(
   }
 
   if (evidenceType === "PERFUME_PHOTO" && counts.perfumePhotos >= config.maxPerfumePhotos) {
+    return {
+      code: "VALIDATION_ERROR",
+      message: `Ya registraste el máximo de ${config.maxPerfumePhotos} fotos de perfumes.`,
+      ok: false
+    };
+  }
+
+  return {
+    data: true,
+    ok: true
+  };
+}
+
+function validatePerfumeEvidenceForQuestion(
+  attempt: FieldScreeningAttemptRecord,
+  questionId: string
+): FieldServiceResult<true> {
+  if (questionId !== F6_PERFUME_EVIDENCE_QUESTION_ID) {
+    return {
+      data: true,
+      ok: true
+    };
+  }
+
+  if (!getStudyBehavior(attempt.questionnaireVersion.study.code).requiresPerfumeEvidence) {
+    return {
+      data: true,
+      ok: true
+    };
+  }
+
+  const config = attempt.questionnaireVersion.study.participantPortalConfig;
+
+  if (!config) {
+    return {
+      code: "STUDY_NOT_AVAILABLE",
+      message: "La captura de evidencias no está configurada para este estudio.",
+      ok: false
+    };
+  }
+
+  const counts = countFieldEvidence(attempt.participantEvidence);
+
+  if (counts.perfumePhotos < config.minPerfumePhotos) {
+    return {
+      code: "VALIDATION_ERROR",
+      message: `Debes registrar al menos ${config.minPerfumePhotos} foto de perfume antes de continuar.`,
+      ok: false
+    };
+  }
+
+  if (counts.perfumePhotos > config.maxPerfumePhotos) {
     return {
       code: "VALIDATION_ERROR",
       message: `Ya registraste el máximo de ${config.maxPerfumePhotos} fotos de perfumes.`,

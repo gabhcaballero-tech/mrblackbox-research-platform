@@ -1,12 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { ScreenerAnswer, ScreenerQuestion } from "@/modules/screener";
 import type { FieldStudySummary } from "@/modules/field/repository";
 import type { FieldAttemptScreen } from "@/modules/field/service";
 import { saveFieldScreeningAnswerAction } from "@/modules/field/actions";
+import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { FieldPerfumePhotoCapture } from "./FieldPerfumePhotoCapture";
+
+const FIELD_PERFUME_EVIDENCE_QUESTION_ID = "F6_MARCAS_UTILIZA";
 
 type ScreeningQuestionFormProps = {
   error?: string;
@@ -49,6 +54,7 @@ export function FieldStudyCard({ study }: { study: FieldStudySummary }) {
 
 export function ScreeningQuestionForm({ error, screen }: ScreeningQuestionFormProps) {
   const question = screen.currentQuestion;
+  const [perfumePhotoCount, setPerfumePhotoCount] = useState(countPerfumePhotos(screen));
 
   if (!question) {
     return (
@@ -65,6 +71,13 @@ export function ScreeningQuestionForm({ error, screen }: ScreeningQuestionFormPr
   const activeQuestion = question;
   const previousQuestion = getPreviousVisibleQuestion(screen.visibleQuestions, activeQuestion.id);
   const answer = screen.answers[activeQuestion.id];
+  const evidenceConfig = screen.attempt.questionnaireVersion.study.participantPortalConfig;
+  const isPerfumeEvidenceQuestion =
+    activeQuestion.id === FIELD_PERFUME_EVIDENCE_QUESTION_ID &&
+    getStudyBehavior(screen.attempt.questionnaireVersion.study.code).requiresPerfumeEvidence &&
+    Boolean(evidenceConfig);
+  const hasMinimumPerfumePhotos =
+    !isPerfumeEvidenceQuestion || perfumePhotoCount >= (evidenceConfig?.minPerfumePhotos ?? 1);
   const isLastVisibleQuestion = screen.progress.currentIndex >= screen.progress.totalVisibleQuestions;
   const pendingLabel = isLastVisibleQuestion ? "Finalizando evaluación..." : "Guardando...";
 
@@ -89,6 +102,20 @@ export function ScreeningQuestionForm({ error, screen }: ScreeningQuestionFormPr
 
       <form action={saveFieldScreeningAnswerAction.bind(null, screen.attempt.id, activeQuestion.id)} className="space-y-5">
         <QuestionControl answer={answer} question={question} />
+        {isPerfumeEvidenceQuestion && evidenceConfig ? (
+          <FieldPerfumePhotoCapture
+            attemptId={screen.attempt.id}
+            currentCount={perfumePhotoCount}
+            maxCount={evidenceConfig.maxPerfumePhotos}
+            minRequired={evidenceConfig.minPerfumePhotos}
+            onCountChange={setPerfumePhotoCount}
+          />
+        ) : null}
+        {!hasMinimumPerfumePhotos && evidenceConfig ? (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Debes registrar al menos {evidenceConfig.minPerfumePhotos} foto de perfume antes de continuar.
+          </p>
+        ) : null}
         <div className="flex flex-wrap gap-3">
           {previousQuestion ? (
             <Link
@@ -98,18 +125,18 @@ export function ScreeningQuestionForm({ error, screen }: ScreeningQuestionFormPr
               Volver
             </Link>
           ) : null}
-          <FieldSubmitButton pendingLabel={pendingLabel} />
+          <FieldSubmitButton disabled={!hasMinimumPerfumePhotos} pendingLabel={pendingLabel} />
         </div>
       </form>
     </section>
   );
 }
 
-function FieldSubmitButton({ pendingLabel }: { pendingLabel: string }) {
+function FieldSubmitButton({ disabled, pendingLabel }: { disabled?: boolean; pendingLabel: string }) {
   const { pending } = useFormStatus();
 
   return (
-    <button className={primaryButtonClass} disabled={pending} type="submit">
+    <button className={primaryButtonClass} disabled={pending || disabled} type="submit">
       {pending ? pendingLabel : "Guardar y continuar"}
     </button>
   );
@@ -297,6 +324,10 @@ function selectedAnswerValues(answer: ScreenerAnswer | undefined): string[] {
 
 function selectedOtherTextFromAnswer(answer: ScreenerAnswer | undefined): string {
   return answer && typeof answer === "object" && !Array.isArray(answer) ? answer.otherText ?? "" : "";
+}
+
+function countPerfumePhotos(screen: FieldAttemptScreen): number {
+  return screen.attempt.participantEvidence.filter((item) => item.type === "PERFUME_PHOTO").length;
 }
 
 export function fieldResultTitle(status: string): string {

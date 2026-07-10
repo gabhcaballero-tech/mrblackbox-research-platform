@@ -18,6 +18,29 @@ vi.mock("@/modules/field/actions", () => ({
   startFieldScreeningAttemptAction: vi.fn()
 }));
 
+vi.mock("./FieldPerfumePhotoCapture", () => ({
+  FieldPerfumePhotoCapture: ({
+    currentCount,
+    maxCount,
+    minRequired,
+    onCountChange
+  }: {
+    currentCount: number;
+    maxCount: number;
+    minRequired: number;
+    onCountChange: (nextCount: number) => void;
+  }) => (
+    <div data-testid="field-perfume-photo-capture">
+      <p>
+        {currentCount} de {maxCount} fotos agregadas. Mínimo requerido: {minRequired}.
+      </p>
+      <button onClick={() => onCountChange(1)} type="button">
+        Simular foto F6
+      </button>
+    </div>
+  )
+}));
+
 const study: FieldStudySummary = {
   activeScreenerVersion: {
     definitionHash: "hash",
@@ -61,7 +84,8 @@ function buildDefinitionWithNse(hasLabel = true): ScreenerDefinition {
 function screenFixture(
   question: ScreenerQuestion = singleChoiceQuestion(),
   status = "INCOMPLETE",
-  hasLabel = true
+  hasLabel = true,
+  participantEvidence: FieldAttemptScreen["attempt"]["participantEvidence"] = []
 ): FieldAttemptScreen {
   return {
     answers: {},
@@ -87,7 +111,7 @@ function screenFixture(
           timeZoneIana: study.timeZoneIana
         }
       },
-      participantEvidence: [],
+      participantEvidence,
       participantScreeningReview: null,
     questionnaireVersionId: "version-1",
     source: "FIELD",
@@ -198,6 +222,34 @@ function shortTextQuestion() {
     type: "SHORT_TEXT" as const,
     validation: {}
   };
+}
+
+function perfumeEvidenceQuestion() {
+  return {
+    dataDestination: "SCREENING" as const,
+    id: "F6_MARCAS_UTILIZA",
+    order: 1,
+    required: true,
+    text: "¿Qué marcas de perfume utiliza?",
+    type: "LONG_TEXT" as const,
+    validation: {}
+  };
+}
+
+function perfumeEvidence(count: number): FieldAttemptScreen["attempt"]["participantEvidence"] {
+  return Array.from({ length: count }, (_, index) => ({
+    extension: "jpg",
+    id: `evidence-${index + 1}`,
+    mimeType: "image/jpeg",
+    originalFilename: `perfume-${index + 1}.jpg`,
+    privateStorageKey: `studies/study-1/participants/profile-1/screening-attempts/attempt-1/perfume_photo/perfume-${index + 1}.jpg`,
+    relatedQuestionId: "F6_MARCAS_UTILIZA",
+    reviewStatus: "PENDING" as const,
+    sizeBytes: 1200,
+    storageBucket: "participant-evidence",
+    type: "PERFUME_PHOTO" as const,
+    uploadedAt: new Date("2026-06-23T10:05:00Z")
+  }));
 }
 
 function finalQuestionScreen(): FieldAttemptScreen {
@@ -367,6 +419,32 @@ describe("FieldComponents", () => {
     fireEvent.click(screen.getByRole("button", { name: "Guardar y continuar" }));
 
     expect(screen.getByRole("button", { name: "Finalizando evaluación..." })).toBeDisabled();
+  });
+
+  it("renders perfume photo capture inside F6 and blocks advancing without a photo", () => {
+    render(<ScreeningQuestionForm screen={screenFixture(perfumeEvidenceQuestion())} />);
+
+    expect(screen.getByLabelText("Respuesta")).toBeInTheDocument();
+    expect(screen.getByTestId("field-perfume-photo-capture")).toBeInTheDocument();
+    expect(screen.getByText("0 de 5 fotos agregadas. Mínimo requerido: 1.")).toBeInTheDocument();
+    expect(screen.getByText("Debes registrar al menos 1 foto de perfume antes de continuar.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Guardar y continuar" })).toBeDisabled();
+  });
+
+  it("enables F6 after at least one perfume photo is registered", () => {
+    render(<ScreeningQuestionForm screen={screenFixture(perfumeEvidenceQuestion())} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Simular foto F6" }));
+
+    expect(screen.getByText("1 de 5 fotos agregadas. Mínimo requerido: 1.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Guardar y continuar" })).toBeEnabled();
+  });
+
+  it("shows existing perfume photos in the F6 counter", () => {
+    render(<ScreeningQuestionForm screen={screenFixture(perfumeEvidenceQuestion(), "INCOMPLETE", true, perfumeEvidence(5))} />);
+
+    expect(screen.getByText("5 de 5 fotos agregadas. Mínimo requerido: 1.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Guardar y continuar" })).toBeEnabled();
   });
 
   it("blocks double submit while the field answer is saving", () => {
