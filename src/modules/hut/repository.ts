@@ -193,6 +193,7 @@ export type HutPortalView = {
   participantId: string;
   status: HutParticipantStatus;
   studyName: string;
+  testMode: boolean;
   token: string;
 };
 
@@ -475,6 +476,7 @@ type HutCallRecord = {
 type HutDailyCheckRecord = {
   blockId: string;
   blockDayNumber: number;
+  date: Date;
   status: string;
 };
 
@@ -540,6 +542,7 @@ const participantSelect = {
     select: {
       blockId: true,
       blockDayNumber: true,
+      date: true,
       status: true
     }
   },
@@ -1576,7 +1579,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
       const availability = currentAvailability(participant, block, new Date());
       if (availability.reason !== "AVAILABLE_FOR_VIDEO") {
-        return { message: videoUnavailableMessage(availability.reason, availability.nextAvailableAt), ok: false };
+        return { message: videoUnavailableMessage(availability.reason), ok: false };
       }
 
       const sequenceNumber = nextHutVideoSequence(block);
@@ -1881,7 +1884,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
       const availability = currentAvailability(participant, block, new Date());
       if (availability.reason !== "AVAILABLE_FOR_SELFIE") {
-        return { message: videoUnavailableMessage(availability.reason, availability.nextAvailableAt), ok: false };
+        return { message: videoUnavailableMessage(availability.reason), ok: false };
       }
 
       if (!participant.referenceSelfie) {
@@ -1929,7 +1932,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
         const availability = currentAvailability(participant, block, now);
         if (availability.reason !== "AVAILABLE_FOR_SELFIE") {
-          return { message: videoUnavailableMessage(availability.reason, availability.nextAvailableAt), ok: false };
+          return { message: videoUnavailableMessage(availability.reason), ok: false };
         }
 
         if (!participant.referenceSelfie) {
@@ -2101,7 +2104,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
         const availability = currentAvailability(participant, block, now);
         if (availability.reason !== "AVAILABLE_FOR_VIDEO") {
-          return { message: videoUnavailableMessage(availability.reason, availability.nextAvailableAt), ok: false };
+          return { message: videoUnavailableMessage(availability.reason), ok: false };
         }
 
         if (input.metadata.storageBucket !== HUT_VIDEO_BUCKET) {
@@ -2571,6 +2574,7 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
       participantId: participant.id,
       status: participant.status,
       studyName: participant.study.name,
+      testMode: participant.testMode,
       token: participant.token
     };
   }
@@ -2597,6 +2601,7 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
     participantId: participant.id,
     status: participant.status,
     studyName: participant.study.name,
+    testMode: participant.testMode,
     token: participant.token
   };
 }
@@ -2837,9 +2842,12 @@ function hutVisualStatusFromReview(reviewStatus: "APPROVED" | "PENDING" | "REJEC
   return "UNCERTAIN" as const;
 }
 
-function videoUnavailableMessage(reason: string, nextAvailableAt: Date | null) {
+function videoUnavailableMessage(reason: string) {
   if (reason === "WAIT_UNTIL_5_AM") {
-    return `Tu siguiente video estara disponible a partir de las 5:00 a.m.${nextAvailableAt ? ` (${nextAvailableAt.toISOString()})` : ""}.`;
+    return "Este video aún no está disponible. Intenta nuevamente mañana a partir de las 5:00 a.m.";
+  }
+  if (reason === "WAIT_UNTIL_NEXT_DAY") {
+    return "Este video aún no está disponible. Intenta nuevamente mañana a partir de las 5:00 a.m.";
   }
   if (reason === "MISSING_REFERENCE_SELFIE") {
     return "Tu registro aun no esta completo. Contacta al encuestador.";

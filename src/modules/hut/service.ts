@@ -85,7 +85,8 @@ export type HutAvailabilityReason =
   | "MISSING_REFERENCE_SELFIE"
   | "WAIT_UNTIL_5_AM"
   | "VISUAL_VERIFICATION_FAILED"
-  | "VISUAL_VERIFICATION_PENDING";
+  | "VISUAL_VERIFICATION_PENDING"
+  | "WAIT_UNTIL_NEXT_DAY";
 
 export type HutAvailabilityInput = {
   block: HutBlockState & {
@@ -94,6 +95,7 @@ export type HutAvailabilityInput = {
   };
   dailyChecks: Array<{
     blockDayNumber: number;
+    date?: Date;
   }>;
   hasReferenceSelfie: boolean;
   testMode?: boolean;
@@ -185,6 +187,20 @@ export function getHutCurrentAvailability(input: HutAvailabilityInput): HutAvail
       available: false,
       nextAvailableAt,
       reason: "WAIT_UNTIL_5_AM"
+    };
+  }
+
+  const nextDailyUploadAt = nextDailyUploadAvailableAt({
+    dailyChecks: input.dailyChecks,
+    now: input.now,
+    timeZoneIana: input.timeZoneIana
+  });
+  if (!input.testMode && nextDailyUploadAt) {
+    return {
+      ...base,
+      available: false,
+      nextAvailableAt: nextDailyUploadAt,
+      reason: "WAIT_UNTIL_NEXT_DAY"
     };
   }
 
@@ -330,6 +346,40 @@ export function hutBlockDayAvailableAt({
     second: 0,
     timeZoneIana,
     year: localDate.getUTCFullYear()
+  });
+}
+
+function nextDailyUploadAvailableAt({
+  dailyChecks,
+  now,
+  timeZoneIana
+}: {
+  dailyChecks: Array<{ date?: Date }>;
+  now: Date;
+  timeZoneIana: string;
+}): Date | null {
+  const today = getTimeZoneDateParts(now, timeZoneIana);
+  const hasCompletedToday = dailyChecks.some((check) => {
+    if (!check.date) {
+      return false;
+    }
+    const checkDate = getTimeZoneDateParts(check.date, timeZoneIana);
+    return checkDate.year === today.year && checkDate.month === today.month && checkDate.day === today.day;
+  });
+
+  if (!hasCompletedToday) {
+    return null;
+  }
+
+  const tomorrow = new Date(Date.UTC(today.year, today.month - 1, today.day + 1, 5, 0, 0, 0));
+  return localDateTimeToUtc({
+    day: tomorrow.getUTCDate(),
+    hour: 5,
+    minute: 0,
+    month: tomorrow.getUTCMonth() + 1,
+    second: 0,
+    timeZoneIana,
+    year: tomorrow.getUTCFullYear()
   });
 }
 

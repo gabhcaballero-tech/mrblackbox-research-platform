@@ -31,6 +31,11 @@ export default async function HutParticipantPage({ params }: HutParticipantPageP
       </header>
       <main className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6">
         <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+          {view.testMode ? (
+            <p className="mb-4 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900">
+              Modo prueba activo: se omiten esperas entre días.
+            </p>
+          ) : null}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-zinc-500">{view.studyName}</p>
@@ -106,6 +111,9 @@ function hutParticipantStatusLabel(status: string) {
 }
 
 function availabilityMessage(reason: string, nextAvailableAt: Date | null) {
+  if (reason === "WAIT_UNTIL_NEXT_DAY") {
+    return "El siguiente video estará disponible mañana a partir de las 5:00 a.m.";
+  }
   if (reason === "WAIT_UNTIL_5_AM") {
     return `Tu siguiente video estará disponible a partir de las 5:00 a.m.${nextAvailableAt ? ` (${nextAvailableAt.toLocaleString("es-MX")})` : ""}.`;
   }

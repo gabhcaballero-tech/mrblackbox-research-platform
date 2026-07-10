@@ -696,6 +696,50 @@ describe("HUT module foundation", () => {
     expect(availability.expectedVideoSequence).toBe(2);
   });
 
+  it("blocks a second video on the same local day even when the next block day is already open", () => {
+    const availability = getHutCurrentAvailability({
+      block: {
+        ...block({ submittedVideosCount: 1 }),
+        startDate: new Date("2026-07-09T00:00:00.000Z")
+      },
+      dailyChecks: [
+        {
+          blockDayNumber: 1,
+          date: new Date("2026-07-10T02:50:00.000Z")
+        }
+      ],
+      hasReferenceSelfie: true,
+      hasVisualOverride: false,
+      now: new Date("2026-07-10T02:51:00.000Z"),
+      timeZoneIana: "America/Mexico_City"
+    });
+
+    expect(availability.available).toBe(false);
+    expect(availability.reason).toBe("WAIT_UNTIL_NEXT_DAY");
+    expect(availability.expectedVideoSequence).toBe(2);
+  });
+
+  it("unlocks video 2 the next day after 5 a.m. in normal mode", () => {
+    const availability = getHutCurrentAvailability({
+      block: {
+        ...block({ submittedVideosCount: 1 }),
+        startDate: new Date("2026-07-09T00:00:00.000Z")
+      },
+      dailyChecks: [
+        {
+          blockDayNumber: 1,
+          date: new Date("2026-07-10T02:50:00.000Z")
+        }
+      ],
+      hasReferenceSelfie: true,
+      hasVisualOverride: false,
+      now: new Date("2026-07-10T11:00:00.000Z"),
+      timeZoneIana: "America/Mexico_City"
+    });
+
+    expect(availability.reason).toBe("AVAILABLE_FOR_SELFIE");
+  });
+
   it("test mode ignores the 5 a.m. availability wait without affecting normal participants", () => {
     const blockInput = {
       ...block({ submittedVideosCount: 1 }),
@@ -749,6 +793,103 @@ describe("HUT module foundation", () => {
 
     expect(verified.ok ? verified.data.status : "").toBe("MATCHED");
     expect(video.ok).toBe(true);
+  });
+
+  it("rejects preparing video 2 on the same local day in normal mode even when called directly", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-10T02:50:00.000Z"));
+    try {
+      const { prisma, storage } = createFakeHutPrisma();
+      const repository = createHutRepository(prisma as never);
+      await repository.createParticipant({
+        name: "Participante Diario",
+        requestOrigin: "https://example.com",
+        startDate: new Date("2026-07-09T14:00:00.000Z"),
+        studyId: "study-hut"
+      });
+      const participant = prisma.state.participants[0]!;
+      participant.referenceSelfie = referenceSelfie();
+      const token = participant.token;
+      const signed = await repository.requestDailySelfieUpload({ metadata: selfieMetadata(), storage, token });
+      const verified = await repository.confirmDailySelfieUpload({
+        faceVerification: faceResult("MATCH", 0.62),
+        metadata: {
+          ...selfieMetadata(),
+          privateStorageKey: signed.ok ? signed.data.privateStorageKey : "",
+          storageBucket: signed.ok ? signed.data.storageBucket : ""
+        },
+        token
+      });
+      const video = await repository.requestVideoUpload({ metadata: videoMetadata(), storage, token });
+      const confirmedVideo = await repository.confirmVideoUpload({
+        metadata: {
+          ...videoMetadata(),
+          privateStorageKey: video.ok ? video.data.privateStorageKey : "",
+          storageBucket: video.ok ? video.data.storageBucket : ""
+        },
+        token
+      });
+
+      expect(verified.ok ? verified.data.status : "").toBe("MATCHED");
+      expect(confirmedVideo.ok).toBe(true);
+      participant.visualVerifications.push({
+        attemptSelfieKey: "daily-selfie-video-2.jpg",
+        attemptStorageBucket: "participant-evidence",
+        blockNumber: 1,
+        id: "verification-video-2",
+        overrideReason: null,
+        reviewedAt: null,
+        reviewedByUserId: null,
+        sequenceNumber: 2,
+        similarityScore: 0.8,
+        status: "MATCHED",
+        verificationDate: new Date("2026-07-10T02:51:00.000Z")
+      });
+
+      const secondVideo = await repository.requestVideoUpload({ metadata: videoMetadata(), storage, token });
+
+      expect(secondVideo.ok).toBe(false);
+      expect(secondVideo.ok ? "" : secondVideo.message).toBe(
+        "Este video aún no está disponible. Intenta nuevamente mañana a partir de las 5:00 a.m."
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("test mode allows preparing the next video on the same local day", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-10T02:50:00.000Z"));
+    try {
+      const { prisma, storage } = createFakeHutPrisma();
+      const repository = createHutRepository(prisma as never);
+      await repository.createParticipant({
+        name: "Participante Test Mode",
+        requestOrigin: "https://example.com",
+        startDate: new Date("2026-07-09T14:00:00.000Z"),
+        studyId: "study-hut"
+      });
+      const participant = prisma.state.participants[0]!;
+      participant.referenceSelfie = referenceSelfie();
+      participant.testMode = true;
+      const token = participant.token;
+      participant.dailyChecks.push({
+        blockDayNumber: 1,
+        blockId: participant.blocks[0]!.id,
+        blockNumber: 1,
+        date: new Date("2026-07-10T02:49:00.000Z"),
+        expectedVideoSequence: 1,
+        participantId: participant.id,
+        status: "COMPLETED"
+      });
+
+      const signed = await repository.requestDailySelfieUpload({ metadata: selfieMetadata(), storage, token });
+
+      expect(signed.ok).toBe(true);
+      expect(signed.ok ? signed.data.privateStorageKey : "").toContain("/daily-selfie/");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("persists participant test mode and allows consecutive uploads without calendar waits", async () => {
@@ -1327,6 +1468,7 @@ async function uploadNextVideo(
   const participant = state.participants.find((item) => item.token === token);
   if (participant) {
     participant.referenceSelfie ??= referenceSelfie();
+    participant.testMode = true;
     const activeBlock = participant.blocks.find((item) => item.status === "IN_PROGRESS");
     const sequenceNumber = activeBlock ? activeBlock.submittedVideosCount + 1 : 1;
     participant.visualVerifications.unshift({
