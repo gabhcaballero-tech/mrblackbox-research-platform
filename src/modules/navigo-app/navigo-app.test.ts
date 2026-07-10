@@ -38,6 +38,7 @@ import {
 import {
   FACE_SIMILARITY_APPROVE_THRESHOLD,
   FACE_SIMILARITY_REJECT_THRESHOLD,
+  NAVIGO_FACE_VERIFICATION_METHOD,
   classifyNavigoFaceSimilarity,
   normalizeNavigoFaceVerificationForStorage
 } from "./face-verification-contract";
@@ -1369,6 +1370,59 @@ describe("navigo app MVP rules", () => {
     );
   });
 
+  it("configures rotation for a field-approved participant without colliding with existing study arm sort orders", async () => {
+    const state = createNavigoParticipantImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const studyParticipantId = seedApprovedFieldParticipantForNavigo(state);
+    state.arms.push(
+      { code: "LEGACY_LEFT", id: "arm-legacy-left", label: "Legacy left", sortOrder: 1, studyId: state.study.id },
+      { code: "LEGACY_RIGHT", id: "arm-legacy-right", label: "Legacy right", sortOrder: 2, studyId: state.study.id }
+    );
+
+    const result = await repository.configureParticipantRotation({
+      actorUserId: "admin-1",
+      leftFragranceCode: "AAA",
+      rightFragranceCode: "BBB",
+      studyParticipantId,
+      triangularCode1: "",
+      triangularCode2: ""
+    });
+
+    expect(result.ok).toBe(true);
+    expect(state.arms).toMatchObject([
+      { code: "LEGACY_LEFT", sortOrder: 1 },
+      { code: "LEGACY_RIGHT", sortOrder: 2 },
+      { code: "LEFT", sortOrder: 3 },
+      { code: "RIGHT", sortOrder: 4 }
+    ]);
+    expect(state.rotationAssignments).toHaveLength(1);
+    expect(state.armAssignments).toMatchObject([
+      { applicationOrder: 1, participantVisibleLabel: "Primera fragancia" },
+      { applicationOrder: 2, participantVisibleLabel: "Segunda fragancia" }
+    ]);
+    expect(state.referenceCodes).toHaveLength(3);
+  });
+
+  it("returns a clear message if StudyArm still hits a unique sort order constraint", async () => {
+    const state = createNavigoParticipantImportState({ failStudyArmCreateUnique: true });
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const studyParticipantId = seedApprovedFieldParticipantForNavigo(state);
+
+    const result = await repository.configureParticipantRotation({
+      actorUserId: "admin-1",
+      leftFragranceCode: "AAA",
+      rightFragranceCode: "BBB",
+      studyParticipantId,
+      triangularCode1: "",
+      triangularCode2: ""
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.message).toBe(
+      "No se pudo guardar la rotacion porque ya existe un brazo con ese orden. Actualiza la configuracion e intenta nuevamente."
+    );
+  });
+
   it("flags duplicate folios or phones in participant import preview", async () => {
     const state = createNavigoParticipantImportState();
     const repository = createNavigoAppRepository(state.prisma as never);
@@ -1743,6 +1797,133 @@ describe("navigo app MVP rules", () => {
     expect(state.participant.participantEvidence).toHaveLength(1);
     expect(state.participant.participantEvidence[0]?.privateStorageKey).toContain("/screening-attempts/attempt-1/");
     expect(state.responses.some((response) => response.questionId === "T0_IDENTITY_CONFIRMED")).toBe(true);
+  });
+
+  it("simulates the full Navigo participant flow for T0, T2, T4 and T6 without T8 or real WhatsApp", async () => {
+    const state = createNavigoParticipantActivityState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    state.participant.visualVerificationMode = "required";
+    state.participant.participantEvidence = [];
+    state.participant.applicationStartedAt = new Date("2026-06-25T15:00:00.000Z");
+    for (const activity of state.activities) {
+      activity.actualCompletedAt = null;
+      activity.actualStartedAt = null;
+      activity.participantActivityEvidence = [];
+      activity.responses = [];
+      activity.status = "AVAILABLE";
+    }
+    const captureTimes = {
+      T0_SALON: new Date("2026-06-25T15:00:00.000Z"),
+      T2_HORAS: new Date("2026-06-25T17:00:00.000Z"),
+      T4_HORAS: new Date("2026-06-25T19:00:00.000Z"),
+      T6_HORAS: new Date("2026-06-25T21:00:00.000Z")
+    } satisfies Record<(typeof NAVIGO_ACTIVITY_CODES)[number], Date>;
+
+    const initial = await repository.getParticipantActivitiesView({
+      now: new Date("2026-06-25T15:00:00.000Z"),
+      testMode: true,
+      token: "token-1"
+    });
+
+    expect(initial.ok).toBe(true);
+    expect(initial.ok ? initial.data.timeline.map((activity) => activity.code) : []).toEqual([
+      "T0_SALON",
+      "T2_HORAS",
+      "T4_HORAS",
+      "T6_HORAS"
+    ]);
+    expect(initial.ok ? JSON.stringify(initial.data) : "").not.toContain("T8");
+
+    for (const code of NAVIGO_ACTIVITY_CODES) {
+      const activityId = `activity-${code}`;
+      const beforeCapture = await repository.getActivityCaptureView({
+        activityId,
+        now: captureTimes[code],
+        testMode: true,
+        token: "token-1"
+      });
+      expect(beforeCapture.ok).toBe(true);
+      expect(beforeCapture.ok ? beforeCapture.data.requiresSelfie : false).toBe(true);
+
+      const upload = await repository.requestActivitySelfieUpload({
+        activityId,
+        metadata: {
+          evidenceType: "SELFIE_IDENTIFICATION",
+          mimeType: "image/jpeg",
+          originalFilename: `${code}.jpg`,
+          sizeBytes: 100
+        },
+        storage: state.storage,
+        token: "token-1"
+      });
+      expect(upload.ok).toBe(true);
+
+      const confirmed = await repository.confirmActivitySelfieUpload({
+        activityId,
+        metadata: {
+          evidenceType: "SELFIE_IDENTIFICATION",
+          faceVerification:
+            code === "T0_SALON"
+              ? null
+              : {
+                  evaluatedAt: "2026-06-25T15:00:00.000Z",
+                  method: NAVIGO_FACE_VERIFICATION_METHOD,
+                  score: 0.88,
+                  status: "MATCH"
+                },
+          mimeType: "image/jpeg",
+          originalFilename: `${code}.jpg`,
+          privateStorageKey: upload.ok ? upload.data.privateStorageKey : "",
+          sizeBytes: 100,
+          storageBucket: "participant-evidence"
+        },
+        token: "token-1"
+      });
+      expect(confirmed.ok).toBe(true);
+      expect(confirmed.ok ? confirmed.data.reviewStatus : "PENDING").toBe("APPROVED");
+      expect(confirmed.ok ? confirmed.data.internalNote : "").toContain(
+        code === "T0_SALON" ? "reference_created" : "MATCH"
+      );
+
+      if (code === "T0_SALON") {
+        const identity = await repository.confirmT0Identity({
+          activityId,
+          identityConfirmed: "YES",
+          now: captureTimes[code],
+          token: "token-1"
+        });
+        expect(identity.ok).toBe(true);
+      }
+
+      const saved = await repository.submitActivityResponses({
+        activityId,
+        answers: completeNavigoAnswers(),
+        testMode: true,
+        token: "token-1"
+      });
+      if (!saved.ok) {
+        throw new Error(`${code}: ${saved.message}`);
+      }
+      expect(saved.ok).toBe(true);
+    }
+
+    const final = await repository.getParticipantActivitiesView({
+      now: new Date("2026-06-25T21:00:00.000Z"),
+      testMode: true,
+      token: "token-1"
+    });
+
+    expect(final.ok).toBe(true);
+    expect(final.ok ? final.data.timeline.map((activity) => activity.code) : []).toEqual([
+      "T0_SALON",
+      "T2_HORAS",
+      "T4_HORAS",
+      "T6_HORAS"
+    ]);
+    expect(state.participant.participantEvidence).toHaveLength(1);
+    expect(state.activities.every((activity) => activity.status === "COMPLETED")).toBe(true);
+    expect(state.responses.filter((response) => response.questionId.startsWith("AP"))).toHaveLength(28);
+    expect(state.activities.some((activity) => String(activity.activitySchedule.code) === "T8_HORAS")).toBe(false);
   });
 
   it("blocks later activities when visual verification is required and reference selfie is missing", async () => {
@@ -2172,6 +2353,39 @@ function createNavigoParticipantActivityState() {
         return target;
       }
     },
+    participantActivityEvidence: {
+      async create(args: {
+        data: {
+          extension: string;
+          internalNote: string;
+          mimeType: string;
+          originalFilename: string;
+          participantActivityId: string;
+          privateStorageKey: string;
+          rejectionReason: string | null;
+          reviewStatus: "APPROVED" | "PENDING" | "REJECTED";
+          sizeBytes: number;
+          storageBucket: string;
+          studyParticipantId: string;
+          type: "SELFIE_IDENTIFICATION";
+        };
+      }) {
+        const activity = activities.find((item) => item.id === args.data.participantActivityId);
+        if (!activity) {
+          throw new Error("activity not found");
+        }
+
+        const record = {
+          ...args.data,
+          id: `activity-evidence-${activity.participantActivityEvidence.length + 1}`,
+          rejectionReason: null,
+          reviewedAt: null,
+          uploadedAt: new Date("2026-06-25T17:00:00.000Z")
+        };
+        activity.participantActivityEvidence.push(record);
+        return record;
+      }
+    },
     participantEvidence: {
       async create(args: { data: (typeof participant.participantEvidence)[number] & { internalNote?: string | null; reviewStatus?: string } }) {
         participant.participantEvidence.unshift({
@@ -2214,10 +2428,12 @@ function createNavigoParticipantActivityState() {
 
         if (target) {
           Object.assign(target, args.update);
+          syncActivityResponses(target);
           return target;
         }
 
         responses.push({ ...args.create });
+        syncActivityResponses(args.create);
         return args.create;
       }
     }
@@ -2239,6 +2455,21 @@ function createNavigoParticipantActivityState() {
       };
     }
   };
+
+  function syncActivityResponses(response: (typeof responses)[number]) {
+    const activity = activities.find((item) => item.id === response.participantActivityId);
+    if (!activity) {
+      return;
+    }
+
+    const existing = activity.responses.find((item) => item.questionId === response.questionId);
+    const next = { answerJson: response.answerJson, questionId: response.questionId };
+    if (existing) {
+      Object.assign(existing, next);
+    } else {
+      activity.responses.push(next);
+    }
+  }
 
   return {
     activities,
@@ -2566,11 +2797,68 @@ function createNavigoFoundationState() {
   };
 }
 
+function seedApprovedFieldParticipantForNavigo(state: ReturnType<typeof createNavigoParticipantImportState>) {
+  const studyParticipantId = "study-participant-field-1";
+  state.participantProfiles.push({
+    createdByUserId: "field-user-1",
+    email: null,
+    id: "profile-field-1",
+    name: "PARTICIPANTE FIELD",
+    participantAuthUserId: null,
+    phone: "+525500000001",
+    status: "ACTIVE"
+  });
+  state.studyParticipants.push({
+    applicationStartedAt: null,
+    createdByUserId: "field-user-1",
+    id: studyParticipantId,
+    operationalStatus: "ASSIGNED",
+    participantProfileId: "profile-field-1",
+    screeningStatus: "PASSED",
+    studyId: state.study.id,
+    visualVerificationMode: "required"
+  });
+  state.screeningAttempts.push({
+    completedAt: new Date("2026-06-25T15:00:00.000Z"),
+    evaluationJson: { status: "PASSED" },
+    fieldUserId: null,
+    id: "attempt-field-1",
+    questionnaireVersionId: "questionnaire-active-1",
+    source: "FIELD",
+    status: "PASSED",
+    studyParticipantId
+  });
+  state.participantScreeningReviews.push({
+    id: "review-field-1",
+    screeningAttemptId: "attempt-field-1",
+    studyParticipantId
+  });
+  state.confirmations.push({
+    approvedAt: new Date("2026-06-25T15:10:00.000Z"),
+    approvedByUserId: "admin-1",
+    folio: "NAV-010",
+    folioSequence: 10,
+    id: "confirmation-field-1",
+    manualMessageStatus: "NOT_SENT",
+    screeningAttemptId: "attempt-field-1",
+    studyId: state.study.id,
+    studyParticipantId
+  });
+  state.referenceCodes.push(
+    { code: "A7K4", confirmationId: "confirmation-field-1", slot: 1 },
+    { code: "M3P9", confirmationId: "confirmation-field-1", slot: 2 },
+    { code: "T8R2", confirmationId: "confirmation-field-1", slot: 3 }
+  );
+
+  return studyParticipantId;
+}
+
 function createNavigoParticipantImportState(
   {
     failExistingLookup = false,
+    failStudyArmCreateUnique = false,
     failStudyProductUpsert = false
-  }: { failExistingLookup?: boolean; failStudyProductUpsert?: boolean } = {}
+  }: { failExistingLookup?: boolean; failStudyArmCreateUnique?: boolean; failStudyProductUpsert?: boolean } = {}
 ) {
   const study = {
     code: NAVIGO_STUDY_CODE,
@@ -3100,6 +3388,13 @@ function createNavigoParticipantImportState(
     },
     studyArm: {
       async create(args: { data: Omit<(typeof arms)[number], "id">; select: { id: true } }) {
+        if (
+          failStudyArmCreateUnique ||
+          arms.some((arm) => arm.studyId === args.data.studyId && arm.sortOrder === args.data.sortOrder)
+        ) {
+          throw { code: "P2002", message: "Unique constraint failed on the fields: (`studyId`, `sortOrder`)" };
+        }
+
         const record = { ...args.data, id: `arm-${arms.length + 1}` };
         arms.push(record);
         return { id: record.id };

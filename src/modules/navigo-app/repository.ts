@@ -1114,228 +1114,64 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
       }
 
       const prisma = await getPrisma();
+      let logStudyId = "unknown";
 
-      return prisma.$transaction(async (tx) => {
-        const participant = (await tx.studyParticipant.findUnique?.({
-          select: participantWithActivitiesSelect,
-          where: { id: input.studyParticipantId }
-        })) as ParticipantRecord | null;
+      try {
+        return await prisma.$transaction(async (tx) => {
+          const participant = (await tx.studyParticipant.findUnique?.({
+            select: participantWithActivitiesSelect,
+            where: { id: input.studyParticipantId }
+          })) as ParticipantRecord | null;
 
-        if (!participant) {
-          return { message: "No encontramos el participante.", ok: false };
-        }
-
-        if (participant.study.code !== NAVIGO_STUDY_CODE) {
-          return { message: "Solo el estudio Navigo permite configurar rotacion de App Navigo.", ok: false };
-        }
-
-        if (!participant.participantConfirmation || participantStatus(participant) !== "APPROVED") {
-          return { message: "Solo participantes confirmados con folio pueden recibir rotacion.", ok: false };
-        }
-
-        if (hasT0Started(participant)) {
-          return { message: "No se puede modificar rotacion porque T0 ya fue iniciado.", ok: false };
-        }
-
-        const studyId = participant.study.id;
-        const rotationCode = createNavigoRotationPlanCode({
-          folio: participant.participantConfirmation.folio,
-          leftFragranceCode,
-          rightFragranceCode
-        });
-        const leftArm = (await tx.studyArm.upsert?.({
-          create: {
-            code: "LEFT",
-            label: "Brazo izquierdo",
-            sortOrder: 1,
-            studyId
-          },
-          update: {
-            label: "Brazo izquierdo",
-            sortOrder: 1
-          },
-          where: {
-            studyId_code: {
-              code: "LEFT",
-              studyId
-            }
+          if (!participant) {
+            return { message: "No encontramos el participante.", ok: false };
           }
-        })) as { id: string };
-        const rightArm = (await tx.studyArm.upsert?.({
-          create: {
-            code: "RIGHT",
-            label: "Brazo derecho",
-            sortOrder: 2,
-            studyId
-          },
-          update: {
-            label: "Brazo derecho",
-            sortOrder: 2
-          },
-          where: {
-            studyId_code: {
-              code: "RIGHT",
-              studyId
-            }
-          }
-        })) as { id: string };
-        const leftProduct = (await tx.studyProduct.upsert?.({
-          create: {
-            displayLabel: "Primera fragancia",
-            internalCode: leftFragranceCode,
-            isSensitive: true,
-            realName: leftFragranceCode,
-            studyId
-          },
-          update: {
-            displayLabel: "Primera fragancia",
-            isSensitive: true
-          },
-          where: {
-            studyId_internalCode: {
-              internalCode: leftFragranceCode,
-              studyId
-            }
-          }
-        })) as { id: string };
-        const rightProduct = (await tx.studyProduct.upsert?.({
-          create: {
-            displayLabel: "Segunda fragancia",
-            internalCode: rightFragranceCode,
-            isSensitive: true,
-            realName: rightFragranceCode,
-            studyId
-          },
-          update: {
-            displayLabel: "Segunda fragancia",
-            isSensitive: true
-          },
-          where: {
-            studyId_internalCode: {
-              internalCode: rightFragranceCode,
-              studyId
-            }
-          }
-        })) as { id: string };
-        const rotationPlan = (await tx.rotationPlan.upsert?.({
-          create: {
-            assignmentModeAllowed: "MANUAL",
-            name: rotationCode,
-            rotationCode,
-            status: "ACTIVE",
-            studyId
-          },
-          select: {
-            id: true
-          },
-          update: {
-            assignmentModeAllowed: "MANUAL",
-            name: rotationCode,
-            status: "ACTIVE"
-          },
-          where: {
-            studyId_rotationCode: {
-              rotationCode,
-              studyId
-            }
-          }
-        })) as { id: string };
 
-        await tx.rotationPlanArm.deleteMany?.({
-          where: { rotationPlanId: rotationPlan.id }
-        });
-        await tx.rotationPlanArm.createMany?.({
-          data: [
-            {
-              applicationOrder: 1,
-              participantVisibleLabel: "Primera fragancia",
-              rotationPlanId: rotationPlan.id,
-              studyArmId: leftArm.id,
-              studyProductId: leftProduct.id
-            },
-            {
-              applicationOrder: 2,
-              participantVisibleLabel: "Segunda fragancia",
-              rotationPlanId: rotationPlan.id,
-              studyArmId: rightArm.id,
-              studyProductId: rightProduct.id
-            }
-          ]
-        });
+          logStudyId = participant.study.id;
 
-        const rotationAssignment = (await tx.participantRotationAssignment.upsert?.({
-          create: {
-            assignedByUserId: input.actorUserId,
-            assignmentMode: "MANUAL_COVER_CODE",
-            rotationCode,
-            rotationPlanId: rotationPlan.id,
-            studyParticipantId: participant.id
-          },
-          select: { id: true },
-          update: {
-            changedAt: new Date(),
-            rotationCode,
-            rotationPlanId: rotationPlan.id
-          },
-          where: {
-            studyParticipantId: participant.id
+          if (participant.study.code !== NAVIGO_STUDY_CODE) {
+            return { message: "Solo el estudio Navigo permite configurar rotacion de App Navigo.", ok: false };
           }
-        })) as { id: string };
 
-        await tx.participantArmAssignment.upsert?.({
-          create: {
-            applicationOrder: 1,
-            participantRotationAssignmentId: rotationAssignment.id,
-            participantVisibleLabel: "Primera fragancia",
-            studyArmId: leftArm.id,
-            studyParticipantId: participant.id,
-            studyProductId: leftProduct.id
-          },
-          update: {
-            applicationOrder: 1,
-            participantRotationAssignmentId: rotationAssignment.id,
-            participantVisibleLabel: "Primera fragancia",
-            studyProductId: leftProduct.id
-          },
-          where: {
-            studyParticipantId_studyArmId: {
-              studyArmId: leftArm.id,
-              studyParticipantId: participant.id
-            }
+          if (!participant.participantConfirmation || participantStatus(participant) !== "APPROVED") {
+            return { message: "Solo participantes confirmados con folio pueden recibir rotacion.", ok: false };
           }
-        });
-        await tx.participantArmAssignment.upsert?.({
-          create: {
-            applicationOrder: 2,
-            participantRotationAssignmentId: rotationAssignment.id,
-            participantVisibleLabel: "Segunda fragancia",
-            studyArmId: rightArm.id,
-            studyParticipantId: participant.id,
-            studyProductId: rightProduct.id
-          },
-          update: {
-            applicationOrder: 2,
-            participantRotationAssignmentId: rotationAssignment.id,
-            participantVisibleLabel: "Segunda fragancia",
-            studyProductId: rightProduct.id
-          },
-          where: {
-            studyParticipantId_studyArmId: {
-              studyArmId: rightArm.id,
-              studyParticipantId: participant.id
-            }
-          }
-        });
 
-        return {
-          data: {
+          if (hasT0Started(participant)) {
+            return { message: "No se puede modificar rotacion porque T0 ya fue iniciado.", ok: false };
+          }
+
+          const { rotationCode } = await upsertParticipantRotationForCodes({
+            actorUserId: input.actorUserId,
             leftFragranceCode,
-            rotationCode,
+            participant,
+            prisma: tx,
             rightFragranceCode
-          },
-          ok: true
+          });
+
+          return {
+            data: {
+              leftFragranceCode,
+              rotationCode,
+              rightFragranceCode
+            },
+            ok: true
+          };
+        });
+      } catch (error) {
+        const failure = toNavigoRotationApplyFailure(error);
+        logNavigoRotationApplyFailure({
+          error,
+          folio: failure.folio,
+          message: failure.logMessage,
+          step: failure.step,
+          studyId: logStudyId
+        });
+        return {
+          message: failure.message,
+          ok: false
         };
-      });
+      }
     },
 
     async updateParticipantVisualVerificationMode(input) {
@@ -4775,14 +4611,31 @@ async function runNavigoRotationImportStep<T>({
 
     return result;
   } catch (error) {
+    const code = getPrismaErrorCode(error);
     throw new NavigoRotationApplyError({
-      code: getPrismaErrorCode(error),
+      code,
       folio,
       logMessage: sanitizeRotationImportLogMessage(error),
-      message: isLikelyDatabaseError(error) ? "Error de base de datos al guardar la rotacion. Revisa logs." : userMessage,
+      message: buildNavigoRotationStepErrorMessage({ code, step, userMessage }),
       step
     });
   }
+}
+
+function buildNavigoRotationStepErrorMessage({
+  code,
+  step,
+  userMessage
+}: {
+  code?: string;
+  step: string;
+  userMessage: string;
+}): string {
+  if (code === "P2002" && step.startsWith("study-arm-")) {
+    return "No se pudo guardar la rotacion porque ya existe un brazo con ese orden. Actualiza la configuracion e intenta nuevamente.";
+  }
+
+  return code ? "Error de base de datos al guardar la rotacion. Revisa logs." : userMessage;
 }
 
 class NavigoRotationApplyError extends Error {
