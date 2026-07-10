@@ -245,6 +245,7 @@ export async function reviewHutVisualVerificationAction(
 export async function requestHutReferenceSelfieUploadAction(
   studyId: string,
   participantId: string,
+  requestOrigin: string,
   metadata: HutSelfieUploadMetadata
 ): Promise<HutActionResult<HutSignedSelfieUpload>> {
   const actor = await requireCapability("screening:review");
@@ -252,6 +253,7 @@ export async function requestHutReferenceSelfieUploadAction(
     actorUserId: actor.id,
     metadata,
     participantId,
+    requestOrigin,
     studyId
   });
 }
@@ -259,6 +261,7 @@ export async function requestHutReferenceSelfieUploadAction(
 export async function confirmHutReferenceSelfieUploadAction(
   studyId: string,
   participantId: string,
+  requestOrigin: string,
   metadata: HutSelfieUploadMetadata & {
     privateStorageKey: string;
     storageBucket: string;
@@ -269,6 +272,7 @@ export async function confirmHutReferenceSelfieUploadAction(
     actorUserId: actor.id,
     metadata,
     participantId,
+    requestOrigin,
     studyId
   });
 

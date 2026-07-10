@@ -10,6 +10,7 @@ import {
   parseHutParticipantImportText,
   parseHutRegistrationSlotImportText
 } from ".";
+import type { OneuiWhatsAppMessageRecord, OneuiWhatsAppRepository } from "@/modules/oneui-whatsapp";
 import type { HutStorageClient } from "./storage";
 
 describe("HUT module foundation", () => {
@@ -78,6 +79,7 @@ describe("HUT module foundation", () => {
       actorUserId: "user-1",
       metadata: selfieMetadata(),
       participantId: participant?.id ?? "",
+      requestOrigin: "https://example.com",
       storage,
       studyId: "study-hut"
     });
@@ -90,11 +92,185 @@ describe("HUT module foundation", () => {
         storageBucket: signed.ok ? signed.data.storageBucket : ""
       },
       participantId: participant?.id ?? "",
+      requestOrigin: "https://example.com",
       studyId: "study-hut"
     });
 
     expect(confirmed.ok).toBe(true);
     expect(participant?.referenceSelfie?.privateStorageKey).toContain("/reference-selfie/");
+  });
+
+  it("allows saving the missing registration selfie when block 1 has an operational start date but no evidence", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Con Fecha",
+      requestOrigin: "https://example.com",
+      startDate: new Date("2026-07-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0];
+
+    const signed = await repository.requestReferenceSelfieUpload({
+      actorUserId: "user-1",
+      metadata: selfieMetadata(),
+      participantId: participant?.id ?? "",
+      requestOrigin: "https://example.com",
+      storage,
+      studyId: "study-hut"
+    });
+
+    expect(signed.ok).toBe(true);
+  });
+
+  it("blocks replacing the registration selfie only after block 1 has real daily evidence", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Con Evidencia",
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    participant.referenceSelfie = referenceSelfie();
+    participant.visualVerifications.push({
+      attemptSelfieKey: "daily-selfie.jpg",
+      attemptStorageBucket: "participant-evidence",
+      blockNumber: 1,
+      id: "verification-1",
+      overrideReason: null,
+      reviewedAt: null,
+      reviewedByUserId: null,
+      sequenceNumber: 1,
+      similarityScore: 0.8,
+      status: "MATCHED",
+      verificationDate: new Date("2026-07-01T13:00:00.000Z")
+    });
+
+    const signed = await repository.requestReferenceSelfieUpload({
+      actorUserId: "user-1",
+      metadata: selfieMetadata(),
+      participantId: participant.id,
+      requestOrigin: "https://example.com",
+      storage,
+      studyId: "study-hut"
+    });
+
+    expect(signed.ok).toBe(false);
+    expect(signed.ok ? "" : signed.message).toBe("La selfie de registro sólo puede reemplazarse antes de iniciar el Bloque 1.");
+  });
+
+  it("does not send HUT WhatsApp when an admin creates a participant without a registration selfie", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const whatsapp = createFakeWhatsAppRepository();
+    const repository = createHutRepository(prisma as never, whatsapp);
+
+    const created = await repository.createParticipant({
+      firstFragranceLeftArm: "Fragancia A",
+      folio: "HUT-010",
+      name: "Participante Manual",
+      phone: "5512345678",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "Fragancia B",
+      studyId: "study-hut"
+    });
+
+    expect(created.ok).toBe(true);
+    expect(whatsapp.createOutboundMessage).not.toHaveBeenCalled();
+  });
+
+  it("sends HUT WhatsApp after saving the admin registration selfie and does not duplicate a sent message", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const whatsapp = createFakeWhatsAppRepository();
+    const repository = createHutRepository(prisma as never, whatsapp);
+    await repository.createParticipant({
+      firstFragranceLeftArm: "Fragancia A",
+      folio: "HUT-011",
+      name: "Participante WhatsApp",
+      phone: "5512345678",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "Fragancia B",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    const signed = await repository.requestReferenceSelfieUpload({
+      actorUserId: "user-1",
+      metadata: selfieMetadata(),
+      participantId: participant.id,
+      requestOrigin: "https://example.com",
+      storage,
+      studyId: "study-hut"
+    });
+
+    const confirmed = await repository.confirmReferenceSelfieUpload({
+      actorUserId: "user-1",
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: signed.ok ? signed.data.privateStorageKey : "",
+        storageBucket: signed.ok ? signed.data.storageBucket : ""
+      },
+      participantId: participant.id,
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    const firstSendCount = whatsapp.createOutboundMessage.mock.calls.length;
+    whatsapp.latestMessage = fakeWhatsAppMessage({ status: "accepted" });
+    const confirmedAgain = await repository.confirmReferenceSelfieUpload({
+      actorUserId: "user-1",
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: signed.ok ? signed.data.privateStorageKey : "",
+        storageBucket: signed.ok ? signed.data.storageBucket : ""
+      },
+      participantId: participant.id,
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+
+    expect(confirmed.ok).toBe(true);
+    expect(firstSendCount).toBeGreaterThan(0);
+    expect(confirmedAgain.ok).toBe(true);
+    expect(whatsapp.createOutboundMessage).toHaveBeenCalledTimes(firstSendCount);
+  });
+
+  it("keeps the registration selfie when HUT WhatsApp fails after saving", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const whatsapp = createFakeWhatsAppRepository();
+    const repository = createHutRepository(prisma as never, whatsapp);
+    await repository.createParticipant({
+      firstFragranceLeftArm: "Fragancia A",
+      folio: "HUT-012",
+      name: "Participante Error WhatsApp",
+      phone: "5512345678",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "Fragancia B",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    const signed = await repository.requestReferenceSelfieUpload({
+      actorUserId: "user-1",
+      metadata: selfieMetadata(),
+      participantId: participant.id,
+      requestOrigin: "https://example.com",
+      storage,
+      studyId: "study-hut"
+    });
+
+    const confirmed = await repository.confirmReferenceSelfieUpload({
+      actorUserId: "user-1",
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: signed.ok ? signed.data.privateStorageKey : "",
+        storageBucket: signed.ok ? signed.data.storageBucket : ""
+      },
+      participantId: participant.id,
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+
+    expect(confirmed.ok).toBe(true);
+    expect(confirmed.ok ? confirmed.message : "").toContain("Faltan variables de entorno para enviar por WhatsApp.");
+    expect(participant.referenceSelfie?.privateStorageKey).toContain("/reference-selfie/");
   });
 
   it("creates a HUT registration folio with rotation and registration link", async () => {
@@ -156,6 +332,36 @@ describe("HUT module foundation", () => {
     });
     expect(prisma.state.participants[0]?.referenceSelfie?.privateStorageKey).toContain("/hut-registration-slots/");
     expect(registered.ok ? registered.data.participantLink : "").toContain("/hut/p/");
+  });
+
+  it("sends HUT WhatsApp after public folio registration because the registration selfie is already stored", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const whatsapp = createFakeWhatsAppRepository();
+    const repository = createHutRepository(prisma as never, whatsapp);
+    await repository.createRegistrationSlot({
+      firstFragranceLeftArm: "Fragancia A",
+      folio: "HUT-020",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "Fragancia B",
+      studyId: "study-hut"
+    });
+    const token = prisma.state.registrationSlots[0]?.registrationToken ?? "";
+    const signed = await repository.requestRegistrationSelfieUpload({ metadata: selfieMetadata(), storage, token });
+
+    const registered = await repository.completeRegistration({
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: signed.ok ? signed.data.privateStorageKey : "",
+        storageBucket: signed.ok ? signed.data.storageBucket : ""
+      },
+      name: "Ana Participante",
+      phone: "55 1234 5678",
+      requestOrigin: "https://example.com",
+      token
+    });
+
+    expect(registered.ok).toBe(true);
+    expect(whatsapp.createOutboundMessage).toHaveBeenCalled();
   });
 
   it("does not allow registering the same HUT folio twice", async () => {
@@ -1674,6 +1880,95 @@ function referenceSelfie(): FakeReferenceSelfie {
     id: "reference-selfie",
     privateStorageKey: "studies/study-hut/hut-participants/participant-1/reference-selfie/base.jpg",
     storageBucket: "participant-evidence"
+  };
+}
+
+function createFakeWhatsAppRepository() {
+  let latestMessage: OneuiWhatsAppMessageRecord | null = null;
+  const repository = {
+    get latestMessage() {
+      return latestMessage;
+    },
+    set latestMessage(value: OneuiWhatsAppMessageRecord | null) {
+      latestMessage = value;
+    },
+    createOutboundMessage: vi.fn(async (input) => fakeWhatsAppMessage({
+      bodyText: input.bodyText,
+      status: "pending"
+    })),
+    findLatestOutboundTemplateMessage: vi.fn(async () => latestMessage),
+    getConversationWithMessages: vi.fn(async () => null),
+    listConversations: vi.fn(async () => []),
+    markOutboundMessageAccepted: vi.fn(async (input) => fakeWhatsAppMessage({
+      metaMessageId: input.metaMessageId,
+      status: input.status
+    })),
+    markOutboundMessageFailed: vi.fn(async (input) => fakeWhatsAppMessage({
+      rawPayload: input.rawPayload,
+      status: input.status
+    })),
+    saveInboundMessage: vi.fn(async (input) => fakeWhatsAppMessage({
+      bodyText: input.bodyText,
+      direction: "INBOUND"
+    })),
+    saveStatusEvent: vi.fn(async (input) => ({
+      createdAt: new Date("2026-07-01T12:00:00.000Z"),
+      id: "status-event-1",
+      messageId: null,
+      metaMessageId: input.metaMessageId,
+      rawPayload: input.rawPayload,
+      status: input.status,
+      timestamp: input.timestamp
+    })),
+    upsertInboundConversation: vi.fn(async (input) => ({
+      createdAt: new Date("2026-07-01T12:00:00.000Z"),
+      id: "conversation-1",
+      lastInboundAt: input.lastInboundAt,
+      lastMessageAt: input.lastInboundAt,
+      lastOutboundAt: null,
+      linkedParticipantId: null,
+      linkedStudyId: null,
+      phoneNumber: input.phoneNumber,
+      profileName: input.profileName,
+      sourceModule: "GENERAL" as const,
+      updatedAt: new Date("2026-07-01T12:00:00.000Z"),
+      waId: input.waId
+    })),
+    upsertOutboundConversation: vi.fn(async (input) => ({
+      createdAt: new Date("2026-07-01T12:00:00.000Z"),
+      id: "conversation-1",
+      lastInboundAt: null,
+      lastMessageAt: new Date("2026-07-01T12:00:00.000Z"),
+      lastOutboundAt: new Date("2026-07-01T12:00:00.000Z"),
+      linkedParticipantId: input.linkedParticipantId ?? null,
+      linkedStudyId: input.linkedStudyId ?? null,
+      phoneNumber: input.phoneNumber,
+      profileName: input.profileName ?? null,
+      sourceModule: input.sourceModule,
+      updatedAt: new Date("2026-07-01T12:00:00.000Z"),
+      waId: input.waId
+    }))
+  } satisfies OneuiWhatsAppRepository & { latestMessage: OneuiWhatsAppMessageRecord | null };
+
+  return repository;
+}
+
+function fakeWhatsAppMessage(input: Partial<OneuiWhatsAppMessageRecord> = {}): OneuiWhatsAppMessageRecord {
+  const now = new Date("2026-07-01T12:00:00.000Z");
+  return {
+    bodyText: input.bodyText ?? "Mensaje HUT",
+    conversationId: input.conversationId ?? "conversation-1",
+    createdAt: input.createdAt ?? now,
+    direction: input.direction ?? "OUTBOUND",
+    fromPhone: input.fromPhone ?? "5215511111111",
+    id: input.id ?? "message-1",
+    messageType: input.messageType ?? "template",
+    metaMessageId: input.metaMessageId ?? null,
+    rawPayload: input.rawPayload ?? {},
+    status: input.status ?? "accepted",
+    timestamp: input.timestamp ?? now,
+    toPhone: input.toPhone ?? "5215512345678",
+    updatedAt: input.updatedAt ?? now
   };
 }
 

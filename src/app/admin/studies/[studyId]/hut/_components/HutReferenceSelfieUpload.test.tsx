@@ -75,7 +75,7 @@ describe("HutReferenceSelfieUpload", () => {
   });
 
   it("uses camera capture for the admin reference selfie without file upload", () => {
-    render(<HutReferenceSelfieUpload disabled={false} participantId="participant-1" studyId="study-hut" />);
+    render(<HutReferenceSelfieUpload disabled={false} participantId="participant-1" requestOrigin="https://example.com" studyId="study-hut" />);
 
     expect(screen.getByRole("button", { name: "Tomar selfie de registro" })).toBeInTheDocument();
     expect(screen.queryByLabelText(/seleccionar archivo/i)).not.toBeInTheDocument();
@@ -83,7 +83,7 @@ describe("HutReferenceSelfieUpload", () => {
   });
 
   it("shows the privacy HUD in camera and preview, while capturing from the original video", async () => {
-    render(<HutReferenceSelfieUpload disabled={false} participantId="participant-1" studyId="study-hut" />);
+    render(<HutReferenceSelfieUpload disabled={false} participantId="participant-1" requestOrigin="https://example.com" studyId="study-hut" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Tomar selfie de registro" }));
 
@@ -94,6 +94,7 @@ describe("HutReferenceSelfieUpload", () => {
       });
     });
     expect(screen.getByTestId("hut-admin-selfie-camera-hud")).toBeInTheDocument();
+    expect(screen.getByTestId("hut-admin-selfie-camera-hud").parentElement).toHaveClass("max-w-[460px]");
 
     fireEvent.click(await screen.findByRole("button", { name: "Tomar selfie" }));
 
@@ -103,14 +104,19 @@ describe("HutReferenceSelfieUpload", () => {
   });
 
   it("uploads the captured reference selfie after camera confirmation", async () => {
-    render(<HutReferenceSelfieUpload disabled={false} participantId="participant-1" studyId="study-hut" />);
+    render(<HutReferenceSelfieUpload disabled={false} participantId="participant-1" requestOrigin="https://example.com" studyId="study-hut" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Tomar selfie de registro" }));
     fireEvent.click(await screen.findByRole("button", { name: "Tomar selfie" }));
     fireEvent.click(await screen.findByRole("button", { name: "Guardar selfie de registro" }));
 
     await waitFor(() => {
-      expect(requestHutReferenceSelfieUploadAction).toHaveBeenCalled();
+      expect(requestHutReferenceSelfieUploadAction).toHaveBeenCalledWith(
+        "study-hut",
+        "participant-1",
+        "https://example.com",
+        expect.objectContaining({ mimeType: "image/jpeg" })
+      );
       expect(createBrowserSupabaseClient).toHaveBeenCalled();
       expect(uploadToSignedUrl).toHaveBeenCalledWith(
         "hut/reference-selfie.jpg",
@@ -118,7 +124,12 @@ describe("HutReferenceSelfieUpload", () => {
         expect.any(File),
         expect.objectContaining({ contentType: "image/jpeg" })
       );
-      expect(confirmHutReferenceSelfieUploadAction).toHaveBeenCalled();
+      expect(confirmHutReferenceSelfieUploadAction).toHaveBeenCalledWith(
+        "study-hut",
+        "participant-1",
+        "https://example.com",
+        expect.objectContaining({ privateStorageKey: "hut/reference-selfie.jpg" })
+      );
     });
   });
 });

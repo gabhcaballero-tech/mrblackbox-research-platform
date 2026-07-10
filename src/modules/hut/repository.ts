@@ -297,6 +297,7 @@ export type HutRepository = {
     actorUserId: string;
     metadata: HutSelfieUploadMetadata;
     participantId: string;
+    requestOrigin: string;
     storage?: HutStorageClient;
     studyId: string;
   }) => Promise<HutActionResult<HutSignedSelfieUpload>>;
@@ -307,6 +308,7 @@ export type HutRepository = {
       storageBucket: string;
     };
     participantId: string;
+    requestOrigin: string;
     studyId: string;
   }) => Promise<HutActionResult<{ participantId: string }>>;
   requestRegistrationSelfieUpload: (input: {
@@ -785,15 +787,6 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           ok: true
         };
       });
-
-      if (result.ok) {
-        await sendHutRegistrationWhatsAppForParticipant({
-          link: result.data.link,
-          participantId: result.data.participantId,
-          prisma,
-          whatsappRepository: getWhatsAppRepository()
-        });
-      }
 
       return result;
     },
@@ -1614,8 +1607,8 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         return { message: "No encontramos el participante HUT.", ok: false };
       }
 
-      if (participant.blocks.some((block) => block.status !== "NOT_STARTED")) {
-        return { message: "La selfie de registro solo puede reemplazarse antes de iniciar el bloque.", ok: false };
+      if (participant.referenceSelfie && hasStartedHutBlockOneEvidence(participant)) {
+        return { message: "La selfie de registro sólo puede reemplazarse antes de iniciar el Bloque 1.", ok: false };
       }
 
       try {
@@ -1635,11 +1628,15 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       const prisma = await getPrisma();
       const now = new Date();
 
-      return prisma.$transaction(async (tx) => {
+      const result: HutActionResult<{ participantId: string }> = await prisma.$transaction(async (tx) => {
         const participant = await findParticipant(tx, input.participantId);
 
         if (!participant || participant.studyId !== input.studyId) {
           return { message: "No encontramos el participante HUT.", ok: false };
+        }
+
+        if (participant.referenceSelfie && hasStartedHutBlockOneEvidence(participant)) {
+          return { message: "La selfie de registro sólo puede reemplazarse antes de iniciar el Bloque 1.", ok: false };
         }
 
         if (input.metadata.storageBucket !== HUT_VIDEO_BUCKET) {
@@ -1692,6 +1689,34 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           ok: true
         };
       });
+
+      if (!result.ok) {
+        return result;
+      }
+
+      const savedParticipant = await findParticipant(prisma, result.data.participantId);
+      const link = savedParticipant ? participantLink(input.requestOrigin, savedParticipant.token) : "";
+      const whatsappResult = await sendHutRegistrationWhatsAppForParticipant({
+        force: false,
+        link,
+        participantId: result.data.participantId,
+        prisma,
+        whatsappRepository: getWhatsAppRepository()
+      });
+
+      if (!whatsappResult.ok) {
+        return {
+          data: result.data,
+          message: `Selfie de registro guardada correctamente. ${whatsappResult.message}`,
+          ok: true
+        };
+      }
+
+      return {
+        data: result.data,
+        message: "Selfie de registro guardada correctamente. WhatsApp de registro HUT enviado correctamente.",
+        ok: true
+      };
     },
 
     async requestRegistrationSelfieUpload(input) {
@@ -2448,6 +2473,9 @@ async function sendHutRegistrationWhatsAppForParticipant({
   if (!participant) {
     return { message: "No encontramos el participante HUT.", ok: false };
   }
+  if (!participant.referenceSelfie) {
+    return { message: "Guarda la selfie de registro para habilitar el inicio del HUT.", ok: false };
+  }
 
   try {
     const repository = whatsappRepository ?? createOneuiWhatsAppRepository();
@@ -2485,6 +2513,20 @@ async function sendHutRegistrationWhatsAppForParticipant({
     });
     return { message: "No fue posible enviar el WhatsApp de registro HUT.", ok: false };
   }
+}
+
+function hasStartedHutBlockOneEvidence(participant: HutParticipantRecord): boolean {
+  const blockOne = blockByNumber(participant, 1);
+  if (!blockOne) {
+    return false;
+  }
+
+  return (
+    blockOne.submittedVideosCount > 0 ||
+    Boolean(participant.videoSubmissions?.some((video) => video.blockNumber === 1)) ||
+    Boolean(participant.dailyChecks?.some((check) => check.blockId === blockOne.id)) ||
+    Boolean(participant.visualVerifications?.some((verification) => verification.blockNumber === 1))
+  );
 }
 
 function toAdminRegistrationSlot(slot: HutRegistrationSlotRecord, requestOrigin: string): HutRegistrationSlotAdmin {

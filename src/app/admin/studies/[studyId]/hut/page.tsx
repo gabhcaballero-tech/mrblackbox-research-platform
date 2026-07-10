@@ -344,7 +344,7 @@ function HutParticipantCard({
       <div className="mt-3 space-y-2">
         {participant.referenceSelfie.status === "MISSING" ? (
           <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
-            Falta selfie de registro.
+            Guarda la selfie de registro para habilitar el inicio del HUT.
           </p>
         ) : null}
         {participant.usedToleranceInCurrentBlock ? (
@@ -387,12 +387,14 @@ function HutParticipantCard({
                 <div>
                   <p className="text-sm font-semibold text-emerald-950">Confirmación por WhatsApp</p>
                   <p className="mt-1 text-xs leading-5 text-emerald-900">
-                    Envío automático: {whatsappAutomationLabel(participant.whatsappRegistration.status)}. El enlace manual sigue disponible como respaldo.
+                    {participant.referenceSelfie.status === "MISSING"
+                      ? "WhatsApp pendiente: se enviará después de guardar la selfie de registro."
+                      : `Envío automático: ${whatsappAutomationLabel(participant.whatsappRegistration.status)}. El enlace manual sigue disponible como respaldo.`}
                   </p>
                 </div>
                 <form action={sendHutRegistrationWhatsAppAction.bind(null, studyId, participant.id)}>
                   <input name="requestOrigin" type="hidden" value={requestOrigin} />
-                  <SubmitButton pendingLabel="Enviando WhatsApp...">
+                  <SubmitButton disabled={participant.referenceSelfie.status === "MISSING"} pendingLabel="Enviando WhatsApp...">
                     {participant.whatsappRegistration.status === "NO_ENVIADO" ? "Enviar WhatsApp" : "Reenviar WhatsApp"}
                   </SubmitButton>
                 </form>
@@ -428,6 +430,7 @@ function HutParticipantCard({
           <SelfieRegistrationCard
             disabledReason={referenceSelfieDisabledReason}
             participant={participant}
+            requestOrigin={requestOrigin}
             studyId={studyId}
           />
 
@@ -639,10 +642,12 @@ function buildHutWhatsAppUrl({ message, phone }: { message: string; phone: strin
 function SelfieRegistrationCard({
   disabledReason,
   participant,
+  requestOrigin,
   studyId
 }: {
   disabledReason: string | null;
   participant: HutAdminParticipant;
+  requestOrigin: string;
   studyId: string;
 }) {
   const hasSelfie = participant.referenceSelfie.status === "COMPLETE";
@@ -682,6 +687,7 @@ function SelfieRegistrationCard({
             disabled={Boolean(disabledReason)}
             disabledReason={disabledReason}
             participantId={participant.id}
+            requestOrigin={requestOrigin}
             studyId={studyId}
           />
         </div>

@@ -20,6 +20,7 @@ type HutReferenceSelfieUploadProps = {
   disabled: boolean;
   disabledReason?: string | null;
   participantId: string;
+  requestOrigin: string;
   studyId: string;
 };
 
@@ -27,6 +28,7 @@ export function HutReferenceSelfieUpload({
   disabled,
   disabledReason = null,
   participantId,
+  requestOrigin,
   studyId
 }: HutReferenceSelfieUploadProps) {
   const [file, setFile] = useState<File | null>(null);
@@ -57,7 +59,7 @@ export function HutReferenceSelfieUpload({
           originalFilename: selectedFile.name,
           sizeBytes: selectedFile.size
         };
-        const signed = await requestHutReferenceSelfieUploadAction(studyId, participantId, metadata);
+        const signed = await requestHutReferenceSelfieUploadAction(studyId, participantId, requestOrigin, metadata);
 
         if (!signed.ok) {
           setError(signed.message);
@@ -79,7 +81,7 @@ export function HutReferenceSelfieUpload({
           return;
         }
 
-        const confirmed = await confirmHutReferenceSelfieUploadAction(studyId, participantId, {
+        const confirmed = await confirmHutReferenceSelfieUploadAction(studyId, participantId, requestOrigin, {
           ...metadata,
           privateStorageKey: signed.data.privateStorageKey,
           storageBucket: signed.data.storageBucket
@@ -231,7 +233,7 @@ export function HutReferenceSelfieUpload({
       ) : null}
       {cameraState !== "idle" ? (
         <div className="space-y-2 rounded-md border border-zinc-200 bg-zinc-950 p-2">
-          <div className={selfieMediaFrameClass}>
+          <div className={adminSelfieMediaFrameClass}>
             <video
               autoPlay
               className={selfieMediaClass}
@@ -255,7 +257,7 @@ export function HutReferenceSelfieUpload({
       ) : null}
       {previewUrl ? (
         <div className="space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-2">
-          <div className={selfieMediaFrameClass}>
+          <div className={adminSelfieMediaFrameClass}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               alt="Preview de selfie de registro"
@@ -285,3 +287,5 @@ export function HutReferenceSelfieUpload({
 
 const secondaryButtonClass =
   "rounded-md border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400";
+
+const adminSelfieMediaFrameClass = `${selfieMediaFrameClass} mx-auto max-w-[460px]`;

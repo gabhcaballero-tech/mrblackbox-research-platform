@@ -153,10 +153,12 @@ describe("HutAdminPage", () => {
     expect(screen.getByText("Modo prueba: Inactivo")).toBeInTheDocument();
     expect(screen.getByText("WhatsApp registro")).toBeInTheDocument();
     expect(screen.getByText("Confirmación por WhatsApp")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Enviar WhatsApp" })).toBeInTheDocument();
+    expect(screen.getByText("WhatsApp pendiente: se enviará después de guardar la selfie de registro.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enviar WhatsApp" })).toBeDisabled();
     expect(screen.getByText("Mensaje manual de respaldo")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copiar mensaje" })).toBeInTheDocument();
     expect(screen.getAllByText("Selfie de registro: Faltante").length).toBeGreaterThan(0);
+    expect(screen.getByText("Guarda la selfie de registro para habilitar el inicio del HUT.")).toBeInTheDocument();
     expect(screen.getByText("Identidad diaria: Pendiente")).toBeInTheDocument();
     expect(screen.getByText("Ver revisión de identidad")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Activar modo prueba" })).toBeInTheDocument();
