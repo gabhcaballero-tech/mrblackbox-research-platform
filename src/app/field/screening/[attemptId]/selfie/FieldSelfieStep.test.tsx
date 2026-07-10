@@ -53,8 +53,13 @@ describe("FieldSelfieStep", () => {
     URL.revokeObjectURL = vi.fn();
   });
 
-  it("shows the privacy HUD over the live camera", async () => {
+  it("shows the privacy HUD over the live camera without saying the selfie is saved complete", async () => {
     render(<FieldSelfieStep screen={fieldSelfieScreen()} />);
+
+    expect(screen.queryByText(/se guarda completa/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Coloca tu rostro dentro de la guía. Si se ven claramente tus ojos y nariz, la foto está bien.")
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Abrir cámara" }));
 
@@ -94,6 +99,22 @@ describe("FieldSelfieStep", () => {
 
     await waitFor(() => {
       expect(window.location.href).toBe("/field/screening/attempt-1/evidences");
+    });
+  });
+
+  it("redirects to result when the evidence action completes review submission", async () => {
+    vi.mocked(completeFieldEvidenceSubmissionAction).mockResolvedValueOnce({
+      data: {
+        redirectTo: "/field/screening/attempt-1/result"
+      },
+      ok: true
+    });
+    render(<FieldSelfieStep screen={fieldSelfieScreen({ perfumePhotos: 1, selfie: 1 })} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Enviar a revisión" }));
+
+    await waitFor(() => {
+      expect(window.location.href).toBe("/field/screening/attempt-1/result");
     });
   });
 });

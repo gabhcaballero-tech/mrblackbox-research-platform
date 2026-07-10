@@ -789,6 +789,20 @@ export async function completeFieldEvidenceSubmission({
     studyParticipantId: context.data.studyParticipantId
   });
 
+  await repository.updateAttemptEvaluation({
+    attemptId: context.data.id,
+    completedAt: context.data.completedAt ?? new Date(),
+    evaluationJson: context.data.evaluationJson,
+    nseClass: context.data.nseClass,
+    nseScore: context.data.nseScore,
+    operationalStatus: "SCREENING_PASSED",
+    screeningStatus: "PENDING_REVIEW",
+    status: "PENDING_REVIEW",
+    studyParticipantId: context.data.studyParticipantId,
+    terminationCode: context.data.terminationCode,
+    terminationReason: context.data.terminationReason
+  });
+
   return {
     data: toFieldSelfieScreen(context.data),
     ok: true

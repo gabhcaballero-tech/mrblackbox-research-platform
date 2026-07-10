@@ -283,7 +283,7 @@ export function FieldSelfieStep({ screen }: { screen: FieldSelfieScreen }) {
             Toma una selfie clara de identificación. Se usará únicamente para validar que la misma persona continúe durante el estudio.
           </p>
           <p className="text-sm leading-6 text-zinc-600">
-            Coloca tus ojos dentro de las guías y mira de frente. La capa oscura es solo una ayuda visual; la selfie se guarda completa.
+            Coloca tu rostro dentro de la guía. Si se ven claramente tus ojos y nariz, la foto está bien.
           </p>
           <p className="text-sm text-zinc-500">Selfie registrada: {selfieCount}/1</p>
         </div>

@@ -852,6 +852,47 @@ describe("field service", () => {
       "F6_MARCAS_UTILIZA"
     );
     expect(completedAttempt?.participantScreeningReview?.status).toBe("PENDING");
+    expect(completedAttempt?.status).toBe("PENDING_REVIEW");
+  });
+
+  it("keeps pending review idempotent when evidence submission is repeated", async () => {
+    const repository = createMemoryRepository();
+    const attemptId = await startAttempt(repository, PUBLIC_FIELD_ACTOR);
+
+    await answerEligibleBase(repository, attemptId, "HIGH", PUBLIC_FIELD_ACTOR);
+    await confirmFieldEvidenceUpload({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      input: {
+        evidenceType: "SELFIE_IDENTIFICATION",
+        mimeType: "image/jpeg",
+        originalFilename: "selfie.jpg",
+        privateStorageKey: `studies/${studyId}/participants/profile-1/screening-attempts/${attemptId}/selfie_identification/selfie.jpg`,
+        sizeBytes: 1200,
+        storageBucket: "participant-evidence"
+      },
+      repository
+    });
+
+    const first = await completeFieldEvidenceSubmission({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      repository
+    });
+    const second = await completeFieldEvidenceSubmission({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      repository
+    });
+    const completedAttempt = await repository.getAttempt(attemptId);
+
+    expect(first).toMatchObject({ ok: true });
+    expect(second).toMatchObject({ ok: true });
+    expect(completedAttempt?.participantScreeningReview).toEqual({
+      rejectionReason: null,
+      status: "PENDING"
+    });
+    expect(completedAttempt?.status).toBe("PENDING_REVIEW");
   });
 
   it("exposes perfume evidence state and blocks adding more than five perfume photos", async () => {

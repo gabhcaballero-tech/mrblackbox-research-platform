@@ -97,11 +97,26 @@ export async function completeFieldEvidenceSubmissionAction(
   attemptId: string
 ): Promise<FieldEvidenceActionResult<{ redirectTo: string }>> {
   const actor = await getFieldActorForRequest();
-  const result = await completeFieldEvidenceSubmission({
-    actor,
-    attemptId,
-    repository: createFieldRepository()
-  });
+  let result: Awaited<ReturnType<typeof completeFieldEvidenceSubmission>>;
+
+  try {
+    result = await completeFieldEvidenceSubmission({
+      actor,
+      attemptId,
+      repository: createFieldRepository()
+    });
+  } catch (error) {
+    console.error("public field evidence completion failed", {
+      attemptId,
+      code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+      step: "complete_evidence_submission"
+    });
+
+    return {
+      message: "No fue posible enviar tu perfil a revisión. Intenta nuevamente.",
+      ok: false
+    };
+  }
 
   if (!result.ok) {
     if (result.code === "EVIDENCE_INCOMPLETE") {

@@ -95,6 +95,32 @@ describe("Field screening result page", () => {
     expect(screen.queryByText("Campo no disponible")).not.toBeInTheDocument();
   });
 
+  it("shows profile review when the attempt status is already PENDING_REVIEW", async () => {
+    vi.mocked(getFieldScreeningAttemptScreen).mockResolvedValueOnce({
+      data: fieldScreen({
+        participantEvidence: [
+          evidenceRecord("evidence-1", "SELFIE_IDENTIFICATION"),
+          evidenceRecord("evidence-2", "PERFUME_PHOTO")
+        ],
+        participantScreeningReview: {
+          rejectionReason: null,
+          status: "PENDING"
+        },
+        status: "PENDING_REVIEW"
+      }),
+      ok: true
+    });
+
+    render(
+      await ScreeningResultPage({
+        params: Promise.resolve({ attemptId: "attempt-1" })
+      })
+    );
+
+    expect(screen.getByText("Registro recibido")).toBeInTheDocument();
+    expect(screen.queryByText("Campo no disponible")).not.toBeInTheDocument();
+  });
+
   it("shows a clear result message instead of the generic field error when the screen cannot be loaded", async () => {
     vi.mocked(getFieldScreeningAttemptScreen).mockResolvedValueOnce({
       code: "STUDY_NOT_AVAILABLE",
@@ -137,8 +163,11 @@ function fieldScreen(
   overrides: {
     participantEvidence?: FieldParticipantEvidenceRecord[];
     participantScreeningReview?: { rejectionReason: string | null; status: "APPROVED" | "PENDING" | "REJECTED" } | null;
+    status?: FieldAttemptScreen["attempt"]["status"];
   } = {}
 ): FieldAttemptScreen {
+  const evaluationStatus = overrides.status === "PENDING_REVIEW" ? "PENDING_REVIEW" : "PASSED";
+
   return {
     answers: {},
     attempt: {
@@ -175,7 +204,7 @@ function fieldScreen(
       questionnaireVersionId: "version-1",
       source: "FIELD",
       startedAt: new Date("2026-06-23T10:00:00Z"),
-      status: "PASSED",
+      status: overrides.status ?? "PASSED",
       studyParticipant: {
         id: "sp-1",
         participantProfile: {
@@ -186,7 +215,7 @@ function fieldScreen(
           phone: "5551112222"
         },
         participantProfileId: "profile-1",
-        screeningStatus: "PASSED",
+        screeningStatus: overrides.status ?? "PASSED",
         studyId: "study-1"
       },
       studyParticipantId: "sp-1",
@@ -215,13 +244,13 @@ function fieldScreen(
         result: "ELIGIBLE",
         safeExplanation: "Elegible preliminar.",
         schemaVersion: "screening-evaluation.v1",
-        status: "PASSED"
+        status: evaluationStatus
       },
       flags: [],
       missingQuestionIds: [],
       nse: null,
       result: "ELIGIBLE",
-      status: "PASSED"
+      status: evaluationStatus
     },
     visibleQuestions: []
   };
