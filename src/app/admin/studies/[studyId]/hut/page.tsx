@@ -580,10 +580,16 @@ function HutParticipantCard({
               <SubmitButton pendingLabel="Eliminando selfie...">Eliminar selfie de registro</SubmitButton>
             </form>
             <form action={resetHutCallEvaluationAction.bind(null, studyId, participant.id, 1)} className="mt-4 space-y-2">
+              <p className="text-xs leading-5 text-rose-900">
+                Esto eliminará los videos, selfies diarias y verificaciones del Bloque 1 para que pueda repetirse desde cero. No se eliminará la selfie base ni el folio.
+              </p>
               <input className={inputClass} name="confirmation" placeholder="RESTABLECER EVALUACIÓN 1" required />
               <SubmitButton pendingLabel="Restableciendo evaluación...">Restablecer evaluación 1</SubmitButton>
             </form>
             <form action={resetHutCallEvaluationAction.bind(null, studyId, participant.id, 2)} className="mt-4 space-y-2">
+              <p className="text-xs leading-5 text-rose-900">
+                Esto eliminará los videos, selfies diarias y verificaciones del Bloque 2 para que pueda repetirse desde cero. No se eliminará la selfie base ni el folio.
+              </p>
               <input className={inputClass} name="confirmation" placeholder="RESTABLECER EVALUACIÓN 2" required />
               <SubmitButton pendingLabel="Restableciendo evaluación...">Restablecer evaluación 2</SubmitButton>
             </form>

@@ -1412,11 +1412,29 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
             blockByNumber(participant, 2)?.status !== "NOT_STARTED");
         if (block2HasProgress && confirmation !== block2Confirmation) {
           return {
-            message: `El bloque 2 ya tiene avance. Escribe ${block2Confirmation} para restablecer la evaluacion 1.`,
+            message: `El bloque 2 ya tiene avance. Escribe ${block2Confirmation} para restablecer el bloque 1 completo.`,
             ok: false
           };
         }
 
+        await tx.hutVisualVerification.deleteMany?.({
+          where: {
+            blockNumber: input.blockNumber,
+            participantId: participant.id
+          }
+        });
+        await tx.hutVideoSubmission.deleteMany?.({
+          where: {
+            blockNumber: input.blockNumber,
+            participantId: participant.id
+          }
+        });
+        await tx.hutDailyCheck.deleteMany?.({
+          where: {
+            blockId: block.id,
+            participantId: participant.id
+          }
+        });
         await tx.hutCallEvaluation.update?.({
           data: {
             completedAt: null,
@@ -1434,22 +1452,27 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         await tx.hutBlock.update?.({
           data: {
             completedAt: null,
-            status: "CALL_PENDING"
+            disqualificationReason: null,
+            disqualifiedAt: null,
+            missedDaysCount: 0,
+            startDate: null,
+            status: "NOT_STARTED",
+            submittedVideosCount: 0
           },
           where: { id: block.id }
         });
         await tx.hutParticipant.update?.({
           data: {
             currentBlockNumber: input.blockNumber,
-            currentVideoSequence: block.requiredVideos,
-            status: input.blockNumber === 1 ? "BLOCK_1_CALL_PENDING" : "BLOCK_2_CALL_PENDING"
+            currentVideoSequence: 1,
+            status: "NOT_STARTED"
           },
           where: { id: participant.id }
         });
 
         return {
           data: { participantId: participant.id },
-          message: `Evaluacion ${input.blockNumber} restablecida correctamente.`,
+          message: `Bloque ${input.blockNumber} restablecido. El Video 1 esta disponible para iniciar de nuevo.`,
           ok: true
         };
       });

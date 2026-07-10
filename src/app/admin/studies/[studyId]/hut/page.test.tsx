@@ -163,6 +163,7 @@ describe("HutAdminPage", () => {
     expect(screen.getByText("Ver revisión de identidad")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Activar modo prueba" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tomar selfie de registro" })).toBeEnabled();
+    expect(screen.getByText(/Esto eliminará los videos, selfies diarias y verificaciones del Bloque 1/)).toBeInTheDocument();
     expect(screen.getByTestId("hut-reference-selfie-upload-participant-1")).toHaveAttribute("data-disabled", "false");
     expect(screen.getByTestId("hut-identity-review-details-participant-1")).not.toHaveAttribute("open");
     expect(screen.getByTestId("hut-danger-zone-participant-1")).not.toHaveAttribute("open");

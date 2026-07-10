@@ -1242,8 +1242,11 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      firstFragranceLeftArm: "Fragancia A",
+      folio: "HUT-RESET-1",
       name: "Participante Bloque 2",
       requestOrigin: "https://example.com",
+      secondFragranceRightArm: "Fragancia B",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
       studyId: "study-hut"
     });
@@ -1276,8 +1279,72 @@ describe("HUT module foundation", () => {
     expect(blocked.ok).toBe(false);
     expect(blocked.ok ? "" : blocked.message).toContain("El bloque 2 ya tiene avance");
     expect(allowed.ok).toBe(true);
+    expect(allowed.ok ? allowed.message : "").toContain("Bloque 1 restablecido");
     expect(participant.callEvaluations[0]?.status).toBe("PENDING");
-    expect(participant.status).toBe("BLOCK_1_CALL_PENDING");
+    expect(participant.referenceSelfie).not.toBeNull();
+    expect(participant.folio).toBe("HUT-RESET-1");
+    expect(participant.firstFragranceLeftArm).toBe("FRAGANCIA A");
+    expect(participant.videoSubmissions.filter((video) => video.blockNumber === 1)).toHaveLength(0);
+    expect(participant.dailyChecks.filter((check) => check.blockNumber === 1)).toHaveLength(0);
+    expect(participant.visualVerifications.filter((verification) => verification.blockNumber === 1)).toHaveLength(0);
+    expect(participant.videoSubmissions.filter((video) => video.blockNumber === 2)).toHaveLength(1);
+    expect(participant.blocks[0]).toMatchObject({
+      missedDaysCount: 0,
+      startDate: null,
+      status: "NOT_STARTED",
+      submittedVideosCount: 0
+    });
+    expect(participant.blocks[1]?.status).toBe("IN_PROGRESS");
+    expect(participant.currentBlockNumber).toBe(1);
+    expect(participant.currentVideoSequence).toBe(1);
+    expect(participant.status).toBe("NOT_STARTED");
+  });
+
+  it("resets block 2 completely without touching block 1", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Reset Bloque 2",
+      requestOrigin: "https://example.com",
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await repository.completeCallEvaluation({ blockNumber: 1, participantId: participant.id, studyId: "study-hut" });
+    await repository.startBlock({
+      blockNumber: 2,
+      participantId: participant.id,
+      startDate: new Date("2020-01-05T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+
+    const reset = await repository.resetCallEvaluation({
+      blockNumber: 2,
+      confirmation: "RESTABLECER EVALUACION 2",
+      participantId: participant.id,
+      studyId: "study-hut"
+    });
+
+    expect(reset.ok).toBe(true);
+    expect(participant.videoSubmissions.filter((video) => video.blockNumber === 1)).toHaveLength(3);
+    expect(participant.videoSubmissions.filter((video) => video.blockNumber === 2)).toHaveLength(0);
+    expect(participant.dailyChecks.filter((check) => check.blockNumber === 2)).toHaveLength(0);
+    expect(participant.visualVerifications.filter((verification) => verification.blockNumber === 2)).toHaveLength(0);
+    expect(participant.blocks[0]?.status).toBe("COMPLETED");
+    expect(participant.blocks[1]).toMatchObject({
+      missedDaysCount: 0,
+      startDate: null,
+      status: "NOT_STARTED",
+      submittedVideosCount: 0
+    });
+    expect(participant.currentBlockNumber).toBe(2);
+    expect(participant.currentVideoSequence).toBe(1);
+    expect(participant.status).toBe("NOT_STARTED");
   });
 
   it("allows one omitted day and keeps the next upload as video 2", async () => {
