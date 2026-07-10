@@ -1450,6 +1450,60 @@ describe("HUT module foundation", () => {
     expect(participant?.status).toBe("COMPLETED");
   });
 
+  it("exposes captured call evaluation details in the admin dashboard", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "Participante Evaluaciones",
+      requestOrigin: "https://example.com",
+      startDate: new Date("2020-01-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await repository.completeCallEvaluation({
+      blockNumber: 1,
+      evaluatorName: "Supervisora Uno",
+      notes: "Respondio sin incidencias.",
+      participantId: participant.id,
+      studyId: "study-hut"
+    });
+    await repository.startBlock({
+      blockNumber: 2,
+      participantId: participant.id,
+      startDate: new Date("2020-01-05T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await uploadNextVideo(repository, participant.token, storage, prisma.state);
+    await repository.completeCallEvaluation({
+      blockNumber: 2,
+      evaluatorName: "Supervisora Dos",
+      notes: "Cierre completo.",
+      participantId: participant.id,
+      studyId: "study-hut"
+    });
+
+    const dashboard = await repository.getAdminDashboard({
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+
+    expect(dashboard?.participants[0]?.call1).toMatchObject({
+      evaluatorName: "SUPERVISORA UNO",
+      notes: "Respondio sin incidencias.",
+      status: "COMPLETED"
+    });
+    expect(dashboard?.participants[0]?.call2).toMatchObject({
+      evaluatorName: "SUPERVISORA DOS",
+      notes: "Cierre completo.",
+      status: "COMPLETED"
+    });
+  });
+
   it("exports HUT progress as clean TSV", async () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
@@ -1808,6 +1862,8 @@ function createFakeHutPrisma() {
         const call: FakeCall = {
           blockNumber: args.data.blockNumber as 1 | 2,
           completedAt: null,
+          evaluatorName: null,
+          notes: null,
           status: (args.data.status as FakeCall["status"]) ?? "PENDING"
         };
         participant?.callEvaluations.push(call);
@@ -2025,6 +2081,8 @@ type FakeBlock = {
 type FakeCall = {
   blockNumber: 1 | 2;
   completedAt: Date | null;
+  evaluatorName: string | null;
+  notes: string | null;
   status: "PENDING" | "SCHEDULED" | "COMPLETED" | "NO_ANSWER" | "RESCHEDULE_NEEDED";
 };
 

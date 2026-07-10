@@ -920,7 +920,14 @@ function CallCard({
       <div className="mt-3 grid gap-2 text-sm">
         <Field label="Estado" value={call ? hutCallStatusLabel(call.status) : "Pendiente"} />
         <Field label="Completada" value={call?.completedAt ? formatDateTime(call.completedAt, studyTimeZone) : "No"} />
+        <Field label="Capturó" value={call?.evaluatorName ?? "No capturado"} />
+        <Field label="Notas" value={call?.notes ?? "Sin notas"} />
       </div>
+      {!call || call.status !== "COMPLETED" ? (
+        <p className="mt-3 rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-600">
+          Esta evaluación todavía no tiene datos completados.
+        </p>
+      ) : null}
     </section>
   );
 }

@@ -126,6 +126,8 @@ export type HutBlockSummary = {
 export type HutCallSummary = {
   blockNumber: number;
   completedAt: Date | null;
+  evaluatorName: string | null;
+  notes: string | null;
   status: HutCallEvaluationStatus;
 };
 
@@ -470,6 +472,8 @@ type HutBlockRecord = {
 type HutCallRecord = {
   blockNumber: 1 | 2;
   completedAt: Date | null;
+  evaluatorName: string | null;
+  notes: string | null;
   status: HutCallEvaluationStatus;
 };
 
@@ -532,6 +536,8 @@ const participantSelect = {
     select: {
       blockNumber: true,
       completedAt: true,
+      evaluatorName: true,
+      notes: true,
       status: true
     }
   },
@@ -2671,6 +2677,8 @@ function toCallSummary(call: HutCallRecord): HutCallSummary {
   return {
     blockNumber: call.blockNumber,
     completedAt: call.completedAt,
+    evaluatorName: call.evaluatorName,
+    notes: call.notes,
     status: call.status
   };
 }

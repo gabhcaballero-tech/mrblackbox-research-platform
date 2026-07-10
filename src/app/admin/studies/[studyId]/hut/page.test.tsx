@@ -192,6 +192,38 @@ describe("HutAdminPage", () => {
     expect(screen.getByRole("button", { name: "Desactivar modo prueba" })).toBeInTheDocument();
   });
 
+  it("muestra los datos capturados de evaluación 1 y evaluación 2", async () => {
+    getAdminDashboardMock.mockResolvedValue(
+      createDashboard({
+        participants: [
+          createParticipant({
+            call1: {
+              blockNumber: 1,
+              completedAt: new Date("2026-07-01T18:00:00.000Z"),
+              evaluatorName: "SUPERVISORA UNO",
+              notes: "Sin incidencias en llamada 1.",
+              status: "COMPLETED"
+            },
+            call2: {
+              blockNumber: 2,
+              completedAt: new Date("2026-07-02T18:00:00.000Z"),
+              evaluatorName: "SUPERVISORA DOS",
+              notes: "Cierre completo.",
+              status: "COMPLETED"
+            }
+          })
+        ]
+      })
+    );
+
+    render(await HutAdminPage({ params: Promise.resolve({ studyId: "study-hut" }), searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByText("SUPERVISORA UNO")).toBeInTheDocument();
+    expect(screen.getByText("Sin incidencias en llamada 1.")).toBeInTheDocument();
+    expect(screen.getByText("SUPERVISORA DOS")).toBeInTheDocument();
+    expect(screen.getByText("Cierre completo.")).toBeInTheDocument();
+  });
+
   it("mantiene videos enviados y pendientes en formato compacto sin exponer storage keys", async () => {
     getAdminDashboardMock.mockResolvedValue(
       createDashboard({
@@ -288,11 +320,15 @@ type TestParticipant = {
   call1: {
     blockNumber: number;
     completedAt: Date | null;
+    evaluatorName: string | null;
+    notes: string | null;
     status: "COMPLETED" | "NO_ANSWER" | "PENDING" | "RESCHEDULE_NEEDED" | "SCHEDULED";
   } | null;
   call2: {
     blockNumber: number;
     completedAt: Date | null;
+    evaluatorName: string | null;
+    notes: string | null;
     status: "COMPLETED" | "NO_ANSWER" | "PENDING" | "RESCHEDULE_NEEDED" | "SCHEDULED";
   } | null;
   currentBlockNumber: number;
@@ -408,11 +444,15 @@ function baseParticipant() {
     call1: {
       blockNumber: 1,
       completedAt: null,
+      evaluatorName: null,
+      notes: null,
       status: "PENDING" as const
     },
     call2: {
       blockNumber: 2,
       completedAt: null,
+      evaluatorName: null,
+      notes: null,
       status: "PENDING" as const
     },
     currentBlockNumber: 1,

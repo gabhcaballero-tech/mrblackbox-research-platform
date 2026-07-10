@@ -49,7 +49,9 @@ export default async function HutParticipantPage({ params }: HutParticipantPageP
           <ProgressSummary view={view} />
         </section>
 
-        {view.availability.reason === "AVAILABLE_FOR_SELFIE" ? (
+        {view.status === "COMPLETED" ? <CompletionMessage /> : null}
+
+        {view.status !== "COMPLETED" && view.availability.reason === "AVAILABLE_FOR_SELFIE" ? (
           <HutVideoUploadForm
             blockNumber={view.availability.blockNumber ?? view.availableUpload?.blockNumber ?? 1}
             mode="selfie"
@@ -58,7 +60,7 @@ export default async function HutParticipantPage({ params }: HutParticipantPageP
           />
         ) : null}
 
-        {view.availableUpload ? (
+        {view.status !== "COMPLETED" && view.availableUpload ? (
           <HutVideoUploadForm
             blockNumber={view.availableUpload.blockNumber}
             mode="video"
@@ -67,7 +69,7 @@ export default async function HutParticipantPage({ params }: HutParticipantPageP
           />
         ) : null}
 
-        {!view.availableUpload && view.availability.reason !== "AVAILABLE_FOR_SELFIE" ? (
+        {view.status !== "COMPLETED" && !view.availableUpload && view.availability.reason !== "AVAILABLE_FOR_SELFIE" ? (
           <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-zinc-950">Actividad no disponible</h2>
             <p className="mt-2 text-sm leading-6 text-zinc-600">{availabilityMessage(view.availability.reason, view.availability.nextAvailableAt)}</p>
@@ -75,6 +77,18 @@ export default async function HutParticipantPage({ params }: HutParticipantPageP
         ) : null}
       </main>
     </div>
+  );
+}
+
+function CompletionMessage() {
+  return (
+    <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+      <h2 className="text-xl font-semibold text-emerald-950">Gracias por tu participación.</h2>
+      <p className="mt-3 text-sm leading-6 text-emerald-900">
+        Tu participación ha sido registrada correctamente. Toma captura de la finalización de tu prueba y envíasela a tu reclutador.
+      </p>
+      <p className="mt-2 text-sm font-semibold text-emerald-950">Ahora puedes cerrar esta ventana.</p>
+    </section>
   );
 }
 
