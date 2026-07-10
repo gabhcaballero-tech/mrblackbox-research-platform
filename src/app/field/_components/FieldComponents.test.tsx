@@ -4,11 +4,11 @@ import type { ScreenerDefinition, ScreenerQuestion } from "@/modules/screener";
 import type { FieldAttemptScreen } from "@/modules/field/service";
 import type { FieldStudySummary } from "@/modules/field/repository";
 import { saveFieldScreeningAnswerAction } from "@/modules/field/actions";
+import { fieldAttemptStatusLabel } from "@/modules/field/status-labels";
 import {
   FieldStudyCard,
   ScreeningQuestionForm,
   ScreeningResultCard,
-  fieldAttemptStatusLabel,
   fieldResultTitle
 } from "./FieldComponents";
 import { ParticipantStartForm } from "./ParticipantStartForm";

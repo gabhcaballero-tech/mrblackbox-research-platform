@@ -12,7 +12,8 @@ import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { createFieldRepository } from "@/modules/field/repository";
 import { getFieldScreeningAttemptScreen } from "@/modules/field/service";
-import { fieldAttemptStatusLabel, ScreeningResultCard } from "../../../_components/FieldComponents";
+import { fieldAttemptStatusLabel } from "@/modules/field/status-labels";
+import { ScreeningResultCard } from "../../../_components/FieldComponents";
 
 export const dynamic = "force-dynamic";
 

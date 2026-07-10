@@ -7,6 +7,7 @@ import type { ScreenerAnswer, ScreenerQuestion } from "@/modules/screener";
 import type { FieldStudySummary } from "@/modules/field/repository";
 import type { FieldAttemptScreen } from "@/modules/field/service";
 import { saveFieldScreeningAnswerAction } from "@/modules/field/actions";
+import { fieldAttemptStatusLabel } from "@/modules/field/status-labels";
 import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { FieldPerfumePhotoCapture } from "./FieldPerfumePhotoCapture";
@@ -342,23 +343,6 @@ export function fieldResultTitle(status: string): string {
       return "Incompleto";
     default:
       return "En curso";
-  }
-}
-
-export function fieldAttemptStatusLabel(status: string): string {
-  switch (status) {
-    case "PASSED":
-      return "Intento elegible";
-    case "TERMINATED":
-      return "Intento terminado";
-    case "PENDING_REVIEW":
-      return "Intento pendiente de revisión";
-    case "INCOMPLETE":
-      return "Intento incompleto";
-    case "STARTED":
-      return "Intento iniciado";
-    default:
-      return `Intento ${status}`;
   }
 }
 
