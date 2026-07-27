@@ -400,8 +400,10 @@ function neutralizeFormula(value: string): string {
 
 function sanitizeTabularValue(value: string | number | null | undefined): string {
   return String(value ?? "")
-    .replace(/\t+/g, " ")
-    .replace(/\r\n|\r|\n/g, " ")
+    .normalize("NFC")
+    .replace(/[\t\v\f]+/g, " ")
+    .replace(/\r\n|\r|\n|\u0085|\u2028|\u2029/g, " ")
+    .replace(/[\u0000-\u0008\u000E-\u001F\u007F]/g, " ")
     .replace(/\s{2,}/g, " ")
     .trim();
 }

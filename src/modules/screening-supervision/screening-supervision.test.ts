@@ -279,14 +279,20 @@ function matchesFilters(record: SupervisionAttemptDetailRecord, filters: Screeni
 }
 
 function parseTsv(content: string): Array<Record<string, string>> {
-  const lines = content.replace(/^\uFEFF/, "").trimEnd().split("\r\n");
-  const headers = lines[0]?.split("\t") ?? [];
+  const rows = splitTsvRows(content);
+  const headers = rows[0] ?? [];
 
-  return lines.slice(1).map((line) => {
-    const cells = line.split("\t");
-
+  return rows.slice(1).map((cells) => {
     return Object.fromEntries(headers.map((header, index) => [header, cells[index] ?? ""]));
   });
+}
+
+function splitTsvRows(content: string): string[][] {
+  return content
+    .replace(/^\uFEFF/, "")
+    .trimEnd()
+    .split("\r\n")
+    .map((line) => line.split("\t"));
 }
 
 describe("screening supervision service", () => {
@@ -727,6 +733,62 @@ describe("screening supervision service", () => {
       expect(row?.F6_MARCAS).toBe("");
       expect(row?.F9A_VECES_AL_DIA).toBe("");
       expect(row?.D1).toBe("");
+    }
+  });
+
+  it("sanitizes tabs and line breaks inside open answers without creating extra columns", async () => {
+    const customDefinition = definition();
+    customDefinition.questions = [
+      ...customDefinition.questions,
+      {
+        dataDestination: "SCREENING",
+        id: "F11_NOTAS_MARCAS",
+        order: 5,
+        required: false,
+        text: "Notas de marcas",
+        type: "LONG_TEXT",
+        validation: {}
+      }
+    ];
+    const record = exportAttempt({
+      id: "open-answer-attempt",
+      participantScreeningReview: {
+        rejectionReason: "Motivo\tcon tab\n y salto",
+        status: "REJECTED"
+      },
+      questionnaireVersion: {
+        definitionHash: "hash-open-answer",
+        definitionJson: customDefinition,
+        id: "version-open-answer",
+        study,
+        versionNumber: 1
+      }
+    });
+    record.answers = [
+      ...record.answers,
+      { answerJson: "Marca A\tMarca B\nMarca C", questionId: "F11_NOTAS_MARCAS" }
+    ];
+    const result = await exportScreeningAttemptsCsvForStudy({
+      actor: admin,
+      filters: {},
+      repository: repository([record]),
+      studyId: study.id
+    });
+
+    expect(result.ok ? result.data.fileContent : "").toContain("Marca A Marca B Marca C");
+    expect(result.ok ? result.data.fileContent : "").toContain("Motivo con tab y salto");
+    expect(result.ok ? result.data.fileContent : "").not.toContain("Marca A\tMarca B");
+    expect(result.ok ? result.data.fileContent : "").not.toContain("Marca B\nMarca C");
+
+    if (result.ok) {
+      const [header, ...rows] = splitTsvRows(result.data.fileContent);
+      const headerColumnCount = header?.length ?? 0;
+      const [row] = parseTsv(result.data.fileContent);
+
+      expect(row?.F11_NOTAS_MARCAS).toBe("Marca A Marca B Marca C");
+      expect(row?.["Motivo rechazo/revisión"]).toBe("Motivo con tab y salto");
+      expect(rows).toHaveLength(1);
+      expect(rows.every((cells) => cells.length === headerColumnCount)).toBe(true);
     }
   });
 
