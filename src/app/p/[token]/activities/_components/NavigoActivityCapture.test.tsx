@@ -189,7 +189,7 @@ describe("NavigoActivityCapture", () => {
     expect(screen.getByTestId("navigo-selfie-preview-lower-mask")).toHaveClass("bg-black/90", "top-[43%]");
   });
 
-  it("does not show AP1 to AP7 for T2/T4/T6 until the activity selfie is saved", () => {
+  it("does not show AP1 to AP7 for T2/T4/T8 until the activity selfie is saved", () => {
     renderCapture();
 
     expect(screen.getByText("Selfie de identificación")).toBeInTheDocument();
@@ -197,7 +197,7 @@ describe("NavigoActivityCapture", () => {
     expect(screen.queryByText(questions[0]?.text ?? "")).not.toBeInTheDocument();
   });
 
-  it("shows AP1 to AP7 for T2/T4/T6 when the activity selfie already exists", () => {
+  it("shows AP1 to AP7 for T2/T4/T8 when the activity selfie already exists", () => {
     renderCapture({ selfieCount: 1, selfieReviewStatus: "APPROVED" });
 
     expect(screen.getByText("Preguntas AP1 a AP7")).toBeInTheDocument();

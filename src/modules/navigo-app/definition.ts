@@ -3,12 +3,12 @@ import type { QuestionnaireQuestion } from "@/modules/questionnaire-engine";
 import { NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
 
 export const NAVIGO_APP_DEFAULT_TIME_ZONE = "America/Mexico_City";
-export const NAVIGO_MEASUREMENT_DRAFT_NAME = "App Navigo - mediciones T0/T2/T4/T6";
+export const NAVIGO_MEASUREMENT_DRAFT_NAME = "App Navigo - mediciones T0/T2/T4/T8";
 export const NAVIGO_MEASUREMENT_VERSION_NAME = "App Navigo - AP1 a AP7";
 export const NAVIGO_T0_IDENTITY_QUESTION_ID = "T0_IDENTITY_CONFIRMED";
 
-export const NAVIGO_ACTIVITY_CODES = ["T0_SALON", "T2_HORAS", "T4_HORAS", "T6_HORAS"] as const;
-export const NAVIGO_LEGACY_ACTIVITY_CODES = ["T8_HORAS"] as const;
+export const NAVIGO_ACTIVITY_CODES = ["T0_SALON", "T2_HORAS", "T4_HORAS", "T8_HORAS"] as const;
+export const NAVIGO_LEGACY_ACTIVITY_CODES = ["T6_HORAS"] as const;
 
 export type NavigoActivityCode = (typeof NAVIGO_ACTIVITY_CODES)[number];
 export type NavigoVisualVerificationMode = "disabled" | "required";
@@ -136,9 +136,9 @@ export function createNavigoScheduleSeeds(questionnaireVersionId: string): Navig
       windowStartsMinutes: -30
     },
     {
-      code: "T6_HORAS",
-      name: "Medicion 6 horas",
-      offsetMinutes: 360,
+      code: "T8_HORAS",
+      name: "Medicion 8 horas",
+      offsetMinutes: 480,
       questionnaireVersionId,
       sortOrder: 3,
       type: "QUESTIONNAIRE_MEASUREMENT",

@@ -57,7 +57,7 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
     <PublicParticipantShell>
       <PageHeader
         actions={<StatusBadge status="ready">{data.folio}</StatusBadge>}
-        description="Aquí verás tus evaluaciones de fragancia a 0, 2, 4 y 6 horas. Realiza cada toma lo más cerca posible del horario recomendado."
+        description="Aquí verás tus evaluaciones de fragancia a 0, 2, 4 y 8 horas. Realiza cada toma lo más cerca posible del horario recomendado."
         eyebrow="App Navigo"
         title="Evaluaciones de fragancia"
       />

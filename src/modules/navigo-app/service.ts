@@ -373,8 +373,8 @@ export function navigoActivityLabel(code: NavigoActivityCode): string {
       return "Evaluacion 2 horas";
     case "T4_HORAS":
       return "Evaluacion 4 horas";
-    case "T6_HORAS":
-      return "Evaluacion 6 horas";
+    case "T8_HORAS":
+      return "Evaluacion 8 horas";
   }
 }
 
