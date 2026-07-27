@@ -34,9 +34,9 @@ type ExportContext = {
   timeZoneIana: string;
 };
 
-type KeyAnswerColumn = {
-  header: string;
-  questionIds: string[];
+type PreparedExportAttempt = {
+  attempt: SupervisionAttemptExportRecord;
+  definition: ScreenerDefinition;
 };
 
 export type ScreeningAttemptTabularExport = {
@@ -46,77 +46,36 @@ export type ScreeningAttemptTabularExport = {
   rowCount: number;
 };
 
-const keyAnswerColumns: KeyAnswerColumn[] = [
-  { header: "Reclutador", questionIds: [DETERGENT_RECRUITER_QUESTION_ID] },
-  { header: "Consentimiento", questionIds: ["CONSENTIMIENTO"] },
-  { header: "Género", questionIds: ["F1_GENERO"] },
-  { header: "Edad", questionIds: ["F2_EDAD"] },
-  { header: "Exclusión laboral", questionIds: ["F3_EXCLUSION_LABORAL"] },
-  { header: "Participación reciente", questionIds: ["F4_PARTICIPACION_RECIENTE"] },
-  { header: "Condiciones físicas", questionIds: ["F5_CONDICIONES_FISICAS"] },
-  { header: "Marcas/F6", questionIds: ["F6_MARCAS_UTILIZA", "F6_MARCAS"] },
-  { header: "Marca frecuente/F7", questionIds: ["F7_MARCA_FRECUENTE"] },
-  { header: "Variante/F8", questionIds: ["F8_VARIANTE_COLOR"] },
-  { header: "Frecuencia/F9", questionIds: ["F9_FRECUENCIA_SEMANAL"] },
-  { header: "Veces/día F9A", questionIds: ["F9A_VECES_AL_DIA"] },
-  { header: "Última compra/F10", questionIds: ["F10_ULTIMA_COMPRA"] },
-  { header: "Detergentes ciudad/F1", questionIds: ["F1_CIUDAD"] },
-  { header: "Detergentes género/F2", questionIds: ["F2_GENERO"] },
-  { header: "Detergentes rango edad/F3", questionIds: ["F3_RANGO_EDAD"] },
-  { header: "Detergentes edad exacta/F4", questionIds: ["F4_EDAD_EXACTA"] },
-  { header: "Detergentes actividades sensibles/F5", questionIds: ["F5_ACTIVIDADES_SENSIBLES"] },
-  { header: "Detergentes participación previa/F6", questionIds: ["F6_PARTICIPACION_PREVIA"] },
-  { header: "Detergentes hogar/F7", questionIds: ["F7_MIEMBROS_HOGAR"] },
-  { header: "Detergentes compras/F8", questionIds: ["F8_RESPONSABLE_COMPRAS"] },
-  { header: "Detergentes lavado/F9", questionIds: ["F9_RESPONSABLE_LAVADO"] },
-  { header: "Detergentes productos frecuentes/F10", questionIds: ["F10_PRODUCTOS_USO_FRECUENTE"] },
-  { header: "Detergentes tipo/F11", questionIds: ["F11_TIPO_DETERGENTE"] },
-  { header: "Detergentes marca/F12", questionIds: ["F12_MARCA_DETERGENTE"] },
-  { header: "Detergentes variante/F13", questionIds: ["F13_VARIANTE_DETERGENTE"] },
-  { header: "Detergentes adicionales/F14", questionIds: ["F14_PRODUCTOS_ADICIONALES_ROPA"] },
-  { header: "NSE detergentes D1", questionIds: ["NSE_D1_CUARTOS"] },
-  { header: "NSE detergentes D2", questionIds: ["NSE_D2_BANOS"] },
-  { header: "NSE detergentes D3", questionIds: ["NSE_D3_REGADERA"] },
-  { header: "NSE detergentes D4", questionIds: ["NSE_D4_FOCOS"] },
-  { header: "NSE detergentes D5", questionIds: ["NSE_D5_PISO"] },
-  { header: "NSE detergentes D6", questionIds: ["NSE_D6_AUTOS"] },
-  { header: "NSE detergentes D7", questionIds: ["NSE_D7_ESTUFA"] },
-  { header: "NSE detergentes D8", questionIds: ["NSE_D8_ESCOLARIDAD"] },
-  { header: "D1", questionIds: ["D1_ESCOLARIDAD_JEFE_HOGAR", "D1"] },
-  { header: "D2", questionIds: ["D2_BANOS_COMPLETOS", "D2"] },
-  { header: "D3", questionIds: ["D3_AUTOMOVILES_HOGAR", "D3"] },
-  { header: "D4", questionIds: ["D4_INTERNET_HOGAR", "D4"] },
-  { header: "D5", questionIds: ["D5_PERSONAS_TRABAJARON", "D5"] },
-  { header: "D6", questionIds: ["D6_CUARTOS_DORMIR", "D6"] }
-];
-
 const baseColumns: ExportColumn[] = [
+  { header: "Folio", value: (attempt) => attempt.participantConfirmation?.folio ?? "" },
+  { header: "Nombre participante", value: (attempt) => attempt.studyParticipant.participantProfile.name },
+  { header: "Teléfono", value: (attempt) => attempt.studyParticipant.participantProfile.phone },
+  { header: "WhatsApp", value: (attempt) => attempt.studyParticipant.participantProfile.phone },
+  { header: "Correo", value: (attempt) => attempt.studyParticipant.participantProfile.email },
+  { header: "Fecha creación", value: (attempt, context) => formatDateTime(attempt.startedAt, context.timeZoneIana) },
+  { header: "Fecha finalización", value: (attempt, context) => formatDateTime(attempt.completedAt, context.timeZoneIana) },
+  { header: "Estado del intento", value: (attempt) => statusLabelsForAttempt(attempt).label },
+  { header: "Elegibilidad", value: (attempt) => statusLabelsForAttempt(attempt).resultLabel },
+  { header: "Reclutador", value: (attempt, context) => questionAnswerText(attempt, context.definition, DETERGENT_RECRUITER_QUESTION_ID) },
+  { header: "Entrevistador", value: (attempt) => userLabel(attempt.fieldUser) ?? "" },
+  { header: "Referencia / código de origen", value: (attempt) => attempt.studyParticipant.participantProfile.externalReference },
+  { header: "NSE", value: (attempt) => attempt.nseScore },
+  { header: "Clasificación NSE", value: (attempt, context) => resolveNseClassLabel(context.definition, attempt.nseClass) },
+  { header: "Código NSE interno", value: (attempt) => attempt.nseClass },
+  { header: "Clasificaciones derivadas", value: (attempt, context) => derivedClassifications(attempt, context.definition) },
+  { header: "Código rechazo / revisión", value: (attempt) => effectiveReason(attempt).code },
+  { header: "Motivo de rechazo / revisión", value: (attempt) => effectiveReason(attempt).reason },
   { header: "Código del estudio", value: (attempt) => attempt.questionnaireVersion.study.code },
   { header: "Nombre del estudio", value: (attempt) => attempt.questionnaireVersion.study.name },
   { header: "Versión de screener usada", value: (attempt) => `v${attempt.questionnaireVersion.versionNumber}` },
   { header: "Hash de versión", value: (attempt) => attempt.questionnaireVersion.definitionHash },
-  { header: "Nombre", value: (attempt) => attempt.studyParticipant.participantProfile.name },
-  { header: "Celular", value: (attempt) => attempt.studyParticipant.participantProfile.phone },
-  { header: "Correo", value: (attempt) => attempt.studyParticipant.participantProfile.email },
-  { header: "Referencia externa", value: (attempt) => attempt.studyParticipant.participantProfile.externalReference },
   {
-    header: "Fecha de registro",
+    header: "Fecha registro participante",
     value: (attempt, context) => formatDateTime(attempt.studyParticipant.participantProfile.createdAt, context.timeZoneIana)
   },
   { header: "Fuente del intento", value: (attempt) => sourceLabel(attempt.source) },
   { header: "ID interno", value: (attempt) => attempt.id },
-  { header: "Fecha/hora inicio", value: (attempt, context) => formatDateTime(attempt.startedAt, context.timeZoneIana) },
-  { header: "Fecha/hora cierre", value: (attempt, context) => formatDateTime(attempt.completedAt, context.timeZoneIana) },
   { header: "Estado interno", value: (attempt) => attempt.status },
-  { header: "Estado visible", value: (attempt) => statusLabelsForAttempt(attempt).label },
-  { header: "Resultado visible", value: (attempt) => statusLabelsForAttempt(attempt).resultLabel },
-  { header: "Código interno terminación/revisión", value: (attempt) => effectiveReason(attempt).code },
-  { header: "Motivo interno", value: (attempt) => effectiveReason(attempt).reason },
-  { header: "Entrevistador/aplicador", value: (attempt) => userLabel(attempt.fieldUser) ?? "Portal participante" },
-  { header: "Origen", value: (attempt) => attempt.source },
-  { header: "Puntaje NSE", value: (attempt) => attempt.nseScore },
-  { header: "Clasificación NSE visible", value: (attempt, context) => resolveNseClassLabel(context.definition, attempt.nseClass) },
-  { header: "Código NSE interno", value: (attempt) => attempt.nseClass },
   { header: "Estado de revisión de evidencia", value: (attempt) => evidenceReviewStatusLabel(attempt) },
   {
     header: "Fecha de revisión",
@@ -128,7 +87,6 @@ const baseColumns: ExportColumn[] = [
   { header: "Selfie registrada", value: (attempt) => yesNo(selfieCount(attempt) > 0) },
   { header: "Número fotos perfumes", value: (attempt) => perfumePhotoCount(attempt) },
   { header: "Evidencia completa", value: (attempt) => yesNo(selfieCount(attempt) === 1 && perfumePhotoCount(attempt) >= 1) },
-  { header: "Folio", value: (attempt) => attempt.participantConfirmation?.folio ?? "" },
   { header: "Código 1", value: (attempt) => referenceCode(attempt, 1) },
   { header: "Código 2", value: (attempt) => referenceCode(attempt, 2) },
   { header: "Código 3", value: (attempt) => referenceCode(attempt, 3) },
@@ -197,18 +155,15 @@ export async function exportScreeningAttemptsCsvForStudy({
 }
 
 export function buildScreeningAttemptsTsv(attempts: SupervisionAttemptExportRecord[], timeZoneIana: string): string {
-  const columns = [
-    ...baseColumns,
-    ...keyAnswerColumns.map<ExportColumn>((column) => ({
-      header: column.header,
-      value: (attempt, context) => keyAnswerText(attempt, context.definition, column.questionIds)
-    }))
-  ];
-  const rows = attempts.map((attempt) => {
-    const definition = applyStudyScreenerDefinitionOverrides(
+  const preparedAttempts = attempts.map<PreparedExportAttempt>((attempt) => ({
+    attempt,
+    definition: applyStudyScreenerDefinitionOverrides(
       attempt.questionnaireVersion.study.code,
       parseScreenerDefinition(attempt.questionnaireVersion.definitionJson)
-    );
+    )
+  }));
+  const columns = [...baseColumns, ...buildQuestionAnswerColumns(preparedAttempts)];
+  const rows = preparedAttempts.map(({ attempt, definition }) => {
     const context = { definition, timeZoneIana };
 
     return columns.map((column) => tsvCell(column.value(attempt, context)));
@@ -218,25 +173,50 @@ export function buildScreeningAttemptsTsv(attempts: SupervisionAttemptExportReco
   return `\uFEFF${[header, ...rows].map((row) => row.join(TSV_SEPARATOR)).join("\r\n")}\r\n`;
 }
 
-function keyAnswerText(attempt: SupervisionAttemptExportRecord, definition: ScreenerDefinition, questionIds: string[]): string {
-  const answerByQuestionId = new Map(attempt.answers.map((answer) => [answer.questionId, answer.answerJson as ScreenerAnswer]));
+function buildQuestionAnswerColumns(preparedAttempts: PreparedExportAttempt[]): ExportColumn[] {
+  const questionIds: string[] = [];
+  const seen = new Set<string>();
 
-  for (const questionId of questionIds) {
-    if (!answerByQuestionId.has(questionId)) {
-      continue;
+  function addQuestionId(questionId: string) {
+    if (seen.has(questionId)) {
+      return;
     }
 
-    const question = definition.questions.find((item) => item.id === questionId);
-    const answer = answerByQuestionId.get(questionId);
-
-    if (answer === undefined) {
-      return "";
-    }
-
-    return question ? formatAnswer(question, answer) : formatUnknownAnswer(answer);
+    seen.add(questionId);
+    questionIds.push(questionId);
   }
 
-  return "";
+  for (const { attempt, definition } of preparedAttempts) {
+    for (const question of [...definition.questions].sort((left, right) => left.order - right.order)) {
+      addQuestionId(question.id);
+    }
+
+    for (const answer of attempt.answers) {
+      addQuestionId(answer.questionId);
+    }
+  }
+
+  return questionIds.map((questionId) => ({
+    header: questionId,
+    value: (attempt, context) => questionAnswerText(attempt, context.definition, questionId)
+  }));
+}
+
+function questionAnswerText(
+  attempt: SupervisionAttemptExportRecord,
+  definition: ScreenerDefinition,
+  questionId: string
+): string {
+  const answer = attempt.answers.find((item) => item.questionId === questionId);
+
+  if (!answer) {
+    return "";
+  }
+
+  const question = definition.questions.find((item) => item.id === questionId);
+  const answerValue = answer.answerJson as ScreenerAnswer;
+
+  return question ? formatAnswer(question, answerValue) : formatUnknownAnswer(answerValue);
 }
 
 function formatAnswer(question: ScreenerQuestion, answer: ScreenerAnswer): string {
@@ -316,11 +296,29 @@ function effectiveReason(attempt: SupervisionAttemptExportRecord): { code: strin
   };
 }
 
-function parseEvaluation(input: unknown): { reasons: Array<{ code: string; reason: string }> } {
+function derivedClassifications(attempt: SupervisionAttemptExportRecord, definition: ScreenerDefinition): string {
+  const evaluation = parseEvaluation(attempt.evaluationJson);
+  const values = [
+    resolveNseClassLabel(definition, attempt.nseClass),
+    ...evaluation.flags.map((flag) => flag.label || flag.code)
+  ].filter(Boolean);
+
+  return [...new Set(values)].join(" | ");
+}
+
+function parseEvaluation(input: unknown): {
+  flags: Array<{ code: string; label?: string }>;
+  reasons: Array<{ code: string; reason: string }>;
+} {
   const value = input && typeof input === "object" ? input as Record<string, unknown> : {};
+  const flags = Array.isArray(value.flags) ? value.flags.filter(isFlag) : [];
   const reasons = Array.isArray(value.reasons) ? value.reasons.filter(isReason) : [];
 
-  return { reasons };
+  return { flags, reasons };
+}
+
+function isFlag(value: unknown): value is { code: string; label?: string } {
+  return Boolean(value && typeof value === "object" && typeof (value as { code?: unknown }).code === "string");
 }
 
 function isReason(value: unknown): value is { code: string; reason: string } {

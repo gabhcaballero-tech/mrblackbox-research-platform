@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import type { InternalUserRole } from "@/shared/auth/permissions";
 import type { ScreenerDefinition } from "@/modules/screener";
 import { DETERGENTS_STUDY_CODE, DETERGENT_RECRUITER_QUESTION_ID } from "@/modules/screener/study-overrides";
@@ -276,6 +276,17 @@ function matchesFilters(record: SupervisionAttemptDetailRecord, filters: Screeni
   }
 
   return true;
+}
+
+function parseTsv(content: string): Array<Record<string, string>> {
+  const lines = content.replace(/^\uFEFF/, "").trimEnd().split("\r\n");
+  const headers = lines[0]?.split("\t") ?? [];
+
+  return lines.slice(1).map((line) => {
+    const cells = line.split("\t");
+
+    return Object.fromEntries(headers.map((header, index) => [header, cells[index] ?? ""]));
+  });
 }
 
 describe("screening supervision service", () => {
@@ -614,8 +625,8 @@ describe("screening supervision service", () => {
     expect(result.ok ? result.data.contentType : null).toBe("text/tab-separated-values; charset=utf-8");
     expect(result.ok ? result.data.rowCount : null).toBe(1);
     expect(result.ok ? result.data.fileContent.startsWith("\uFEFF") : false).toBe(true);
-    expect(result.ok ? result.data.fileContent : "").toContain("Código del estudio\tNombre del estudio");
-    expect(result.ok ? result.data.fileContent : "").toContain("Reclutador\tConsentimiento");
+    expect(result.ok ? result.data.fileContent : "").toContain("Folio\tNombre participante\tTeléfono\tWhatsApp");
+    expect(result.ok ? result.data.fileContent : "").toContain("F1_GENERO\tF6_MARCAS\tF9A_VECES_AL_DIA\tD1\tF0_RECLUTADOR");
     expect(result.ok ? result.data.fileContent : "").toContain("FMASCULINA-NAVIGO-2026");
     expect(result.ok ? result.data.fileContent : "").toContain("MAR\u00cdA \u00d1AND\u00da");
     expect(result.ok ? result.data.fileContent : "").toContain("Portal participante");
@@ -626,7 +637,7 @@ describe("screening supervision service", () => {
     expect(result.ok ? result.data.fileContent : "").toContain("24 jun 2026, 11:10 a.m.");
     expect(result.ok ? result.data.fileContent : "").toContain("24 jun 2026, 12:00 p.m.");
     expect(result.ok ? result.data.fileContent : "").toContain("144\tC típico\tRANGO-3");
-    expect(result.ok ? result.data.fileContent : "").toContain("Sí\t1\tSí\tNAV-001\tA7K4\tM3P9\tT8R2");
+    expect(result.ok ? result.data.fileContent : "").toContain("Sí\t1\tSí\tA7K4\tM3P9\tT8R2");
     expect(result.ok ? result.data.fileContent : "").toContain("Navigo|Otra - Especificación: Marca local");
     expect(result.ok ? result.data.fileContent : "").toContain("Evidencia clara. Lista");
     expect(result.ok ? result.data.fileContent : "").toContain("Motivo; interno, con separadores");
@@ -638,10 +649,52 @@ describe("screening supervision service", () => {
     if (result.ok) {
       const lines = result.data.fileContent.trimEnd().split("\r\n");
       const headerTabCount = (lines[0]?.match(/\t/g) ?? []).length;
+      const [row] = parseTsv(result.data.fileContent);
 
       expect(headerTabCount).toBeGreaterThan(10);
       expect(lines[1]).toContain("\t");
       expect(lines[0]).not.toContain("Código del estudio;Nombre del estudio");
+      expect(row?.Folio).toBe("NAV-001");
+      expect(row?.["Nombre participante"]).toBe("Participante Uno");
+      expect(row?.Teléfono).toBe("5550000000");
+      expect(row?.WhatsApp).toBe("5550000000");
+      expect(row?.Reclutador).toBe("MAR\u00cdA \u00d1AND\u00da");
+      expect(row?.NSE).toBe("144");
+      expect(row?.["Clasificación NSE"]).toBe("C típico");
+      expect(row?.F1_GENERO).toBe("Hombre");
+      expect(row?.F6_MARCAS).toBe("Navigo|Otra - Especificación: Marca local");
+      expect(row?.F9A_VECES_AL_DIA).toBe("3");
+      expect(row?.D1).toBe("Alto");
+      expect(row?.F0_RECLUTADOR).toBe("MAR\u00cdA \u00d1AND\u00da");
+    }
+  });
+
+  it("exports every screener question column and leaves missing answers blank", async () => {
+    const record = exportAttempt({
+      id: "missing-answer-attempt",
+      participantConfirmation: {
+        folio: "NAV-002",
+        manualMessageStatus: "NOT_SENT",
+        referenceCodes: []
+      }
+    });
+    record.answers = [{ answerJson: "HOMBRE", questionId: "F1_GENERO" }];
+    const result = await exportScreeningAttemptsCsvForStudy({
+      actor: admin,
+      filters: {},
+      repository: repository([record]),
+      studyId: study.id
+    });
+
+    expect(result.ok ? result.data.fileContent : "").toContain("F1_GENERO\tF6_MARCAS\tF9A_VECES_AL_DIA\tD1");
+
+    if (result.ok) {
+      const [row] = parseTsv(result.data.fileContent);
+
+      expect(row?.F1_GENERO).toBe("Hombre");
+      expect(row?.F6_MARCAS).toBe("");
+      expect(row?.F9A_VECES_AL_DIA).toBe("");
+      expect(row?.D1).toBe("");
     }
   });
 
