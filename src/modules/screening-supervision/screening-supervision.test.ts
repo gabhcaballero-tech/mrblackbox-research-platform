@@ -625,21 +625,15 @@ describe("screening supervision service", () => {
     expect(result.ok ? result.data.contentType : null).toBe("text/tab-separated-values; charset=utf-8");
     expect(result.ok ? result.data.rowCount : null).toBe(1);
     expect(result.ok ? result.data.fileContent.startsWith("\uFEFF") : false).toBe(true);
-    expect(result.ok ? result.data.fileContent : "").toContain("Folio\tNombre participante\tTeléfono\tWhatsApp");
+    expect(result.ok ? result.data.fileContent : "").toContain("Folio\tNombre\tTeléfono\tWhatsApp");
     expect(result.ok ? result.data.fileContent : "").toContain("F1_GENERO\tF6_MARCAS\tF9A_VECES_AL_DIA\tD1\tF0_RECLUTADOR");
-    expect(result.ok ? result.data.fileContent : "").toContain("FMASCULINA-NAVIGO-2026");
     expect(result.ok ? result.data.fileContent : "").toContain("MAR\u00cdA \u00d1AND\u00da");
     expect(result.ok ? result.data.fileContent : "").toContain("Portal participante");
     expect(result.ok ? result.data.fileContent : "").toContain("Elegible confirmado");
-    expect(result.ok ? result.data.fileContent : "").toContain("23 jun 2026, 8:30 a.m.");
     expect(result.ok ? result.data.fileContent : "").toContain("23 jun 2026, 9:00 a.m.");
     expect(result.ok ? result.data.fileContent : "").toContain("23 jun 2026, 10:00 a.m.");
-    expect(result.ok ? result.data.fileContent : "").toContain("24 jun 2026, 11:10 a.m.");
-    expect(result.ok ? result.data.fileContent : "").toContain("24 jun 2026, 12:00 p.m.");
     expect(result.ok ? result.data.fileContent : "").toContain("144\tC típico\tRANGO-3");
-    expect(result.ok ? result.data.fileContent : "").toContain("Sí\t1\tSí\tA7K4\tM3P9\tT8R2");
     expect(result.ok ? result.data.fileContent : "").toContain("Navigo|Otra - Especificación: Marca local");
-    expect(result.ok ? result.data.fileContent : "").toContain("Evidencia clara. Lista");
     expect(result.ok ? result.data.fileContent : "").toContain("Motivo; interno, con separadores");
     expect(result.ok ? result.data.fileContent : "").not.toContain("Evidencia\tclara.");
     expect(result.ok ? result.data.fileContent : "").not.toContain("other-attempt");
@@ -655,12 +649,50 @@ describe("screening supervision service", () => {
       expect(lines[1]).toContain("\t");
       expect(lines[0]).not.toContain("Código del estudio;Nombre del estudio");
       expect(row?.Folio).toBe("NAV-001");
-      expect(row?.["Nombre participante"]).toBe("Participante Uno");
+      expect(lines[0]?.replace(/^\uFEFF/, "").split("\t").slice(0, 29)).toEqual([
+        "Folio",
+        "Nombre",
+        "Teléfono",
+        "WhatsApp",
+        "Correo",
+        "Fecha creación",
+        "Fecha finalización",
+        "Reclutador",
+        "Entrevistador",
+        "Referencia/código origen",
+        "Fuente",
+        "Estado intento",
+        "Elegibilidad",
+        "Motivo rechazo/revisión",
+        "NSE",
+        "Clasificación NSE",
+        "Código NSE interno",
+        "Selfie registrada",
+        "Número fotos perfumes",
+        "Evidencia completa",
+        "Estado revisión evidencia",
+        "Código 1",
+        "Código 2",
+        "Código 3",
+        "F1_GENERO",
+        "F6_MARCAS",
+        "F9A_VECES_AL_DIA",
+        "D1",
+        "F0_RECLUTADOR"
+      ]);
+      expect(row?.Nombre).toBe("Participante Uno");
       expect(row?.Teléfono).toBe("5550000000");
       expect(row?.WhatsApp).toBe("5550000000");
       expect(row?.Reclutador).toBe("MAR\u00cdA \u00d1AND\u00da");
       expect(row?.NSE).toBe("144");
       expect(row?.["Clasificación NSE"]).toBe("C típico");
+      expect(row?.["Selfie registrada"]).toBe("Sí");
+      expect(row?.["Número fotos perfumes"]).toBe("1");
+      expect(row?.["Evidencia completa"]).toBe("Sí");
+      expect(row?.["Estado revisión evidencia"]).toBe("Aprobado");
+      expect(row?.["Código 1"]).toBe("A7K4");
+      expect(row?.["Código 2"]).toBe("M3P9");
+      expect(row?.["Código 3"]).toBe("T8R2");
       expect(row?.F1_GENERO).toBe("Hombre");
       expect(row?.F6_MARCAS).toBe("Navigo|Otra - Especificación: Marca local");
       expect(row?.F9A_VECES_AL_DIA).toBe("3");
@@ -695,6 +727,31 @@ describe("screening supervision service", () => {
       expect(row?.F6_MARCAS).toBe("");
       expect(row?.F9A_VECES_AL_DIA).toBe("");
       expect(row?.D1).toBe("");
+    }
+  });
+
+  it("uses OP1_RECLUTADOR as recruiter fallback when F0 is empty", async () => {
+    const record = exportAttempt({
+      id: "op-recruiter-attempt"
+    });
+    record.answers = [
+      { answerJson: "", questionId: DETERGENT_RECRUITER_QUESTION_ID },
+      { answerJson: "RECLUTADOR OPERATIVO", questionId: "OP1_RECLUTADOR" },
+      { answerJson: "HOMBRE", questionId: "F1_GENERO" }
+    ];
+    const result = await exportScreeningAttemptsCsvForStudy({
+      actor: admin,
+      filters: {},
+      repository: repository([record]),
+      studyId: study.id
+    });
+
+    if (result.ok) {
+      const [row] = parseTsv(result.data.fileContent);
+
+      expect(row?.Reclutador).toBe("RECLUTADOR OPERATIVO");
+      expect(row?.OP1_RECLUTADOR).toBe("RECLUTADOR OPERATIVO");
+      expect(row?.F1_GENERO).toBe("Hombre");
     }
   });
 
@@ -752,7 +809,6 @@ describe("screening supervision service", () => {
       studyId: invalidTimeZoneStudy.id
     });
 
-    expect(result.ok ? result.data.fileContent : "").toContain("23 jun 2026, 8:30 a.m.");
     expect(result.ok ? result.data.fileContent : "").toContain("23 jun 2026, 9:00 a.m.");
     expect(result.ok ? result.data.fileContent : "").toContain("23 jun 2026, 10:00 a.m.");
     expect(result.ok ? result.data.filename : null).toBe("FMASCULINA-NAVIGO-2026_intentos_screener_2026-06-24.tsv");
@@ -769,7 +825,7 @@ describe("screening supervision service", () => {
 
     expect(result.ok ? result.data.rowCount : null).toBe(0);
     expect(result.ok ? result.data.fileContent.split("\r\n").filter(Boolean).length : null).toBe(1);
-    expect(result.ok ? result.data.fileContent : "").toContain("Código del estudio");
+    expect(result.ok ? result.data.fileContent : "").toContain("Folio\tNombre\tTeléfono\tWhatsApp");
   });
 
   it("denies CSV export to roles without screening review permission", async () => {

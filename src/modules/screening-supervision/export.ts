@@ -23,6 +23,7 @@ import { parseScreeningAttemptFilters } from "./validation";
 const TSV_SEPARATOR = "\t";
 const TSV_CONTENT_TYPE = "text/tab-separated-values; charset=utf-8";
 const DEFAULT_STUDY_TIME_ZONE = "America/Mexico_City";
+const RECRUITER_QUESTION_IDS = [DETERGENT_RECRUITER_QUESTION_ID, "OP1_RECLUTADOR"];
 
 type ExportColumn = {
   header: string;
@@ -48,54 +49,29 @@ export type ScreeningAttemptTabularExport = {
 
 const baseColumns: ExportColumn[] = [
   { header: "Folio", value: (attempt) => attempt.participantConfirmation?.folio ?? "" },
-  { header: "Nombre participante", value: (attempt) => attempt.studyParticipant.participantProfile.name },
+  { header: "Nombre", value: (attempt) => attempt.studyParticipant.participantProfile.name },
   { header: "Teléfono", value: (attempt) => attempt.studyParticipant.participantProfile.phone },
   { header: "WhatsApp", value: (attempt) => attempt.studyParticipant.participantProfile.phone },
   { header: "Correo", value: (attempt) => attempt.studyParticipant.participantProfile.email },
   { header: "Fecha creación", value: (attempt, context) => formatDateTime(attempt.startedAt, context.timeZoneIana) },
   { header: "Fecha finalización", value: (attempt, context) => formatDateTime(attempt.completedAt, context.timeZoneIana) },
-  { header: "Estado del intento", value: (attempt) => statusLabelsForAttempt(attempt).label },
-  { header: "Elegibilidad", value: (attempt) => statusLabelsForAttempt(attempt).resultLabel },
-  { header: "Reclutador", value: (attempt, context) => questionAnswerText(attempt, context.definition, DETERGENT_RECRUITER_QUESTION_ID) },
+  { header: "Reclutador", value: (attempt, context) => firstQuestionAnswerText(attempt, context.definition, RECRUITER_QUESTION_IDS) },
   { header: "Entrevistador", value: (attempt) => userLabel(attempt.fieldUser) ?? "" },
-  { header: "Referencia / código de origen", value: (attempt) => attempt.studyParticipant.participantProfile.externalReference },
+  { header: "Referencia/código origen", value: (attempt) => attempt.studyParticipant.participantProfile.externalReference },
+  { header: "Fuente", value: (attempt) => sourceLabel(attempt.source) },
+  { header: "Estado intento", value: (attempt) => statusLabelsForAttempt(attempt).label },
+  { header: "Elegibilidad", value: (attempt) => statusLabelsForAttempt(attempt).resultLabel },
+  { header: "Motivo rechazo/revisión", value: (attempt) => rejectionOrReviewReason(attempt) },
   { header: "NSE", value: (attempt) => attempt.nseScore },
   { header: "Clasificación NSE", value: (attempt, context) => resolveNseClassLabel(context.definition, attempt.nseClass) },
   { header: "Código NSE interno", value: (attempt) => attempt.nseClass },
-  { header: "Clasificaciones derivadas", value: (attempt, context) => derivedClassifications(attempt, context.definition) },
-  { header: "Código rechazo / revisión", value: (attempt) => effectiveReason(attempt).code },
-  { header: "Motivo de rechazo / revisión", value: (attempt) => effectiveReason(attempt).reason },
-  { header: "Código del estudio", value: (attempt) => attempt.questionnaireVersion.study.code },
-  { header: "Nombre del estudio", value: (attempt) => attempt.questionnaireVersion.study.name },
-  { header: "Versión de screener usada", value: (attempt) => `v${attempt.questionnaireVersion.versionNumber}` },
-  { header: "Hash de versión", value: (attempt) => attempt.questionnaireVersion.definitionHash },
-  {
-    header: "Fecha registro participante",
-    value: (attempt, context) => formatDateTime(attempt.studyParticipant.participantProfile.createdAt, context.timeZoneIana)
-  },
-  { header: "Fuente del intento", value: (attempt) => sourceLabel(attempt.source) },
-  { header: "ID interno", value: (attempt) => attempt.id },
-  { header: "Estado interno", value: (attempt) => attempt.status },
-  { header: "Estado de revisión de evidencia", value: (attempt) => evidenceReviewStatusLabel(attempt) },
-  {
-    header: "Fecha de revisión",
-    value: (attempt, context) => formatDateTime(attempt.participantScreeningReview?.reviewedAt ?? null, context.timeZoneIana)
-  },
-  { header: "Supervisor que revisó", value: (attempt) => userLabel(attempt.participantScreeningReview?.reviewedBy ?? null) },
-  { header: "Nota interna de revisión", value: (attempt) => attempt.participantScreeningReview?.internalNote ?? "" },
-  { header: "Motivo interno rechazo", value: (attempt) => attempt.participantScreeningReview?.rejectionReason ?? "" },
   { header: "Selfie registrada", value: (attempt) => yesNo(selfieCount(attempt) > 0) },
   { header: "Número fotos perfumes", value: (attempt) => perfumePhotoCount(attempt) },
   { header: "Evidencia completa", value: (attempt) => yesNo(selfieCount(attempt) === 1 && perfumePhotoCount(attempt) >= 1) },
+  { header: "Estado revisión evidencia", value: (attempt) => evidenceReviewStatusLabel(attempt) },
   { header: "Código 1", value: (attempt) => referenceCode(attempt, 1) },
   { header: "Código 2", value: (attempt) => referenceCode(attempt, 2) },
-  { header: "Código 3", value: (attempt) => referenceCode(attempt, 3) },
-  { header: "WhatsApp manual status", value: (attempt) => manualMessageStatusLabel(attempt.participantConfirmation?.manualMessageStatus) },
-  {
-    header: "Fecha marcado enviado",
-    value: (attempt, context) => formatDateTime(attempt.participantConfirmation?.manualMessageMarkedSentAt ?? null, context.timeZoneIana)
-  },
-  { header: "Usuario que marcó enviado", value: (attempt) => userLabel(attempt.participantConfirmation?.manualMessageMarkedSentBy ?? null) }
+  { header: "Código 3", value: (attempt) => referenceCode(attempt, 3) }
 ];
 
 export async function exportScreeningAttemptsCsvForStudy({
@@ -202,6 +178,22 @@ function buildQuestionAnswerColumns(preparedAttempts: PreparedExportAttempt[]): 
   }));
 }
 
+function firstQuestionAnswerText(
+  attempt: SupervisionAttemptExportRecord,
+  definition: ScreenerDefinition,
+  questionIds: string[]
+): string {
+  for (const questionId of questionIds) {
+    const value = questionAnswerText(attempt, definition, questionId).trim();
+
+    if (value) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
 function questionAnswerText(
   attempt: SupervisionAttemptExportRecord,
   definition: ScreenerDefinition,
@@ -286,6 +278,10 @@ function optionLabel(question: Extract<ScreenerQuestion, { options: unknown[] }>
   return question.options.find((option) => option.value === value)?.label ?? `Valor registrado: ${value}`;
 }
 
+function rejectionOrReviewReason(attempt: SupervisionAttemptExportRecord): string {
+  return attempt.participantScreeningReview?.rejectionReason ?? effectiveReason(attempt).reason;
+}
+
 function effectiveReason(attempt: SupervisionAttemptExportRecord): { code: string; reason: string } {
   const evaluation = parseEvaluation(attempt.evaluationJson);
   const firstReason = evaluation.reasons[0];
@@ -296,29 +292,11 @@ function effectiveReason(attempt: SupervisionAttemptExportRecord): { code: strin
   };
 }
 
-function derivedClassifications(attempt: SupervisionAttemptExportRecord, definition: ScreenerDefinition): string {
-  const evaluation = parseEvaluation(attempt.evaluationJson);
-  const values = [
-    resolveNseClassLabel(definition, attempt.nseClass),
-    ...evaluation.flags.map((flag) => flag.label || flag.code)
-  ].filter(Boolean);
-
-  return [...new Set(values)].join(" | ");
-}
-
-function parseEvaluation(input: unknown): {
-  flags: Array<{ code: string; label?: string }>;
-  reasons: Array<{ code: string; reason: string }>;
-} {
+function parseEvaluation(input: unknown): { reasons: Array<{ code: string; reason: string }> } {
   const value = input && typeof input === "object" ? input as Record<string, unknown> : {};
-  const flags = Array.isArray(value.flags) ? value.flags.filter(isFlag) : [];
   const reasons = Array.isArray(value.reasons) ? value.reasons.filter(isReason) : [];
 
-  return { flags, reasons };
-}
-
-function isFlag(value: unknown): value is { code: string; label?: string } {
-  return Boolean(value && typeof value === "object" && typeof (value as { code?: unknown }).code === "string");
+  return { reasons };
 }
 
 function isReason(value: unknown): value is { code: string; reason: string } {
@@ -406,18 +384,6 @@ function userLabel(user: { email: string; name: string } | null | undefined): st
 
 function sourceLabel(source: SupervisionAttemptRecord["source"]): string {
   return source === "FIELD" ? "Campo" : "Portal participante";
-}
-
-function manualMessageStatusLabel(status: "MARKED_SENT" | "NOT_SENT" | undefined): string {
-  if (status === "MARKED_SENT") {
-    return "Marcado enviado";
-  }
-
-  if (status === "NOT_SENT") {
-    return "No enviado";
-  }
-
-  return "";
 }
 
 function yesNo(value: boolean): string {
