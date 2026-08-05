@@ -53,7 +53,6 @@ export async function saveParticipantPortalScreenerAnswerAction(
     identity: auth.identity,
     questionId,
     repository: createParticipantPortalScreenerRepository(),
-    sendWhatsApp: true,
     studyCode
   });
 

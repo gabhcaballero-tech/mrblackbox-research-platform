@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getParticipantPortalAuth } from "@/shared/auth/participant-portal";
+import { sendNavigoConfirmationWhatsAppBestEffort } from "./navigo-confirmation-whatsapp";
 import { allowsDirectParticipantAccess } from "./access-mode";
 import { createParticipantPortalRepository } from "./repository";
 import { createParticipantPortalEvidenceRepository } from "./evidence-repository";
@@ -145,9 +146,10 @@ export async function completeParticipantEvidenceSubmissionAction(
     return auth;
   }
 
+  const repository = createParticipantPortalEvidenceRepository();
   const result = await completeParticipantEvidenceSubmission({
     identity: auth.data.identity,
-    repository: createParticipantPortalEvidenceRepository(),
+    repository,
     studyCode
   });
 
@@ -160,6 +162,22 @@ export async function completeParticipantEvidenceSubmissionAction(
 
   revalidatePath(`/participar/${studyCode}/evidencias`);
   revalidatePath(`/participar/${studyCode}/resultado`);
+
+  const attempt = await repository.getAttempt(result.data.attemptId);
+
+  if (attempt && (attempt.status === "PASSED" || attempt.status === "PENDING_REVIEW")) {
+    await sendNavigoConfirmationWhatsAppBestEffort({
+      attemptId: attempt.id,
+      confirmation: attempt.participantConfirmation,
+      participant: {
+        name: attempt.studyParticipant.participantProfile.name,
+        phone: attempt.studyParticipant.participantProfile.phone
+      },
+      sourceLabel: "participant portal",
+      studyId: result.data.study.id,
+      studyParticipantId: attempt.studyParticipantId
+    });
+  }
 
   return {
     data: {

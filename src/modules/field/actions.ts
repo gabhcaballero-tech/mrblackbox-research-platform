@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createOneuiWhatsAppRepository, sendNavigoConfirmationWhatsApp } from "@/modules/oneui-whatsapp";
 import { createParticipantPortalScreenerRepository } from "@/modules/participant-portal/screener-repository";
 import { generateParticipantReferenceCode } from "@/modules/participant-portal/review";
 import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
@@ -148,12 +147,6 @@ export async function saveFieldScreeningAnswerAction(
         repository: confirmationRepository
       });
 
-      await sendFieldConfirmationWhatsAppBestEffort({
-        attempt: confirmationAttempt,
-        attemptId,
-        confirmation: confirmation.confirmation
-      });
-
       if (
         confirmationAttempt &&
         getStudyBehavior(confirmationAttempt.questionnaireVersion.study.code).requiresFinalSelfie
@@ -196,55 +189,5 @@ async function loadFieldConfirmationAttemptBestEffort({
       step: "load_confirmation_attempt"
     });
     return null;
-  }
-}
-
-async function sendFieldConfirmationWhatsAppBestEffort({
-  attempt,
-  attemptId,
-  confirmation
-}: {
-  attempt: Awaited<ReturnType<ReturnType<typeof createParticipantPortalScreenerRepository>["getAttempt"]>>;
-  attemptId: string;
-  confirmation: {
-    folio: string;
-    referenceCodes: Array<{ code: string; slot: number }>;
-  };
-}): Promise<void> {
-  try {
-    if (!attempt) {
-      return;
-    }
-
-    const whatsappRepository = createOneuiWhatsAppRepository();
-    const existingMessage = await whatsappRepository.findLatestOutboundTemplateMessage({
-      linkedParticipantId: attempt.studyParticipantId,
-      linkedStudyId: attempt.questionnaireVersion.study.id,
-      sourceModule: "NAVIGO"
-    });
-    const result = await sendNavigoConfirmationWhatsApp({
-      codes: confirmation.referenceCodes,
-      existingMessage,
-      folio: confirmation.folio,
-      participantId: attempt.studyParticipantId,
-      participantName: attempt.studyParticipant.participantProfile.name,
-      phone: attempt.studyParticipant.participantProfile.phone,
-      repository: whatsappRepository,
-      studyId: attempt.questionnaireVersion.study.id
-    });
-
-    if (!result.ok) {
-      console.error("public field navigo whatsapp skipped or failed", {
-        attemptId,
-        code: result.code,
-        step: "send_confirmation_template"
-      });
-    }
-  } catch (error) {
-    console.error("public field navigo whatsapp failed", {
-      attemptId,
-      code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
-      step: "send_confirmation_template"
-    });
   }
 }

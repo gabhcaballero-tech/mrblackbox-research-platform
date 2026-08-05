@@ -67,7 +67,6 @@ describe("participant portal screener actions", () => {
     expect(saveParticipantPortalScreenerAnswer).toHaveBeenCalledWith(
       expect.objectContaining({
         identity: { email: null, id: "public-identity-1", source: "PUBLIC_SESSION" },
-        sendWhatsApp: true,
         studyCode: "DETERGENTES-ROPA-2026"
       })
     );

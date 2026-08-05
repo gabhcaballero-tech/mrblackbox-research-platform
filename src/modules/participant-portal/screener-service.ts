@@ -28,8 +28,6 @@ import {
 import { applyStudyScreenerDefinitionOverrides } from "@/modules/screener/study-overrides";
 import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
 import { generateParticipantReferenceCode } from "./review";
-import { createOneuiWhatsAppRepository, sendNavigoConfirmationWhatsApp } from "@/modules/oneui-whatsapp";
-import type { OneuiWhatsAppSendTemplateResult } from "@/modules/oneui-whatsapp/service";
 
 export const PARTICIPANT_PORTAL_REGISTRATION_REQUIRED_MESSAGE =
   "Completa tu registro y consentimiento para continuar.";
@@ -52,8 +50,6 @@ export type ParticipantPortalAnswerInput = {
   otherText?: string;
   value?: string | string[];
 };
-
-export type ParticipantPortalWhatsAppSender = typeof sendNavigoConfirmationWhatsApp;
 
 export type ParticipantPortalScreenProgress = {
   answeredVisibleQuestions: number;
@@ -193,18 +189,14 @@ export async function saveParticipantPortalScreenerAnswer({
   identity,
   questionId,
   repository,
-  sendWhatsApp,
-  studyCode,
-  whatsappSender
+  studyCode
 }: {
   attemptId: string;
   formInput: unknown;
   identity: ParticipantPortalIdentity;
   questionId: string;
   repository: ParticipantPortalScreenerRepository;
-  sendWhatsApp?: boolean;
   studyCode: string;
-  whatsappSender?: ParticipantPortalWhatsAppSender;
 }): Promise<ParticipantPortalScreenerResult<ParticipantPortalAnswerSaveResult>> {
   const context = await loadPortalContext({ identity, repository, studyCode });
 
@@ -353,14 +345,6 @@ export async function saveParticipantPortalScreenerAnswer({
         message: confirmation.message,
         ok: false
       };
-    }
-
-    if (sendWhatsApp) {
-      await sendPortalNavigoWhatsAppBestEffort({
-        attempt,
-        confirmation: confirmation.confirmation,
-        sender: whatsappSender
-      });
     }
 
     return {
@@ -891,54 +875,6 @@ async function closePortalAttempt({
     terminationCode: evaluation.termination?.code ?? null,
     terminationReason: evaluation.termination?.reason ?? null
   });
-}
-
-async function sendPortalNavigoWhatsAppBestEffort({
-  attempt,
-  confirmation,
-  sender
-}: {
-  attempt: PortalScreeningAttemptRecord;
-  confirmation: NonNullable<PortalScreeningAttemptRecord["participantConfirmation"]>;
-  sender?: ParticipantPortalWhatsAppSender;
-}) {
-  const participant = attempt.studyParticipant.participantProfile;
-  const whatsappRepository = sender ? null : createOneuiWhatsAppRepository();
-
-  try {
-    const existingMessage = whatsappRepository
-      ? await whatsappRepository.findLatestOutboundTemplateMessage({
-          linkedParticipantId: attempt.studyParticipantId,
-          linkedStudyId: attempt.questionnaireVersion.study.id,
-          sourceModule: "NAVIGO"
-        })
-      : null;
-    const send = sender ?? sendNavigoConfirmationWhatsApp;
-    const result: OneuiWhatsAppSendTemplateResult | { ok: false; code: "SKIPPED"; message: string } = await send({
-      codes: confirmation.referenceCodes,
-      existingMessage,
-      folio: confirmation.folio,
-      participantId: attempt.studyParticipantId,
-      participantName: participant.name,
-      phone: participant.phone,
-      repository: whatsappRepository ?? undefined,
-      studyId: attempt.questionnaireVersion.study.id
-    });
-
-    if (!result.ok) {
-      console.error("participant portal navigo whatsapp skipped or failed", {
-        attemptId: attempt.id,
-        code: result.code,
-        step: "send_confirmation_template"
-      });
-    }
-  } catch (error) {
-    console.error("participant portal navigo whatsapp failed", {
-      attemptId: attempt.id,
-      code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
-      step: "send_confirmation_template"
-    });
-  }
 }
 
 function operationalStatusFromScreeningStatus(status: PortalScreeningStatus): PortalOperationalStatus {

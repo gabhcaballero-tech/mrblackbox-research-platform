@@ -279,7 +279,7 @@ describe("ONEUI WhatsApp template sending", () => {
       profileName: "ANA",
       repository,
       sourceModule: "NAVIGO",
-      templateName: "oneui_navigo_confirmacion_participacion",
+      templateName: "oneui_navigo_confirmation_participacion",
       toPhone: "5512345678"
     });
 
@@ -300,7 +300,7 @@ describe("ONEUI WhatsApp template sending", () => {
           }
         ],
         language: { code: "es" },
-        name: "oneui_navigo_confirmacion_participacion"
+        name: "oneui_navigo_confirmation_participacion"
       },
       to: "5215512345678",
       type: "template"

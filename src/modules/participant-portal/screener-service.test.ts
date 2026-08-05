@@ -462,11 +462,7 @@ async function answer(
   questionId: string,
   value: string | string[],
   otherText = "",
-  studyCode = "FMASCULINA-NAVIGO-2026",
-  options: {
-    sendWhatsApp?: boolean;
-    whatsappSender?: Parameters<typeof saveParticipantPortalScreenerAnswer>[0]["whatsappSender"];
-  } = {}
+  studyCode = "FMASCULINA-NAVIGO-2026"
 ) {
   return saveParticipantPortalScreenerAnswer({
     attemptId,
@@ -474,9 +470,7 @@ async function answer(
     identity,
     questionId,
     repository,
-    sendWhatsApp: options.sendWhatsApp,
-    studyCode,
-    whatsappSender: options.whatsappSender
+    studyCode
   });
 }
 
@@ -876,14 +870,9 @@ describe("participant portal screener service", () => {
     expect(result.ok ? result.data.message : "").toContain("Falta tu selfie");
   });
 
-  it("sends Navigo WhatsApp only after creating folio and keeps confirmation if WhatsApp fails", async () => {
+  it("creates folio and codes for an eligible filter without sending WhatsApp before selfie", async () => {
     const { attempts, confirmations, repository } = createMemoryRepository();
     const attemptId = await start(repository);
-    const whatsappSender = vi.fn(async () => ({
-      code: "SKIPPED" as const,
-      message: "WhatsApp rechazado en prueba.",
-      ok: false as const
-    }));
 
     await answer(repository, attemptId, "CONSENTIMIENTO", "SI");
     await answer(repository, attemptId, "F1_GENERO", "HOMBRE");
@@ -895,33 +884,14 @@ describe("participant portal screener service", () => {
       await answer(repository, attemptId, questionId, "HIGH");
     }
 
-    const saved = await answer(repository, attemptId, "D6", "HIGH", "", "FMASCULINA-NAVIGO-2026", {
-      sendWhatsApp: true,
-      whatsappSender
-    });
+    const saved = await answer(repository, attemptId, "D6", "HIGH");
 
     expect(saved.ok).toBe(true);
     expect(confirmations).toHaveLength(1);
     expect(attempts[0].participantConfirmation?.folio).toBe("NAV-001");
     expect(attempts[0].participantConfirmation?.referenceCodes).toHaveLength(3);
-    expect(whatsappSender).toHaveBeenCalledOnce();
-    expect(whatsappSender).toHaveBeenCalledWith(
-      expect.objectContaining({
-        codes: [
-          { code: "A7K4", slot: 1 },
-          { code: "M3P9", slot: 2 },
-          { code: "T8R2", slot: 3 }
-        ],
-        folio: "NAV-001",
-        participantName: "Persona Participante",
-        phone: "+525512345678"
-      })
-    );
 
-    const retry = await answer(repository, attemptId, "D6", "HIGH", "", "FMASCULINA-NAVIGO-2026", {
-      sendWhatsApp: true,
-      whatsappSender
-    });
+    const retry = await answer(repository, attemptId, "D6", "HIGH");
 
     expect(retry.ok).toBe(false);
     expect(confirmations).toHaveLength(1);

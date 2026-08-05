@@ -92,7 +92,7 @@ export async function sendNavigoConfirmationWhatsApp(input: {
     profileName: input.participantName,
     repository: input.repository,
     sourceModule: "NAVIGO",
-    templateName: env.WHATSAPP_NAVIGO_CONFIRMATION_TEMPLATE ?? "oneui_navigo_confirmacion_participacion",
+    templateName: env.WHATSAPP_NAVIGO_CONFIRMATION_TEMPLATE ?? "oneui_navigo_confirmation_participacion",
     toPhone: input.phone ?? ""
   });
 }

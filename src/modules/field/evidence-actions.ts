@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { sendNavigoConfirmationWhatsAppBestEffort } from "@/modules/participant-portal/navigo-confirmation-whatsapp";
 import { getFieldActorForRequest } from "./auth";
 import { createFieldRepository } from "./repository";
 import {
@@ -107,13 +108,14 @@ export async function completeFieldEvidenceSubmissionAction(
   attemptId: string
 ): Promise<FieldEvidenceActionResult<{ redirectTo: string }>> {
   const actor = await getFieldActorForRequest();
+  const repository = createFieldRepository();
   let result: Awaited<ReturnType<typeof completeFieldEvidenceSubmission>>;
 
   try {
     result = await completeFieldEvidenceSubmission({
       actor,
       attemptId,
-      repository: createFieldRepository()
+      repository
     });
   } catch (error) {
     console.error("public field evidence completion failed", {
@@ -161,6 +163,22 @@ export async function completeFieldEvidenceSubmissionAction(
   revalidatePath(`/field/screening/${attemptId}/selfie`);
   revalidatePath(`/field/screening/${attemptId}`);
   revalidatePath(`/field/screening/${attemptId}/result`);
+
+  const attempt = await repository.getAttempt(attemptId);
+
+  if (attempt && attempt.status === "PENDING_REVIEW") {
+    await sendNavigoConfirmationWhatsAppBestEffort({
+      attemptId,
+      confirmation: attempt.participantConfirmation ?? null,
+      participant: {
+        name: attempt.studyParticipant.participantProfile.name,
+        phone: attempt.studyParticipant.participantProfile.phone
+      },
+      sourceLabel: "public field",
+      studyId: attempt.questionnaireVersion.study.id,
+      studyParticipantId: attempt.studyParticipantId
+    });
+  }
 
   await logFieldSelfieReviewFlow({
     actor,

@@ -115,7 +115,7 @@ describe("field actions public access", () => {
     });
   });
 
-  it("generates folio and codes, sends complete WhatsApp, and then redirects to selfie when review is required", async () => {
+  it("generates folio and codes without sending WhatsApp, and then redirects to selfie when review is required", async () => {
     const { saveFieldScreeningAnswerAction } = await import("./actions");
     const { PUBLIC_FIELD_ACTOR } = await import("./service");
     const { saveFieldScreeningAnswer } = await import("./service");
@@ -158,13 +158,6 @@ describe("field actions public access", () => {
       },
       studyParticipantId: "study-participant-1"
     });
-    mocks.findLatestOutboundTemplateMessage.mockResolvedValueOnce(null);
-    mocks.sendNavigoConfirmationWhatsApp.mockResolvedValueOnce({
-      code: "SKIPPED",
-      message: "WhatsApp rechazado en prueba.",
-      ok: false
-    });
-
     const formData = new FormData();
     formData.set("value", "SI");
 
@@ -183,19 +176,7 @@ describe("field actions public access", () => {
         attemptId: "attempt-public-1"
       })
     );
-    expect(mocks.sendNavigoConfirmationWhatsApp).toHaveBeenCalledWith(
-      expect.objectContaining({
-        codes: [
-          { code: "A7K4", slot: 1 },
-          { code: "M3P9", slot: 2 },
-          { code: "T8R2", slot: 3 }
-        ],
-        folio: "NAV-001",
-        participantId: "study-participant-1",
-        participantName: "Persona publica",
-        phone: "5551112222"
-      })
-    );
+    expect(mocks.sendNavigoConfirmationWhatsApp).not.toHaveBeenCalled();
   });
 
   it("goes straight to result when a passed public field study does not require selfie", async () => {
@@ -240,26 +221,13 @@ describe("field actions public access", () => {
       },
       studyParticipantId: "study-participant-1"
     });
-    mocks.findLatestOutboundTemplateMessage.mockResolvedValueOnce(null);
-    mocks.sendNavigoConfirmationWhatsApp.mockResolvedValueOnce({
-      code: "SKIPPED",
-      message: "WhatsApp rechazado en prueba.",
-      ok: false
-    });
-
     const formData = new FormData();
     formData.set("value", "SI");
 
     await expect(saveFieldScreeningAnswerAction("attempt-detergents-1", "CONSENTIMIENTO", formData)).rejects.toThrow(
       "redirect:/field/screening/attempt-detergents-1/result"
     );
-    expect(mocks.sendNavigoConfirmationWhatsApp).toHaveBeenCalledWith(
-      expect.objectContaining({
-        folio: "DET-001",
-        participantId: "study-participant-1",
-        phone: "5551112222"
-      })
-    );
+    expect(mocks.sendNavigoConfirmationWhatsApp).not.toHaveBeenCalled();
   });
 
   it("redirects back to the field question with a clear error when saving fails unexpectedly", async () => {
