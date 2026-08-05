@@ -317,6 +317,40 @@ describe("ONEUI WhatsApp template sending", () => {
     });
   });
 
+  it("sendNavigoConfirmationWhatsApp usa el nuevo template aprobado aunque el env conserve el nombre anterior", async () => {
+    const senderCalls: unknown[] = [];
+    const result = await sendNavigoConfirmationWhatsApp({
+      codes: [{ code: "A7K4", slot: 1 }, { code: "M3P9", slot: 2 }, { code: "T8R2", slot: 3 }],
+      env: {
+        ...whatsappEnv(),
+        WHATSAPP_NAVIGO_CONFIRMATION_TEMPLATE: "oneui_navigo_confirmacion_participacion"
+      },
+      folio: "NAV-001",
+      participantId: "participant-1",
+      participantName: "ANA",
+      phone: "5512345678",
+      sender: async (input) => {
+        senderCalls.push(input);
+        return { data: createMessage({ direction: "OUTBOUND", messageType: "template" }), ok: true };
+      },
+      studyId: "study-1"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(senderCalls).toHaveLength(1);
+    expect(senderCalls[0]).toMatchObject({
+      parameters: [
+        { text: "ANA", type: "text" },
+        { text: "NAV-001", type: "text" },
+        { text: "A7K4", type: "text" },
+        { text: "M3P9", type: "text" },
+        { text: "T8R2", type: "text" }
+      ],
+      sourceModule: "NAVIGO",
+      templateName: "oneui_navigo_confirmation_participacion"
+    });
+  });
+
   it("arma payload de plantilla HUT", async () => {
     const repository = createFakeRepository();
     const fetcher = viFetch({

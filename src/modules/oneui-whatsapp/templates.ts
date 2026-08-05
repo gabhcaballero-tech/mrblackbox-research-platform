@@ -14,6 +14,9 @@ export type WhatsAppAutomationStatus = {
 
 export type WhatsAppTemplateSender = typeof sendOneuiWhatsAppTemplate;
 
+const NAVIGO_CONFIRMATION_TEMPLATE_NAME = "oneui_navigo_confirmation_participacion";
+const LEGACY_NAVIGO_CONFIRMATION_TEMPLATE_NAME = "oneui_navigo_confirmacion_participacion";
+
 export function whatsappAutomationStatusFromMessage(
   message: Pick<OneuiWhatsAppMessageRecord, "createdAt" | "metaMessageId" | "rawPayload" | "status" | "timestamp"> | null
 ): WhatsAppAutomationStatus {
@@ -92,9 +95,17 @@ export async function sendNavigoConfirmationWhatsApp(input: {
     profileName: input.participantName,
     repository: input.repository,
     sourceModule: "NAVIGO",
-    templateName: env.WHATSAPP_NAVIGO_CONFIRMATION_TEMPLATE ?? "oneui_navigo_confirmation_participacion",
+    templateName: resolveNavigoConfirmationTemplateName(env.WHATSAPP_NAVIGO_CONFIRMATION_TEMPLATE),
     toPhone: input.phone ?? ""
   });
+}
+
+function resolveNavigoConfirmationTemplateName(configuredTemplateName?: string): string {
+  if (!configuredTemplateName || configuredTemplateName === LEGACY_NAVIGO_CONFIRMATION_TEMPLATE_NAME) {
+    return NAVIGO_CONFIRMATION_TEMPLATE_NAME;
+  }
+
+  return configuredTemplateName;
 }
 
 export function buildNavigoCodesWhatsAppBody({
