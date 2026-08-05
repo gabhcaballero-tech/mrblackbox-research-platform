@@ -78,6 +78,13 @@ export type NavigoParticipantListItem = {
     referenceCodes: Array<{ code: string; slot: number }>;
     screeningAttempt?: { evaluationJson: unknown; id: string } | null;
   } | null;
+  ctl: {
+    completed: boolean;
+    completedAt: Date | null;
+    interviewerName: string | null;
+    sessionId: string | null;
+    status: "CANCELLED" | "COMPLETED" | "IN_PROGRESS" | "PENDING" | null;
+  };
   hasRecoverableToken: boolean;
   participantLinkToken: string | null;
   id: string;
@@ -127,7 +134,26 @@ export type NavigoActivityListItem = NavigoActivityRecord & {
 export type NavigoAdminDashboard = {
   participants: NavigoParticipantListItem[];
   study: NavigoStudySummary;
+  rotationConfig: NavigoStudyRotationConfiguration;
   timeZoneIana: string;
+};
+
+export type NavigoStudyRotationConfiguration = {
+  samples: Array<{
+    displayLabel: string;
+    id: string;
+    internalName: string;
+    sampleKey: string;
+  }>;
+  rotations: Array<{
+    arms: Array<{
+      applicationOrder: number;
+      participantVisibleLabel: string;
+      sampleKey: string;
+    }>;
+    name: string;
+    rotationCode: string;
+  }>;
 };
 
 export type NavigoStartT0Result =
@@ -171,6 +197,15 @@ export type NavigoConfigureRotationInput = {
   triangularCode2?: string | null;
 };
 
+export type NavigoStudyRotationConfigInput = {
+  actorUserId: string;
+  firstInternalName: string;
+  firstSampleKey: string;
+  secondInternalName: string;
+  secondSampleKey: string;
+  studyId: string;
+};
+
 export type NavigoRotationImportPreviewRow = NavigoRotationImportRowInput & {
   errors: string[];
   existingRotation: boolean;
@@ -201,9 +236,9 @@ export type NavigoParticipantRegistrationInput = {
   generateLink?: boolean;
   nombre: string;
   observaciones?: string | null;
-  primeraFragancia: string;
+  primeraFragancia?: string | null;
   reclutador?: string | null;
-  segundaFragancia: string;
+  segundaFragancia?: string | null;
   studyId: string;
 };
 
@@ -356,6 +391,11 @@ export type NavigoAppRepository = {
     leftFragranceCode: string;
     rightFragranceCode: string;
   }>>;
+  clearParticipantRotation: (input: {
+    actorUserId: string;
+    studyParticipantId: string;
+  }) => Promise<NavigoMaintenanceResult>;
+  configureStudyRotation: (input: NavigoStudyRotationConfigInput) => Promise<NavigoActionResult<NavigoStudyRotationConfiguration>>;
   confirmActivitySelfieUpload: (input: {
     activityId: string;
     metadata: EvidenceUploadMetadata & {
@@ -431,6 +471,11 @@ export type NavigoAppRepository = {
     rejectionReason?: string | null;
     status: "APPROVED" | "PENDING" | "REJECTED";
     studyId: string;
+  }) => Promise<NavigoMaintenanceResult>;
+  releaseParticipantAfterCtl: (input: {
+    actorUserId: string;
+    now?: Date;
+    studyParticipantId: string;
   }) => Promise<NavigoMaintenanceResult>;
   updateParticipantVisualVerificationMode: (input: {
     actorUserId: string;
@@ -573,6 +618,16 @@ const activitySelect = {
 
 const participantSelect = {
   applicationStartedAt: true,
+  ctlSessions: {
+    orderBy: { createdAt: "desc" },
+    select: {
+      completedAt: true,
+      id: true,
+      interviewer: { select: { name: true } },
+      status: true
+    },
+    take: 5
+  },
   id: true,
   visualVerificationMode: true,
   participantConfirmation: {
@@ -750,6 +805,12 @@ type ParticipantRecord = {
   accessTokens?: Array<{ expiresAt: Date; id: string; status: string; tokenHash: string }>;
   activities?: ActivityRecord[];
   applicationStartedAt: Date | null;
+  ctlSessions?: Array<{
+    completedAt: Date | null;
+    id: string;
+    interviewer: { name: string };
+    status: "CANCELLED" | "COMPLETED" | "IN_PROGRESS" | "PENDING";
+  }>;
   id: string;
   participantConfirmation: {
     id: string;
@@ -1174,6 +1235,147 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
       }
     },
 
+    async clearParticipantRotation(input) {
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = (await tx.studyParticipant.findUnique?.({
+          select: participantWithActivitiesSelect,
+          where: { id: input.studyParticipantId }
+        })) as ParticipantRecord | null;
+
+        if (!participant) {
+          return { message: "No encontramos el participante.", ok: false };
+        }
+
+        if (participant.study.code !== NAVIGO_STUDY_CODE) {
+          return { message: "Solo el estudio Navigo permite limpiar rotacion.", ok: false };
+        }
+
+        if (hasT0Started(participant)) {
+          return { message: "No se puede limpiar rotacion porque T0 ya fue iniciado.", ok: false };
+        }
+
+        await tx.participantArmAssignment.deleteMany?.({
+          where: { studyParticipantId: participant.id }
+        });
+        await tx.participantRotationAssignment.deleteMany?.({
+          where: { studyParticipantId: participant.id }
+        });
+
+        return {
+          message: "Rotacion provisional limpiada. Folio y codigos se conservaron.",
+          ok: true
+        };
+      });
+    },
+
+    async configureStudyRotation(input) {
+      const firstSampleKey = normalizeNavigoRotationCode(input.firstSampleKey);
+      const secondSampleKey = normalizeNavigoRotationCode(input.secondSampleKey);
+      const firstInternalName = normalizeNavigoParticipantName(input.firstInternalName);
+      const secondInternalName = normalizeNavigoParticipantName(input.secondInternalName);
+
+      if (!firstInternalName || !secondInternalName || !firstSampleKey || !secondSampleKey) {
+        return { message: "Captura nombre interno y clave real para ambas fragancias.", ok: false };
+      }
+
+      if (firstSampleKey === secondSampleKey) {
+        return { message: "Las claves reales de muestra deben ser distintas.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+
+      try {
+        return await prisma.$transaction(async (tx) => {
+          const study = (await tx.study.findUnique?.({
+            select: studySelect,
+            where: { id: input.studyId }
+          })) as StudyRecord | null;
+
+          if (!study || study.code !== NAVIGO_STUDY_CODE) {
+            return { message: "Solo el estudio Navigo permite configurar muestras reales.", ok: false };
+          }
+
+          const leftArm = await resolveNavigoStudyArm({
+            code: "LEFT",
+            folio: "STUDY_CONFIG",
+            label: "Brazo izquierdo",
+            preferredSortOrder: 1,
+            prisma: tx,
+            studyId: study.id,
+            userMessage: "No se pudo preparar el brazo izquierdo."
+          });
+          const rightArm = await resolveNavigoStudyArm({
+            code: "RIGHT",
+            folio: "STUDY_CONFIG",
+            label: "Brazo derecho",
+            preferredSortOrder: 2,
+            prisma: tx,
+            studyId: study.id,
+            userMessage: "No se pudo preparar el brazo derecho."
+          });
+          const firstProduct = await upsertNavigoStudyProduct({
+            displayLabel: firstInternalName,
+            folio: "STUDY_CONFIG",
+            internalName: firstInternalName,
+            prisma: tx,
+            sampleKey: firstSampleKey,
+            studyId: study.id
+          });
+          const secondProduct = await upsertNavigoStudyProduct({
+            displayLabel: secondInternalName,
+            folio: "STUDY_CONFIG",
+            internalName: secondInternalName,
+            prisma: tx,
+            sampleKey: secondSampleKey,
+            studyId: study.id
+          });
+
+          await upsertNavigoStudyRotationPlan({
+            firstProductId: firstProduct.id,
+            folio: "STUDY_CONFIG",
+            leftArmId: leftArm.id,
+            name: "Rotacion 1",
+            prisma: tx,
+            rightArmId: rightArm.id,
+            rotationCode: "ROTACION_1",
+            secondProductId: secondProduct.id,
+            studyId: study.id
+          });
+          await upsertNavigoStudyRotationPlan({
+            firstProductId: secondProduct.id,
+            folio: "STUDY_CONFIG",
+            leftArmId: leftArm.id,
+            name: "Rotacion 2",
+            prisma: tx,
+            rightArmId: rightArm.id,
+            rotationCode: "ROTACION_2",
+            secondProductId: firstProduct.id,
+            studyId: study.id
+          });
+
+          return {
+            data: await loadNavigoStudyRotationConfiguration(tx, study.id),
+            ok: true
+          };
+        });
+      } catch (error) {
+        const failure = toNavigoRotationApplyFailure(error);
+        logNavigoRotationApplyFailure({
+          error,
+          folio: failure.folio,
+          message: failure.logMessage,
+          step: failure.step,
+          studyId: input.studyId
+        });
+        return {
+          message: failure.message,
+          ok: false
+        };
+      }
+    },
+
     async updateParticipantVisualVerificationMode(input) {
       const mode = resolveNavigoVisualVerificationMode(input.mode);
       const prisma = await getPrisma();
@@ -1241,6 +1443,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
 
       return {
         participants: await Promise.all(participants.map((participant) => toDashboardParticipant(participant, now, storage))),
+        rotationConfig: await loadNavigoStudyRotationConfiguration(prisma, studyId),
         study,
         timeZoneIana: resolveNavigoTimeZone(study.timeZoneIana)
       };
@@ -2166,6 +2369,18 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
       };
     },
 
+    async releaseParticipantAfterCtl(input) {
+      const prisma = await getPrisma();
+      return prisma.$transaction((tx) =>
+        releaseNavigoParticipantForCtl({
+          actorUserId: input.actorUserId,
+          now: input.now,
+          prisma: tx,
+          studyParticipantId: input.studyParticipantId
+        })
+      );
+    },
+
     async confirmActivitySelfieUpload(input) {
       const prisma = await getPrisma();
       const participant = await getParticipantByToken(input.token, prisma);
@@ -2399,6 +2614,88 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         };
       });
     }
+  };
+}
+
+export async function releaseNavigoParticipantForCtl({
+  actorUserId,
+  now = new Date(),
+  prisma,
+  studyParticipantId
+}: {
+  actorUserId: string;
+  now?: Date;
+  prisma: NavigoTransactionClient;
+  studyParticipantId: string;
+}): Promise<NavigoMaintenanceResult & { linkToken?: string }> {
+  let participant = (await prisma.studyParticipant.findUnique?.({
+    select: participantWithActivitiesSelect,
+    where: { id: studyParticipantId }
+  })) as ParticipantRecord | null;
+
+  if (!participant) {
+    return { message: "No encontramos el participante para liberar Navigo.", ok: false };
+  }
+
+  const releaseGuard = validateParticipantForCtlRelease(participant);
+  if (!releaseGuard.ok) {
+    return releaseGuard;
+  }
+
+  await ensureCurrentNavigoSchedulesForParticipant({ participant, prisma });
+
+  if (!buildParticipantRotationSummary(participant).ready) {
+    const rotationResult = await assignNavigoRotationFromStudyConfig({
+      actorUserId,
+      participant,
+      prisma
+    });
+
+    if (!rotationResult.ok) {
+      return rotationResult;
+    }
+
+    participant = ((await prisma.studyParticipant.findUnique?.({
+      select: participantWithActivitiesSelect,
+      where: { id: studyParticipantId }
+    })) as ParticipantRecord | null) ?? participant;
+  }
+
+  const guard = validateParticipantForT0(participant);
+  if (!guard.ok) {
+    return { message: guard.message, ok: false };
+  }
+
+  const t0 = await ensureNavigoT0Activity({
+    now,
+    participant,
+    prisma
+  });
+
+  if (!t0.ok) {
+    return t0;
+  }
+
+  const linkToken = await ensureParticipantAccessToken({
+    actorUserId,
+    now,
+    participant,
+    prisma
+  });
+
+  if (!participant.applicationStartedAt) {
+    await prisma.studyParticipant.update?.({
+      data: {
+        operationalStatus: "ASSIGNED"
+      },
+      where: { id: participant.id }
+    });
+  }
+
+  return {
+    linkToken,
+    message: "Navigo liberado correctamente.",
+    ok: true
   };
 }
 
@@ -3168,6 +3465,7 @@ async function toDashboardParticipant(
     availability: timeline.find((item) => item.id === activity.id)?.availability
   }));
   const rotation = buildParticipantRotationSummary(participant);
+  const ctl = buildParticipantCtlSummary(participant);
   const alert =
     timeline.find((activity) => activity.availability.reason === "AFTER_WINDOW")
       ? "Requiere contacto"
@@ -3183,6 +3481,7 @@ async function toDashboardParticipant(
     applicationStartedAt: participant.applicationStartedAt,
     canChangeVisualVerificationMode: !hasT0Started(participant),
     confirmation: participant.participantConfirmation,
+    ctl,
     hasRecoverableToken: Boolean(participant.accessTokens?.[0]),
     id: participant.id,
     participant: {
@@ -3199,6 +3498,20 @@ async function toDashboardParticipant(
     rotationReady: rotation.ready,
     participantLinkToken: participant.accessTokens?.[0]?.id ?? null,
     status: participantStatus(participant)
+  };
+}
+
+function buildParticipantCtlSummary(participant: ParticipantRecord): NavigoParticipantListItem["ctl"] {
+  const sessions = participant.ctlSessions ?? [];
+  const completed = sessions.find((session) => session.status === "COMPLETED") ?? null;
+  const visible = completed ?? sessions[0] ?? null;
+
+  return {
+    completed: Boolean(completed),
+    completedAt: completed?.completedAt ?? null,
+    interviewerName: visible?.interviewer.name ?? null,
+    sessionId: visible?.id ?? null,
+    status: visible?.status ?? null
   };
 }
 
@@ -3242,12 +3555,6 @@ async function buildParticipantImportPreview({
     if (row.correo && !isNavigoEmail(row.correo)) {
       errors.push("formato de correo invalido");
     }
-    if (!row.primeraFragancia) {
-      errors.push("primera fragancia vacia");
-    }
-    if (!row.segundaFragancia) {
-      errors.push("segunda fragancia vacia");
-    }
     if (row.primeraFragancia && row.primeraFragancia === row.segundaFragancia) {
       errors.push("primera y segunda fragancia deben ser distintas");
     }
@@ -3268,7 +3575,7 @@ async function buildParticipantImportPreview({
       existingParticipant: Boolean(matchedParticipant),
       folioNuevo: !folioParticipant,
       unchanged,
-      rotationComplete: Boolean(row.primeraFragancia && row.segundaFragancia && row.primeraFragancia !== row.segundaFragancia),
+      rotationComplete: false,
       rowNumber: index + 2,
       updatable: errors.length === 0 && Boolean(matchedParticipant) && !unchanged
     };
@@ -3485,20 +3792,12 @@ function isSameNavigoParticipantImportRow(
   row: NavigoParticipantImportRowInput
 ): boolean {
   const directMetadata = readNavigoDirectImportMetadata(participant);
-  const leftArm = participant.rotationAssignment?.arms.find(
-    (arm) => arm.studyArm.code.toUpperCase() === "LEFT" || arm.applicationOrder === 1
-  );
-  const rightArm = participant.rotationAssignment?.arms.find(
-    (arm) => arm.studyArm.code.toUpperCase() === "RIGHT" || arm.applicationOrder === 2
-  );
 
   return (
     participant.participantConfirmation?.folio === row.folio &&
     participant.participantProfile.name === row.nombre &&
     participant.participantProfile.phone === row.celular &&
     (participant.participantProfile.email ?? null) === (row.correo ?? null) &&
-    (leftArm?.studyProduct.internalCode ?? null) === row.primeraFragancia &&
-    (rightArm?.studyProduct.internalCode ?? null) === row.segundaFragancia &&
     (directMetadata.reclutador ?? null) === (row.reclutador ?? null) &&
     (directMetadata.observaciones ?? null) === (row.observaciones ?? null)
   );
@@ -3525,9 +3824,9 @@ function normalizeNavigoParticipantRegistrationInput(
     folio: normalizeNavigoFolio(input.folio),
     nombre: normalizeNavigoParticipantName(input.nombre),
     observaciones: input.observaciones ? normalizeNavigoParticipantName(input.observaciones) : null,
-    primeraFragancia: normalizeNavigoRotationCode(input.primeraFragancia),
+    primeraFragancia: normalizeNavigoRotationCode(input.primeraFragancia ?? ""),
     reclutador: input.reclutador ? normalizeNavigoParticipantName(input.reclutador) : null,
-    segundaFragancia: normalizeNavigoRotationCode(input.segundaFragancia)
+    segundaFragancia: normalizeNavigoRotationCode(input.segundaFragancia ?? "")
   };
   const errors: string[] = [];
 
@@ -3536,11 +3835,6 @@ function normalizeNavigoParticipantRegistrationInput(
   if (!data.celular) errors.push("Captura el celular.");
   if (data.celular && !isNavigoPhone(data.celular)) errors.push("Captura un celular valido a 10 digitos o con clave +52.");
   if (data.correo && !isNavigoEmail(data.correo)) errors.push("Captura un correo valido.");
-  if (!data.primeraFragancia || !data.segundaFragancia) errors.push("Captura primera y segunda fragancia.");
-  if (data.primeraFragancia && data.primeraFragancia === data.segundaFragancia) {
-    errors.push("Los codigos de primera y segunda fragancia deben ser distintos.");
-  }
-
   if (errors.length > 0) {
     return { message: errors.join(" "), ok: false };
   }
@@ -3807,64 +4101,32 @@ async function upsertNavigoDirectParticipant({
         where: { id: participant.id }
       }) as Promise<ParticipantRecord | null>,
     rowNumber,
-    step: "study-participant-reload-before-rotation",
-    userMessage: "no se pudo recargar StudyParticipant antes de la rotacion."
-  });
-
-  try {
-    await upsertParticipantRotationForCodes({
-      actorUserId,
-      leftFragranceCode: row.primeraFragancia,
-      participant,
-      prisma,
-      rightFragranceCode: row.segundaFragancia
-    });
-  } catch (error) {
-    throw toNavigoParticipantImportApplyError(error, {
-      folio: row.folio,
-      rowNumber
-    });
-  }
-
-  participant = await runNavigoParticipantImportStep({
-    folio: row.folio,
-    operation: () =>
-      prisma.studyParticipant.findUnique?.({
-        select: participantWithActivitiesSelect,
-        where: { id: participant.id }
-      }) as Promise<ParticipantRecord | null>,
-    rowNumber,
-    step: "study-participant-reload-after-rotation",
-    userMessage: "no se pudo recargar StudyParticipant despues de la rotacion."
+    step: "study-participant-reload-after-confirmation",
+    userMessage: "no se pudo recargar StudyParticipant despues de crear folio y codigos."
   });
 
   let linkToken: string | null = null;
-  if (generateLink) {
-    const t0 = await ensureNavigoT0Activity({ now, participant, prisma });
-    if (!t0.ok) {
+  if (generateLink && hasCompletedCtlSession(participant)) {
+    const release = await releaseNavigoParticipantForCtl({
+      actorUserId,
+      now,
+      prisma,
+      studyParticipantId: participant.id
+    });
+    if (!release.ok) {
       throw new NavigoParticipantImportApplyError({
         folio: row.folio,
-        logMessage: t0.message,
+        logMessage: release.message,
         message: buildNavigoParticipantImportRowMessage({
           folio: row.folio,
-          message: "no se pudo preparar T0 para generar el enlace.",
+          message: "no se pudo liberar Navigo para generar el enlace.",
           rowNumber
         }),
         rowNumber,
-        step: "participant-t0-prepare"
+        step: "participant-navigo-release"
       });
     }
-
-    try {
-      linkToken = await ensureParticipantAccessToken({ actorUserId, now, participant, prisma });
-    } catch (error) {
-      throw toNavigoParticipantImportApplyError(error, {
-        folio: row.folio,
-        rowNumber,
-        stepOverride: "participant-access-token",
-        userMessageOverride: "no se pudo crear o reutilizar ParticipantAccessToken."
-      });
-    }
+    linkToken = release.linkToken ?? null;
   }
 
   return {
@@ -3996,53 +4258,23 @@ async function upsertParticipantRotationForCodes({
     studyId,
     userMessage: "No se pudo crear la asignacion de brazo derecho."
   });
-  const leftProduct = await runNavigoRotationImportStep({
+  const leftProduct = await upsertNavigoStudyProduct({
+    displayLabel: "Primera fragancia",
     folio,
-    operation: () =>
-      prisma.studyProduct.upsert?.({
-        create: {
-          displayLabel: "Primera fragancia",
-          internalCode: leftFragranceCode,
-          isSensitive: true,
-          realName: leftFragranceCode,
-          studyId
-        },
-        update: {
-          displayLabel: "Primera fragancia",
-          isSensitive: true
-        },
-        where: {
-          studyId_internalCode: {
-            internalCode: leftFragranceCode,
-            studyId
-          }
-        }
-      }) as Promise<{ id: string }>,
+    internalName: leftFragranceCode,
+    prisma,
+    sampleKey: leftFragranceCode,
+    studyId,
     step: "study-product-left",
     userMessage: "No se pudo crear el producto de brazo izquierdo."
   });
-  const rightProduct = await runNavigoRotationImportStep({
+  const rightProduct = await upsertNavigoStudyProduct({
+    displayLabel: "Segunda fragancia",
     folio,
-    operation: () =>
-      prisma.studyProduct.upsert?.({
-        create: {
-          displayLabel: "Segunda fragancia",
-          internalCode: rightFragranceCode,
-          isSensitive: true,
-          realName: rightFragranceCode,
-          studyId
-        },
-        update: {
-          displayLabel: "Segunda fragancia",
-          isSensitive: true
-        },
-        where: {
-          studyId_internalCode: {
-            internalCode: rightFragranceCode,
-            studyId
-          }
-        }
-      }) as Promise<{ id: string }>,
+    internalName: rightFragranceCode,
+    prisma,
+    sampleKey: rightFragranceCode,
+    studyId,
     step: "study-product-right",
     userMessage: "No se pudo crear el producto de brazo derecho."
   });
@@ -4193,6 +4425,137 @@ async function upsertParticipantRotationForCodes({
   };
 }
 
+async function upsertNavigoStudyProduct({
+  displayLabel,
+  folio,
+  internalName,
+  prisma,
+  sampleKey,
+  step = "study-product",
+  studyId,
+  userMessage = "No se pudo crear el producto de estudio."
+}: {
+  displayLabel: string;
+  folio: string;
+  internalName: string;
+  prisma: NavigoTransactionClient;
+  sampleKey: string;
+  step?: string;
+  studyId: string;
+  userMessage?: string;
+}) {
+  return runNavigoRotationImportStep({
+    folio,
+    operation: () =>
+      prisma.studyProduct.upsert?.({
+        create: {
+          displayLabel,
+          internalCode: sampleKey,
+          isSensitive: true,
+          realName: internalName,
+          studyId
+        },
+        update: {
+          displayLabel,
+          isSensitive: true,
+          realName: internalName
+        },
+        where: {
+          studyId_internalCode: {
+            internalCode: sampleKey,
+            studyId
+          }
+        }
+      }) as Promise<{ id: string }>,
+    step,
+    userMessage
+  });
+}
+
+async function upsertNavigoStudyRotationPlan({
+  firstProductId,
+  folio,
+  leftArmId,
+  name,
+  prisma,
+  rightArmId,
+  rotationCode,
+  secondProductId,
+  studyId
+}: {
+  firstProductId: string;
+  folio: string;
+  leftArmId: string;
+  name: string;
+  prisma: NavigoTransactionClient;
+  rightArmId: string;
+  rotationCode: string;
+  secondProductId: string;
+  studyId: string;
+}) {
+  const rotationPlan = await runNavigoRotationImportStep({
+    folio,
+    operation: () =>
+      prisma.rotationPlan.upsert?.({
+        create: {
+          assignmentModeAllowed: "MANUAL",
+          name,
+          rotationCode,
+          status: "ACTIVE",
+          studyId
+        },
+        select: {
+          id: true
+        },
+        update: {
+          assignmentModeAllowed: "MANUAL",
+          name,
+          status: "ACTIVE"
+        },
+        where: {
+          studyId_rotationCode: {
+            rotationCode,
+            studyId
+          }
+        }
+      }) as Promise<{ id: string }>,
+    step: "study-rotation-plan",
+    userMessage: "No se pudo crear el plan de rotacion del estudio."
+  });
+
+  await runNavigoRotationImportStep({
+    folio,
+    operation: async () => {
+      await prisma.rotationPlanArm.deleteMany?.({
+        where: { rotationPlanId: rotationPlan.id }
+      });
+      await prisma.rotationPlanArm.createMany?.({
+        data: [
+          {
+            applicationOrder: 1,
+            participantVisibleLabel: "Primera fragancia",
+            rotationPlanId: rotationPlan.id,
+            studyArmId: leftArmId,
+            studyProductId: firstProductId
+          },
+          {
+            applicationOrder: 2,
+            participantVisibleLabel: "Segunda fragancia",
+            rotationPlanId: rotationPlan.id,
+            studyArmId: rightArmId,
+            studyProductId: secondProductId
+          }
+        ]
+      });
+      return { id: rotationPlan.id };
+    },
+    step: "study-rotation-plan-arms",
+    userMessage: "No se pudieron guardar los brazos del plan de rotacion del estudio."
+  });
+
+  return rotationPlan;
+}
+
 async function resolveActiveScreenerVersionId({
   prisma,
   studyId
@@ -4218,6 +4581,199 @@ async function listExistingReferenceCodes(prisma: NavigoPrismaClient | NavigoTra
   })) as Array<{ code: string }>;
 
   return codes.map((code) => code.code);
+}
+
+async function loadNavigoStudyRotationConfiguration(
+  prisma: NavigoPrismaClient | NavigoTransactionClient,
+  studyId: string
+): Promise<NavigoStudyRotationConfiguration> {
+  const products = (await prisma.studyProduct.findMany?.({
+    orderBy: { internalCode: "asc" },
+    select: {
+      displayLabel: true,
+      id: true,
+      internalCode: true,
+      realName: true
+    },
+    where: { studyId }
+  })) as Array<{ displayLabel: string; id: string; internalCode: string; realName: string }> | undefined;
+  const rotationPlans = (await prisma.rotationPlan.findMany?.({
+    orderBy: { rotationCode: "asc" },
+    select: {
+      arms: {
+        orderBy: { applicationOrder: "asc" },
+        select: {
+          applicationOrder: true,
+          participantVisibleLabel: true,
+          studyProduct: {
+            select: {
+              internalCode: true
+            }
+          }
+        }
+      },
+      name: true,
+      rotationCode: true
+    },
+    where: {
+      status: "ACTIVE",
+      studyId
+    }
+  })) as
+    | Array<{
+        arms: Array<{
+          applicationOrder: number;
+          participantVisibleLabel: string;
+          studyProduct: { internalCode: string };
+        }>;
+        name: string;
+        rotationCode: string;
+      }>
+    | undefined;
+
+  return {
+    samples: (products ?? []).map((product) => ({
+      displayLabel: product.displayLabel,
+      id: product.id,
+      internalName: product.realName,
+      sampleKey: product.internalCode
+    })),
+    rotations: (rotationPlans ?? []).map((plan) => ({
+      arms: plan.arms.map((arm) => ({
+        applicationOrder: arm.applicationOrder,
+        participantVisibleLabel: arm.participantVisibleLabel,
+        sampleKey: arm.studyProduct.internalCode
+      })),
+      name: plan.name,
+      rotationCode: plan.rotationCode
+    }))
+  };
+}
+
+type NavigoStudyRotationPlanRecord = {
+  arms: Array<{
+    applicationOrder: number;
+    participantVisibleLabel: string;
+    studyArmId: string;
+    studyProductId: string;
+  }>;
+  id: string;
+  name: string;
+  rotationCode: string;
+};
+
+async function assignNavigoRotationFromStudyConfig({
+  actorUserId,
+  participant,
+  prisma
+}: {
+  actorUserId: string;
+  participant: ParticipantRecord;
+  prisma: NavigoTransactionClient;
+}): Promise<NavigoMaintenanceResult> {
+  if (participant.rotationAssignment) {
+    return { message: "Rotacion existente conservada.", ok: true };
+  }
+
+  if (hasT0Started(participant)) {
+    return { message: "No se puede asignar rotacion porque T0 ya fue iniciado.", ok: false };
+  }
+
+  const plans = ((await prisma.rotationPlan.findMany?.({
+    orderBy: { rotationCode: "asc" },
+    select: {
+      arms: {
+        orderBy: { applicationOrder: "asc" },
+        select: {
+          applicationOrder: true,
+          participantVisibleLabel: true,
+          studyArmId: true,
+          studyProductId: true
+        }
+      },
+      id: true,
+      name: true,
+      rotationCode: true
+    },
+    where: {
+      status: "ACTIVE",
+      studyId: participant.study.id
+    }
+  })) ?? []) as NavigoStudyRotationPlanRecord[];
+
+  const validPlans = plans.filter((plan) => {
+    const orders = plan.arms.map((arm) => arm.applicationOrder).sort();
+    return plan.arms.length === 2 && orders[0] === 1 && orders[1] === 2;
+  });
+
+  if (validPlans.length === 0) {
+    return { message: "No se puede liberar Navigo: configura las rotaciones del estudio.", ok: false };
+  }
+
+  const assignments = ((await prisma.participantRotationAssignment.findMany?.({
+    select: {
+      rotationPlanId: true
+    },
+    where: {
+      rotationPlanId: {
+        in: validPlans.map((plan) => plan.id)
+      }
+    }
+  })) ?? []) as Array<{ rotationPlanId: string }>;
+  const usageByPlan = new Map<string, number>();
+  for (const assignment of assignments) {
+    usageByPlan.set(assignment.rotationPlanId, (usageByPlan.get(assignment.rotationPlanId) ?? 0) + 1);
+  }
+  const selected = [...validPlans].sort((left, right) => {
+    const usageDelta = (usageByPlan.get(left.id) ?? 0) - (usageByPlan.get(right.id) ?? 0);
+    return usageDelta !== 0 ? usageDelta : left.rotationCode.localeCompare(right.rotationCode);
+  })[0];
+
+  if (!selected) {
+    return { message: "No se pudo resolver una rotacion valida para Navigo.", ok: false };
+  }
+
+  const rotationAssignment = (await prisma.participantRotationAssignment.upsert?.({
+    create: {
+      assignedByUserId: actorUserId,
+      assignmentMode: "AUTOMATIC",
+      rotationCode: selected.rotationCode,
+      rotationPlanId: selected.id,
+      studyParticipantId: participant.id
+    },
+    select: { id: true },
+    update: {},
+    where: {
+      studyParticipantId: participant.id
+    }
+  })) as { id: string };
+
+  for (const arm of selected.arms) {
+    await prisma.participantArmAssignment.upsert?.({
+      create: {
+        applicationOrder: arm.applicationOrder,
+        participantRotationAssignmentId: rotationAssignment.id,
+        participantVisibleLabel: arm.participantVisibleLabel,
+        studyArmId: arm.studyArmId,
+        studyParticipantId: participant.id,
+        studyProductId: arm.studyProductId
+      },
+      update: {
+        applicationOrder: arm.applicationOrder,
+        participantRotationAssignmentId: rotationAssignment.id,
+        participantVisibleLabel: arm.participantVisibleLabel,
+        studyProductId: arm.studyProductId
+      },
+      where: {
+        studyParticipantId_studyArmId: {
+          studyArmId: arm.studyArmId,
+          studyParticipantId: participant.id
+        }
+      }
+    });
+  }
+
+  return { message: "Rotacion asignada desde configuracion del estudio.", ok: true };
 }
 
 async function deleteNavigoAppOwnedRelations(
@@ -4972,6 +5528,10 @@ function validateParticipantForT0(participant: ParticipantRecord | null): Navigo
     return { message: "Pendiente para iniciar T0: aprobacion del participante.", ok: false };
   }
 
+  if (!hasCompletedCtlSession(participant)) {
+    return { message: "Pendiente para iniciar T0: completar CTL presencial.", ok: false };
+  }
+
   const rotation = buildParticipantRotationSummary(participant);
 
   if (!rotation.ready) {
@@ -5005,6 +5565,13 @@ function validateParticipantForToken(
     };
   }
 
+  if (!hasCompletedCtlSession(participant)) {
+    return {
+      message: "Tu evaluacion presencial aun no ha sido completada. Espera indicaciones de tu encuestador.",
+      ok: false
+    };
+  }
+
   const rotation = buildParticipantRotationSummary(participant);
   if (!rotation.ready) {
     return {
@@ -5014,6 +5581,34 @@ function validateParticipantForToken(
   }
 
   return { ok: true };
+}
+
+function validateParticipantForCtlRelease(participant: ParticipantRecord): NavigoMaintenanceResult {
+  if (participant.study.code !== NAVIGO_STUDY_CODE) {
+    return { message: "Solo el estudio Navigo puede liberarse desde CTL.", ok: false };
+  }
+
+  if (!participant.participantConfirmation) {
+    return { message: "No se puede liberar Navigo porque falta folio.", ok: false };
+  }
+
+  if (participant.participantConfirmation.referenceCodes.length < 3) {
+    return { message: "No se puede liberar Navigo porque faltan codigos asignados.", ok: false };
+  }
+
+  if (participantStatus(participant) !== "APPROVED" && participantStatus(participant) !== "CONFIRMED") {
+    return { message: "No se puede liberar Navigo porque el participante no esta aprobado.", ok: false };
+  }
+
+  if (!hasCompletedCtlSession(participant)) {
+    return { message: "No se puede liberar Navigo porque CTL no esta completado.", ok: false };
+  }
+
+  return { message: "ok", ok: true };
+}
+
+function hasCompletedCtlSession(participant: Pick<ParticipantRecord, "ctlSessions">): boolean {
+  return (participant.ctlSessions ?? []).some((session) => session.status === "COMPLETED");
 }
 
 function participantStatus(participant: ParticipantRecord): NavigoParticipantListItem["status"] {

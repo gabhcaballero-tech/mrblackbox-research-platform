@@ -80,6 +80,22 @@ export async function generateNavigoParticipantLinkAction(
   redirectWithNavigoMessage(studyId, { message: result.message });
 }
 
+export async function releaseNavigoAfterCtlAction(studyId: string, studyParticipantId: string) {
+  const actor = await requireCapability("admin:access");
+  await ensureNavigoAppFoundation({ actorUserId: actor.id });
+  const result = await createNavigoAppRepository().releaseParticipantAfterCtl({
+    actorUserId: actor.id,
+    studyParticipantId
+  });
+
+  if (!result.ok) {
+    redirectWithNavigoMessage(studyId, { error: result.message, participant: studyParticipantId });
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+  redirectWithNavigoMessage(studyId, { message: result.message, participant: studyParticipantId });
+}
+
 export async function registerNavigoDirectParticipantAction(studyId: string, formData: FormData) {
   const actor = await requireCapability("screening:review");
   await ensureNavigoAppFoundation({ actorUserId: actor.id });
@@ -91,9 +107,7 @@ export async function registerNavigoDirectParticipantAction(studyId: string, for
     generateLink: formData.get("generateLink") === "on",
     nombre: String(formData.get("nombre") ?? ""),
     observaciones: String(formData.get("observaciones") ?? ""),
-    primeraFragancia: String(formData.get("primeraFragancia") ?? ""),
     reclutador: String(formData.get("reclutador") ?? ""),
-    segundaFragancia: String(formData.get("segundaFragancia") ?? ""),
     studyId
   });
 
@@ -239,6 +253,51 @@ export async function configureNavigoRotationAction(studyId: string, studyPartic
   revalidatePath(`/admin/studies/${studyId}/navigo-app`);
   redirectWithNavigoMessage(studyId, {
     message: "Rotacion configurada correctamente.",
+    participant: studyParticipantId
+  });
+}
+
+export async function configureNavigoStudyRotationAction(studyId: string, formData: FormData) {
+  const actor = await requireCapability("rotation:register");
+  const result = await createNavigoAppRepository().configureStudyRotation({
+    actorUserId: actor.id,
+    firstInternalName: String(formData.get("firstInternalName") ?? ""),
+    firstSampleKey: String(formData.get("firstSampleKey") ?? ""),
+    secondInternalName: String(formData.get("secondInternalName") ?? ""),
+    secondSampleKey: String(formData.get("secondSampleKey") ?? ""),
+    studyId
+  });
+
+  if (!result.ok) {
+    redirectWithNavigoMessage(studyId, { error: result.message });
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+  redirectWithNavigoMessage(studyId, {
+    message: "Configuracion real de muestras y rotaciones guardada correctamente."
+  });
+}
+
+export async function clearNavigoParticipantRotationAction(studyId: string, studyParticipantId: string, formData: FormData) {
+  const actor = await requireCapability("rotation:register");
+  const confirmation = String(formData.get("confirmation") ?? "").trim();
+
+  if (confirmation !== "LIMPIAR ROTACION") {
+    redirectWithNavigoMessage(studyId, { error: "Escribe LIMPIAR ROTACION para confirmar.", participant: studyParticipantId });
+  }
+
+  const result = await createNavigoAppRepository().clearParticipantRotation({
+    actorUserId: actor.id,
+    studyParticipantId
+  });
+
+  if (!result.ok) {
+    redirectWithNavigoMessage(studyId, { error: result.message, participant: studyParticipantId });
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+  redirectWithNavigoMessage(studyId, {
+    message: result.message,
     participant: studyParticipantId
   });
 }

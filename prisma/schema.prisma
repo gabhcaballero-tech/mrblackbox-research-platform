@@ -95,6 +95,13 @@ enum ManualMessageStatus {
   MARKED_SENT
 }
 
+enum CtlSessionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
 enum ApplicationTimeEventType {
   REGISTERED
   CORRECTED
@@ -403,6 +410,7 @@ model InternalUser {
   approvedParticipantConfirmations    ParticipantConfirmation[]       @relation("ParticipantConfirmationApprovedBy")
   manualParticipantMessagesMarkedSent ParticipantConfirmation[]       @relation("ParticipantConfirmationManualMessageMarkedSentBy")
   rotationAssignments                 ParticipantRotationAssignment[] @relation("ParticipantRotationAssignedBy")
+  ctlSessions                         CtlSession[]                    @relation("CtlSessionInterviewer")
   reopenedActivities                  ParticipantActivity[]           @relation("ParticipantActivityReopenedBy")
   reviewedMediaEvidence               MediaEvidencePlaceholder[]      @relation("MediaEvidenceReviewedBy")
   exportJobs                          ExportJob[]                     @relation("ExportJobRequestedBy")
@@ -434,6 +442,7 @@ model Study {
   participants             StudyParticipant[]
   participantPortalConfig  ParticipantPortalStudyConfig?
   participantConfirmations ParticipantConfirmation[]
+  ctlSessions             CtlSession[]
   questionnaireDrafts      QuestionnaireDraft[]
   questionnaireVersions    QuestionnaireVersion[]
   libraryItems             LibraryItem[]
@@ -605,6 +614,7 @@ model StudyParticipant {
   armAssignments                   ParticipantArmAssignment[]
   activities                       ParticipantActivity[]
   attributeOrders                  ParticipantAttributeOrder[]
+  ctlSessions                      CtlSession[]
 
   @@unique([participantProfileId, studyId])
   @@index([studyId, operationalStatus])
@@ -1029,6 +1039,7 @@ model ScreeningAttempt {
   participantEvidence        ParticipantEvidence[]
   participantScreeningReview ParticipantScreeningReview?
   participantConfirmation    ParticipantConfirmation?
+  ctlSessions                CtlSession[]
 
   @@index([studyParticipantId, status])
   @@index([fieldUserId, startedAt])
@@ -1049,6 +1060,46 @@ model ScreeningAnswer {
 
   @@unique([screeningAttemptId, questionId])
   @@map("screening_answers")
+}
+
+model CtlSession {
+  id                 String           @id @default(uuid()) @db.Uuid
+  studyId            String           @db.Uuid
+  studyParticipantId String           @db.Uuid
+  screeningAttemptId String?          @db.Uuid
+  interviewerId      String           @db.Uuid
+  status             CtlSessionStatus @default(PENDING)
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  study            Study             @relation(fields: [studyId], references: [id])
+  studyParticipant StudyParticipant  @relation(fields: [studyParticipantId], references: [id])
+  screeningAttempt ScreeningAttempt? @relation(fields: [screeningAttemptId], references: [id])
+  interviewer      InternalUser      @relation("CtlSessionInterviewer", fields: [interviewerId], references: [id], onDelete: Restrict)
+  answers          CtlAnswer[]
+
+  @@index([studyId, status, createdAt])
+  @@index([studyParticipantId, status])
+  @@index([screeningAttemptId])
+  @@index([interviewerId, createdAt])
+  @@map("ctl_sessions")
+}
+
+model CtlAnswer {
+  id           String   @id @default(uuid()) @db.Uuid
+  ctlSessionId String   @db.Uuid
+  questionCode String
+  answerValue  Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ctlSession CtlSession @relation(fields: [ctlSessionId], references: [id])
+
+  @@unique([ctlSessionId, questionCode])
+  @@index([questionCode])
+  @@map("ctl_answers")
 }
 
 model ParticipantConsent {

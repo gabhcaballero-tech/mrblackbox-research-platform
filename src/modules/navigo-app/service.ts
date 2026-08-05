@@ -138,9 +138,9 @@ export type NavigoParticipantImportRowInput = {
   folio: string;
   nombre: string;
   observaciones: string | null;
-  primeraFragancia: string;
+  primeraFragancia?: string;
   reclutador: string | null;
-  segundaFragancia: string;
+  segundaFragancia?: string;
 };
 
 export type NavigoRotationImportParseResult =
@@ -614,8 +614,6 @@ export function parseNavigoParticipantImportText({
     indexes.folio < 0 ? "folio" : null,
     indexes.nombre < 0 ? "nombre" : null,
     indexes.celular < 0 ? "celular" : null,
-    indexes.primeraFragancia < 0 ? "primera_fragancia" : null,
-    indexes.segundaFragancia < 0 ? "segunda_fragancia" : null
   ].filter(Boolean);
 
   if (missing.length > 0) {
@@ -636,9 +634,11 @@ export function parseNavigoParticipantImportText({
         folio: normalizeNavigoFolio(cells[indexes.folio] ?? ""),
         nombre: normalizeNavigoParticipantName(cells[indexes.nombre] ?? ""),
         observaciones: indexes.observaciones >= 0 ? normalizeNullableNavigoText(cells[indexes.observaciones] ?? "") : null,
-        primeraFragancia: normalizeNavigoRotationCode(cells[indexes.primeraFragancia] ?? ""),
+        primeraFragancia:
+          indexes.primeraFragancia >= 0 ? normalizeNavigoRotationCode(cells[indexes.primeraFragancia] ?? "") : "",
         reclutador: indexes.reclutador >= 0 ? normalizeNullableNavigoText(cells[indexes.reclutador] ?? "") : null,
-        segundaFragancia: normalizeNavigoRotationCode(cells[indexes.segundaFragancia] ?? "")
+        segundaFragancia:
+          indexes.segundaFragancia >= 0 ? normalizeNavigoRotationCode(cells[indexes.segundaFragancia] ?? "") : ""
       };
     })
   };
@@ -646,8 +646,8 @@ export function parseNavigoParticipantImportText({
 
 export function createNavigoParticipantImportTemplateTsv(): string {
   return [
-    "folio\tnombre\tcelular\tcorreo\tprimera_fragancia\tsegunda_fragancia\treclutador\tobservaciones",
-    "NAV-001\tNOMBRE PARTICIPANTE\t5512345678\tparticipante@example.com\tCODIGO-A\tCODIGO-B\tRECLUTADOR\tOBSERVACIONES"
+    "folio\tnombre\tcelular\tcorreo\treclutador\tobservaciones",
+    "NAV-001\tNOMBRE PARTICIPANTE\t5512345678\tparticipante@example.com\tRECLUTADOR\tOBSERVACIONES"
   ].join("\n");
 }
 

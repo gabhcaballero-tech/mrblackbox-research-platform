@@ -128,6 +128,12 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
           >
             Ver intentos de screener
           </Link>
+          <Link
+            className="text-sm font-semibold text-zinc-700 transition hover:text-zinc-950"
+            href={`/admin/studies/${studyId}/ctl`}
+          >
+            CTL presencial
+          </Link>
           {config.study.code === NAVIGO_STUDY_CODE ? (
             <Link
               className="text-sm font-semibold text-zinc-700 transition hover:text-zinc-950"

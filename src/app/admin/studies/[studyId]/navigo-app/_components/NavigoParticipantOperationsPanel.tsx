@@ -115,7 +115,7 @@ function ParticipantImportPanel({ studyId }: { studyId: string }) {
     <div className="mt-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <p className="text-sm leading-6 text-zinc-600">
-          Usa TSV o CSV. Columnas minimas: folio, nombre, celular, primera_fragancia y segunda_fragancia.
+          Usa TSV o CSV. Columnas minimas: folio, nombre y celular. La rotacion se importa o configura por separado.
         </p>
         <Link
           className="inline-flex w-fit rounded-md border border-teal-300 bg-white px-4 py-2 text-sm font-semibold text-teal-800 transition hover:bg-teal-50"
@@ -216,7 +216,6 @@ function ParticipantImportPreview({ state }: { state: NavigoParticipantImportAct
         <Metric label="Actualizables" value={preview.summary.updatable} />
         <Metric label="Omitidos" value={preview.summary.omitted} />
         <Metric label="Celulares duplicados" value={preview.summary.phoneDuplicates} />
-        <Metric label="Rotaciones completas" value={preview.summary.rotationComplete} />
       </dl>
       <div className="mt-5 overflow-x-auto">
         <table className="min-w-full text-left text-sm">
@@ -227,8 +226,6 @@ function ParticipantImportPreview({ state }: { state: NavigoParticipantImportAct
               <th className="px-2 py-2">Nombre</th>
               <th className="px-2 py-2">Celular</th>
               <th className="px-2 py-2">Correo</th>
-              <th className="px-2 py-2">1a fragancia</th>
-              <th className="px-2 py-2">2a fragancia</th>
               <th className="px-2 py-2">Reclutador</th>
               <th className="px-2 py-2">Estado</th>
               <th className="px-2 py-2">Errores</th>
@@ -242,8 +239,6 @@ function ParticipantImportPreview({ state }: { state: NavigoParticipantImportAct
                 <td className="px-2 py-2 text-zinc-900">{row.nombre || "-"}</td>
                 <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.celular || "-"}</td>
                 <td className="px-2 py-2 text-zinc-900">{row.correo || "-"}</td>
-                <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.primeraFragancia || "-"}</td>
-                <td className="px-2 py-2 font-mono text-xs text-zinc-900">{row.segundaFragancia || "-"}</td>
                 <td className="px-2 py-2 text-zinc-900">{row.reclutador || "-"}</td>
                 <td className="px-2 py-2">
                   {row.errors.length > 0 ? (

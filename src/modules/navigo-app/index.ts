@@ -32,6 +32,7 @@ export {
   type NavigoParticipantListItem,
   type NavigoSignedActivityUpload,
   type NavigoStartT0Result,
+  type NavigoStudyRotationConfiguration,
   type NavigoStudySummary
 } from "./repository";
 export {

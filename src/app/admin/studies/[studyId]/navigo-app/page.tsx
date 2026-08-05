@@ -3,11 +3,14 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
   configureNavigoRotationAction,
+  configureNavigoStudyRotationAction,
+  clearNavigoParticipantRotationAction,
   deleteNavigoParticipantAction,
   deleteNavigoParticipantStagesAction,
   generateNavigoParticipantLinksForStudyAction,
   generateNavigoParticipantLinkAction,
   registerNavigoDirectParticipantAction,
+  releaseNavigoAfterCtlAction,
   resetNavigoParticipantAppAction,
   reviewNavigoActivityIdentityAction,
   startNavigoT0Action,
@@ -21,7 +24,8 @@ import {
   navigoActivityLabel,
   nowInStudyTimezoneForDateTimeLocal,
   type NavigoActivityListItem,
-  type NavigoParticipantListItem
+  type NavigoParticipantListItem,
+  type NavigoStudyRotationConfiguration
 } from "@/modules/navigo-app";
 import type { QuestionnaireQuestion } from "@/modules/questionnaire-engine";
 import { NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
@@ -86,6 +90,9 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
         <Link className="text-zinc-700 transition hover:text-zinc-950" href={`/admin/studies/${studyId}/screening-attempts`}>
           Supervisar filtro
         </Link>
+        <Link className="text-zinc-700 transition hover:text-zinc-950" href={`/admin/studies/${studyId}/ctl`}>
+          CTL presencial
+        </Link>
       </div>
 
       {!isNavigo ? (
@@ -109,6 +116,7 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
             Antes de usar verificación facial automática en producción, confirma que el aviso de privacidad y consentimiento cubren verificación biométrica automatizada.
           </p>
           <NavigoParticipantOperationsPanel studyId={studyId} />
+          <StudyRotationConfigurationPanel rotationConfig={result.rotationConfig} studyId={studyId} />
           <DirectParticipantRegistration studyId={studyId} />
           <BulkLinkGeneration studyId={studyId} />
           <NavigoRotationImportPanel studyId={studyId} />
@@ -146,6 +154,81 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
   );
 }
 
+function StudyRotationConfigurationPanel({
+  rotationConfig,
+  studyId
+}: {
+  rotationConfig: NavigoStudyRotationConfiguration;
+  studyId: string;
+}) {
+  const firstSample = rotationConfig.samples[0];
+  const secondSample = rotationConfig.samples[1];
+
+  return (
+    <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-zinc-950">Configuracion real de muestras</h2>
+          <p className="mt-1 text-sm leading-6 text-zinc-600">
+            Estas claves identifican las muestras reales del estudio. No se generan automaticamente y no son los codigos de WhatsApp.
+          </p>
+        </div>
+        <StatusBadge status={rotationConfig.rotations.length >= 2 ? "ready" : "planned"}>
+          {rotationConfig.rotations.length >= 2 ? "Configurada" : "Pendiente"}
+        </StatusBadge>
+      </div>
+
+      <form action={configureNavigoStudyRotationAction.bind(null, studyId)} className="mt-5 grid gap-4 md:grid-cols-2">
+        <label className={labelClass}>
+          Nombre interno fragancia A
+          <input className={inputClass} defaultValue={firstSample?.internalName ?? "Fragancia A"} name="firstInternalName" required />
+        </label>
+        <label className={labelClass}>
+          Clave real fragancia A
+          <input className={inputClass} defaultValue={firstSample?.sampleKey ?? ""} name="firstSampleKey" placeholder="247" required />
+        </label>
+        <label className={labelClass}>
+          Nombre interno fragancia B
+          <input className={inputClass} defaultValue={secondSample?.internalName ?? "Fragancia B"} name="secondInternalName" required />
+        </label>
+        <label className={labelClass}>
+          Clave real fragancia B
+          <input className={inputClass} defaultValue={secondSample?.sampleKey ?? ""} name="secondSampleKey" placeholder="583" required />
+        </label>
+        <div className="md:col-span-2">
+          <SubmitButton pendingLabel="Guardando configuracion...">Guardar claves y rotaciones</SubmitButton>
+        </div>
+      </form>
+
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+          <h3 className="text-sm font-semibold text-zinc-900">Fragancias</h3>
+          <p className="mt-2 font-mono text-sm text-zinc-700">
+            {rotationConfig.samples.length > 0 ? rotationConfig.samples.map((sample) => sample.sampleKey).join(" / ") : "Sin claves reales"}
+          </p>
+        </div>
+        <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+          <h3 className="text-sm font-semibold text-zinc-900">Rotaciones configuradas</h3>
+          <ul className="mt-2 space-y-1 text-sm text-zinc-700">
+            {rotationConfig.rotations.length > 0 ? (
+              rotationConfig.rotations.map((rotation) => (
+                <li key={rotation.rotationCode}>
+                  <span className="font-semibold">{rotation.name}:</span>{" "}
+                  <span className="font-mono">
+                    {rotation.arms.map((arm) => arm.sampleKey).join(" -> ")}
+                  </span>
+                </li>
+              ))
+            ) : (
+              <li>Sin rotaciones configuradas.</li>
+            )}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function DirectParticipantRegistration({ studyId }: { studyId: string }) {
   return (
     <details className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
@@ -166,14 +249,6 @@ function DirectParticipantRegistration({ studyId }: { studyId: string }) {
         <label className={labelClass}>
           Correo opcional
           <input className={inputClass} name="correo" type="email" />
-        </label>
-        <label className={labelClass}>
-          Primera fragancia / brazo izquierdo
-          <input className={inputClass} name="primeraFragancia" required />
-        </label>
-        <label className={labelClass}>
-          Segunda fragancia / brazo derecho
-          <input className={inputClass} name="segundaFragancia" required />
         </label>
         <label className={labelClass}>
           Reclutador
@@ -226,8 +301,10 @@ function ParticipantRow({
   studyId: string;
   timeZoneIana: string;
 }) {
-  const canStart = participant.status === "APPROVED" && participant.confirmation && participant.rotationReady;
-  const pendingMessage = participant.rotation.startPendingMessage;
+  const canStart = participant.status === "APPROVED" && participant.confirmation && participant.ctl.completed && participant.rotationReady;
+  const pendingMessage = !participant.ctl.completed
+    ? "Pendiente para iniciar T0: completar CTL presencial."
+    : participant.rotation.startPendingMessage;
   const t0Activity = participant.activities.find((activity) => activity.code === "T0_SALON");
   const measurementQuestions = createNavigoMeasurementDefinition().questions;
   const participantUrl = participant.participantLinkToken
@@ -259,6 +336,10 @@ function ParticipantRow({
             <dd className="inline text-zinc-900">{participant.status === "APPROVED" ? "Confirmado" : participant.status}</dd>
           </div>
           <div>
+            <dt className="inline font-medium text-zinc-500">CTL: </dt>
+            <dd className="inline text-zinc-900">{ctlStatusLabel(participant.ctl.status)}</dd>
+          </div>
+          <div>
             <dt className="inline font-medium text-zinc-500">Identificación visual: </dt>
             <dd className="inline font-semibold text-zinc-900">
               {participant.visualVerificationMode === "disabled" ? "No requerida" : "Requerida"}
@@ -273,6 +354,7 @@ function ParticipantRow({
       </div>
 
       <div className="space-y-4">
+        <CtlPreparation participant={participant} studyId={studyId} timeZoneIana={timeZoneIana} />
         <RotationPreparation participant={participant} studyId={studyId} />
         <div className="grid gap-3 md:grid-cols-4">
           {NAVIGO_ACTIVITY_CODES.map((code) => (
@@ -513,6 +595,52 @@ function VisualVerificationModeForm({
   );
 }
 
+function CtlPreparation({
+  participant,
+  studyId,
+  timeZoneIana
+}: {
+  participant: NavigoParticipantListItem;
+  studyId: string;
+  timeZoneIana: string;
+}) {
+  const navigoActive = Boolean(participant.ctl.completed && participant.rotationReady && participant.participantLinkToken);
+
+  return (
+    <section className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-950">Liberacion Navigo</h3>
+          <p className="mt-1 text-xs leading-5 text-zinc-600">
+            Navigo se habilita solo despues de CTL completado. Al liberar, la rotacion queda fija y se prepara el acceso participante.
+          </p>
+        </div>
+        <StatusBadge status={navigoActive ? "ready" : participant.ctl.completed ? "planned" : "blocked"}>
+          {navigoActive ? "Navigo activo" : participant.ctl.completed ? "Listo para liberar" : "Bloqueado"}
+        </StatusBadge>
+      </div>
+      <dl className="mt-4 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
+        <DetailItem label="CTL" value={ctlStatusLabel(participant.ctl.status)} />
+        <DetailItem
+          label="Completado"
+          value={participant.ctl.completedAt ? formatDate(participant.ctl.completedAt, timeZoneIana) : "Pendiente"}
+        />
+        <DetailItem label="Encuestador CTL" value={participant.ctl.interviewerName ?? "Sin asignar"} />
+        <DetailItem label="Navigo" value={navigoActive ? "Activo" : "Pendiente"} />
+      </dl>
+      {!participant.ctl.completed ? (
+        <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          Pendiente para iniciar T0: completar CTL presencial.
+        </p>
+      ) : !navigoActive ? (
+        <form action={releaseNavigoAfterCtlAction.bind(null, studyId, participant.id)} className="mt-3">
+          <SubmitButton pendingLabel="Liberando Navigo...">Liberar Navigo</SubmitButton>
+        </form>
+      ) : null}
+    </section>
+  );
+}
+
 function RotationPreparation({
   participant,
   studyId
@@ -603,6 +731,20 @@ function RotationPreparation({
             </button>
           </div>
         </form>
+        {participant.rotation.ready ? (
+          <form action={clearNavigoParticipantRotationAction.bind(null, studyId, participant.id)} className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+            <p className="text-xs leading-5 text-amber-900">
+              Limpia solo la rotacion provisional del participante. Conserva folio, codigos de WhatsApp, evidencias y respuestas.
+            </p>
+            <label className={`${labelClass} mt-3`}>
+              Confirmacion
+              <input className={inputClass} name="confirmation" placeholder="LIMPIAR ROTACION" />
+            </label>
+            <div className="mt-3">
+              <SubmitButton pendingLabel="Limpiando rotacion...">Limpiar rotacion provisional</SubmitButton>
+            </div>
+          </form>
+        ) : null}
       </details>
     </section>
   );
@@ -945,6 +1087,21 @@ function statusLabel(status: string) {
       return "En captura";
     default:
       return "Pendiente";
+  }
+}
+
+function ctlStatusLabel(status: NavigoParticipantListItem["ctl"]["status"]) {
+  switch (status) {
+    case "COMPLETED":
+      return "Completado";
+    case "IN_PROGRESS":
+      return "En captura";
+    case "PENDING":
+      return "Pendiente";
+    case "CANCELLED":
+      return "Cancelado";
+    default:
+      return "Sin CTL";
   }
 }
 

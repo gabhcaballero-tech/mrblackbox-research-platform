@@ -844,25 +844,25 @@ describe("navigo app MVP rules", () => {
 
   it("creates and parses the participant import template for TSV or CSV", () => {
     expect(createNavigoParticipantImportTemplateTsv()).toContain(
-      "folio\tnombre\tcelular\tcorreo\tprimera_fragancia\tsegunda_fragancia\treclutador\tobservaciones"
+      "folio\tnombre\tcelular\tcorreo\treclutador\tobservaciones"
     );
 
     const tsv = parseNavigoParticipantImportText({
       filename: "participantes.tsv",
-      text: "\uFEFFFolio\tParticipante\tTeléfono\tBrazo izquierdo\tBrazo derecho\tReclutador\nNAV-001\tAna Pérez\t55 1234 5678\t cod-a \t cod-b \t reclutadora"
+      text: "\uFEFFFolio\tParticipante\tTeléfono\tReclutador\nNAV-001\tAna Pérez\t55 1234 5678\treclutadora"
     });
     const csv = parseNavigoParticipantImportText({
       filename: "participantes.csv",
-      text: "FOLIO,Nombre,Celular,Primera fragancia,Segunda fragancia\nNAV-002,Juan Ñunez,5511112222,COD-C,COD-D"
+      text: "FOLIO,Nombre,Celular\nNAV-002,Juan Ñunez,5511112222"
     });
 
     expect(tsv.ok ? tsv.rows[0] : null).toMatchObject({
       celular: "+525512345678",
       folio: "NAV-001",
       nombre: "ANA PÉREZ",
-      primeraFragancia: "COD-A",
       reclutador: "RECLUTADORA",
-      segundaFragancia: "COD-B"
+      primeraFragancia: "",
+      segundaFragancia: ""
     });
     expect(csv.ok ? csv.rows[0] : null).toMatchObject({
       celular: "+525511112222",
@@ -875,13 +875,13 @@ describe("navigo app MVP rules", () => {
     const sample = parseNavigoParticipantImportText({
       filename: "navigo_participantes_template.tsv",
       text: [
-        "folio\tnombre\tcelular\tcorreo\tprimera_fragancia\tsegunda_fragancia\treclutador\tobservaciones",
-        "NAV-010\tPRUEBA UNO\t5512345678\t\tAAA\tBBB\tGABY\tPRUEBA",
-        "NAV-011\tPRUEBA DOS\t5598765432\t\tBBB\tAAA\tGABY\tPRUEBA",
-        "NAV-012\tPRUEBA TRES\t5685185186\t\tAAA\tBBB\tGABY\tPRUEBA",
-        "NAV-013\tPRUEBA CUATRO\t5771604940\t\tBBB\tAAA\tGABY\tPRUEBA",
-        "NAV-014\tPRUEBA CINCO\t5858024694\t\tAAA\tBBB\tGABY\tPRUEBA",
-        "NAV-015\tPRUEBA SEIS\t5944444448\t\tAAA\tBBB\tGABY\tPRUEBA"
+        "folio\tnombre\tcelular\tcorreo\treclutador\tobservaciones",
+        "NAV-010\tPRUEBA UNO\t5512345678\t\tGABY\tPRUEBA",
+        "NAV-011\tPRUEBA DOS\t5598765432\t\tGABY\tPRUEBA",
+        "NAV-012\tPRUEBA TRES\t5685185186\t\tGABY\tPRUEBA",
+        "NAV-013\tPRUEBA CUATRO\t5771604940\t\tGABY\tPRUEBA",
+        "NAV-014\tPRUEBA CINCO\t5858024694\t\tGABY\tPRUEBA",
+        "NAV-015\tPRUEBA SEIS\t5944444448\t\tGABY\tPRUEBA"
       ].join("\r\n")
     });
 
@@ -892,9 +892,9 @@ describe("navigo app MVP rules", () => {
       correo: null,
       folio: "NAV-010",
       nombre: "PRUEBA UNO",
-      primeraFragancia: "AAA",
+      primeraFragancia: "",
       reclutador: "GABY",
-      segundaFragancia: "BBB"
+      segundaFragancia: ""
     });
   });
 
@@ -931,6 +931,10 @@ describe("navigo app MVP rules", () => {
 
     expect(adminPage).toContain("Registrar participante");
     expect(adminPage).toContain("Generar enlaces para todos");
+    expect(adminPage).toContain("Configuracion real de muestras");
+    expect(adminPage).toContain("Guardar claves y rotaciones");
+    expect(adminPage).toContain("configureNavigoStudyRotationAction");
+    expect(adminPage).toContain("clearNavigoParticipantRotationAction");
     expect(adminPage).toContain("Identificación visual");
     expect(adminPage).toContain("Identificación visual: ");
     expect(adminPage).toContain("updateNavigoVisualVerificationModeAction");
@@ -960,13 +964,13 @@ describe("navigo app MVP rules", () => {
     const parsed = parseNavigoParticipantImportText({
       filename: "participantes.tsv",
       text: [
-        "folio\tnombre\tcelular\tcorreo\tprimera_fragancia\tsegunda_fragancia\treclutador\tobservaciones",
-        "NAV-010\tPRUEBA UNO\t5512345678\t\tAAA\tBBB\tGABY\tPRUEBA",
-        "NAV-011\tPRUEBA DOS\t5598765432\t\tBBB\tAAA\tGABY\tPRUEBA",
-        "NAV-012\tPRUEBA TRES\t5685185186\t\tAAA\tBBB\tGABY\tPRUEBA",
-        "NAV-013\tPRUEBA CUATRO\t5771604940\t\tBBB\tAAA\tGABY\tPRUEBA",
-        "NAV-014\tPRUEBA CINCO\t5858024694\t\tAAA\tBBB\tGABY\tPRUEBA",
-        "NAV-015\tPRUEBA SEIS\t5944444448\t\tAAA\tBBB\tGABY\tPRUEBA"
+        "folio\tnombre\tcelular\tcorreo\treclutador\tobservaciones",
+        "NAV-010\tPRUEBA UNO\t5512345678\t\tGABY\tPRUEBA",
+        "NAV-011\tPRUEBA DOS\t5598765432\t\tGABY\tPRUEBA",
+        "NAV-012\tPRUEBA TRES\t5685185186\t\tGABY\tPRUEBA",
+        "NAV-013\tPRUEBA CUATRO\t5771604940\t\tGABY\tPRUEBA",
+        "NAV-014\tPRUEBA CINCO\t5858024694\t\tGABY\tPRUEBA",
+        "NAV-015\tPRUEBA SEIS\t5944444448\t\tGABY\tPRUEBA"
       ].join("\r\n")
     });
 
@@ -1010,7 +1014,7 @@ describe("navigo app MVP rules", () => {
     expect(result.ok ? "" : result.message).toBe("No fue posible validar participantes existentes. Intenta nuevamente.");
   });
 
-  it("applies participant import rows by creating participant, confirmation, rotation and link", async () => {
+  it("applies participant import rows without creating Navigo link or activities before CTL", async () => {
     const state = createNavigoParticipantImportState();
     const repository = createNavigoAppRepository(state.prisma as never);
 
@@ -1037,11 +1041,11 @@ describe("navigo app MVP rules", () => {
     expect(state.participantProfiles).toHaveLength(1);
     expect(state.studyParticipants).toHaveLength(1);
     expect(state.confirmations).toHaveLength(1);
-    expect(state.rotationAssignments).toHaveLength(1);
-    expect(state.armAssignments).toHaveLength(2);
+    expect(state.rotationAssignments).toHaveLength(0);
+    expect(state.armAssignments).toHaveLength(0);
     expect(state.referenceCodes).toHaveLength(3);
-    expect(state.accessTokens).toHaveLength(1);
-    expect(state.activities).toHaveLength(1);
+    expect(state.accessTokens).toHaveLength(0);
+    expect(state.activities).toHaveLength(0);
   });
 
   it("deletes a direct App Navigo participant and frees its folio record", async () => {
@@ -1067,6 +1071,23 @@ describe("navigo app MVP rules", () => {
     });
 
     const participantId = state.studyParticipants[0]!.id;
+    await repository.configureStudyRotation({
+      actorUserId: "admin-1",
+      firstInternalName: "Fragancia A",
+      firstSampleKey: "247",
+      secondInternalName: "Fragancia B",
+      secondSampleKey: "583",
+      studyId: state.study.id
+    });
+    state.ctlSessions.push({
+      completedAt: new Date("2026-06-26T15:00:00.000Z"),
+      createdAt: new Date("2026-06-26T15:00:00.000Z"),
+      id: "ctl-session-delete-1",
+      interviewer: { name: "Encuestador Uno" },
+      status: "COMPLETED",
+      studyParticipantId: participantId
+    });
+    await repository.releaseParticipantAfterCtl({ actorUserId: "admin-1", studyParticipantId: participantId });
     const attemptId = state.screeningAttempts[0]!.id;
     const activityId = state.activities[0]!.id;
 
@@ -1172,6 +1193,26 @@ describe("navigo app MVP rules", () => {
       ],
       studyId: state.study.id
     });
+    await repository.configureParticipantRotation({
+      actorUserId: "admin-1",
+      leftFragranceCode: "AAA 123",
+      rightFragranceCode: "BBB 456",
+      studyParticipantId: state.studyParticipants[0]!.id,
+      triangularCode1: "",
+      triangularCode2: ""
+    });
+    state.ctlSessions.push({
+      completedAt: new Date("2026-06-26T15:00:00.000Z"),
+      createdAt: new Date("2026-06-26T15:00:00.000Z"),
+      id: "ctl-session-export-1",
+      interviewer: { name: "Encuestador Uno" },
+      status: "COMPLETED",
+      studyParticipantId: state.studyParticipants[0]!.id
+    });
+    await repository.releaseParticipantAfterCtl({
+      actorUserId: "admin-1",
+      studyParticipantId: state.studyParticipants[0]!.id
+    });
 
     const result = await repository.exportLinksAndRotation({
       now: new Date("2026-06-30T12:00:00.000Z"),
@@ -1201,8 +1242,8 @@ describe("navigo app MVP rules", () => {
       "ana.navigo@example.com",
       "GABY CDMX; TURNO 1",
       expect.stringMatching(/^https:\/\/encuestas\.example\.com\/p\/.+\/activities$/),
-      "AAA 123",
-      "BBB 456",
+      "AAA123",
+      "BBB456",
       "APPROVED"
     ]);
     expect(result.ok ? result.data.body : "").toContain("\uFEFF");
@@ -1241,7 +1282,7 @@ describe("navigo app MVP rules", () => {
     expect(state.participantProfiles).toHaveLength(1);
     expect(state.studyParticipants).toHaveLength(1);
     expect(state.confirmations).toHaveLength(1);
-    expect(state.rotationAssignments).toHaveLength(1);
+    expect(state.rotationAssignments).toHaveLength(0);
   });
 
   it("completes a partial existing participant without duplicating profile or study participant", async () => {
@@ -1288,11 +1329,11 @@ describe("navigo app MVP rules", () => {
     expect(state.participantProfiles).toHaveLength(1);
     expect(state.studyParticipants).toHaveLength(1);
     expect(state.confirmations).toHaveLength(1);
-    expect(state.rotationAssignments).toHaveLength(1);
-    expect(state.accessTokens).toHaveLength(1);
+    expect(state.rotationAssignments).toHaveLength(0);
+    expect(state.accessTokens).toHaveLength(0);
   });
 
-  it("reports a sanitized per-row error when study product creation fails and preserves preview", async () => {
+  it("does not create random product keys or rotation while importing participants", async () => {
     const state = createNavigoParticipantImportState({ failStudyProductUpsert: true });
     const repository = createNavigoAppRepository(state.prisma as never);
 
@@ -1314,15 +1355,14 @@ describe("navigo app MVP rules", () => {
       studyId: state.study.id
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.ok ? [] : result.data?.applyErrors).toHaveLength(1);
-    expect(result.ok ? "" : result.data?.applyErrors[0]?.message ?? "").toContain(
-      "Fila 2 / NAV-010: no se pudo crear StudyProduct para primera fragancia."
-    );
-    expect(result.ok ? null : result.data?.preview).not.toBeNull();
+    expect(result.ok).toBe(true);
+    expect(state.products).toHaveLength(0);
+    expect(state.rotationPlans).toHaveLength(0);
+    expect(state.rotationAssignments).toHaveLength(0);
+    expect(state.referenceCodes).toHaveLength(3);
   });
 
-  it("blocks participant rotation changes after T0 has started", async () => {
+  it("does not attempt participant rotation updates when reimporting participants after T0", async () => {
     const state = createNavigoParticipantImportState();
     const repository = createNavigoAppRepository(state.prisma as never);
 
@@ -1364,10 +1404,9 @@ describe("navigo app MVP rules", () => {
       studyId: state.study.id
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.ok ? "" : result.data?.applyErrors[0]?.message ?? "").toContain(
-      "Fila 2 / NAV-010: no se puede actualizar la rotacion porque T0 ya fue iniciado."
-    );
+    expect(result.ok).toBe(true);
+    expect(state.rotationAssignments).toHaveLength(0);
+    expect(state.products).toHaveLength(0);
   });
 
   it("configures rotation for a field-approved participant without colliding with existing study arm sort orders", async () => {
@@ -1401,6 +1440,101 @@ describe("navigo app MVP rules", () => {
       { applicationOrder: 2, participantVisibleLabel: "Segunda fragancia" }
     ]);
     expect(state.referenceCodes).toHaveLength(3);
+  });
+
+  it("saves real Navigo sample keys and study rotations without assigning participants", async () => {
+    const state = createNavigoParticipantImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+
+    const result = await repository.configureStudyRotation({
+      actorUserId: "admin-1",
+      firstInternalName: "Fragancia A",
+      firstSampleKey: "247",
+      secondInternalName: "Fragancia B",
+      secondSampleKey: "583",
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(true);
+    expect(state.products.map((product) => product.internalCode)).toEqual(["247", "583"]);
+    expect(state.products.map((product) => product.realName)).toEqual(["FRAGANCIA A", "FRAGANCIA B"]);
+    expect(state.rotationAssignments).toHaveLength(0);
+    expect(result.ok ? result.data.rotations : []).toMatchObject([
+      {
+        name: "Rotacion 1",
+        rotationCode: "ROTACION_1",
+        arms: [{ sampleKey: "247" }, { sampleKey: "583" }]
+      },
+      {
+        name: "Rotacion 2",
+        rotationCode: "ROTACION_2",
+        arms: [{ sampleKey: "583" }, { sampleKey: "247" }]
+      }
+    ]);
+  });
+
+  it("keeps WhatsApp reference codes independent from the configured rotation samples", async () => {
+    const state = createNavigoParticipantImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+
+    await repository.applyParticipantImport({
+      actorUserId: "admin-1",
+      generateLinks: false,
+      rows: [
+        {
+          celular: "+525512345678",
+          correo: null,
+          folio: "NAV-010",
+          nombre: "PRUEBA UNO",
+          observaciones: null,
+          primeraFragancia: "AAA",
+          reclutador: "GABY",
+          segundaFragancia: "BBB"
+        }
+      ],
+      studyId: state.study.id
+    });
+
+    await repository.configureStudyRotation({
+      actorUserId: "admin-1",
+      firstInternalName: "Fragancia A",
+      firstSampleKey: "247",
+      secondInternalName: "Fragancia B",
+      secondSampleKey: "583",
+      studyId: state.study.id
+    });
+
+    expect(state.referenceCodes).toHaveLength(3);
+    expect(state.referenceCodes.map((code) => code.code)).not.toContain("247");
+    expect(state.referenceCodes.map((code) => code.code)).not.toContain("583");
+    expect(state.rotationAssignments).toHaveLength(0);
+  });
+
+  it("clears provisional participant rotation while preserving folio and WhatsApp codes", async () => {
+    const state = createNavigoParticipantImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const studyParticipantId = seedApprovedFieldParticipantForNavigo(state);
+
+    const configured = await repository.configureParticipantRotation({
+      actorUserId: "admin-1",
+      leftFragranceCode: "247",
+      rightFragranceCode: "583",
+      studyParticipantId,
+      triangularCode1: "",
+      triangularCode2: ""
+    });
+    const codesBefore = state.referenceCodes.map((code) => code.code);
+    const cleared = await repository.clearParticipantRotation({
+      actorUserId: "admin-1",
+      studyParticipantId
+    });
+
+    expect(configured.ok).toBe(true);
+    expect(cleared.ok).toBe(true);
+    expect(state.rotationAssignments).toHaveLength(0);
+    expect(state.armAssignments).toHaveLength(0);
+    expect(state.confirmations).toHaveLength(1);
+    expect(state.referenceCodes.map((code) => code.code)).toEqual(codesBefore);
   });
 
   it("returns a clear message if StudyArm still hits a unique sort order constraint", async () => {
@@ -1577,6 +1711,119 @@ describe("navigo app MVP rules", () => {
     expect(blocked.ok).toBe(false);
     expect(blocked.ok ? "" : blocked.message).toBe("Corrige los errores de la previsualizacion antes de aplicar la importacion.");
     expect(blocked.ok ? 0 : blocked.data?.summary.rowsWithError).toBe(1);
+  });
+
+  it("blocks Navigo before CTL and releases link, T0 and rotation after CTL completion", async () => {
+    const state = createNavigoParticipantImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    await repository.configureStudyRotation({
+      actorUserId: "admin-1",
+      firstInternalName: "Fragancia A",
+      firstSampleKey: "247",
+      secondInternalName: "Fragancia B",
+      secondSampleKey: "583",
+      studyId: state.study.id
+    });
+    const registered = await repository.registerDirectParticipant({
+      actorUserId: "admin-1",
+      celular: "5512345678",
+      folio: "NAV-001",
+      generateLink: true,
+      nombre: "Participante Uno",
+      studyId: state.study.id
+    });
+
+    expect(registered.ok).toBe(true);
+    expect(registered.ok ? registered.data.linkToken : "unexpected").toBeNull();
+    expect(state.accessTokens).toHaveLength(0);
+    expect(state.activities).toHaveLength(0);
+
+    const participantId = registered.ok ? registered.data.studyParticipantId : "";
+    const blocked = await repository.generateParticipantLink({
+      actorUserId: "admin-1",
+      studyParticipantId: participantId
+    });
+    expect(blocked.ok).toBe(false);
+    expect(blocked.ok ? "" : blocked.message).toBe("Pendiente para iniciar T0: completar CTL presencial.");
+
+    state.ctlSessions.push({
+      completedAt: new Date("2026-06-26T15:00:00.000Z"),
+      createdAt: new Date("2026-06-26T15:00:00.000Z"),
+      id: "ctl-session-1",
+      interviewer: { name: "Encuestador Uno" },
+      status: "COMPLETED",
+      studyParticipantId: participantId
+    });
+
+    const released = await repository.releaseParticipantAfterCtl({
+      actorUserId: "admin-1",
+      now: new Date("2026-06-26T15:05:00.000Z"),
+      studyParticipantId: participantId
+    });
+
+    expect(released.ok).toBe(true);
+    expect(state.accessTokens).toHaveLength(1);
+    expect(state.activities.map((activity) => activity.activityScheduleId)).toContain("schedule-t0");
+    expect(state.rotationAssignments).toMatchObject([{ rotationCode: "ROTACION_1" }]);
+    expect(state.armAssignments).toHaveLength(2);
+  });
+
+  it("keeps CTL release rotation fixed and assigns independent rotations to two participants", async () => {
+    const state = createNavigoParticipantImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    await repository.configureStudyRotation({
+      actorUserId: "admin-1",
+      firstInternalName: "Fragancia A",
+      firstSampleKey: "247",
+      secondInternalName: "Fragancia B",
+      secondSampleKey: "583",
+      studyId: state.study.id
+    });
+    const first = await repository.registerDirectParticipant({
+      actorUserId: "admin-1",
+      celular: "5512345678",
+      folio: "NAV-001",
+      nombre: "Participante Uno",
+      studyId: state.study.id
+    });
+    const second = await repository.registerDirectParticipant({
+      actorUserId: "admin-1",
+      celular: "5598765432",
+      folio: "NAV-002",
+      nombre: "Participante Dos",
+      studyId: state.study.id
+    });
+    const firstId = first.ok ? first.data.studyParticipantId : "";
+    const secondId = second.ok ? second.data.studyParticipantId : "";
+    state.ctlSessions.push(
+      {
+        completedAt: new Date("2026-06-26T15:00:00.000Z"),
+        createdAt: new Date("2026-06-26T15:00:00.000Z"),
+        id: "ctl-session-1",
+        interviewer: { name: "Encuestador Uno" },
+        status: "COMPLETED",
+        studyParticipantId: firstId
+      },
+      {
+        completedAt: new Date("2026-06-26T15:10:00.000Z"),
+        createdAt: new Date("2026-06-26T15:10:00.000Z"),
+        id: "ctl-session-2",
+        interviewer: { name: "Encuestador Uno" },
+        status: "COMPLETED",
+        studyParticipantId: secondId
+      }
+    );
+
+    await repository.releaseParticipantAfterCtl({ actorUserId: "admin-1", studyParticipantId: firstId });
+    await repository.releaseParticipantAfterCtl({ actorUserId: "admin-1", studyParticipantId: secondId });
+    await repository.releaseParticipantAfterCtl({ actorUserId: "admin-1", studyParticipantId: firstId });
+
+    expect(state.rotationAssignments).toMatchObject([
+      { rotationCode: "ROTACION_1", studyParticipantId: firstId },
+      { rotationCode: "ROTACION_2", studyParticipantId: secondId }
+    ]);
+    expect(state.armAssignments.filter((assignment) => assignment.studyParticipantId === firstId)).toHaveLength(2);
+    expect(state.armAssignments.filter((assignment) => assignment.studyParticipantId === secondId)).toHaveLength(2);
   });
 
   it("returns sanitized database errors without dropping the valid preview", async () => {
@@ -2174,6 +2421,14 @@ function createNavigoParticipantActivityState() {
     accessTokens: [],
     activities,
     applicationStartedAt: new Date("2026-06-25T15:00:00.000Z") as Date | null,
+    ctlSessions: [
+      {
+        completedAt: new Date("2026-06-25T14:30:00.000Z"),
+        id: "ctl-session-1",
+        interviewer: { name: "Encuestador Uno" },
+        status: "COMPLETED" as const
+      }
+    ],
     id: "study-participant-1",
     participantConfirmation: {
       id: "confirmation-1",
@@ -2934,6 +3189,14 @@ function createNavigoParticipantImportState(
     studyParticipantId: string;
     tokenHash: string;
   }> = [];
+  const ctlSessions: Array<{
+    completedAt: Date | null;
+    createdAt: Date;
+    id: string;
+    interviewer: { name: string };
+    status: "CANCELLED" | "COMPLETED" | "IN_PROGRESS" | "PENDING";
+    studyParticipantId: string;
+  }> = [];
   const applicationTimeEvents: Array<{ id: string; studyParticipantId: string }> = [];
   const activities: Array<{
     activityScheduleId: string;
@@ -2966,7 +3229,7 @@ function createNavigoParticipantImportState(
     realName: string;
     studyId: string;
   }> = [];
-  const rotationPlans: Array<{ id: string; name: string; rotationCode: string; studyId: string }> = [];
+  const rotationPlans: Array<{ id: string; name: string; rotationCode: string; status?: string; studyId: string }> = [];
   const rotationPlanArms: Array<{
     applicationOrder: number;
     participantVisibleLabel: string;
@@ -3034,6 +3297,15 @@ function createNavigoParticipantImportState(
           };
         }),
       applicationStartedAt: participant.applicationStartedAt,
+      ctlSessions: ctlSessions
+        .filter((session) => session.studyParticipantId === participant.id)
+        .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+        .map((session) => ({
+          completedAt: session.completedAt,
+          id: session.id,
+          interviewer: session.interviewer,
+          status: session.status
+        })),
       id: participant.id,
       participantConfirmation: confirmation
         ? {
@@ -3088,6 +3360,21 @@ function createNavigoParticipantImportState(
 
   const tx = {
     activitySchedule: {
+      async create(args: { data: (typeof schedules)[number] }) {
+        const record = { ...args.data, id: `schedule-${args.data.code}` };
+        schedules.push(record);
+        return { id: record.id };
+      },
+      async findMany(args: { where: { code?: { in: readonly string[] }; status?: string; studyId: string } }) {
+        return schedules
+          .filter(
+            (schedule) =>
+              schedule.studyId === args.where.studyId &&
+              (args.where.status === undefined || schedule.status === args.where.status) &&
+              (args.where.code === undefined || args.where.code.in.includes(schedule.code))
+          )
+          .sort((left, right) => left.sortOrder - right.sortOrder);
+      },
       async findFirst(args: { where: { code: string; status: string; studyId: string } }) {
         return (
           schedules.find(
@@ -3095,6 +3382,14 @@ function createNavigoParticipantImportState(
               item.code === args.where.code && item.status === args.where.status && item.studyId === args.where.studyId
           ) ?? null
         );
+      },
+      async update(args: { data: Partial<(typeof schedules)[number]>; where: { id: string } }) {
+        const target = schedules.find((schedule) => schedule.id === args.where.id);
+        if (!target) {
+          throw new Error("schedule not found");
+        }
+        Object.assign(target, args.data);
+        return target;
       }
     },
     participantAccessToken: {
@@ -3254,16 +3549,23 @@ function createNavigoParticipantImportState(
           (assignment) => assignment.studyParticipantId === args.where.studyParticipantId
         );
       },
+      async findMany(args: { where: { rotationPlanId: { in: string[] } } }) {
+        return rotationAssignments
+          .filter((assignment) => args.where.rotationPlanId.in.includes(assignment.rotationPlanId))
+          .map((assignment) => ({ rotationPlanId: assignment.rotationPlanId }));
+      },
       async upsert(args: {
         create: {
+          assignedByUserId?: string;
+          assignmentMode?: string;
           rotationCode: string;
           rotationPlanId: string;
           studyParticipantId: string;
         };
-        update: {
+        update: Partial<{
           rotationCode: string;
           rotationPlanId: string;
-        };
+        }>;
         where: { studyParticipantId: string };
       }) {
         const target = rotationAssignments.find((item) => item.studyParticipantId === args.where.studyParticipantId);
@@ -3301,6 +3603,33 @@ function createNavigoParticipantImportState(
       }
     },
     rotationPlan: {
+      async findMany(args: { where: { status?: string; studyId: string } }) {
+        return rotationPlans
+          .filter(
+            (plan) =>
+              plan.studyId === args.where.studyId &&
+              (args.where.status === undefined || (plan as { status?: string }).status === args.where.status)
+          )
+          .sort((left, right) => left.rotationCode.localeCompare(right.rotationCode))
+          .map((plan) => ({
+            arms: rotationPlanArms
+              .filter((arm) => arm.rotationPlanId === plan.id)
+              .sort((left, right) => left.applicationOrder - right.applicationOrder)
+              .map((arm) => {
+                const product = products.find((candidate) => candidate.id === arm.studyProductId);
+                return {
+                  applicationOrder: arm.applicationOrder,
+                  participantVisibleLabel: arm.participantVisibleLabel,
+                  studyArmId: arm.studyArmId,
+                  studyProductId: arm.studyProductId,
+                  studyProduct: { internalCode: product?.internalCode ?? "" }
+                };
+              }),
+            name: plan.name,
+            id: plan.id,
+            rotationCode: plan.rotationCode
+          }));
+      },
       async upsert(args: {
         create: { name: string; rotationCode: string; studyId: string };
         update: { name: string };
@@ -3497,6 +3826,11 @@ function createNavigoParticipantImportState(
       }
     },
     studyProduct: {
+      async findMany(args: { where: { studyId: string } }) {
+        return products
+          .filter((product) => product.studyId === args.where.studyId)
+          .sort((left, right) => left.internalCode.localeCompare(right.internalCode));
+      },
       async upsert(args: {
         create: Omit<(typeof products)[number], "id">;
         update: Partial<(typeof products)[number]>;
@@ -3538,6 +3872,7 @@ function createNavigoParticipantImportState(
     armAssignments,
     arms,
     confirmations,
+    ctlSessions,
     mediaEvidencePlaceholders,
     participantActivityEvidence,
     participantAttributeOrders,
@@ -3546,6 +3881,7 @@ function createNavigoParticipantImportState(
     participantProfiles,
     participantScreeningReviews,
     prisma,
+    products,
     quotaEvaluations,
     referenceCodes,
     reminderLogs,
@@ -3615,7 +3951,7 @@ function createNavigoRotationImportState({ failProductUpsert = false }: { failPr
     realName: string;
     studyId: string;
   }> = [];
-  const rotationPlans: Array<{ id: string; name: string; rotationCode: string; studyId: string }> = [];
+  const rotationPlans: Array<{ id: string; name: string; rotationCode: string; status?: string; studyId: string }> = [];
   const rotationPlanArms: Array<{
     applicationOrder: number;
     participantVisibleLabel: string;
@@ -3744,6 +4080,30 @@ function createNavigoRotationImportState({ failProductUpsert = false }: { failPr
       }
     },
     rotationPlan: {
+      async findMany(args: { where: { status?: string; studyId: string } }) {
+        return rotationPlans
+          .filter(
+            (plan) =>
+              plan.studyId === args.where.studyId &&
+              (args.where.status === undefined || (plan as { status?: string }).status === args.where.status)
+          )
+          .sort((left, right) => left.rotationCode.localeCompare(right.rotationCode))
+          .map((plan) => ({
+            arms: rotationPlanArms
+              .filter((arm) => arm.rotationPlanId === plan.id)
+              .sort((left, right) => left.applicationOrder - right.applicationOrder)
+              .map((arm) => {
+                const product = products.find((candidate) => candidate.id === arm.studyProductId);
+                return {
+                  applicationOrder: arm.applicationOrder,
+                  participantVisibleLabel: arm.participantVisibleLabel,
+                  studyProduct: { internalCode: product?.internalCode ?? "" }
+                };
+              }),
+            name: plan.name,
+            rotationCode: plan.rotationCode
+          }));
+      },
       async upsert(args: {
         create: {
           name: string;
@@ -3817,6 +4177,11 @@ function createNavigoRotationImportState({ failProductUpsert = false }: { failPr
       }
     },
     studyProduct: {
+      async findMany(args: { where: { studyId: string } }) {
+        return products
+          .filter((product) => product.studyId === args.where.studyId)
+          .sort((left, right) => left.internalCode.localeCompare(right.internalCode));
+      },
       async upsert(args: {
         create: Omit<(typeof products)[number], "id">;
         update: Partial<(typeof products)[number]>;
