@@ -1,4 +1,4 @@
-import {
+﻿import {
   parseScreenerDefinition,
   type ScreenerAnswer,
   type ScreenerDefinition,
@@ -65,13 +65,13 @@ const baseColumns: ExportColumn[] = [
   { header: "NSE", value: (attempt) => attempt.nseScore },
   { header: "Clasificación NSE", value: (attempt, context) => resolveNseClassLabel(context.definition, attempt.nseClass) },
   { header: "Código NSE interno", value: (attempt) => attempt.nseClass },
+  { header: "Código 1", value: (attempt) => referenceCode(attempt, 1) },
+  { header: "Código 2", value: (attempt) => referenceCode(attempt, 2) },
+  { header: "Código 3", value: (attempt) => referenceCode(attempt, 3) },
   { header: "Selfie registrada", value: (attempt) => yesNo(selfieCount(attempt) > 0) },
   { header: "Número fotos perfumes", value: (attempt) => perfumePhotoCount(attempt) },
   { header: "Evidencia completa", value: (attempt) => yesNo(selfieCount(attempt) === 1 && perfumePhotoCount(attempt) >= 1) },
   { header: "Estado revisión evidencia", value: (attempt) => evidenceReviewStatusLabel(attempt) },
-  { header: "Código 1", value: (attempt) => referenceCode(attempt, 1) },
-  { header: "Código 2", value: (attempt) => referenceCode(attempt, 2) },
-  { header: "Código 3", value: (attempt) => referenceCode(attempt, 3) }
 ];
 
 export async function exportScreeningAttemptsCsvForStudy({
@@ -145,8 +145,11 @@ export function buildScreeningAttemptsTsv(attempts: SupervisionAttemptExportReco
     return columns.map((column) => tsvCell(column.value(attempt, context)));
   });
   const header = columns.map((column) => tsvCell(column.header));
+  const fileContent = `\uFEFF${[header, ...rows].map((row) => row.join(TSV_SEPARATOR)).join("\r\n")}\r\n`;
 
-  return `\uFEFF${[header, ...rows].map((row) => row.join(TSV_SEPARATOR)).join("\r\n")}\r\n`;
+  validateTsvStructure(fileContent, header, rows);
+
+  return fileContent;
 }
 
 function buildQuestionAnswerColumns(preparedAttempts: PreparedExportAttempt[]): ExportColumn[] {
@@ -242,10 +245,40 @@ function formatUnknownAnswer(answer: ScreenerAnswer): string {
     const otherText = otherTextFromAnswer(answer);
     const base = values.length > 0 ? values.join("|") : "";
 
+    if (!base && !otherText) {
+      return safeJsonAnswerText(answer);
+    }
+
     return otherText ? `${base} - Especificación: ${otherText}` : base;
   }
 
   return String(answer);
+}
+
+function safeJsonAnswerText(value: object): string {
+  try {
+    return JSON.stringify(sanitizeJsonValue(value)) ?? "";
+  } catch {
+    return "[Respuesta no serializable]";
+  }
+}
+
+function sanitizeJsonValue(value: unknown): unknown {
+  if (typeof value === "string") {
+    return sanitizeTabularValue(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(sanitizeJsonValue);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, nestedValue]) => [key, sanitizeJsonValue(nestedValue)])
+    );
+  }
+
+  return value;
 }
 
 function selectedValues(answer: ScreenerAnswer): string[] {
@@ -392,6 +425,40 @@ function yesNo(value: boolean): string {
 
 function tsvCell(value: string | number | null | undefined): string {
   return neutralizeFormula(sanitizeTabularValue(value));
+}
+
+function validateTsvStructure(fileContent: string, header: string[], rows: string[][]): void {
+  const lines = fileContent.replace(/^\uFEFF/, "").replace(/\r\n$/, "").split("\r\n");
+  const expectedColumns = lines[0]?.split(TSV_SEPARATOR).length ?? 0;
+
+  lines.slice(1).forEach((line, rowIndex) => {
+    const actualColumns = line.split(TSV_SEPARATOR).length;
+
+    if (actualColumns !== expectedColumns) {
+      const suspectedColumn = findPotentialBreakingColumn(header, rows[rowIndex] ?? []);
+
+      console.error("screening export tsv structure mismatch", {
+        actualColumns,
+        expectedColumns,
+        rowNumber: rowIndex + 2,
+        suspectedColumn
+      });
+    }
+  });
+}
+
+function findPotentialBreakingColumn(header: string[], row: string[]): string {
+  const unsafeIndex = row.findIndex((cell) => containsTsvBreakingCharacter(cell));
+
+  if (unsafeIndex >= 0) {
+    return header[unsafeIndex] ?? `column_${unsafeIndex + 1}`;
+  }
+
+  return "unknown";
+}
+
+function containsTsvBreakingCharacter(value: string): boolean {
+  return /[\t\r\n\u0085\u2028\u2029]/.test(value);
 }
 
 function neutralizeFormula(value: string): string {

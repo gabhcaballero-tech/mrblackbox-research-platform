@@ -290,7 +290,7 @@ function parseTsv(content: string): Array<Record<string, string>> {
 function splitTsvRows(content: string): string[][] {
   return content
     .replace(/^\uFEFF/, "")
-    .trimEnd()
+    .replace(/\r\n$/, "")
     .split("\r\n")
     .map((line) => line.split("\t"));
 }
@@ -673,13 +673,13 @@ describe("screening supervision service", () => {
         "NSE",
         "Clasificación NSE",
         "Código NSE interno",
+        "Código 1",
+        "Código 2",
+        "Código 3",
         "Selfie registrada",
         "Número fotos perfumes",
         "Evidencia completa",
         "Estado revisión evidencia",
-        "Código 1",
-        "Código 2",
-        "Código 3",
         "F1_GENERO",
         "F6_MARCAS",
         "F9A_VECES_AL_DIA",
@@ -733,10 +733,84 @@ describe("screening supervision service", () => {
       expect(row?.F6_MARCAS).toBe("");
       expect(row?.F9A_VECES_AL_DIA).toBe("");
       expect(row?.D1).toBe("");
+      expect(row?.["Código 1"]).toBe("");
+      expect(row?.["Código 2"]).toBe("");
+      expect(row?.["Código 3"]).toBe("");
     }
   });
 
-  it("sanitizes tabs and line breaks inside open answers without creating extra columns", async () => {
+  it("keeps folio and assigned reference codes on the same participant row without generating missing codes", async () => {
+    const firstRecord = exportAttempt({
+      id: "coded-attempt-1",
+      participantConfirmation: {
+        folio: "NAV-101",
+        manualMessageStatus: "NOT_SENT",
+        referenceCodes: [
+          { code: "A7K4", slot: 1 },
+          { code: "M3P9", slot: 2 },
+          { code: "T8R2", slot: 3 }
+        ]
+      },
+      studyParticipant: {
+        id: "study-participant-coded-1",
+        participantProfile: {
+          createdAt: new Date("2026-06-23T14:30:00Z"),
+          email: "uno@example.com",
+          externalReference: "COD-1",
+          id: "profile-coded-1",
+          name: "Participante Codigos Uno",
+          phone: "5551010101"
+        },
+        studyId: study.id
+      }
+    });
+    const secondRecord = exportAttempt({
+      id: "coded-attempt-2",
+      participantConfirmation: {
+        folio: "NAV-102",
+        manualMessageStatus: "NOT_SENT",
+        referenceCodes: [{ code: "B6N7", slot: 2 }]
+      },
+      studyParticipant: {
+        id: "study-participant-coded-2",
+        participantProfile: {
+          createdAt: new Date("2026-06-23T14:35:00Z"),
+          email: "dos@example.com",
+          externalReference: "COD-2",
+          id: "profile-coded-2",
+          name: "Participante Codigos Dos",
+          phone: "5552020202"
+        },
+        studyId: study.id
+      }
+    });
+
+    const result = await exportScreeningAttemptsCsvForStudy({
+      actor: admin,
+      filters: {},
+      repository: repository([firstRecord, secondRecord]),
+      studyId: study.id
+    });
+
+    expect(result.ok).toBe(true);
+
+    if (result.ok) {
+      const rows = parseTsv(result.data.fileContent);
+      const firstRow = rows.find((row) => row.Folio === "NAV-101");
+      const secondRow = rows.find((row) => row.Folio === "NAV-102");
+
+      expect(firstRow?.Nombre).toBe("Participante Codigos Uno");
+      expect(firstRow?.["Código 1"]).toBe("A7K4");
+      expect(firstRow?.["Código 2"]).toBe("M3P9");
+      expect(firstRow?.["Código 3"]).toBe("T8R2");
+      expect(secondRow?.Nombre).toBe("Participante Codigos Dos");
+      expect(secondRow?.["Código 1"]).toBe("");
+      expect(secondRow?.["Código 2"]).toBe("B6N7");
+      expect(secondRow?.["Código 3"]).toBe("");
+    }
+  });
+
+  it("sanitizes tabs, line breaks, Unicode, multiple answers and JSON without creating extra columns", async () => {
     const customDefinition = definition();
     customDefinition.questions = [
       ...customDefinition.questions,
@@ -765,17 +839,62 @@ describe("screening supervision service", () => {
       }
     });
     record.answers = [
-      ...record.answers,
-      { answerJson: "Marca A\tMarca B\nMarca C", questionId: "F11_NOTAS_MARCAS" }
+      { answerJson: "HOMBRE", questionId: "F1_GENERO" },
+      {
+        answerJson: {
+          otherText: "Marca A\tMarca B\nMarca C",
+          values: ["NAVIGO", "OTRA"]
+        },
+        questionId: "F6_MARCAS"
+      },
+      { answerJson: "Texto Unicode Ñandú\tlínea 1\nlínea 2", questionId: "F11_NOTAS_MARCAS" },
+      {
+        answerJson: {
+          nested: {
+            brand: "Marca\tJSON",
+            note: "Línea A\nLínea B"
+          }
+        },
+        questionId: "JSON_ACCIDENTAL"
+      }
+    ];
+    const secondRecord = exportAttempt({
+      id: "second-structural-attempt",
+      studyParticipant: {
+        id: "study-participant-structural-2",
+        participantProfile: {
+          createdAt: new Date("2026-06-23T14:55:00Z"),
+          email: "estructura@example.com",
+          externalReference: "EST-2",
+          id: "profile-structural-2",
+          name: "Participante Estructura",
+          phone: "5553334444"
+        },
+        studyId: study.id
+      },
+      questionnaireVersion: {
+        definitionHash: "hash-open-answer",
+        definitionJson: customDefinition,
+        id: "version-open-answer",
+        study,
+        versionNumber: 1
+      }
+    });
+    secondRecord.answers = [
+      { answerJson: "MUJER", questionId: "F1_GENERO" },
+      { answerJson: ["NAVIGO", "OTRA"], questionId: "F6_MARCAS" },
+      { answerJson: "Sin caracteres raros", questionId: "F11_NOTAS_MARCAS" }
     ];
     const result = await exportScreeningAttemptsCsvForStudy({
       actor: admin,
       filters: {},
-      repository: repository([record]),
+      repository: repository([record, secondRecord]),
       studyId: study.id
     });
 
     expect(result.ok ? result.data.fileContent : "").toContain("Marca A Marca B Marca C");
+    expect(result.ok ? result.data.fileContent : "").toContain("Texto Unicode Ñandú línea 1 línea 2");
+    expect(result.ok ? result.data.fileContent : "").toContain('"brand":"Marca JSON"');
     expect(result.ok ? result.data.fileContent : "").toContain("Motivo con tab y salto");
     expect(result.ok ? result.data.fileContent : "").not.toContain("Marca A\tMarca B");
     expect(result.ok ? result.data.fileContent : "").not.toContain("Marca B\nMarca C");
@@ -785,9 +904,11 @@ describe("screening supervision service", () => {
       const headerColumnCount = header?.length ?? 0;
       const [row] = parseTsv(result.data.fileContent);
 
-      expect(row?.F11_NOTAS_MARCAS).toBe("Marca A Marca B Marca C");
+      expect(row?.F6_MARCAS).toBe("Navigo|Otra - Especificación: Marca A Marca B Marca C");
+      expect(row?.F11_NOTAS_MARCAS).toBe("Texto Unicode Ñandú línea 1 línea 2");
+      expect(row?.JSON_ACCIDENTAL).toBe('{"nested":{"brand":"Marca JSON","note":"Línea A Línea B"}}');
       expect(row?.["Motivo rechazo/revisión"]).toBe("Motivo con tab y salto");
-      expect(rows).toHaveLength(1);
+      expect(rows).toHaveLength(2);
       expect(rows.every((cells) => cells.length === headerColumnCount)).toBe(true);
     }
   });
