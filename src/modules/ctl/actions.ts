@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireCapability } from "@/shared/auth/session";
 import { createCtlRepository } from "./repository";
-import { parseCtlAnswers } from "./service";
+import { ctlFormDataToAnswerInput, parseCtlAnswers } from "./service";
 
 export async function startCtlSessionAction(studyId: string, formData: FormData) {
   const actor = await requireCapability("field:access");
@@ -27,7 +27,7 @@ export async function startCtlSessionAction(studyId: string, formData: FormData)
 
 export async function saveCtlAnswersAction(studyId: string, sessionId: string, formData: FormData) {
   const actor = await requireCapability("field:access");
-  const parsed = parseCtlAnswers(Object.fromEntries(formData.entries()));
+  const parsed = parseCtlAnswers(ctlFormDataToAnswerInput(formData));
   const complete = formData.get("complete") === "1";
 
   if (!parsed.ok) {

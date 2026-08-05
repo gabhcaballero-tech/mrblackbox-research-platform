@@ -1,11 +1,40 @@
 import { describe, expect, it } from "vitest";
+import { getCtlDefinition, getCtlQuestions, type CtlDefinition } from "./definition";
 import { createCtlRepository } from "./repository";
-import { doReferenceCodesMatch, parseCtlAnswers } from "./service";
+import { ctlFormDataToAnswerInput, doReferenceCodesMatch, parseCtlAnswers, type CtlAnswerInput } from "./service";
 
 const interviewer = { id: "interviewer-1", role: "INTERVIEWER" as const, status: "ACTIVE" as const };
 const otherInterviewer = { id: "interviewer-2", role: "INTERVIEWER" as const, status: "ACTIVE" as const };
 
 describe("ctl module", () => {
+  it("exposes CTL definition by sections while keeping current questions", () => {
+    const definition = getCtlDefinition();
+    const questions = getCtlQuestions(definition);
+
+    expect(definition.version).toBe(2);
+    expect(definition.sections.map((section) => section.id)).toEqual([
+      "TRIANGULAR_1",
+      "TRIANGULAR_2",
+      "FRAGRANCIA_1",
+      "FRAGRANCIA_2",
+      "COMPARATIVA",
+      "DEMOGRAFICOS"
+    ]);
+    expect(questions).toHaveLength(38);
+    expect(definition.sections.every((section) => Array.isArray(section.questions))).toBe(true);
+    expect(questions.map((question) => question.code)).toEqual(expect.arrayContaining([
+      "P1_TRIANGULAR_1",
+      "P3_TRIANGULAR_2",
+      "P5A_GUSTO_M1",
+      "P5A_GUSTO_M2",
+      "P8A_ATRIBUTOS_M1",
+      "P8A_ATRIBUTOS_M2",
+      "P14_PREFERENCIA",
+      "D1_ESCOLARIDAD_JEFE",
+      "D8_NSE_REGISTRADO"
+    ]));
+  });
+
   it("validates participant reference codes in slot order", () => {
     expect(
       doReferenceCodesMatch(
@@ -75,12 +104,7 @@ describe("ctl module", () => {
 
     expect(started.ok).toBe(true);
     const sessionId = started.ok ? started.sessionId : "";
-    const parsed = parseCtlAnswers({
-      OBSERVACIONES_CTL: "  todo bien  ",
-      P1_TRIANGULAR_1: "247",
-      P2_TRIANGULAR_2: "583",
-      P5_GUSTO: "4"
-    });
+    const parsed = parseCtlAnswers(createValidCtlAnswerInput());
     expect(parsed.ok).toBe(true);
 
     const saved = await repository.saveAnswers({
@@ -94,11 +118,74 @@ describe("ctl module", () => {
     expect(saved.ok).toBe(true);
     expect(session?.status).toBe("IN_PROGRESS");
     expect(session?.answers).toMatchObject({
-      OBSERVACIONES_CTL: "TODO BIEN",
-      P1_TRIANGULAR_1: "247",
-      P2_TRIANGULAR_2: "583",
-      P5_GUSTO: "4"
+      D8_NSE_REGISTRADO: "C_TIPICO",
+      P1_TRIANGULAR_1: "1",
+      P3_TRIANGULAR_2: "7",
+      P5A_GUSTO_M1: 4,
+      P5A_GUSTO_M2: 5
     });
+  });
+
+  it("rejects invalid select options", () => {
+    const parsed = parseCtlAnswers({
+      ...createValidCtlAnswerInput(),
+      P1_TRIANGULAR_1: "999"
+    });
+
+    expect(parsed.ok).toBe(false);
+    expect(parsed.ok ? "" : parsed.message).toBe("Selecciona una opcion valida.");
+    expect(parsed.ok ? [] : parsed.missingQuestionCodes).toEqual(["P1_TRIANGULAR_1"]);
+  });
+
+  it("parses scale answers as numeric values", () => {
+    const parsed = parseCtlAnswers({ P5A_GUSTO: "7" }, scaleDefinition);
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.ok ? parsed.answers : []).toEqual([
+      {
+        answerValue: 7,
+        questionCode: "P5A_GUSTO"
+      }
+    ]);
+  });
+
+  it("rejects scale answers outside min and max", () => {
+    const parsed = parseCtlAnswers({ P5A_GUSTO: "8" }, scaleDefinition);
+
+    expect(parsed.ok).toBe(false);
+    expect(parsed.ok ? "" : parsed.message).toBe("Selecciona un valor entre 1 y 7.");
+    expect(parsed.ok ? [] : parsed.missingQuestionCodes).toEqual(["P5A_GUSTO"]);
+  });
+
+  it("keeps matrix answers grouped by row from form data", () => {
+    const formData = new FormData();
+    formData.set("P8A_ATRIBUTOS.LIMPIA", "4");
+    formData.set("P8A_ATRIBUTOS.MASCULINA", "5");
+    formData.set("complete", "1");
+
+    const parsed = parseCtlAnswers(ctlFormDataToAnswerInput(formData), matrixDefinition);
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.ok ? parsed.answers : []).toEqual([
+      {
+        answerValue: {
+          LIMPIA: "4",
+          MASCULINA: "5"
+        },
+        questionCode: "P8A_ATRIBUTOS"
+      }
+    ]);
+  });
+
+  it("requires all matrix rows when matrix question is required", () => {
+    const formData = new FormData();
+    formData.set("P8A_ATRIBUTOS.LIMPIA", "4");
+
+    const parsed = parseCtlAnswers(ctlFormDataToAnswerInput(formData), matrixDefinition);
+
+    expect(parsed.ok).toBe(false);
+    expect(parsed.ok ? "" : parsed.message).toBe("Responde las preguntas obligatorias antes de continuar.");
+    expect(parsed.ok ? [] : parsed.missingQuestionCodes).toEqual(["P8A_ATRIBUTOS.MASCULINA"]);
   });
 
   it("allows multiple interviewers to have separate CTL sessions for the same participant", async () => {
@@ -153,11 +240,7 @@ describe("ctl module", () => {
       folio: "NAV-001",
       studyId: state.study.id
     });
-    const parsed = parseCtlAnswers({
-      P1_TRIANGULAR_1: "247",
-      P2_TRIANGULAR_2: "583",
-      P5_GUSTO: "5"
-    });
+    const parsed = parseCtlAnswers(createValidCtlAnswerInput());
 
     await repository.saveAnswers({
       actor: interviewer,
@@ -176,6 +259,151 @@ describe("ctl module", () => {
     expect(state.accessTokens).toHaveLength(1);
   });
 });
+
+const scaleDefinition: CtlDefinition = {
+  sections: [
+    {
+      id: "FRAGRANCE_1",
+      questions: [
+        {
+          code: "P5A_GUSTO",
+          label: "Gusto general",
+          labels: {
+            1: "Le disgusta muchisimo",
+            7: "Le gusta muchisimo"
+          },
+          max: 7,
+          min: 1,
+          required: true,
+          type: "SCALE"
+        }
+      ],
+      title: "Evaluacion primera fragancia"
+    }
+  ],
+  version: 2
+};
+
+const matrixDefinition: CtlDefinition = {
+  sections: [
+    {
+      id: "FRAGRANCE_1_ATTRIBUTES",
+      questions: [
+        {
+          code: "P8A_ATRIBUTOS",
+          columns: [
+            { label: "Totalmente en desacuerdo", value: 1 },
+            { label: "En desacuerdo", value: 2 },
+            { label: "Ni de acuerdo ni en desacuerdo", value: 3 },
+            { label: "De acuerdo", value: 4 },
+            { label: "Totalmente de acuerdo", value: 5 }
+          ],
+          label: "Atributos de la fragancia",
+          required: true,
+          rows: [
+            { code: "LIMPIA", label: "Limpia" },
+            { code: "MASCULINA", label: "Masculina" }
+          ],
+          type: "MATRIX"
+        }
+      ],
+      title: "Bateria de atributos"
+    }
+  ],
+  version: 2
+};
+
+function createValidCtlAnswerInput(): CtlAnswerInput {
+  return {
+    D1_ESCOLARIDAD_JEFE: "8",
+    D2_BANOS_COMPLETOS: "1",
+    D3_AUTOS: "1",
+    D4_INTERNET: "1",
+    D5_TRABAJADORES: "2",
+    D6_CUARTOS_DORMIR: "3",
+    D7_PUNTAJE_NSE: "144",
+    D8_NSE_REGISTRADO: "C_TIPICO",
+    P1_TRIANGULAR_1: "1",
+    P2_TRIANGULAR_1_RESULTADO: "1",
+    P3_TRIANGULAR_2: "7",
+    P4_TRIANGULAR_2_RESULTADO: "1",
+    P5A_GUSTO_M1: "4",
+    P5A_GUSTO_M2: "5",
+    P6A_INTENSIDAD_PREFERIDA_M1: "3",
+    P6A_INTENSIDAD_PREFERIDA_M2: "3",
+    P7A_INTENSIDAD_PERCIBIDA_M1: "4",
+    P7A_INTENSIDAD_PERCIBIDA_M2: "5",
+    P8A_ATRIBUTOS_M1: createMatrixAnswer("4"),
+    P8A_ATRIBUTOS_M2: createMatrixAnswer("5"),
+    P9A_AROMA_M1: createAromaMatrixAnswer("1"),
+    P9A_AROMA_M2: createAromaMatrixAnswer("0"),
+    P10A_INTENCION_COMPRA_M1: "4",
+    P10A_INTENCION_COMPRA_M2: "5",
+    P11A_COMPARACION_MARCA_USUAL_M1: "3",
+    P11A_COMPARACION_MARCA_USUAL_M2: "4",
+    P12A_INTENCION_CAMBIO_M1: "2",
+    P12A_INTENCION_CAMBIO_M2: "2",
+    P13A_DURACION_M1: "3",
+    P13A_DURACION_M2: "4",
+    P14_PREFERENCIA: "1",
+    P14A_RAZONES_PREFERENCIA: "  aroma mas fresco  ",
+    P15_PREFERENCIA_INTENSIDAD: "1",
+    P16_INTENSIDAD_PRIMERA: "4",
+    P17_INTENSIDAD_SEGUNDA: "5",
+    P18_MAYOR_DURACION: "1",
+    P19_PREFERENCIA_CAMBIO: "2",
+    P20_ADECUADA_JAFRA: "1"
+  };
+}
+
+function createMatrixAnswer(value: string): Record<string, string> {
+  return Object.fromEntries(
+    [
+      "LIMPIA",
+      "MASCULINA",
+      "FRESCA",
+      "SEDUCTORA",
+      "ATEMPORAL",
+      "ATRACTIVA",
+      "ALTA_CALIDAD",
+      "INNOVADORA",
+      "ENERGIZANTE",
+      "TIENE_CARACTER",
+      "PARA_ALGUIEN_COMO_YO",
+      "VERSATIL",
+      "ADICTIVA",
+      "LLAMATIVA",
+      "ME_HACE_SENTIR_SEGURO",
+      "MODERNA",
+      "ME_TRANSMITE_LIBERTAD",
+      "ME_HACE_SENTIR_COMODO",
+      "ELEGANTE",
+      "ARTIFICIAL",
+      "AUDAZ",
+      "MISTERIOSA"
+    ].map((rowCode) => [rowCode, value])
+  );
+}
+
+function createAromaMatrixAnswer(value: string): Record<string, string> {
+  return Object.fromEntries(
+    [
+      "FLORAL",
+      "FRUTAL",
+      "DULCE",
+      "ATALCADA",
+      "CITRICA",
+      "AMADERADA_MADEROSA",
+      "JUGOSA",
+      "EMPALAGOSA",
+      "ESPECIADA",
+      "HERBAL",
+      "LAVANDA",
+      "MARINA",
+      "ALCOHOL"
+    ].map((rowCode) => [rowCode, value])
+  );
+}
 
 function createCtlState() {
   const study = { code: "FMASCULINA-NAVIGO-2026", id: "study-1", name: "Navigo" };

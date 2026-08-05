@@ -1,4 +1,10 @@
-import { getCtlDefinition, type CtlDefinition } from "./definition";
+import {
+  getCtlDefinition,
+  getCtlQuestions,
+  type CtlDefinition,
+  type CtlMatrixQuestionDefinition,
+  type CtlQuestionDefinition
+} from "./definition";
 
 export type CtlActor = {
   id: string;
@@ -8,7 +14,10 @@ export type CtlActor = {
 
 export type CtlSessionStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 
-export type CtlAnswerInput = Record<string, FormDataEntryValue | null | undefined>;
+export type CtlAnswerInput = Record<
+  string,
+  FormDataEntryValue | Record<string, FormDataEntryValue | null | undefined> | null | undefined
+>;
 
 export type CtlAnswerDraft = {
   answerValue: unknown;
@@ -61,22 +70,28 @@ export function parseCtlAnswers(
   const answers: CtlAnswerDraft[] = [];
   const missingQuestionCodes: string[] = [];
 
-  for (const question of definition.questions) {
-    const rawValue = input[question.code];
-    const normalized =
-      question.type === "SELECT" ? normalizeCtlCode(rawValue) : normalizeCtlText(rawValue);
+  for (const question of getCtlQuestions(definition)) {
+    const parsed = parseCtlAnswerForQuestion(input, question);
 
-    if (question.required && !normalized) {
+    if (!parsed.ok) {
+      return {
+        message: parsed.message,
+        missingQuestionCodes: parsed.missingQuestionCodes,
+        ok: false
+      };
+    }
+
+    if (question.required && parsed.empty) {
       missingQuestionCodes.push(question.code);
       continue;
     }
 
-    if (!normalized) {
+    if (parsed.empty) {
       continue;
     }
 
     answers.push({
-      answerValue: normalized,
+      answerValue: parsed.answerValue,
       questionCode: question.code
     });
   }
@@ -93,6 +108,156 @@ export function parseCtlAnswers(
     answers,
     ok: true
   };
+}
+
+export function ctlFormDataToAnswerInput(formData: FormData): CtlAnswerInput {
+  const input: CtlAnswerInput = {};
+
+  for (const [key, value] of formData.entries()) {
+    if (key === "complete") {
+      continue;
+    }
+
+    const separatorIndex = key.indexOf(".");
+
+    if (separatorIndex === -1) {
+      input[key] = value;
+      continue;
+    }
+
+    const questionCode = key.slice(0, separatorIndex);
+    const rowCode = key.slice(separatorIndex + 1);
+
+    if (!questionCode || !rowCode) {
+      continue;
+    }
+
+    const current = input[questionCode];
+    const nested = isMatrixValueRecord(current)
+      ? current as Record<string, FormDataEntryValue | null | undefined>
+      : {};
+
+    nested[rowCode] = value;
+    input[questionCode] = nested;
+  }
+
+  return input;
+}
+
+function parseCtlAnswerForQuestion(input: CtlAnswerInput, question: CtlQuestionDefinition):
+  | {
+      answerValue: unknown;
+      empty: boolean;
+      ok: true;
+    }
+  | {
+      message: string;
+      missingQuestionCodes: string[];
+      ok: false;
+    } {
+  if (question.type === "MATRIX") {
+    return parseMatrixAnswer(input[question.code], question);
+  }
+
+  const rawValue = input[question.code];
+  const normalized = question.type === "SELECT" || question.type === "SCALE"
+    ? normalizeCtlCode(rawValue)
+    : normalizeCtlText(rawValue);
+
+  if (!normalized) {
+    return { answerValue: null, empty: true, ok: true };
+  }
+
+  if (question.type === "SELECT") {
+    const allowedValues = new Set(question.options.map((option) => normalizeCtlCode(option.value)));
+
+    if (!allowedValues.has(normalized)) {
+      return {
+        message: "Selecciona una opcion valida.",
+        missingQuestionCodes: [question.code],
+        ok: false
+      };
+    }
+
+    return { answerValue: normalized, empty: false, ok: true };
+  }
+
+  if (question.type === "SCALE") {
+    const value = Number(normalized);
+
+    if (!Number.isInteger(value) || value < question.min || value > question.max) {
+      return {
+        message: `Selecciona un valor entre ${question.min} y ${question.max}.`,
+        missingQuestionCodes: [question.code],
+        ok: false
+      };
+    }
+
+    return { answerValue: value, empty: false, ok: true };
+  }
+
+  return { answerValue: normalized, empty: false, ok: true };
+}
+
+function parseMatrixAnswer(
+  rawValue: CtlAnswerInput[string],
+  question: CtlMatrixQuestionDefinition
+):
+  | {
+      answerValue: Record<string, string>;
+      empty: boolean;
+      ok: true;
+    }
+  | {
+      message: string;
+      missingQuestionCodes: string[];
+      ok: false;
+    } {
+  const rawRows = isMatrixValueRecord(rawValue)
+    ? rawValue as Record<string, FormDataEntryValue | null | undefined>
+    : {};
+  const allowedValues = new Set(question.columns.map((column) => normalizeCtlCode(column.value)));
+  const answerValue: Record<string, string> = {};
+  const missingRows: string[] = [];
+
+  for (const row of question.rows) {
+    const normalized = normalizeCtlCode(rawRows[row.code]);
+
+    if (!normalized) {
+      if (question.required) {
+        missingRows.push(row.code);
+      }
+      continue;
+    }
+
+    if (!allowedValues.has(normalized)) {
+      return {
+        message: "Selecciona una opcion valida.",
+        missingQuestionCodes: [`${question.code}.${row.code}`],
+        ok: false
+      };
+    }
+
+    answerValue[row.code] = normalized;
+  }
+
+  if (missingRows.length > 0) {
+    return {
+      message: "Responde las preguntas obligatorias antes de continuar.",
+      missingQuestionCodes: missingRows.map((rowCode) => `${question.code}.${rowCode}`),
+      ok: false
+    };
+  }
+
+  return {
+    answerValue,
+    empty: Object.keys(answerValue).length === 0,
+    ok: true
+  };
+}
+
+function isMatrixValueRecord(value: unknown): value is Record<string, FormDataEntryValue | null | undefined> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 export function canAccessCtl(actor: CtlActor): boolean {

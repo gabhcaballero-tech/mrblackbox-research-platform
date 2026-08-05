@@ -4,6 +4,7 @@ import { requireCapability } from "@/shared/auth/session";
 import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import type { CtlQuestionDefinition } from "@/modules/ctl/definition";
 import { createCtlRepository, ctlStatusLabel } from "@/modules/ctl/repository";
 import { saveCtlAnswersAction } from "@/modules/ctl/actions";
 
@@ -74,28 +75,24 @@ export default async function CtlCapturePage({ params, searchParams }: CtlCaptur
 
         <form action={saveCtlAnswersAction.bind(null, studyId, session.id)} className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-zinc-950">Captura CTL</h2>
-          <div className="mt-5 space-y-6">
-            {session.definition.questions.map((question) => (
-              <label key={question.code} className={labelClass}>
-                <span>
-                  {question.code} · {question.label}
-                  {question.required ? <span className="text-rose-700"> *</span> : null}
-                </span>
-                {question.type === "SELECT" ? (
-                  <select className={inputClass} defaultValue={String(session.answers[question.code] ?? "")} disabled={readOnly} name={question.code} required={question.required}>
-                    <option value="">Selecciona</option>
-                    {(question.options ?? []).map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                ) : question.type === "LONG_TEXT" ? (
-                  <textarea className={inputClass} defaultValue={String(session.answers[question.code] ?? "")} disabled={readOnly} name={question.code} rows={3} />
-                ) : (
-                  <input className={inputClass} defaultValue={String(session.answers[question.code] ?? "")} disabled={readOnly} name={question.code} required={question.required} />
-                )}
-              </label>
+          <div className="mt-5 space-y-8">
+            {session.definition.sections.map((section) => (
+              <section key={section.id} className="space-y-5 rounded-md border border-zinc-200 bg-zinc-50 p-4">
+                <div>
+                  <h3 className="text-base font-semibold text-zinc-950">{section.title}</h3>
+                  {section.description ? <p className="mt-1 text-sm text-zinc-600">{section.description}</p> : null}
+                </div>
+                <div className="space-y-6">
+                  {section.questions.map((question) => (
+                    <CtlQuestionField
+                      answer={session.answers[question.code]}
+                      key={question.code}
+                      question={question}
+                      readOnly={readOnly}
+                    />
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
 
@@ -126,6 +123,135 @@ function Detail({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 font-semibold text-zinc-950">{value}</dd>
     </div>
   );
+}
+
+function CtlQuestionField({
+  answer,
+  question,
+  readOnly
+}: {
+  answer: unknown;
+  question: CtlQuestionDefinition;
+  readOnly: boolean;
+}) {
+  return (
+    <div className={labelClass}>
+      <span>
+        {question.code} · {question.label}
+        {question.required ? <span className="text-rose-700"> *</span> : null}
+      </span>
+      {renderQuestionInput(question, answer, readOnly)}
+    </div>
+  );
+}
+
+function renderQuestionInput(question: CtlQuestionDefinition, answer: unknown, readOnly: boolean) {
+  if (question.type === "SELECT") {
+    return (
+      <select
+        className={inputClass}
+        defaultValue={String(answer ?? "")}
+        disabled={readOnly}
+        name={question.code}
+        required={question.required}
+      >
+        <option value="">Selecciona</option>
+        {question.options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  if (question.type === "SCALE") {
+    return (
+      <div className="flex flex-wrap gap-2">
+        {Array.from({ length: question.max - question.min + 1 }, (_, index) => question.min + index).map((value) => (
+          <label key={value} className="flex min-w-24 flex-col gap-1 rounded-md border border-zinc-300 bg-white p-2 text-xs text-zinc-700">
+            <span className="font-semibold text-zinc-950">{value}</span>
+            {question.labels?.[value] ? <span>{question.labels[value]}</span> : null}
+            <input
+              defaultChecked={String(answer ?? "") === String(value)}
+              disabled={readOnly}
+              name={question.code}
+              required={question.required}
+              type="radio"
+              value={value}
+            />
+          </label>
+        ))}
+      </div>
+    );
+  }
+
+  if (question.type === "MATRIX") {
+    const matrixAnswer = isRecord(answer) ? answer : {};
+
+    return (
+      <div className="overflow-x-auto rounded-md border border-zinc-200 bg-white">
+        <table className="min-w-full text-sm">
+          <thead className="bg-zinc-100 text-xs font-semibold uppercase tracking-wide text-zinc-600">
+            <tr>
+              <th className="px-3 py-2 text-left">Atributo</th>
+              {question.columns.map((column) => (
+                <th key={String(column.value)} className="px-3 py-2 text-center">
+                  {column.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {question.rows.map((row) => (
+              <tr key={row.code} className="border-t border-zinc-200">
+                <th className="px-3 py-2 text-left font-medium text-zinc-800">{row.label}</th>
+                {question.columns.map((column) => (
+                  <td key={String(column.value)} className="px-3 py-2 text-center">
+                    <input
+                      aria-label={`${question.label}: ${row.label} - ${column.label}`}
+                      defaultChecked={String(matrixAnswer[row.code] ?? "") === String(column.value)}
+                      disabled={readOnly}
+                      name={`${question.code}.${row.code}`}
+                      required={question.required}
+                      type="radio"
+                      value={column.value}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  if (question.type === "LONG_TEXT") {
+    return (
+      <textarea
+        className={inputClass}
+        defaultValue={String(answer ?? "")}
+        disabled={readOnly}
+        name={question.code}
+        rows={3}
+      />
+    );
+  }
+
+  return (
+    <input
+      className={inputClass}
+      defaultValue={String(answer ?? "")}
+      disabled={readOnly}
+      name={question.code}
+      required={question.required}
+    />
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 const labelClass = "flex flex-col gap-1 text-sm font-medium text-zinc-700";
