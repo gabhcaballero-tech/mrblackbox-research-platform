@@ -115,7 +115,7 @@ describe("field actions public access", () => {
     });
   });
 
-  it("generates folio and codes but does not send final WhatsApp before selfie when review is required", async () => {
+  it("generates folio and codes, sends complete WhatsApp, and then redirects to selfie when review is required", async () => {
     const { saveFieldScreeningAnswerAction } = await import("./actions");
     const { PUBLIC_FIELD_ACTOR } = await import("./service");
     const { saveFieldScreeningAnswer } = await import("./service");
@@ -183,7 +183,19 @@ describe("field actions public access", () => {
         attemptId: "attempt-public-1"
       })
     );
-    expect(mocks.sendNavigoConfirmationWhatsApp).not.toHaveBeenCalled();
+    expect(mocks.sendNavigoConfirmationWhatsApp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        codes: [
+          { code: "A7K4", slot: 1 },
+          { code: "M3P9", slot: 2 },
+          { code: "T8R2", slot: 3 }
+        ],
+        folio: "NAV-001",
+        participantId: "study-participant-1",
+        participantName: "Persona publica",
+        phone: "5551112222"
+      })
+    );
   });
 
   it("goes straight to result when a passed public field study does not require selfie", async () => {

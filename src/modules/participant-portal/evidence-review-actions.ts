@@ -321,7 +321,6 @@ export async function sendParticipantConfirmationWhatsAppAction(attemptId: strin
   const result = await sendParticipantConfirmationWhatsApp({
     actor,
     attemptId,
-    force: true,
     repository: createEvidenceReviewRepository()
   });
 
@@ -331,7 +330,7 @@ export async function sendParticipantConfirmationWhatsAppAction(attemptId: strin
     redirect(reviewPath(attemptId, "evidenceError", result.message, "whatsapp"));
   }
 
-  redirect(reviewPath(attemptId, "evidenceMessage", "WhatsApp enviado correctamente.", "whatsapp"));
+  redirect(reviewPath(attemptId, "evidenceMessage", "Actualización de códigos enviada por WhatsApp.", "whatsapp"));
 }
 
 function reviewPath(

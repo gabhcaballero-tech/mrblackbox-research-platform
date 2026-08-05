@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import type {
@@ -122,7 +122,7 @@ export function ScreeningAttemptFilters({ data }: { data: ScreeningAttemptListDa
             className={inputClass}
             defaultValue={data.filters.participantQuery ?? ""}
             name="participantQuery"
-            placeholder="Ej. Gabriela, teléfono o referencia"
+            placeholder="Ej. Gabriela, telÃ©fono o referencia"
           />
         </label>
         <label className={labelClass}>
@@ -133,7 +133,7 @@ export function ScreeningAttemptFilters({ data }: { data: ScreeningAttemptListDa
             <option value="INCOMPLETE">Incompleto</option>
             <option value="PASSED">Elegible</option>
             <option value="TERMINATED">No elegible</option>
-            <option value="PENDING_REVIEW">Pendiente de revisión</option>
+            <option value="PENDING_REVIEW">Pendiente de revisiÃ³n</option>
           </select>
         </label>
         <label className={labelClass}>
@@ -156,7 +156,7 @@ export function ScreeningAttemptFilters({ data }: { data: ScreeningAttemptListDa
           <input className={inputClass} defaultValue={formatInputDate(data.filters.dateTo)} name="dateTo" type="date" />
         </label>
         <label className={labelClass}>
-          Código o resultado
+          CÃ³digo o resultado
           <input className={inputClass} defaultValue={data.filters.code ?? ""} name="code" placeholder="Ej. GENERO o PASSED" />
         </label>
       </div>
@@ -203,23 +203,23 @@ export function ScreeningAttemptDetailView({ detail }: { detail: ScreeningAttemp
           <StatusBadge status={badgeToneForAttempt(detail.status, detail.statusLabel)}>{detail.statusLabel}</StatusBadge>
         </div>
         <dl className="mt-6 grid gap-4 text-sm md:grid-cols-3">
-          <SummaryItem label="Estudio" value={`${detail.study.name} · ${detail.study.code}`} />
+          <SummaryItem label="Estudio" value={`${detail.study.name} Â· ${detail.study.code}`} />
           <SummaryItem label="Participante" value={detail.participant.name} />
           <SummaryItem label="Referencia externa" value={detail.participant.externalReference ?? "Sin referencia"} />
-          <SummaryItem label="Teléfono" value={detail.participant.phone ?? "Sin teléfono"} />
+          <SummaryItem label="TelÃ©fono" value={detail.participant.phone ?? "Sin telÃ©fono"} />
           <SummaryItem label="Correo" value={detail.participant.email ?? "Sin correo"} />
           <SummaryItem label="Entrevistador" value={detail.fieldUser?.name ?? "Portal participante"} />
           <SummaryItem label="Revision de evidencia" value={reviewStatusLabel(detail.evidenceReviewStatus ?? undefined)} />
           <SummaryItem label="Confirmacion final" value={detail.confirmation ? "Confirmada" : "Sin confirmacion"} />
           <SummaryItem label="Folio" value={detail.confirmation?.folio ?? "No generado"} mono />
-          <SummaryItem label="Código" value={detail.terminationCode ?? "No aplica"} />
+          <SummaryItem label="CÃ³digo" value={detail.terminationCode ?? "No aplica"} />
           <SummaryItem label="Inicio" value={formatDate(detail.startedAt, detail.study.timeZoneIana)} />
           <SummaryItem label="Cierre" value={formatDate(detail.closedAt, detail.study.timeZoneIana)} />
-          <SummaryItem label="Versión del screener" value={`v${detail.screenerVersionNumber}`} />
-          <SummaryItem label="Hash de definición" value={detail.definitionHash} mono />
+          <SummaryItem label="VersiÃ³n del screener" value={`v${detail.screenerVersionNumber}`} />
+          <SummaryItem label="Hash de definiciÃ³n" value={detail.definitionHash} mono />
           <SummaryItem label="Puntaje NSE" value={String(detail.nseScore ?? "No calculado")} />
-          <SummaryItem label="Clasificación NSE" value={detail.nseClassLabel ?? "Sin clasificación"} />
-          <SummaryItem label="Código NSE" value={detail.nseClassCode ?? "No aplica"} mono />
+          <SummaryItem label="ClasificaciÃ³n NSE" value={detail.nseClassLabel ?? "Sin clasificaciÃ³n"} />
+          <SummaryItem label="CÃ³digo NSE" value={detail.nseClassCode ?? "No aplica"} mono />
         </dl>
       </section>
 
@@ -288,7 +288,7 @@ function AnswerList({ detail }: { detail: ScreeningAttemptDetail }) {
               <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                    {answer.order}. {answer.questionType} · ID técnico: {answer.questionId}
+                    {answer.order}. {answer.questionType} Â· ID tÃ©cnico: {answer.questionId}
                   </p>
                   <h3 className="mt-1 text-base font-semibold text-zinc-950">{answer.questionText}</h3>
                 </div>
@@ -334,7 +334,7 @@ export function EvidenceReviewPanel({
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Revisión de evidencias</p>
+          <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">RevisiÃ³n de evidencias</p>
           <h2 className="mt-2 text-xl font-semibold text-zinc-950">{detail.participant.name}</h2>
           <p className="mt-2 text-sm text-zinc-600">
             Revisa la selfie capturada al inicio, las fotos de perfumes capturadas en F6 y las marcas declaradas antes de aprobar.
@@ -364,14 +364,14 @@ export function EvidenceReviewPanel({
 
       <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StateCard label="Estado del intento" value={cleanupAttemptStatusLabel(detail.attemptStatus)} />
-        <StateCard label="Estado de la revisión" value={reviewStatusLabel(detail.reviewState.reviewStatus)} />
+        <StateCard label="Estado de la revisiÃ³n" value={reviewStatusLabel(detail.reviewState.reviewStatus)} />
         <StateCard label="Selfie" value={summarizeEvidenceType(detail.reviewState.evidenceStatuses, "SELFIE_IDENTIFICATION")} />
         <StateCard label="Fotos de perfume" value={summarizeEvidenceType(detail.reviewState.evidenceStatuses, "PERFUME_PHOTO")} />
       </div>
 
       {detail.reviewState.hasInconsistency ? (
         <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="font-semibold">Inconsistencia de revisión</p>
+          <p className="font-semibold">Inconsistencia de revisiÃ³n</p>
           <p className="mt-1">{detail.reviewState.inconsistencyMessage}</p>
         </div>
       ) : null}
@@ -423,7 +423,7 @@ export function EvidenceReviewPanel({
               <div className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  alt={item.type === "SELFIE_IDENTIFICATION" ? "Selfie de identificación" : "Foto de perfume"}
+                  alt={item.type === "SELFIE_IDENTIFICATION" ? "Selfie de identificaciÃ³n" : "Foto de perfume"}
                   className="max-h-[28rem] w-full rounded-md object-contain"
                   src={item.signedUrl}
                 />
@@ -432,7 +432,7 @@ export function EvidenceReviewPanel({
               <p className="mt-3 text-sm text-zinc-600">No fue posible generar vista temporal.</p>
             )}
             <p className="mt-2 text-xs text-zinc-500">
-              {item.mimeType} · {Math.round(item.sizeBytes / 1024)} KB
+              {item.mimeType} Â· {Math.round(item.sizeBytes / 1024)} KB
             </p>
             {item.signedUrl ? (
               <Link
@@ -467,21 +467,21 @@ export function EvidenceReviewPanel({
           action={reopenParticipantEvidenceReviewAction.bind(null, detail.attemptId)}
           className="mt-5 rounded-md border border-amber-200 bg-amber-50 p-4"
         >
-          <h3 className="font-semibold text-amber-950">Reabrir revisión</h3>
+          <h3 className="font-semibold text-amber-950">Reabrir revisiÃ³n</h3>
           <p className="mt-2 text-sm leading-6 text-amber-900">
-            Usa esta acción cuando existan evidencias pendientes pero la revisión global no esté pendiente.
+            Usa esta acciÃ³n cuando existan evidencias pendientes pero la revisiÃ³n global no estÃ© pendiente.
           </p>
           {detail.confirmation ? (
             <p className="mt-2 text-sm leading-6 text-amber-900">
-              El folio y los códigos existentes se conservarán. Al aprobar de nuevo no se duplicarán.
+              El folio y los cÃ³digos existentes se conservarÃ¡n. Al aprobar de nuevo no se duplicarÃ¡n.
             </p>
           ) : null}
           <label className={`${labelClass} mt-4`}>
-            Escribe REABRIR REVISIÓN para confirmar
+            Escribe REABRIR REVISIÃ“N para confirmar
             <input className={inputClass} name="confirmationText" />
           </label>
           <button className={`${secondaryButtonClass} mt-4`} type="submit">
-            Reabrir revisión
+            Reabrir revisiÃ³n
           </button>
         </form>
       ) : null}
@@ -491,7 +491,8 @@ export function EvidenceReviewPanel({
           <form action={approveParticipantEvidenceAction.bind(null, detail.attemptId)} className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
             <h3 className="font-semibold text-emerald-950">Aprobar evidencia</h3>
             <p className="mt-2 text-sm leading-6 text-emerald-900">
-              Al aprobar se generará folio y exactamente tres códigos únicos de 4 caracteres.
+              Al aprobar se actualizará la revisión manual. El folio y los códigos existentes se conservan y no se
+              envía WhatsApp adicional.
             </p>
             <button className={`${primaryButtonClass} mt-4`} type="submit">
               Aprobar evidencia
@@ -786,7 +787,7 @@ function reviewStatusLabel(status: string | undefined): string {
     case "PENDING":
       return "Pendiente";
     default:
-      return "Sin revisión";
+      return "Sin revisiÃ³n";
   }
 }
 
@@ -831,7 +832,7 @@ function summarizeEvidenceType(
     counts.rejected > 0 ? `${counts.rejected} rechazada${counts.rejected === 1 ? "" : "s"}` : null
   ].filter(Boolean);
 
-  return parts.join(" · ");
+  return parts.join(" Â· ");
 }
 
 function StateCard({ label, value }: { label: string; value: string }) {

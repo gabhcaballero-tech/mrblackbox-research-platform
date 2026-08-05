@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import { participantProfileSchema, studyParticipantSchema } from "@/modules/participants";
 import {
   approveParticipantReview,
@@ -286,7 +286,7 @@ describe("participant portal foundation", () => {
     });
 
     expect(result).toEqual({
-      message: "Se agotó la secuencia de folios configurada para este estudio.",
+      message: "Se agotÃ³ la secuencia de folios configurada para este estudio.",
       ok: false
     });
   });
@@ -394,11 +394,13 @@ describe("participant portal foundation", () => {
       studyName: "Fragancia Masculina"
     });
 
-    expect(message).toContain("Folio: NAV-001.");
+    expect(message).toContain("Tu perfil cumple con los criterios iniciales");
+    expect(message).toContain("Folio: NAV-001");
     expect(message).toContain("Código 1: A7K4");
     expect(message).toContain("Código 2: M3P9");
     expect(message).toContain("Código 3: T8R2");
     expect(message).toContain("Conserva este mensaje y tus códigos");
+    expect(message).not.toContain("confirmada");
   });
 
   it("prepares OTP, CAPTCHA and E.164 contracts without calling external services", () => {

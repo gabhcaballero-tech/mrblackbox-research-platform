@@ -184,13 +184,6 @@ export async function approveParticipantEvidenceReview({
     return result;
   }
 
-  await sendNavigoConfirmationWhatsAppForAttempt({
-    attemptId,
-    codes: result.confirmation.referenceCodes,
-    folio: result.confirmation.folio,
-    repository
-  });
-
   return {
     data: {
       created: result.created

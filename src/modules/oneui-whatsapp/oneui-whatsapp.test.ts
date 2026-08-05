@@ -22,7 +22,7 @@ import {
   sendOneuiWhatsAppTemplate,
   sendOneuiWhatsAppTextReply
 } from "./service";
-import { sendHutRegistrationWhatsApp, sendNavigoConfirmationWhatsApp } from "./templates";
+import { buildNavigoCodesWhatsAppBody, sendHutRegistrationWhatsApp, sendNavigoConfirmationWhatsApp } from "./templates";
 
 describe("ONEUI WhatsApp webhook processing", () => {
   it("crea conversación GENERAL y guarda mensaje inbound", async () => {
@@ -377,6 +377,11 @@ describe("ONEUI WhatsApp template sending", () => {
     });
     repository.conversations.push(conversation);
     repository.messages.push(createMessage({
+      bodyText: buildNavigoCodesWhatsAppBody({
+        codes: [{ code: "A7K4", slot: 1 }, { code: "M3P9", slot: 2 }, { code: "T8R2", slot: 3 }],
+        folio: "NAV-001",
+        participantName: "ANA"
+      }),
       conversationId: conversation.id,
       direction: "OUTBOUND",
       messageType: "template",
@@ -399,6 +404,54 @@ describe("ONEUI WhatsApp template sending", () => {
     });
 
     expect(result).toMatchObject({ code: "SKIPPED", ok: false });
+  });
+
+  it("permite enviar actualizacion completa cuando el mensaje previo solo tenia folio", async () => {
+    const senderCalls: unknown[] = [];
+    const result = await sendNavigoConfirmationWhatsApp({
+      codes: [{ code: "A7K4", slot: 1 }, { code: "M3P9", slot: 2 }, { code: "T8R2", slot: 3 }],
+      existingMessage: createMessage({
+        bodyText: "Folio NAV-001",
+        direction: "OUTBOUND",
+        messageType: "template",
+        rawPayload: {
+          request: {
+            template: {
+              components: [
+                {
+                  parameters: [{ text: "ANA", type: "text" }, { text: "NAV-001", type: "text" }],
+                  type: "body"
+                }
+              ]
+            }
+          }
+        },
+        status: "accepted"
+      }),
+      folio: "NAV-001",
+      participantId: "participant-1",
+      participantName: "ANA",
+      phone: "5512345678",
+      sender: async (input) => {
+        senderCalls.push(input);
+        return { data: createMessage({ direction: "OUTBOUND", messageType: "template" }), ok: true };
+      },
+      studyId: "study-1"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(senderCalls).toHaveLength(1);
+    expect(senderCalls[0]).toMatchObject({
+      bodyText: expect.stringContaining("Código 3: T8R2"),
+      parameters: [
+        { text: "ANA", type: "text" },
+        { text: "NAV-001", type: "text" },
+        { text: "A7K4", type: "text" },
+        { text: "M3P9", type: "text" },
+        { text: "T8R2", type: "text" }
+      ],
+      sourceModule: "NAVIGO"
+    });
   });
 
   it("prepara variables de template HUT", async () => {

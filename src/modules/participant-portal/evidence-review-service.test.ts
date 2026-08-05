@@ -286,6 +286,7 @@ describe("participant evidence review service", () => {
     expect(approved.ok).toBe(true);
     expect(rejectedWithoutReason.ok).toBe(false);
     expect(rejected.ok).toBe(true);
+    expect(repo.getAttemptReview).not.toHaveBeenCalled();
     const approveInput = vi.mocked(repo.approveEvidence).mock.calls[0]?.[0];
     expect(approveInput?.codeGenerator()).toMatch(PARTICIPANT_REFERENCE_CODE_PATTERN);
     expect(repo.rejectEvidence).toHaveBeenCalledWith(expect.objectContaining({ rejectionReason: "Selfie borrosa" }));

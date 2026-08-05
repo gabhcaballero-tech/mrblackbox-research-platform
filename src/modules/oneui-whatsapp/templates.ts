@@ -58,8 +58,8 @@ export async function sendNavigoConfirmationWhatsApp(input: {
     return { code: "SKIPPED", message: "Envio automatico Navigo desactivado.", ok: false };
   }
 
-  if (!input.force && input.existingMessage && input.existingMessage.status !== "failed") {
-    return { code: "SKIPPED", message: "WhatsApp Navigo ya enviado.", ok: false };
+  if (input.existingMessage && input.existingMessage.status !== "failed" && isCompleteNavigoCodesWhatsApp(input.existingMessage)) {
+    return { code: "SKIPPED", message: "WhatsApp Navigo con codigos ya enviado.", ok: false };
   }
 
   const orderedCodes = [...input.codes].sort((left, right) => left.slot - right.slot);
@@ -72,7 +72,11 @@ export async function sendNavigoConfirmationWhatsApp(input: {
   const sender = input.sender ?? sendOneuiWhatsAppTemplate;
 
   return sender({
-    bodyText: `Confirmacion Navigo ${input.folio}`,
+    bodyText: buildNavigoCodesWhatsAppBody({
+      codes: orderedCodes,
+      folio: input.folio,
+      participantName: input.participantName
+    }),
     env,
     language: env.WHATSAPP_NAVIGO_CONFIRMATION_LANGUAGE ?? "es",
     linkedParticipantId: input.participantId,
@@ -91,6 +95,76 @@ export async function sendNavigoConfirmationWhatsApp(input: {
     templateName: env.WHATSAPP_NAVIGO_CONFIRMATION_TEMPLATE ?? "oneui_navigo_confirmacion_participacion",
     toPhone: input.phone ?? ""
   });
+}
+
+export function buildNavigoCodesWhatsAppBody({
+  codes,
+  folio,
+  participantName
+}: {
+  codes: Array<{ code: string; slot: number }>;
+  folio: string;
+  participantName: string;
+}): string {
+  const orderedCodes = [...codes].sort((left, right) => left.slot - right.slot);
+
+  return [
+    `Hola, ${participantName}.`,
+    "",
+    "Tu perfil cumple con los criterios iniciales del estudio y puedes continuar con el proceso.",
+    "",
+    `Folio: ${folio}`,
+    "",
+    `Código 1: ${orderedCodes[0]?.code ?? ""}`,
+    `Código 2: ${orderedCodes[1]?.code ?? ""}`,
+    `Código 3: ${orderedCodes[2]?.code ?? ""}`,
+    "",
+    "Conserva este mensaje y tus códigos, ya que serán solicitados durante tu evaluación.",
+    "",
+    "Gracias por participar."
+  ].join("\n");
+}
+
+function isCompleteNavigoCodesWhatsApp(
+  message: Pick<OneuiWhatsAppMessageRecord, "bodyText" | "rawPayload">
+): boolean {
+  if (message.bodyText?.includes("Código 3:") || message.bodyText?.includes("Codigo 3:")) {
+    return true;
+  }
+
+  return countTemplateBodyParameters(message.rawPayload) >= 5;
+}
+
+function countTemplateBodyParameters(rawPayload: unknown): number {
+  if (!rawPayload || typeof rawPayload !== "object" || !("request" in rawPayload)) {
+    return 0;
+  }
+
+  const request = (rawPayload as { request?: unknown }).request;
+  if (!request || typeof request !== "object" || !("template" in request)) {
+    return 0;
+  }
+
+  const template = (request as { template?: unknown }).template;
+  if (!template || typeof template !== "object" || !("components" in template)) {
+    return 0;
+  }
+
+  const components = (template as { components?: unknown }).components;
+  if (!Array.isArray(components)) {
+    return 0;
+  }
+
+  const body = components.find((component) => {
+    return Boolean(component && typeof component === "object" && (component as { type?: unknown }).type === "body");
+  });
+
+  if (!body || typeof body !== "object" || !("parameters" in body)) {
+    return 0;
+  }
+
+  const parameters = (body as { parameters?: unknown }).parameters;
+  return Array.isArray(parameters) ? parameters.length : 0;
 }
 
 export async function sendHutRegistrationWhatsApp(input: {

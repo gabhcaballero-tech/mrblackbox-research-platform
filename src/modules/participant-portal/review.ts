@@ -1,4 +1,5 @@
-import { randomInt } from "node:crypto";
+﻿import { randomInt } from "node:crypto";
+import { buildNavigoCodesWhatsAppBody } from "@/modules/oneui-whatsapp/templates";
 
 export type ParticipantScreeningReviewDraft = {
   createdAt: Date;
@@ -101,7 +102,7 @@ export function approveParticipantReview(input: ParticipantPortalApprovalInput):
 
   if (input.nextFolioSequence > input.folioMaxSequence) {
     return {
-      message: "Se agotó la secuencia de folios configurada para este estudio.",
+      message: "Se agotÃ³ la secuencia de folios configurada para este estudio.",
       ok: false
     };
   }
@@ -150,7 +151,7 @@ export function generateReferenceCodes({
     attempts += 1;
 
     if (attempts > 50) {
-      throw new Error("No fue posible generar tres códigos de referencia únicos.");
+      throw new Error("No fue posible generar tres cÃ³digos de referencia Ãºnicos.");
     }
 
     const code = normalizeParticipantReferenceCode(codeGenerator());
@@ -199,14 +200,5 @@ export function buildManualWhatsAppMessage({
   studyName: string;
 }): string {
   void _studyName;
-  const orderedCodes = [...codes].sort((a, b) => a.slot - b.slot);
-
-  return [
-    `Hola, ${participantName}. Tu participación ha sido confirmada para continuar en el estudio.`,
-    "",
-    `Folio: ${folio}.`,
-    ...orderedCodes.map((item) => `Código ${item.slot}: ${item.code}`),
-    "",
-    "Conserva este mensaje y tus códigos, ya que te serán solicitados durante tu evaluación."
-  ].join("\n");
+  return buildNavigoCodesWhatsAppBody({ codes, folio, participantName });
 }

@@ -148,18 +148,18 @@ export async function saveFieldScreeningAnswerAction(
         repository: confirmationRepository
       });
 
+      await sendFieldConfirmationWhatsAppBestEffort({
+        attempt: confirmationAttempt,
+        attemptId,
+        confirmation: confirmation.confirmation
+      });
+
       if (
         confirmationAttempt &&
         getStudyBehavior(confirmationAttempt.questionnaireVersion.study.code).requiresFinalSelfie
       ) {
         redirect(`/field/screening/${attemptId}/selfie`);
       }
-
-      await sendFieldConfirmationWhatsAppBestEffort({
-        attempt: confirmationAttempt,
-        attemptId,
-        confirmation: confirmation.confirmation
-      });
     }
 
     redirect(`/field/screening/${attemptId}/result`);

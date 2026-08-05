@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+﻿import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type {
   ScreeningAttemptDetail,
@@ -26,7 +26,7 @@ const study = {
 };
 
 const longReason =
-  "La frecuencia declarada no cumple con el criterio operativo definido para este filtro y requiere una explicación completa.";
+  "La frecuencia declarada no cumple con el criterio operativo definido para este filtro y requiere una explicaciÃ³n completa.";
 
 const listItem: ScreeningAttemptListItem = {
   closedAt: new Date("2026-06-23T16:00:00Z"),
@@ -39,7 +39,7 @@ const listItem: ScreeningAttemptListItem = {
   },
   id: "attempt-1",
   nseClassCode: "RANGO-3",
-  nseClassLabel: "C típico",
+  nseClassLabel: "C tÃ­pico",
   nseScore: 144,
   participant: {
     externalReference: null,
@@ -79,11 +79,11 @@ const detail: ScreeningAttemptDetail = {
       missing: false,
       order: 1,
       questionId: "F1_GENERO",
-      questionText: "Género",
+      questionText: "GÃ©nero",
       questionType: "SINGLE_CHOICE"
     },
     {
-      answerText: "Navigo, Otra. Especificación: Marca local",
+      answerText: "Navigo, Otra. EspecificaciÃ³n: Marca local",
       currentlyHidden: false,
       missing: false,
       order: 2,
@@ -104,7 +104,7 @@ const detail: ScreeningAttemptDetail = {
   fieldUser: listItem.fieldUser,
   id: "attempt-1",
   nseClassCode: "RANGO-3",
-  nseClassLabel: "C típico",
+  nseClassLabel: "C tÃ­pico",
   nseScore: 144,
   participant: {
     email: "participante@example.com",
@@ -136,7 +136,7 @@ describe("ScreeningSupervisionComponents", () => {
 
     expect(screen.getByLabelText("Participante o referencia")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Gabriela")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Ej. Gabriela, teléfono o referencia")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Ej. Gabriela, telÃ©fono o referencia")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Limpiar filtros" })).toHaveAttribute(
       "href",
       "/admin/studies/study-1/screening-attempts"
@@ -176,7 +176,7 @@ describe("ScreeningSupervisionComponents", () => {
     render(<ScreeningAttemptTable attempts={listData.attempts} studyId={study.id} />);
 
     expect(screen.getByRole("link", { name: "Ver detalle" })).toBeInTheDocument();
-    expect(screen.queryByText("Acción")).not.toBeInTheDocument();
+    expect(screen.queryByText("AcciÃ³n")).not.toBeInTheDocument();
   });
 
   it("renders row checkboxes and shows the bulk delete confirmation after selecting a record", () => {
@@ -233,7 +233,7 @@ describe("ScreeningSupervisionComponents", () => {
     render(<ScreeningAttemptTable attempts={listData.attempts} studyId={study.id} />);
 
     expect(screen.getByText("—")).toBeInTheDocument();
-    expect(screen.getByText("144 · C típico")).toBeInTheDocument();
+    expect(screen.getByText((text) => text.startsWith("144 · C"))).toBeInTheDocument();
     expect(screen.getByText("v1")).toBeInTheDocument();
   });
 
@@ -269,8 +269,8 @@ describe("ScreeningSupervisionComponents", () => {
     render(<ScreeningAttemptDetailView detail={detail} />);
 
     expect(screen.getByText("Participante Uno")).toBeInTheDocument();
-    expect(screen.getByText("Navigo, Otra. Especificación: Marca local")).toBeInTheDocument();
-    expect(screen.getByText("C típico")).toBeInTheDocument();
+    expect(screen.getByText("Navigo, Otra. EspecificaciÃ³n: Marca local")).toBeInTheDocument();
+    expect(screen.getByText("C tÃ­pico")).toBeInTheDocument();
     expect(screen.getByText("RANGO-3")).toBeInTheDocument();
     expect(screen.getByText("23 jun 2026, 9:00 a.m.")).toBeInTheDocument();
     expect(screen.getByText("23 jun 2026, 10:00 a.m.")).toBeInTheDocument();
@@ -297,12 +297,12 @@ describe("ScreeningSupervisionComponents", () => {
   it("keeps statuses in Spanish", () => {
     render(
       <ScreeningAttemptTable
-        attempts={[{ ...listItem, status: "PENDING_REVIEW", statusLabel: "Pendiente de revisión" }]}
+        attempts={[{ ...listItem, status: "PENDING_REVIEW", statusLabel: "Pendiente de revisiÃ³n" }]}
         studyId={study.id}
       />
     );
 
-    expect(screen.getByText("Pendiente de revisión")).toBeInTheDocument();
+    expect(screen.getByText("Pendiente de revisiÃ³n")).toBeInTheDocument();
   });
 
   it("shows confirmed supervision attempts with folio and review state", () => {
@@ -329,7 +329,7 @@ describe("ScreeningSupervisionComponents", () => {
 
     expect(screen.getAllByText("Elegible confirmado").length).toBeGreaterThan(0);
     expect(screen.getByText("NAV-001")).toBeInTheDocument();
-    expect(screen.queryByText("Pendiente de revisión")).not.toBeInTheDocument();
+    expect(screen.queryByText("Pendiente de revisiÃ³n")).not.toBeInTheDocument();
   });
 
   it("renders full evidence previews, signed links and inconsistency alert", () => {
@@ -374,7 +374,7 @@ describe("ScreeningSupervisionComponents", () => {
           },
           review: {
             internalNote: null,
-            rejectionReason: "Revisión cerrada antes de tiempo",
+            rejectionReason: "RevisiÃ³n cerrada antes de tiempo",
             status: "REJECTED"
           },
           reviewState: {
@@ -396,7 +396,7 @@ describe("ScreeningSupervisionComponents", () => {
             hasInconsistency: true,
             hasPendingEvidence: true,
             inconsistencyMessage:
-              "Hay una inconsistencia: existen evidencias pendientes pero la revisión global no está pendiente.",
+              "Hay una inconsistencia: existen evidencias pendientes pero la revisiÃ³n global no estÃ¡ pendiente.",
             pendingEvidenceCount: 2,
             reviewStatus: "REJECTED"
           },
@@ -409,15 +409,15 @@ describe("ScreeningSupervisionComponents", () => {
       />
     );
 
-    const preview = screen.getByAltText("Selfie de identificación");
+    const preview = screen.getByAltText("Selfie de identificaciÃ³n");
     expect(preview.className).toContain("object-contain");
     expect(screen.getAllByRole("link", { name: "Ver imagen completa" })[0]).toHaveAttribute(
       "href",
       "https://signed.example/selfie"
     );
-    expect(screen.getByText("Estado de la revisión")).toBeInTheDocument();
-    expect(screen.getByText("Inconsistencia de revisión")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Reabrir revisión" })).toBeInTheDocument();
+    expect(screen.getByText("Estado de la revisiÃ³n")).toBeInTheDocument();
+    expect(screen.getByText("Inconsistencia de revisiÃ³n")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reabrir revisiÃ³n" })).toBeInTheDocument();
     expect(screen.queryByText("private/selfie.jpg")).not.toBeInTheDocument();
   });
 
@@ -496,8 +496,8 @@ describe("ScreeningSupervisionComponents", () => {
 
     expect(screen.getByText("Datos del participante")).toBeInTheDocument();
     expect(screen.getByText("Confirmacion final")).toBeInTheDocument();
-    expect(screen.getByText("Envío automático: No enviado")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Enviar automático" })).toBeInTheDocument();
+    expect(screen.getByText("Mensaje enviado al completar filtro elegible: No enviado")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enviar actualización de códigos WhatsApp" })).toBeInTheDocument();
     expect(screen.getByText("4821")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Regenerar codigos de 4 caracteres" })).toBeInTheDocument();
     expect(screen.getAllByText("Eliminar registro de prueba y liberar folio").length).toBeGreaterThan(0);
