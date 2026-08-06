@@ -59,6 +59,14 @@ export type CtlAvailableParticipantSummary = {
   name: string;
 };
 
+export type CtlOpenInterviewerSessionSummary = {
+  folio: string;
+  id: string;
+  name: string;
+  sessionId: string;
+  status: Extract<CtlSessionStatus, "IN_PROGRESS" | "PENDING">;
+};
+
 export type CtlSessionView = {
   answers: Record<string, unknown>;
   completedAt: Date | null;
@@ -168,6 +176,11 @@ export type CtlRepository = {
     ctlInterviewerCodeId: string;
     now?: Date;
   }) => Promise<{ ok: true; participants: CtlAvailableParticipantSummary[] } | { message: string; ok: false }>;
+  listOpenSessionsForInterviewerCode: (input: {
+    ctlInterviewerCodeId: string;
+    now?: Date;
+    studyCode: string;
+  }) => Promise<{ ok: true; sessions: CtlOpenInterviewerSessionSummary[] } | { message: string; ok: false }>;
   listParticipants: (input: { actor: CtlActor; studyId: string }) => Promise<{
     ok: true;
     participants: CtlParticipantSummary[];
@@ -471,6 +484,61 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
             id: confirmation.studyParticipant.id,
             name: confirmation.studyParticipant.participantProfile.name
           }))
+      };
+    },
+
+    async listOpenSessionsForInterviewerCode(input) {
+      const prisma = await getPrisma();
+      const now = input.now ?? new Date();
+      const interviewerCode = toInterviewerCodeView(await prisma.ctlInterviewerCode.findFirst?.({
+        select: ctlInterviewerCodeSelect,
+        where: {
+          id: input.ctlInterviewerCodeId,
+          study: { code: input.studyCode }
+        }
+      }));
+
+      if (!interviewerCode || !isUsableInterviewerCode(interviewerCode, now)) {
+        return { message: "El codigo de encuestador no es valido.", ok: false };
+      }
+
+      const sessions = (await prisma.ctlSession.findMany?.({
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          status: true,
+          studyParticipant: {
+            select: {
+              participantConfirmation: {
+                select: { folio: true }
+              },
+              participantProfile: { select: { name: true } }
+            }
+          }
+        },
+        where: {
+          ctlInterviewerCodeId: interviewerCode.id,
+          status: { in: ["PENDING", "IN_PROGRESS"] },
+          studyId: interviewerCode.studyId
+        }
+      })) as Array<{
+        id: string;
+        status: Extract<CtlSessionStatus, "IN_PROGRESS" | "PENDING">;
+        studyParticipant: {
+          participantConfirmation: { folio: string } | null;
+          participantProfile: { name: string };
+        };
+      }>;
+
+      return {
+        ok: true,
+        sessions: sessions.map((session) => ({
+          folio: session.studyParticipant.participantConfirmation?.folio ?? "SIN FOLIO",
+          id: session.id,
+          name: session.studyParticipant.participantProfile.name,
+          sessionId: session.id,
+          status: session.status
+        }))
       };
     },
 

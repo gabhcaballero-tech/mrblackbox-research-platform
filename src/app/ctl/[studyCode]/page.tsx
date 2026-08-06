@@ -2,7 +2,8 @@ import { getPublicCtlInterviewerActor } from "@/shared/auth/ctl-public";
 import {
   createCtlRepository,
   ctlStatusLabel,
-  type CtlAvailableParticipantSummary
+  type CtlAvailableParticipantSummary,
+  type CtlOpenInterviewerSessionSummary
 } from "@/modules/ctl/repository";
 import {
   claimPublicCtlFolioAction,
@@ -24,6 +25,12 @@ export default async function CtlPublicPage({ params, searchParams }: CtlPublicP
   const availableParticipants = actor
     ? await createCtlRepository().listAvailableParticipantsForInterviewerCode({
         ctlInterviewerCodeId: actor.id
+      })
+    : null;
+  const openSessions = actor
+    ? await createCtlRepository().listOpenSessionsForInterviewerCode({
+        ctlInterviewerCodeId: actor.id,
+        studyCode
       })
     : null;
 
@@ -79,6 +86,14 @@ export default async function CtlPublicPage({ params, searchParams }: CtlPublicP
               </p>
             </section>
 
+            {openSessions?.ok ? (
+              <OpenSessionsTable sessions={openSessions.sessions} studyCode={studyCode} />
+            ) : openSessions ? (
+              <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                {openSessions.message}
+              </p>
+            ) : null}
+
             {availableParticipants?.ok ? (
               <AvailableParticipantsTable participants={availableParticipants.participants} studyCode={studyCode} />
             ) : availableParticipants ? (
@@ -90,6 +105,57 @@ export default async function CtlPublicPage({ params, searchParams }: CtlPublicP
         )}
       </div>
     </main>
+  );
+}
+
+function OpenSessionsTable({
+  sessions,
+  studyCode
+}: {
+  sessions: CtlOpenInterviewerSessionSummary[];
+  studyCode: string;
+}) {
+  return (
+    <section className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+      <div className="border-b border-zinc-200 px-4 py-3">
+        <h2 className="text-lg font-semibold">Mis entrevistas en curso</h2>
+        <p className="mt-1 text-sm text-zinc-600">
+          Estas entrevistas ya fueron tomadas con tu codigo IKA y puedes continuarlas.
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-left text-sm">
+          <thead className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500">
+            <tr>
+              <th className="px-4 py-3">Folio</th>
+              <th className="px-4 py-3">Nombre</th>
+              <th className="px-4 py-3">Estado CTL</th>
+              <th className="px-4 py-3">Accion</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-100">
+            {sessions.length > 0 ? sessions.map((session) => (
+              <tr key={session.sessionId}>
+                <td className="px-4 py-3 font-mono text-xs font-semibold text-zinc-950">{session.folio}</td>
+                <td className="px-4 py-3 font-semibold text-zinc-950">{session.name}</td>
+                <td className="px-4 py-3 text-zinc-700">{ctlStatusLabel(session.status)}</td>
+                <td className="px-4 py-3">
+                  <a className={primaryButtonClass} href={`/ctl/${encodeURIComponent(studyCode)}/sessions/${encodeURIComponent(session.sessionId)}`}>
+                    Continuar CTL
+                  </a>
+                </td>
+              </tr>
+            )) : (
+              <tr>
+                <td className="px-4 py-6 text-center text-zinc-500" colSpan={4}>
+                  No tienes entrevistas CTL en curso.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

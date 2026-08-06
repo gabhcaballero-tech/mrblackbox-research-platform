@@ -621,6 +621,96 @@ describe("ctl module", () => {
     ]);
   });
 
+  it("moves a claimed folio from available to the interviewer's open sessions", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const code = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-1111",
+      label: "Encuestador IKA 1",
+      studyId: state.study.id
+    });
+
+    const beforeClaim = await repository.listAvailableParticipantsForInterviewerCode({
+      ctlInterviewerCodeId: code.ok ? code.interviewerCode.id : ""
+    });
+    const claim = await repository.claimFolioForInterviewerCode({
+      ctlInterviewerCodeId: code.ok ? code.interviewerCode.id : "",
+      folio: "NAV-001"
+    });
+    const afterClaim = await repository.listAvailableParticipantsForInterviewerCode({
+      ctlInterviewerCodeId: code.ok ? code.interviewerCode.id : ""
+    });
+    const openSessions = await repository.listOpenSessionsForInterviewerCode({
+      ctlInterviewerCodeId: code.ok ? code.interviewerCode.id : "",
+      studyCode: state.study.code
+    });
+
+    expect(beforeClaim.ok ? beforeClaim.participants.map((participant) => participant.folio) : []).toEqual(["NAV-001"]);
+    expect(claim.ok).toBe(true);
+    expect(afterClaim.ok ? afterClaim.participants : []).toEqual([]);
+    expect(openSessions.ok ? openSessions.sessions : []).toEqual([
+      {
+        folio: "NAV-001",
+        id: claim.ok ? claim.sessionId : "",
+        name: "ANA PEREZ",
+        sessionId: claim.ok ? claim.sessionId : "",
+        status: "PENDING"
+      }
+    ]);
+  });
+
+  it("keeps open CTL sessions private to the interviewer code that claimed them", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const firstCode = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-1111",
+      label: "Encuestador IKA 1",
+      studyId: state.study.id
+    });
+    const secondCode = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-2222",
+      label: "Encuestador IKA 2",
+      studyId: state.study.id
+    });
+
+    const claim = await repository.claimFolioForInterviewerCode({
+      ctlInterviewerCodeId: firstCode.ok ? firstCode.interviewerCode.id : "",
+      folio: "NAV-001"
+    });
+    const firstActor = await repository.getPublicInterviewerActor({
+      ctlInterviewerCodeId: firstCode.ok ? firstCode.interviewerCode.id : "",
+      studyCode: state.study.code
+    });
+    const secondActor = await repository.getPublicInterviewerActor({
+      ctlInterviewerCodeId: secondCode.ok ? secondCode.interviewerCode.id : "",
+      studyCode: state.study.code
+    });
+    const firstOpenSessions = await repository.listOpenSessionsForInterviewerCode({
+      ctlInterviewerCodeId: firstCode.ok ? firstCode.interviewerCode.id : "",
+      studyCode: state.study.code
+    });
+    const secondOpenSessions = await repository.listOpenSessionsForInterviewerCode({
+      ctlInterviewerCodeId: secondCode.ok ? secondCode.interviewerCode.id : "",
+      studyCode: state.study.code
+    });
+    const secondRead = await repository.getSession({
+      actor: secondActor!,
+      sessionId: claim.ok ? claim.sessionId : ""
+    });
+    const firstRead = await repository.getSession({
+      actor: firstActor!,
+      sessionId: claim.ok ? claim.sessionId : ""
+    });
+
+    expect(firstOpenSessions.ok ? firstOpenSessions.sessions.map((session) => session.folio) : []).toEqual(["NAV-001"]);
+    expect(secondOpenSessions.ok ? secondOpenSessions.sessions : []).toEqual([]);
+    expect(secondRead).toBeNull();
+    expect(firstRead?.id).toBe(claim.ok ? claim.sessionId : "");
+  });
+
   it("rejects direct public CTL claim when the folio is not ready", async () => {
     const state = createCtlState();
     const repository = createCtlRepository(state.prisma as never);
@@ -1174,8 +1264,22 @@ function createCtlState() {
           ) ?? null
         );
       },
-      async findMany(args: { where: { studyId: string } }) {
-        return sessions.filter((session) => session.studyId === args.where.studyId).map(toSessionRecord);
+      async findMany(args: {
+        where: {
+          ctlInterviewerCodeId?: string;
+          status?: { in: string[] };
+          studyId: string;
+        };
+      }) {
+        return sessions
+          .filter(
+            (session) =>
+              session.studyId === args.where.studyId &&
+              (args.where.ctlInterviewerCodeId === undefined ||
+                session.ctlInterviewerCodeId === args.where.ctlInterviewerCodeId) &&
+              (args.where.status === undefined || args.where.status.in.includes(session.status))
+          )
+          .map(toSessionRecord);
       },
       async findUnique(args: { where: { id: string } }) {
         const session = sessions.find((candidate) => candidate.id === args.where.id);
