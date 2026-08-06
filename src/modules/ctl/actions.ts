@@ -166,3 +166,27 @@ export async function saveCtlAnswersAction(studyId: string, sessionId: string, f
     `/admin/studies/${studyId}/ctl/${sessionId}?ctlMessage=${encodeURIComponent("Avance CTL guardado.")}`
   );
 }
+
+export async function resetCtlSessionAction(studyId: string, sessionId: string, formData: FormData) {
+  const actor = await requireCapability("field:access");
+  const confirmation = String(formData.get("confirmation") ?? "").trim();
+
+  if (confirmation !== "REINICIAR CTL") {
+    redirect(
+      `/admin/studies/${studyId}/ctl/${sessionId}?ctlError=${encodeURIComponent("Escribe REINICIAR CTL para confirmar.")}`
+    );
+  }
+
+  const result = await createCtlRepository().resetSession({
+    actor,
+    sessionId
+  });
+
+  if (!result.ok) {
+    redirect(`/admin/studies/${studyId}/ctl/${sessionId}?ctlError=${encodeURIComponent(result.message)}`);
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/ctl`);
+  revalidatePath(`/admin/studies/${studyId}/ctl/${sessionId}`);
+  redirect(`/admin/studies/${studyId}/ctl/${sessionId}?ctlMessage=${encodeURIComponent("CTL reiniciado correctamente.")}`);
+}

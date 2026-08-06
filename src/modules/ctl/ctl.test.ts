@@ -21,16 +21,20 @@ describe("ctl module", () => {
 
     expect(definition.version).toBe(2);
     expect(definition.sections.map((section) => section.id)).toEqual([
+      "CODIGOS_FISICOS",
       "FILTROS",
       "TRIANGULAR_1",
       "TRIANGULAR_2",
       "FRAGRANCIA_1",
-      "FRAGRANCIA_2"
+      "FRAGRANCIA_2",
+      "DATOS_GENERALES",
+      "DEMOGRAFICOS"
     ]);
-    expect(questions).toHaveLength(38);
+    expect(questions).toHaveLength(53);
     expect(definition.sections.every((section) => Array.isArray(section.questions))).toBe(true);
     expect(questions.map((question) => question.code)).toEqual(expect.arrayContaining([
       "F0",
+      "CODIGO_FISICO_1",
       "F1",
       "F11",
       "F11A",
@@ -42,7 +46,10 @@ describe("ctl module", () => {
       "P8A",
       "P8B",
       "P13A",
-      "P13B"
+      "P13B",
+      "DG_NOMBRE",
+      "DG_TELEFONO",
+      "D1_OCUPACION"
     ]));
     expect(questions.map((question) => question.code)).not.toEqual(expect.arrayContaining([
       "P14_PREFERENCIA",
@@ -921,6 +928,38 @@ describe("ctl module", () => {
     ]);
     expect(state.accessTokens).toHaveLength(1);
   });
+
+  it("resets a CTL session by deleting answers and preserving the session", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const started = await repository.startSession({
+      actor: interviewer,
+      folio: "NAV-001",
+      studyId: state.study.id
+    });
+    const parsed = parseCtlAnswers(createValidCtlAnswerInput());
+    await repository.saveAnswers({
+      actor: interviewer,
+      answers: parsed.ok ? parsed.answers : [],
+      complete: false,
+      sessionId: started.ok ? started.sessionId : ""
+    });
+
+    const reset = await repository.resetSession({
+      actor: admin,
+      sessionId: started.ok ? started.sessionId : ""
+    });
+    const session = await repository.getSession({
+      actor: admin,
+      sessionId: started.ok ? started.sessionId : ""
+    });
+
+    expect(reset.ok).toBe(true);
+    expect(state.sessions).toHaveLength(1);
+    expect(state.answers).toHaveLength(0);
+    expect(session?.status).toBe("PENDING");
+    expect(session?.answers).toEqual({});
+  });
 });
 
 const scaleDefinition: CtlDefinition = {
@@ -978,6 +1017,9 @@ const matrixDefinition: CtlDefinition = {
 
 function createValidCtlAnswerInput(): CtlAnswerInput {
   return {
+    CODIGO_FISICO_1: "247",
+    CODIGO_FISICO_2: "583",
+    CODIGO_FISICO_3: "742",
     F0: "1",
     F1: "1",
     F2: "2",
@@ -1015,7 +1057,19 @@ function createValidCtlAnswerInput(): CtlAnswerInput {
     P12A: "2",
     P12B: "2",
     P13A: "3",
-    P13B: "4"
+    P13B: "4",
+    DG_NOMBRE: "ANA PEREZ",
+    DG_DIRECCION: "CALLE 1",
+    DG_COLONIA: "CENTRO",
+    DG_MUNICIPIO: "CDMX",
+    DG_TELEFONO: "5512345678",
+    DG_FECHA: "2026-08-05",
+    DG_HORA_INICIO: "10:00",
+    DG_HORA_TERMINO: "11:00",
+    D1_OCUPACION: "EMPLEADO",
+    D2_ESCOLARIDAD: "LICENCIATURA",
+    D3_ESTADO_CIVIL: "SOLTERO",
+    D4_OBSERVACIONES: "SIN OBSERVACIONES"
   };
 }
 
@@ -1198,6 +1252,14 @@ function createCtlState() {
 
   const tx = {
     ctlAnswer: {
+      async deleteMany(args: { where: { ctlSessionId: string } }) {
+        for (let index = answers.length - 1; index >= 0; index -= 1) {
+          if (answers[index]?.ctlSessionId === args.where.ctlSessionId) {
+            answers.splice(index, 1);
+          }
+        }
+        return { count: 0 };
+      },
       async upsert(args: {
         create: { answerValue: unknown; ctlSessionId: string; questionCode: string };
         update: { answerValue: unknown };

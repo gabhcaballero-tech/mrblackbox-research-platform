@@ -17,11 +17,13 @@ import {
 type FlatQuestion = {
   index: number;
   question: CtlQuestionDefinition;
+  sectionInstructions?: Array<{ text: string; title?: string; type: string }>;
   sectionTitle: string;
 };
 
 type CtlMobileCaptureProps = {
   answers: Record<string, unknown>;
+  completedAtLabel?: string | null;
   definition: CtlDefinition;
   participant: {
     folio: string;
@@ -29,7 +31,9 @@ type CtlMobileCaptureProps = {
   };
   readOnly: boolean;
   sessionId: string;
+  startedAtLabel?: string | null;
   studyCode: string;
+  todayLabel?: string;
 };
 
 type ActionResult =
@@ -45,18 +49,29 @@ type ActionResult =
 
 export function CtlMobileCapture({
   answers,
+  completedAtLabel,
   definition,
   participant,
   readOnly,
   sessionId,
-  studyCode
+  startedAtLabel,
+  studyCode,
+  todayLabel
 }: CtlMobileCaptureProps) {
-  const [localAnswers, setLocalAnswers] = useState<Record<string, unknown>>(answers);
+  const initialAnswers = useMemo(
+    () => ({
+      ...buildAutomaticCtlAnswers({ completedAtLabel, participant, startedAtLabel, todayLabel }),
+      ...answers
+    }),
+    [answers, completedAtLabel, participant, startedAtLabel, todayLabel]
+  );
+  const [localAnswers, setLocalAnswers] = useState<Record<string, unknown>>(initialAnswers);
   const questions = useMemo(() => flattenCtlQuestions(definition, localAnswers), [definition, localAnswers]);
   const [currentIndex, setCurrentIndex] = useState(() => getInitialCtlQuestionIndex(definition, answers));
   const [isReviewing, setIsReviewing] = useState(readOnly);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [validationModal, setValidationModal] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const current = questions[currentIndex];
@@ -99,6 +114,7 @@ export function CtlMobileCapture({
     const validation = validateCtlQuestionForClient(current.question, localAnswers[current.question.code]);
     if (!validation.ok) {
       setError(validation.message);
+      setValidationModal(validation.message);
       return;
     }
 
@@ -209,6 +225,9 @@ export function CtlMobileCapture({
       </header>
 
       <StatusMessages error={error} message={message} />
+      {validationModal ? (
+        <ValidationModal message={validationModal} onClose={() => setValidationModal(null)} />
+      ) : null}
 
       {isReviewing ? (
         <ReviewPanel
@@ -220,7 +239,10 @@ export function CtlMobileCapture({
           answer={localAnswers[current.question.code]}
           flatQuestion={current}
           onAnswer={setAnswer}
+          participant={participant}
           readOnly={readOnly}
+          sessionId={sessionId}
+          answers={localAnswers}
         />
       ) : null}
 
@@ -258,29 +280,42 @@ export function CtlMobileCapture({
 }
 
 function QuestionStep({
+  answers,
   answer,
   flatQuestion,
   onAnswer,
-  readOnly
+  participant,
+  readOnly,
+  sessionId
 }: {
+  answers: Record<string, unknown>;
   answer: unknown;
   flatQuestion: FlatQuestion;
   onAnswer: (questionCode: string, answer: unknown) => void;
+  participant: { folio: string; name: string };
   readOnly: boolean;
+  sessionId: string;
 }) {
-  const { question, sectionTitle } = flatQuestion;
+  const { question, sectionInstructions, sectionTitle } = flatQuestion;
+  const displayLabel = resolveQuestionLabel(question, answers, participant);
 
   return (
     <article className="mt-6 space-y-5">
       <div className="rounded-xl bg-zinc-50 p-4">
         <p className="text-sm font-semibold text-teal-700">{sectionTitle}</p>
+        {sectionInstructions?.map((instruction, index) => (
+          <InstructionBox instruction={instruction} key={`${instruction.type}-${index}`} />
+        ))}
+        {question.instructions?.map((instruction, index) => (
+          <InstructionBox instruction={instruction} key={`${question.code}-${instruction.type}-${index}`} />
+        ))}
         <h3 className="mt-2 text-lg font-bold leading-7 text-zinc-950">
-          {question.label}
+          {displayLabel}
           {question.required ? <span className="text-rose-700"> *</span> : null}
         </h3>
         <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">{question.code}</p>
       </div>
-      {renderMobileQuestionInput(question, answer, onAnswer, readOnly)}
+      {renderMobileQuestionInput(question, answer, onAnswer, readOnly, sessionId)}
     </article>
   );
 }
@@ -289,7 +324,8 @@ function renderMobileQuestionInput(
   question: CtlQuestionDefinition,
   answer: unknown,
   onAnswer: (questionCode: string, answer: unknown) => void,
-  readOnly: boolean
+  readOnly: boolean,
+  sessionId: string
 ) {
   if (question.type === "SELECT") {
     return (
@@ -307,7 +343,15 @@ function renderMobileQuestionInput(
   }
 
   if (question.type === "MATRIX") {
-    return <MatrixBlocks answer={answer} disabled={readOnly} onChange={(value) => onAnswer(question.code, value)} question={question} />;
+    return (
+      <MatrixBlocks
+        answer={answer}
+        disabled={readOnly}
+        onChange={(value) => onAnswer(question.code, value)}
+        question={question}
+        sessionId={sessionId}
+      />
+    );
   }
 
   if (question.type === "LONG_TEXT") {
@@ -425,18 +469,21 @@ function MatrixBlocks({
   answer,
   disabled,
   onChange,
-  question
+  question,
+  sessionId
 }: {
   answer: unknown;
   disabled: boolean;
   onChange: (value: Record<string, string>) => void;
   question: CtlMatrixQuestionDefinition;
+  sessionId: string;
 }) {
   const matrixAnswer = isRecord(answer) ? toStringRecord(answer) : {};
+  const rows = question.randomizeRows ? stableShuffle(question.rows, `${sessionId}:${question.code}`) : question.rows;
 
   return (
     <div className="space-y-4">
-      {question.rows.map((row) => (
+      {rows.map((row) => (
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4" key={row.code}>
           <p className="text-base font-semibold text-zinc-950">{row.label}</p>
           <div className="mt-3 grid grid-cols-5 gap-2">
@@ -471,6 +518,38 @@ function MatrixBlocks({
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function InstructionBox({
+  instruction
+}: {
+  instruction: { text: string; title?: string; type: string };
+}) {
+  return (
+    <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
+      <p className="text-xs font-bold uppercase tracking-wide">{instruction.title ?? "INSTRUCCION"}</p>
+      <p className="mt-1">{instruction.text}</p>
+    </div>
+  );
+}
+
+function ValidationModal({ message, onClose }: { message: string; onClose: () => void }) {
+  return (
+    <div
+      aria-labelledby="ctl-validation-modal-title"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+      role="dialog"
+    >
+      <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+        <h3 className="text-lg font-bold text-zinc-950" id="ctl-validation-modal-title">Falta responder esta pregunta</h3>
+        <p className="mt-2 text-sm text-zinc-600">{message}</p>
+        <button className={`${primaryButtonClass} mt-5 w-full`} onClick={onClose} type="button">
+          Entendido
+        </button>
+      </div>
     </div>
   );
 }
@@ -525,6 +604,7 @@ export function flattenCtlQuestions(definition: CtlDefinition, answers: Record<s
       .map((question, index) => ({
         index,
         question,
+        sectionInstructions: section.instructions,
         sectionTitle: section.title
       }))
   );
@@ -605,6 +685,67 @@ function appendQuestionAnswer(formData: FormData, question: CtlQuestionDefinitio
   if (answer !== undefined && answer !== null) {
     formData.set(question.code, String(answer));
   }
+}
+
+function buildAutomaticCtlAnswers({
+  completedAtLabel,
+  participant,
+  startedAtLabel,
+  todayLabel
+}: {
+  completedAtLabel?: string | null;
+  participant: { name: string };
+  startedAtLabel?: string | null;
+  todayLabel?: string;
+}): Record<string, string> {
+  return {
+    DG_FECHA: todayLabel ?? new Date().toLocaleDateString("es-MX"),
+    DG_HORA_INICIO: startedAtLabel ?? "",
+    DG_HORA_TERMINO: completedAtLabel ?? "",
+    DG_NOMBRE: participant.name
+  };
+}
+
+function resolveQuestionLabel(
+  question: CtlQuestionDefinition,
+  answers: Record<string, unknown>,
+  participant: { folio: string; name: string }
+): string {
+  const template = question.displayTemplate ?? question.label;
+  const values: Record<string, unknown> = {
+    ...answers,
+    FOLIO: participant.folio,
+    PARTICIPANT_NAME: participant.name
+  };
+
+  return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_match, token: string) => {
+    const value = values[token];
+    if (isRecord(value)) {
+      return Object.entries(value)
+        .map(([key, item]) => `${key}: ${String(item ?? "")}`)
+        .join(", ");
+    }
+    return String(value ?? "pendiente");
+  });
+}
+
+function stableShuffle<T>(items: T[], seed: string): T[] {
+  return [...items]
+    .map((item, index) => ({
+      item,
+      sortKey: stableHash(`${seed}:${index}`)
+    }))
+    .sort((left, right) => left.sortKey - right.sortKey)
+    .map(({ item }) => item);
+}
+
+function stableHash(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }
 
 function optionButtonClass(isSelected: boolean): string {

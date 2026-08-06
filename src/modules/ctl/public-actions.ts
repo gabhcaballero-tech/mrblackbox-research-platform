@@ -244,7 +244,9 @@ export async function finishPublicCtlSessionAction(studyCode: string, sessionId:
 
   return {
     ok: true,
-    redirectTo: buildCtlPublicUrl(studyCode, { ctlMessage: "CTL completado correctamente." })
+    redirectTo:
+      `/ctl/${encodeURIComponent(studyCode)}/sessions/${encodeURIComponent(sessionId)}` +
+      `?ctlMessage=${encodeURIComponent("La evaluacion sensorial inicial ha concluido correctamente.")}`
   };
 }
 

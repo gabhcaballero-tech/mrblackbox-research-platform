@@ -7,8 +7,16 @@ export type CtlQuestionOption = {
   value: string;
 };
 
+export type CtlInstructionDefinition = {
+  text: string;
+  title?: string;
+  type: "BEFORE_QUESTION" | "INTERVIEWER_NOTE" | "SECTION";
+};
+
 export type CtlBaseQuestionDefinition = {
   code: string;
+  displayTemplate?: string;
+  instructions?: CtlInstructionDefinition[];
   label: string;
   required: boolean;
   type: CtlQuestionType;
@@ -32,6 +40,7 @@ export type CtlScaleQuestionDefinition = CtlBaseQuestionDefinition & {
 
 export type CtlMatrixQuestionDefinition = CtlBaseQuestionDefinition & {
   columns: Array<{ label: string; value: string | number }>;
+  randomizeRows?: boolean;
   rows: Array<{ code: string; label: string }>;
   type: "MATRIX";
 };
@@ -45,6 +54,7 @@ export type CtlQuestionDefinition =
 export type CtlSectionDefinition = {
   description?: string;
   id: string;
+  instructions?: CtlInstructionDefinition[];
   questions: CtlQuestionDefinition[];
   title: string;
 };
@@ -172,6 +182,116 @@ const aromaAttributeRows = [
   { code: "ALCOHOL", label: "Alcohol" }
 ];
 
+const sampleCodeQuestions: CtlQuestionDefinition[] = [
+  {
+    code: "CODIGO_FISICO_1",
+    instructions: [
+      {
+        text: "Registra el codigo fisico observado en campo. Estos codigos no son requisito para tomar el folio.",
+        title: "INSTRUCCION",
+        type: "BEFORE_QUESTION"
+      }
+    ],
+    label: "Codigo fisico 1",
+    required: true,
+    type: "SHORT_TEXT"
+  },
+  {
+    code: "CODIGO_FISICO_2",
+    label: "Codigo fisico 2",
+    required: true,
+    type: "SHORT_TEXT"
+  },
+  {
+    code: "CODIGO_FISICO_3",
+    label: "Codigo fisico 3",
+    required: true,
+    type: "SHORT_TEXT"
+  }
+];
+
+const generalDataQuestions: CtlQuestionDefinition[] = [
+  {
+    code: "DG_NOMBRE",
+    displayTemplate: "Nombre del participante: {{PARTICIPANT_NAME}}",
+    label: "Nombre",
+    required: true,
+    type: "SHORT_TEXT"
+  },
+  {
+    code: "DG_DIRECCION",
+    label: "Direccion",
+    required: true,
+    type: "SHORT_TEXT"
+  },
+  {
+    code: "DG_COLONIA",
+    label: "Colonia",
+    required: true,
+    type: "SHORT_TEXT"
+  },
+  {
+    code: "DG_MUNICIPIO",
+    label: "Municipio",
+    required: true,
+    type: "SHORT_TEXT"
+  },
+  {
+    code: "DG_TELEFONO",
+    label: "Telefono",
+    required: true,
+    type: "SHORT_TEXT"
+  },
+  {
+    code: "DG_FECHA",
+    displayTemplate: "Fecha de entrevista: {{TODAY}}",
+    label: "Fecha",
+    required: false,
+    type: "SHORT_TEXT"
+  },
+  {
+    code: "DG_HORA_INICIO",
+    displayTemplate: "Hora inicio CTL: {{CTL_STARTED_AT}}",
+    label: "Hora inicio",
+    required: false,
+    type: "SHORT_TEXT"
+  },
+  {
+    code: "DG_HORA_TERMINO",
+    displayTemplate: "Hora termino CTL: {{CTL_COMPLETED_AT}}",
+    label: "Hora termino",
+    required: false,
+    type: "SHORT_TEXT"
+  }
+];
+
+const demographicQuestions: CtlQuestionDefinition[] = [
+  {
+    code: "D1_OCUPACION",
+    label: "Ocupacion",
+    required: false,
+    type: "SHORT_TEXT"
+  },
+  {
+    code: "D2_ESCOLARIDAD",
+    label: "Escolaridad",
+    required: false,
+    type: "SHORT_TEXT"
+  },
+  {
+    code: "D3_ESTADO_CIVIL",
+    label: "Estado civil",
+    required: false,
+    type: "SHORT_TEXT"
+  },
+  {
+    code: "D4_OBSERVACIONES",
+    label: "Observaciones demograficas o complementos no capturados en screening",
+    required: false,
+    type: "LONG_TEXT"
+  }
+];
+
 function makeFragranceQuestions(suffix: "A" | "B", labelSuffix: string): CtlQuestionDefinition[] {
   const letter = suffix.toLowerCase();
 
@@ -206,7 +326,15 @@ function makeFragranceQuestions(suffix: "A" | "B", labelSuffix: string): CtlQues
     {
       code: `P8${suffix}`,
       columns: agreementColumns,
+      instructions: [
+        {
+          text: "Lee cada atributo en el orden mostrado en pantalla. El orden puede variar por participante y se mantiene durante toda la entrevista.",
+          title: "NOTA PARA ENCUESTADOR",
+          type: "INTERVIEWER_NOTE"
+        }
+      ],
       label: `P8${letter}. Le voy a leer una lista de atributos que pueden ser usados para DESCRIBIR una fragancia. Para cada uno, por favor dígame ¿En qué medida está de acuerdo con que este atributo aplica para esta fragancia de perfume? (RU) (${labelSuffix})`,
+      randomizeRows: true,
       required: true,
       rows: fragranceAttributeRows,
       type: "MATRIX"
@@ -215,6 +343,7 @@ function makeFragranceQuestions(suffix: "A" | "B", labelSuffix: string): CtlQues
       code: `P9${suffix}`,
       columns: yesNoColumns,
       label: `P9${letter}. Voy a leer una lista de atributos sobre el aroma de la fragancia que acaba de probar. Por favor dígame si cada uno de estos atributos aplica o no para esta fragancia. (RU) (${labelSuffix})`,
+      randomizeRows: true,
       required: true,
       rows: aromaAttributeRows,
       type: "MATRIX"
@@ -260,6 +389,18 @@ function makeFragranceQuestions(suffix: "A" | "B", labelSuffix: string): CtlQues
 
 export const CTL_DEFINITION: CtlDefinition = {
   sections: [
+    {
+      id: "CODIGOS_FISICOS",
+      instructions: [
+        {
+          text: "Captura los codigos fisicos de las muestras antes de iniciar la entrevista. Si el participante ya fue tomado por el encuestador, estos codigos no bloquean la sesion CTL.",
+          title: "INSTRUCCION",
+          type: "SECTION"
+        }
+      ],
+      questions: sampleCodeQuestions,
+      title: "CODIGOS FISICOS DE MUESTRAS"
+    },
     {
       id: "FILTROS",
       questions: [
@@ -501,7 +642,32 @@ export const CTL_DEFINITION: CtlDefinition = {
       questions: makeFragranceQuestions("B", "segunda fragancia"),
       title: "SECCIÓN IV - EVALUACIÓN DE SEGUNDA FRAGANCIA"
     }
-    // La SECCIÓN V - COMPARATIVA (P14-P20) y DEMOGRÁFICOS pertenecen al flujo Navigo posterior, no al CTL presencial.
+    // La SECCION V - COMPARATIVA (P14-P20) pertenece al flujo Navigo posterior, no al CTL presencial.
+    ,
+    {
+      id: "DATOS_GENERALES",
+      instructions: [
+        {
+          text: "Complementa datos operativos de la entrevista. Si un dato ya viene del screening, confirmalo y completa lo faltante.",
+          title: "INSTRUCCION",
+          type: "SECTION"
+        }
+      ],
+      questions: generalDataQuestions,
+      title: "DATOS GENERALES"
+    },
+    {
+      id: "DEMOGRAFICOS",
+      instructions: [
+        {
+          text: "No repitas informacion ya capturada en screening salvo que necesite correccion o complemento. El NSE se conserva desde screening.",
+          title: "NOTA PARA ENCUESTADOR",
+          type: "SECTION"
+        }
+      ],
+      questions: demographicQuestions,
+      title: "DEMOGRAFICOS"
+    }
   ],
   version: 2
 };

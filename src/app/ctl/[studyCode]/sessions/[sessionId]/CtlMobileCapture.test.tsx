@@ -36,7 +36,8 @@ describe("CtlMobileCapture", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
 
-    expect(screen.getByText("Responde la pregunta obligatoria antes de continuar.")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Falta responder esta pregunta" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Entendido" })).toBeInTheDocument();
     expect(saveQuestionMock).not.toHaveBeenCalled();
   });
 
@@ -104,6 +105,13 @@ describe("CtlMobileCapture", () => {
       "Q3_MATRIX"
     ]);
   });
+
+  it("renders instructions and dynamic participant references", () => {
+    renderMobileCapture();
+
+    expect(screen.getByText("Lee esta instruccion de seccion.")).toBeInTheDocument();
+    expect(screen.getByText(/Participante ANA PEREZ/)).toBeInTheDocument();
+  });
 });
 
 function renderMobileCapture({ answers = {} }: { answers?: Record<string, unknown> } = {}) {
@@ -126,9 +134,17 @@ const mobileDefinition: CtlDefinition = {
   sections: [
     {
       id: "INTRO",
+      instructions: [
+        {
+          text: "Lee esta instruccion de seccion.",
+          title: "INSTRUCCION",
+          type: "SECTION"
+        }
+      ],
       questions: [
         {
           code: "Q1_SELECT",
+          displayTemplate: "Participante {{PARTICIPANT_NAME}}: selecciona una opcion",
           label: "Selecciona una opcion",
           options: [
             { label: "Opcion A", value: "A" },
@@ -152,6 +168,7 @@ const mobileDefinition: CtlDefinition = {
             { label: "De acuerdo", value: 2 }
           ],
           label: "Atributos",
+          randomizeRows: true,
           required: true,
           rows: [
             { code: "LIMPIA", label: "Limpia" },

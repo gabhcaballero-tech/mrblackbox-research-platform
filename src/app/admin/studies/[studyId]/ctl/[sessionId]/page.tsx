@@ -6,7 +6,7 @@ import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import type { CtlQuestionDefinition } from "@/modules/ctl/definition";
 import { createCtlRepository, ctlStatusLabel } from "@/modules/ctl/repository";
-import { saveCtlAnswersAction } from "@/modules/ctl/actions";
+import { resetCtlSessionAction, saveCtlAnswersAction } from "@/modules/ctl/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -111,6 +111,24 @@ export default async function CtlCapturePage({ params, searchParams }: CtlCaptur
             </p>
           )}
         </form>
+
+        <section className="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-amber-950">Soporte CTL</h2>
+          <p className="mt-2 text-sm leading-6 text-amber-900">
+            Reiniciar este CTL elimina las respuestas capturadas de esta sesion y la regresa a pendiente. El participante, folio y auditoria de sesion se conservan.
+          </p>
+          <form action={resetCtlSessionAction.bind(null, studyId, session.id)} className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,240px)_auto]">
+            <label className={labelClass}>
+              Confirmacion
+              <input className={inputClass} name="confirmation" placeholder="REINICIAR CTL" />
+            </label>
+            <div className="flex items-end">
+              <button className={dangerButtonClass} type="submit">
+                Resetear CTL
+              </button>
+            </div>
+          </form>
+        </section>
       </div>
     </AppShell>
   );
@@ -260,3 +278,5 @@ const primaryButtonClass =
   "inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800";
 const secondaryButtonClass =
   "inline-flex rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50";
+const dangerButtonClass =
+  "inline-flex rounded-md bg-rose-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-800";

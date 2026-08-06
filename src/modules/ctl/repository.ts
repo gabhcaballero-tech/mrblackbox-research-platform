@@ -18,6 +18,7 @@ import {
 type Delegate = {
   create?: (args: unknown) => Promise<unknown>;
   delete?: (args: unknown) => Promise<unknown>;
+  deleteMany?: (args: unknown) => Promise<unknown>;
   findFirst?: (args: unknown) => Promise<unknown>;
   findMany?: (args: unknown) => Promise<unknown[]>;
   findUnique?: (args: unknown) => Promise<unknown>;
@@ -44,6 +45,7 @@ export type CtlParticipantSummary = {
   interviewerName: string | null;
   name: string;
   nse: string;
+  participantLinkToken: string | null;
   referenceCodes: Array<{ code: string; slot: number }>;
   rotation: {
     firstSampleKey: string | null;
@@ -102,6 +104,7 @@ type ConfirmationRecord = {
 };
 
 type ParticipantRecord = {
+  accessTokens?: Array<{ expiresAt: Date; id: string; status: string; tokenHash: string }>;
   id: string;
   participantProfile: {
     name: string;
@@ -200,6 +203,10 @@ export type CtlRepository = {
     ctlInterviewerCodeId: string;
     studyId: string;
   }) => Promise<{ code: string; interviewerCode: CtlInterviewerCodeView; ok: true } | { message: string; ok: false }>;
+  resetSession: (input: {
+    actor: CtlActor;
+    sessionId: string;
+  }) => Promise<{ message: string; ok: false } | { ok: true; sessionId: string }>;
   saveAnswers: (input: {
     actor: CtlActor;
     answers: CtlAnswerDraft[];
@@ -739,6 +746,39 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
       };
     },
 
+    async resetSession(input) {
+      if (!canAccessCtl(input.actor) || isPublicCtlInterviewerActor(input.actor)) {
+        return { message: "No tienes permiso para reiniciar CTL.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const session = (await tx.ctlSession.findUnique?.({
+          select: sessionSelect,
+          where: { id: input.sessionId }
+        })) as SessionRecord | null;
+
+        if (!session || !canReadSession(input.actor, session)) {
+          return { message: "No encontramos la sesion CTL.", ok: false };
+        }
+
+        await tx.ctlAnswer.deleteMany?.({
+          where: { ctlSessionId: session.id }
+        });
+        await tx.ctlSession.update?.({
+          data: {
+            completedAt: null,
+            startedAt: null,
+            status: "PENDING"
+          },
+          where: { id: session.id }
+        });
+
+        return { ok: true, sessionId: session.id };
+      });
+    },
+
     async saveAnswers(input) {
       if (!canAccessCtl(input.actor)) {
         return { message: "No tienes permiso para capturar CTL.", ok: false };
@@ -953,6 +993,12 @@ const confirmationSelect = {
   },
   studyParticipant: {
     select: {
+      accessTokens: {
+        orderBy: { createdAt: "desc" },
+        select: { expiresAt: true, id: true, status: true, tokenHash: true },
+        take: 1,
+        where: { status: "ACTIVE" }
+      },
       id: true,
       participantProfile: { select: { name: true } },
       rotationAssignment: {
@@ -988,6 +1034,12 @@ const sessionSelect = {
   studyId: true,
   studyParticipant: {
     select: {
+      accessTokens: {
+        orderBy: { createdAt: "desc" },
+        select: { expiresAt: true, id: true, status: true, tokenHash: true },
+        take: 1,
+        where: { status: "ACTIVE" }
+      },
       id: true,
       participantConfirmation: {
         select: {
@@ -1047,6 +1099,7 @@ function toParticipantSummary(
     interviewerName: session ? getSessionInterviewerName(session) : null,
     name: confirmation.studyParticipant.participantProfile.name,
     nse: formatNse(confirmation.screeningAttempt),
+    participantLinkToken: confirmation.studyParticipant.accessTokens?.[0]?.id ?? null,
     referenceCodes: confirmation.referenceCodes,
     rotation: {
       firstSampleKey: arms.find((arm) => arm.applicationOrder === 1)?.studyProduct.internalCode ?? null,
@@ -1099,6 +1152,7 @@ function toSessionView(session: SessionRecord): CtlSessionView {
           interviewerName,
           name: session.studyParticipant.participantProfile.name,
           nse: "Sin NSE",
+          participantLinkToken: session.studyParticipant.accessTokens?.[0]?.id ?? null,
           referenceCodes: [],
           rotation: { firstSampleKey: null, secondSampleKey: null },
           sessionId: session.id
