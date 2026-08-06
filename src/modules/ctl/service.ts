@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from "node:crypto";
 import {
   getCtlDefinition,
   getCtlQuestions,
@@ -6,13 +7,27 @@ import {
   type CtlQuestionDefinition
 } from "./definition";
 
-export type CtlActor = {
+export type CtlInternalActor = {
   id: string;
+  kind?: "INTERNAL";
   role: "ADMIN" | "ANALYST" | "INTERVIEWER" | "SUPERVISOR";
   status: "ACTIVE" | "INACTIVE";
 };
 
+export type CtlPublicInterviewerActor = {
+  id: string;
+  kind: "PUBLIC_CTL_INTERVIEWER";
+  label: string;
+  role: "CTL_INTERVIEWER";
+  status: "ACTIVE";
+  studyId: string;
+};
+
+export type CtlActor = CtlInternalActor | CtlPublicInterviewerActor;
+
 export type CtlSessionStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+
+export type CtlInterviewerCodeStatus = "ACTIVE" | "DISABLED" | "EXPIRED";
 
 export type CtlAnswerInput = Record<
   string,
@@ -31,6 +46,19 @@ export function normalizeCtlCode(value: unknown): string {
     .trim()
     .replace(/\s+/g, "")
     .toUpperCase();
+}
+
+export function generateCtlInterviewerCode(): string {
+  const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ2346789";
+  const bytes = randomBytes(8);
+
+  return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+}
+
+export function hashCtlInterviewerCode(value: unknown): string {
+  return createHash("sha256")
+    .update(`ctl-interviewer:${normalizeCtlCode(value)}`)
+    .digest("hex");
 }
 
 export function normalizeCtlText(value: unknown): string {
@@ -261,7 +289,15 @@ function isMatrixValueRecord(value: unknown): value is Record<string, FormDataEn
 }
 
 export function canAccessCtl(actor: CtlActor): boolean {
+  if (isPublicCtlInterviewerActor(actor)) {
+    return actor.status === "ACTIVE";
+  }
+
   return actor.status === "ACTIVE" && actor.role !== "ANALYST";
+}
+
+export function isPublicCtlInterviewerActor(actor: CtlActor): actor is CtlPublicInterviewerActor {
+  return actor.kind === "PUBLIC_CTL_INTERVIEWER";
 }
 
 export function ctlStatusLabel(status: CtlSessionStatus | null | undefined): string {

@@ -102,6 +102,12 @@ enum CtlSessionStatus {
   CANCELLED
 }
 
+enum CtlInterviewerCodeStatus {
+  ACTIVE
+  DISABLED
+  EXPIRED
+}
+
 enum ApplicationTimeEventType {
   REGISTERED
   CORRECTED
@@ -411,6 +417,7 @@ model InternalUser {
   manualParticipantMessagesMarkedSent ParticipantConfirmation[]       @relation("ParticipantConfirmationManualMessageMarkedSentBy")
   rotationAssignments                 ParticipantRotationAssignment[] @relation("ParticipantRotationAssignedBy")
   ctlSessions                         CtlSession[]                    @relation("CtlSessionInterviewer")
+  createdCtlInterviewerCodes          CtlInterviewerCode[]            @relation("CtlInterviewerCodeCreatedBy")
   reopenedActivities                  ParticipantActivity[]           @relation("ParticipantActivityReopenedBy")
   reviewedMediaEvidence               MediaEvidencePlaceholder[]      @relation("MediaEvidenceReviewedBy")
   exportJobs                          ExportJob[]                     @relation("ExportJobRequestedBy")
@@ -442,7 +449,8 @@ model Study {
   participants             StudyParticipant[]
   participantPortalConfig  ParticipantPortalStudyConfig?
   participantConfirmations ParticipantConfirmation[]
-  ctlSessions             CtlSession[]
+  ctlInterviewerCodes      CtlInterviewerCode[]
+  ctlSessions              CtlSession[]
   questionnaireDrafts      QuestionnaireDraft[]
   questionnaireVersions    QuestionnaireVersion[]
   libraryItems             LibraryItem[]
@@ -1063,28 +1071,53 @@ model ScreeningAnswer {
 }
 
 model CtlSession {
-  id                 String           @id @default(uuid()) @db.Uuid
-  studyId            String           @db.Uuid
-  studyParticipantId String           @db.Uuid
-  screeningAttemptId String?          @db.Uuid
-  interviewerId      String           @db.Uuid
-  status             CtlSessionStatus @default(PENDING)
-  startedAt          DateTime?
-  completedAt        DateTime?
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  id                   String           @id @default(uuid()) @db.Uuid
+  studyId              String           @db.Uuid
+  studyParticipantId   String           @db.Uuid
+  screeningAttemptId   String?          @db.Uuid
+  interviewerId        String?          @db.Uuid
+  ctlInterviewerCodeId String?          @db.Uuid
+  status               CtlSessionStatus @default(PENDING)
+  claimedAt            DateTime?
+  startedAt            DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
-  study            Study             @relation(fields: [studyId], references: [id])
-  studyParticipant StudyParticipant  @relation(fields: [studyParticipantId], references: [id])
-  screeningAttempt ScreeningAttempt? @relation(fields: [screeningAttemptId], references: [id])
-  interviewer      InternalUser      @relation("CtlSessionInterviewer", fields: [interviewerId], references: [id], onDelete: Restrict)
-  answers          CtlAnswer[]
+  study              Study               @relation(fields: [studyId], references: [id])
+  studyParticipant   StudyParticipant    @relation(fields: [studyParticipantId], references: [id])
+  screeningAttempt   ScreeningAttempt?   @relation(fields: [screeningAttemptId], references: [id])
+  interviewer        InternalUser?       @relation("CtlSessionInterviewer", fields: [interviewerId], references: [id], onDelete: Restrict)
+  ctlInterviewerCode CtlInterviewerCode? @relation(fields: [ctlInterviewerCodeId], references: [id], onDelete: Restrict)
+  answers            CtlAnswer[]
 
   @@index([studyId, status, createdAt])
   @@index([studyParticipantId, status])
   @@index([screeningAttemptId])
   @@index([interviewerId, createdAt])
+  @@index([ctlInterviewerCodeId, createdAt])
   @@map("ctl_sessions")
+}
+
+model CtlInterviewerCode {
+  id              String                   @id @default(uuid()) @db.Uuid
+  studyId         String                   @db.Uuid
+  label           String
+  codeHash        String                   @unique
+  status          CtlInterviewerCodeStatus @default(ACTIVE)
+  expiresAt       DateTime?
+  lastUsedAt      DateTime?
+  createdByUserId String                   @db.Uuid
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  study       Study        @relation(fields: [studyId], references: [id])
+  createdBy   InternalUser @relation("CtlInterviewerCodeCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  ctlSessions CtlSession[]
+
+  @@index([studyId, status])
+  @@index([createdByUserId])
+  @@map("ctl_interviewer_codes")
 }
 
 model CtlAnswer {
@@ -1538,18 +1571,18 @@ model AuditLog {
 }
 
 model OneuiWhatsAppConversation {
-  id                  String                     @id @default(uuid()) @db.Uuid
-  waId                String                     @unique
+  id                  String                    @id @default(uuid()) @db.Uuid
+  waId                String                    @unique
   phoneNumber         String
   profileName         String?
   sourceModule        OneuiWhatsAppSourceModule @default(GENERAL)
-  linkedStudyId       String?                    @db.Uuid
-  linkedParticipantId String?                    @db.Uuid
+  linkedStudyId       String?                   @db.Uuid
+  linkedParticipantId String?                   @db.Uuid
   lastMessageAt       DateTime?
   lastInboundAt       DateTime?
   lastOutboundAt      DateTime?
-  createdAt           DateTime                   @default(now())
-  updatedAt           DateTime                   @updatedAt
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
 
   messages OneuiWhatsAppMessage[]
 
@@ -1560,9 +1593,9 @@ model OneuiWhatsAppConversation {
 }
 
 model OneuiWhatsAppMessage {
-  id             String                         @id @default(uuid()) @db.Uuid
-  conversationId String                         @db.Uuid
-  metaMessageId  String?                        @unique
+  id             String                        @id @default(uuid()) @db.Uuid
+  conversationId String                        @db.Uuid
+  metaMessageId  String?                       @unique
   direction      OneuiWhatsAppMessageDirection
   fromPhone      String
   toPhone        String
@@ -1571,10 +1604,10 @@ model OneuiWhatsAppMessage {
   status         String?
   timestamp      DateTime?
   rawPayload     Json
-  createdAt      DateTime                       @default(now())
-  updatedAt      DateTime                       @updatedAt
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
 
-  conversation OneuiWhatsAppConversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation OneuiWhatsAppConversation         @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   statusEvents OneuiWhatsAppMessageStatusEvent[]
 
   @@index([conversationId, timestamp])
@@ -1584,13 +1617,13 @@ model OneuiWhatsAppMessage {
 }
 
 model OneuiWhatsAppMessageStatusEvent {
-  id            String   @id @default(uuid()) @db.Uuid
-  messageId     String?  @db.Uuid
+  id            String    @id @default(uuid()) @db.Uuid
+  messageId     String?   @db.Uuid
   metaMessageId String
   status        String
   timestamp     DateTime?
   rawPayload    Json
-  createdAt     DateTime @default(now())
+  createdAt     DateTime  @default(now())
 
   message OneuiWhatsAppMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
 

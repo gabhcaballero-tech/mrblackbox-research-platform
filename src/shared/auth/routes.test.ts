@@ -5,6 +5,10 @@ describe("auth route rules", () => {
   it("keeps participant token routes public", () => {
     expect(isPublicPath("/p/token-generico")).toBe(true);
     expect(getInternalRouteDecision("/p/token-generico", false)).toEqual({ action: "allow" });
+    expect(getInternalRouteDecision("/ctl/FMASCULINA-NAVIGO-2026", false)).toEqual({ action: "allow" });
+    expect(getInternalRouteDecision("/ctl/FMASCULINA-NAVIGO-2026/sessions/session-1", false)).toEqual({
+      action: "allow"
+    });
     expect(getInternalRouteDecision("/hut/p/token-generico", false)).toEqual({ action: "allow" });
     expect(getInternalRouteDecision("/hut/register/token-generico", false)).toEqual({ action: "allow" });
   });

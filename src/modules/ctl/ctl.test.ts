@@ -5,6 +5,7 @@ import { ctlFormDataToAnswerInput, doReferenceCodesMatch, parseCtlAnswers, type 
 
 const interviewer = { id: "interviewer-1", role: "INTERVIEWER" as const, status: "ACTIVE" as const };
 const otherInterviewer = { id: "interviewer-2", role: "INTERVIEWER" as const, status: "ACTIVE" as const };
+const admin = { id: "admin-1", role: "ADMIN" as const, status: "ACTIVE" as const };
 
 describe("ctl module", () => {
   it("exposes CTL definition by sections while keeping current questions", () => {
@@ -188,7 +189,7 @@ describe("ctl module", () => {
     expect(parsed.ok ? [] : parsed.missingQuestionCodes).toEqual(["P8A_ATRIBUTOS.MASCULINA"]);
   });
 
-  it("allows multiple interviewers to have separate CTL sessions for the same participant", async () => {
+  it("blocks another interviewer from taking a folio with an open CTL session", async () => {
     const state = createCtlState();
     const repository = createCtlRepository(state.prisma as never);
     const first = await repository.startSession({
@@ -209,9 +210,169 @@ describe("ctl module", () => {
     });
 
     expect(first.ok).toBe(true);
-    expect(second.ok).toBe(true);
-    expect(state.sessions).toHaveLength(2);
-    expect(state.sessions.map((session) => session.interviewerId)).toEqual(["interviewer-1", "interviewer-2"]);
+    expect(second.ok).toBe(false);
+    expect(second.ok ? "" : second.message).toBe("Este folio ya fue tomado por otro encuestador.");
+    expect(state.sessions).toHaveLength(1);
+    expect(state.sessions.map((session) => session.interviewerId)).toEqual(["interviewer-1"]);
+  });
+
+  it("creates and validates a public CTL interviewer code without storing plain code", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+
+    const created = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-1234",
+      label: "Encuestador IKA 1",
+      studyId: state.study.id
+    });
+
+    expect(created.ok).toBe(true);
+    expect(state.ctlInterviewerCodes).toHaveLength(1);
+    expect(state.ctlInterviewerCodes[0]?.codeHash).not.toBe("IKA-1234");
+
+    const valid = await repository.validateInterviewerCode({
+      code: " ika-1234 ",
+      studyCode: state.study.code
+    });
+    const invalid = await repository.validateInterviewerCode({
+      code: "otro-codigo",
+      studyCode: state.study.code
+    });
+
+    expect(valid.ok).toBe(true);
+    expect(valid.ok ? valid.interviewerCode.label : "").toBe("Encuestador IKA 1");
+    expect(invalid.ok).toBe(false);
+  });
+
+  it("rejects disabled public CTL interviewer codes", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-1234",
+      label: "Encuestador IKA 1",
+      studyId: state.study.id
+    });
+    state.ctlInterviewerCodes[0]!.status = "DISABLED";
+
+    const result = await repository.validateInterviewerCode({
+      code: "ika-1234",
+      studyCode: state.study.code
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.message).toBe("El codigo de encuestador no es valido.");
+  });
+
+  it("resolves public CTL interviewer actor and previews an available folio", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const created = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-1234",
+      label: "Encuestador IKA 1",
+      studyId: state.study.id
+    });
+
+    const publicActor = await repository.getPublicInterviewerActor({
+      ctlInterviewerCodeId: created.ok ? created.interviewerCode.id : "",
+      studyCode: state.study.code
+    });
+    const preview = await repository.previewFolioForInterviewerCode({
+      ctlInterviewerCodeId: created.ok ? created.interviewerCode.id : "",
+      folio: "nav-001"
+    });
+    const deniedList = await repository.listParticipants({
+      actor: publicActor!,
+      studyId: state.study.id
+    });
+
+    expect(publicActor).toMatchObject({
+      kind: "PUBLIC_CTL_INTERVIEWER",
+      label: "Encuestador IKA 1",
+      role: "CTL_INTERVIEWER",
+      studyId: state.study.id
+    });
+    expect(preview.ok).toBe(true);
+    expect(preview.ok ? preview.participant : null).toMatchObject({
+      folio: "NAV-001",
+      name: "ANA PEREZ",
+      nse: "144 · RANGO-3",
+      rotation: {
+        firstSampleKey: "247",
+        secondSampleKey: "583"
+      }
+    });
+    expect(deniedList.ok).toBe(false);
+    expect(deniedList.ok ? "" : deniedList.message).toBe("No tienes permiso para capturar CTL.");
+  });
+
+  it("claims a CTL folio for a public interviewer code and blocks a second code", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const firstCode = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-1111",
+      label: "Encuestador IKA 1",
+      studyId: state.study.id
+    });
+    const secondCode = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-2222",
+      label: "Encuestador IKA 2",
+      studyId: state.study.id
+    });
+
+    const firstClaim = await repository.claimFolioForInterviewerCode({
+      ctlInterviewerCodeId: firstCode.ok ? firstCode.interviewerCode.id : "",
+      folio: "nav-001"
+    });
+    const secondClaim = await repository.claimFolioForInterviewerCode({
+      ctlInterviewerCodeId: secondCode.ok ? secondCode.interviewerCode.id : "",
+      folio: "NAV-001"
+    });
+
+    expect(firstClaim.ok).toBe(true);
+    expect(secondClaim.ok).toBe(false);
+    expect(secondClaim.ok ? "" : secondClaim.message).toBe("Este folio ya fue tomado por otro encuestador.");
+    expect(state.sessions).toMatchObject([
+      {
+        ctlInterviewerCodeId: firstCode.ok ? firstCode.interviewerCode.id : "",
+        interviewerId: null,
+        status: "PENDING",
+        studyParticipantId: "participant-1"
+      }
+    ]);
+  });
+
+  it("reports an occupied folio before a public interviewer claims it", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const firstCode = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-1111",
+      label: "Encuestador IKA 1",
+      studyId: state.study.id
+    });
+    const secondCode = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-2222",
+      label: "Encuestador IKA 2",
+      studyId: state.study.id
+    });
+
+    await repository.claimFolioForInterviewerCode({
+      ctlInterviewerCodeId: firstCode.ok ? firstCode.interviewerCode.id : "",
+      folio: "NAV-001"
+    });
+    const preview = await repository.previewFolioForInterviewerCode({
+      ctlInterviewerCodeId: secondCode.ok ? secondCode.interviewerCode.id : "",
+      folio: "NAV-001"
+    });
+
+    expect(preview.ok).toBe(false);
+    expect(preview.ok ? "" : preview.message).toBe("Este folio ya fue tomado por otro encuestador.");
   });
 
   it("lists NSE from screening and shows rotation without modifying it", async () => {
@@ -408,6 +569,7 @@ function createAromaMatrixAnswer(value: string): Record<string, string> {
 function createCtlState() {
   const study = { code: "FMASCULINA-NAVIGO-2026", id: "study-1", name: "Navigo" };
   const users = [
+    { id: "admin-1", name: "Admin Uno" },
     { id: "interviewer-1", name: "Encuestador Uno" },
     { id: "interviewer-2", name: "Encuestador Dos" }
   ];
@@ -451,15 +613,29 @@ function createCtlState() {
     studyParticipant: participant
   };
   const sessions: Array<{
+    claimedAt: Date | null;
     completedAt: Date | null;
     createdAt: Date;
+    ctlInterviewerCodeId: string | null;
     id: string;
-    interviewerId: string;
+    interviewerId: string | null;
     screeningAttemptId: string | null;
     startedAt: Date | null;
     status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
     studyId: string;
     studyParticipantId: string;
+  }> = [];
+  const ctlInterviewerCodes: Array<{
+    codeHash: string;
+    createdAt: Date;
+    createdByUserId: string;
+    expiresAt: Date | null;
+    id: string;
+    label: string;
+    lastUsedAt: Date | null;
+    status: "ACTIVE" | "DISABLED" | "EXPIRED";
+    studyId: string;
+    updatedAt: Date;
   }> = [];
   const answers: Array<{ answerValue: unknown; ctlSessionId: string; questionCode: string }> = [];
   const armAssignments = [{ id: "arm-1" }, { id: "arm-2" }];
@@ -495,10 +671,13 @@ function createCtlState() {
   const accessTokens: Array<{ createdByUserId: string; expiresAt: Date; id: string; status: string; studyParticipantId: string; tokenHash: string }> = [];
 
   function toSessionRecord(session: (typeof sessions)[number]) {
-    const user = users.find((candidate) => candidate.id === session.interviewerId) ?? users[0]!;
+    const user = users.find((candidate) => candidate.id === session.interviewerId) ?? null;
+    const ctlInterviewerCode =
+      ctlInterviewerCodes.find((candidate) => candidate.id === session.ctlInterviewerCodeId) ?? null;
     return {
       ...session,
       answers: answers.filter((answer) => answer.ctlSessionId === session.id),
+      ctlInterviewerCode,
       interviewer: user,
       studyParticipant: {
         ...participant,
@@ -527,21 +706,87 @@ function createCtlState() {
         return args.create;
       }
     },
-    ctlSession: {
-      async create(args: { data: Omit<(typeof sessions)[number], "completedAt" | "createdAt" | "id" | "startedAt">; select: { id: true } }) {
+    ctlInterviewerCode: {
+      async create(args: {
+        data: {
+          codeHash: string;
+          createdByUserId: string;
+          expiresAt: Date | null;
+          label: string;
+          status: "ACTIVE" | "DISABLED" | "EXPIRED";
+          studyId: string;
+        };
+      }) {
         const record = {
           ...args.data,
+          createdAt: new Date(),
+          id: `ctl-code-${ctlInterviewerCodes.length + 1}`,
+          lastUsedAt: null,
+          updatedAt: new Date()
+        };
+        ctlInterviewerCodes.push(record);
+        return record;
+      },
+      async findFirst(args: { where: { codeHash?: string; id?: string; study: { code: string } } }) {
+        return (
+          ctlInterviewerCodes.find(
+            (code) =>
+              (args.where.codeHash === undefined || code.codeHash === args.where.codeHash) &&
+              (args.where.id === undefined || code.id === args.where.id) &&
+              code.studyId === study.id &&
+              args.where.study.code === study.code
+          ) ?? null
+        );
+      },
+      async findUnique(args: { where: { id: string } }) {
+        return ctlInterviewerCodes.find((code) => code.id === args.where.id) ?? null;
+      },
+      async update(args: { data: { lastUsedAt: Date }; where: { id: string } }) {
+        const code = ctlInterviewerCodes.find((candidate) => candidate.id === args.where.id);
+        if (!code) throw new Error("interviewer code not found");
+        Object.assign(code, args.data, { updatedAt: new Date() });
+        return code;
+      }
+    },
+    ctlSession: {
+      async create(args: {
+        data: Partial<Omit<(typeof sessions)[number], "completedAt" | "createdAt" | "id" | "startedAt">> & {
+          screeningAttemptId: string | null;
+          status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+          studyId: string;
+          studyParticipantId: string;
+        };
+        select: { id: true };
+      }) {
+        const hasOpenSession = sessions.some(
+          (session) =>
+            session.studyParticipantId === args.data.studyParticipantId &&
+            ["PENDING", "IN_PROGRESS"].includes(session.status)
+        );
+        if (hasOpenSession) {
+          const error = new Error("unique constraint") as Error & { code: string };
+          error.code = "P2002";
+          throw error;
+        }
+        const record = {
+          claimedAt: args.data.claimedAt ?? null,
           completedAt: null,
           createdAt: new Date(),
+          ctlInterviewerCodeId: args.data.ctlInterviewerCodeId ?? null,
           id: `ctl-session-${sessions.length + 1}`,
-          startedAt: null
+          interviewerId: args.data.interviewerId ?? null,
+          screeningAttemptId: args.data.screeningAttemptId,
+          startedAt: null,
+          status: args.data.status,
+          studyId: args.data.studyId,
+          studyParticipantId: args.data.studyParticipantId
         };
         sessions.push(record);
         return { id: record.id };
       },
       async findFirst(args: {
         where: {
-          interviewerId: string;
+          interviewerId?: string;
           status: { in: string[] };
           studyParticipantId: string;
         };
@@ -549,7 +794,7 @@ function createCtlState() {
         return (
           sessions.find(
             (session) =>
-              session.interviewerId === args.where.interviewerId &&
+              (args.where.interviewerId === undefined || session.interviewerId === args.where.interviewerId) &&
               session.studyParticipantId === args.where.studyParticipantId &&
               args.where.status.in.includes(session.status)
           ) ?? null
@@ -680,6 +925,7 @@ function createCtlState() {
     answers,
     accessTokens,
     armAssignments,
+    ctlInterviewerCodes,
     navigoActivities,
     prisma,
     sessions,

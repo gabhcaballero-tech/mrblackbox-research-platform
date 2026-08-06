@@ -15,6 +15,7 @@ export function isPublicPath(pathname: string): boolean {
     pathname === "/login" ||
     pathname === "/unauthorized" ||
     pathname === "/api/health" ||
+    pathname.startsWith("/ctl/") ||
     pathname.startsWith("/p/") ||
     pathname.startsWith("/participar/") ||
     PUBLIC_FIELD_SCREENING_NEW_PATTERN.test(pathname) ||
