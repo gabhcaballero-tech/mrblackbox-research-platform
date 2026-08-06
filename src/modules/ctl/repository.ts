@@ -245,6 +245,10 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
           return { message: "No encontramos un participante con ese folio.", ok: false };
         }
 
+        if (!isCtlAvailableConfirmation(confirmation)) {
+          return { message: "Este folio aun no esta listo para CTL.", ok: false };
+        }
+
         const existing = (await tx.ctlSession.findFirst?.({
           orderBy: { createdAt: "desc" },
           select: {
@@ -547,6 +551,10 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
         return { message: "No encontramos un participante con ese folio.", ok: false };
       }
 
+      if (!isCtlAvailableConfirmation(confirmation)) {
+        return { message: "Este folio aun no esta listo para CTL.", ok: false };
+      }
+
       const existing = (await prisma.ctlSession.findFirst?.({
         orderBy: { createdAt: "desc" },
         select: {
@@ -719,6 +727,10 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
 
       if (!confirmation) {
         return { message: "No encontramos un participante con ese folio.", ok: false };
+      }
+
+      if (!isCtlAvailableConfirmation(confirmation)) {
+        return { message: "Este folio aun no esta listo para CTL.", ok: false };
       }
 
       const existing = (await prisma.ctlSession.findFirst?.({

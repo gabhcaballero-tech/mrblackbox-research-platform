@@ -591,6 +591,82 @@ describe("ctl module", () => {
     ]);
   });
 
+  it("creates the public CTL session from the interviewer flow without admin pre-start", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const code = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-1111",
+      label: "Encuestador IKA 1",
+      studyId: state.study.id
+    });
+
+    expect(state.sessions).toHaveLength(0);
+    const available = await repository.listAvailableParticipantsForInterviewerCode({
+      ctlInterviewerCodeId: code.ok ? code.interviewerCode.id : ""
+    });
+    const claim = await repository.claimFolioForInterviewerCode({
+      ctlInterviewerCodeId: code.ok ? code.interviewerCode.id : "",
+      folio: "NAV-001"
+    });
+
+    expect(available.ok ? available.participants.map((participant) => participant.folio) : []).toEqual(["NAV-001"]);
+    expect(claim.ok).toBe(true);
+    expect(state.sessions).toMatchObject([
+      {
+        ctlInterviewerCodeId: code.ok ? code.interviewerCode.id : "",
+        status: "PENDING",
+        studyParticipantId: "participant-1"
+      }
+    ]);
+  });
+
+  it("rejects direct public CTL claim when the folio is not ready", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const code = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-1111",
+      label: "Encuestador IKA 1",
+      studyId: state.study.id
+    });
+    state.confirmations[0]!.studyParticipant.rotationAssignment = null as never;
+
+    const claim = await repository.claimFolioForInterviewerCode({
+      ctlInterviewerCodeId: code.ok ? code.interviewerCode.id : "",
+      folio: "NAV-001"
+    });
+
+    expect(claim.ok).toBe(false);
+    expect(claim.ok ? "" : claim.message).toBe("Este folio aun no esta listo para CTL.");
+    expect(state.sessions).toHaveLength(0);
+  });
+
+  it("hides participants with completed CTL from public availability", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const code = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-1111",
+      label: "Encuestador IKA 1",
+      studyId: state.study.id
+    });
+    const claim = await repository.claimFolioForInterviewerCode({
+      ctlInterviewerCodeId: code.ok ? code.interviewerCode.id : "",
+      folio: "NAV-001"
+    });
+    state.sessions[0]!.status = "COMPLETED";
+    state.sessions[0]!.completedAt = new Date();
+
+    const available = await repository.listAvailableParticipantsForInterviewerCode({
+      ctlInterviewerCodeId: code.ok ? code.interviewerCode.id : ""
+    });
+
+    expect(claim.ok).toBe(true);
+    expect(available.ok).toBe(true);
+    expect(available.ok ? available.participants : []).toEqual([]);
+  });
+
   it("removes occupied CTL folios from public availability", async () => {
     const state = createCtlState();
     const repository = createCtlRepository(state.prisma as never);
