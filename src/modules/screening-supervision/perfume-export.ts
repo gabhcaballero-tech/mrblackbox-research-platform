@@ -113,6 +113,8 @@ export function buildPerfumeParticipantsTsv(rows: PerfumeExportRow[]): string {
   const columns: PerfumeExportColumn[] = [
     { header: "Folio", value: (row) => row.attempt.participantConfirmation?.folio ?? "" },
     { header: "Participante", value: (row) => row.attempt.studyParticipant.participantProfile.name },
+    { header: "Estado screening", value: (row) => screeningStatusLabel(row.attempt.status) },
+    { header: "Elegible", value: (row) => (isReadyForCtl(row.attempt) ? "SI" : "NO") },
     { header: "Marca perfume", value: (row) => row.brand },
     { header: "Foto perfume 1", value: (row) => row.photoUrls[0] ?? "" },
     { header: "Foto perfume 2", value: (row) => row.photoUrls[1] ?? "" },
@@ -201,6 +203,42 @@ function dedupeAttemptsByParticipant(attempts: SupervisionPerfumeExportRecord[])
 
 function attemptScore(attempt: SupervisionPerfumeExportRecord): number {
   return (attempt.participantConfirmation ? 100 : 0) + attempt.participantEvidence.length;
+}
+
+function isReadyForCtl(attempt: SupervisionPerfumeExportRecord): boolean {
+  const participant = attempt.studyParticipant;
+  const arms = participant.rotationAssignment?.arms ?? [];
+  const hasCompleteRotation =
+    Boolean(arms.find((arm) => arm.applicationOrder === 1)?.studyProduct.internalCode) &&
+    Boolean(arms.find((arm) => arm.applicationOrder === 2)?.studyProduct.internalCode);
+  const hasBlockingCtlSession = (participant.ctlSessions ?? []).some((session) =>
+    session.status === "PENDING" || session.status === "IN_PROGRESS" || session.status === "COMPLETED"
+  );
+
+  return (
+    attempt.status === "PASSED" &&
+    participant.screeningStatus === "PASSED" &&
+    Boolean(attempt.participantConfirmation) &&
+    hasCompleteRotation &&
+    !hasBlockingCtlSession
+  );
+}
+
+function screeningStatusLabel(status: SupervisionPerfumeExportRecord["status"]): string {
+  switch (status) {
+    case "INCOMPLETE":
+      return "Incompleto";
+    case "PASSED":
+      return "Aprobado";
+    case "PENDING_REVIEW":
+      return "Pendiente de revisión";
+    case "STARTED":
+      return "Iniciado";
+    case "TERMINATED":
+      return "Rechazado";
+    default:
+      return status;
+  }
 }
 
 function questionAnswerText(

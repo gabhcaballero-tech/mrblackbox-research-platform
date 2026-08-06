@@ -210,12 +210,43 @@ function exportAttempt(input: Partial<SupervisionAttemptExportRecord> = {}): Sup
   };
 }
 
-function perfumeExportAttempt(input: Partial<SupervisionPerfumeExportRecord> = {}): SupervisionPerfumeExportRecord {
+type PerfumeExportAttemptInput = Omit<Partial<SupervisionPerfumeExportRecord>, "studyParticipant"> & {
+  studyParticipant?: Partial<SupervisionPerfumeExportRecord["studyParticipant"]>;
+};
+
+function perfumeExportAttempt(input: PerfumeExportAttemptInput = {}): SupervisionPerfumeExportRecord {
   const detailInput = input as Partial<SupervisionAttemptDetailRecord>;
+  const base = attempt(detailInput);
 
   return {
-    ...attempt(detailInput),
+    ...base,
+    studyParticipant: ctlReadyStudyParticipant(input.studyParticipant),
     participantEvidence: input.participantEvidence ?? []
+  };
+}
+
+function ctlReadyStudyParticipant(
+  input: Partial<SupervisionPerfumeExportRecord["studyParticipant"]> = {}
+): SupervisionPerfumeExportRecord["studyParticipant"] {
+  const base = attempt().studyParticipant;
+
+  return {
+    ctlSessions: input.ctlSessions ?? [],
+    id: input.id ?? base.id,
+    operationalStatus: input.operationalStatus ?? "SCREENING_PASSED",
+    participantProfile: input.participantProfile ?? base.participantProfile,
+    rotationAssignment:
+      input.rotationAssignment === undefined
+        ? {
+            arms: [
+              { applicationOrder: 1, studyProduct: { internalCode: "247" } },
+              { applicationOrder: 2, studyProduct: { internalCode: "583" } }
+            ],
+            id: "rotation-assignment-1"
+          }
+        : input.rotationAssignment,
+    screeningStatus: input.screeningStatus ?? "PASSED",
+    studyId: input.studyId ?? base.studyId
   };
 }
 
@@ -233,7 +264,7 @@ function perfumeEvidence(input: Partial<SupervisionPerfumeEvidenceRecord> = {}):
 }
 
 function repository(
-  records: Array<SupervisionAttemptDetailRecord | SupervisionAttemptExportRecord> = [attempt()]
+  records: Array<SupervisionAttemptDetailRecord | SupervisionAttemptExportRecord | SupervisionPerfumeExportRecord> = [attempt()]
 ): ScreeningSupervisionRepository {
   return {
     async getAttemptDetail(attemptId) {
@@ -259,7 +290,7 @@ function repository(
         .map((record) => ({
           ...record,
           participantEvidence: "participantEvidence" in record ? record.participantEvidence : []
-        }));
+        })) as SupervisionAttemptExportRecord[];
     },
     async listStudyAttemptsForPerfumeExport({ studyId }) {
       return records
@@ -785,6 +816,7 @@ describe("screening supervision service", () => {
         manualMessageStatus: "NOT_SENT",
         referenceCodes: []
       },
+      studyParticipant: ctlReadyStudyParticipant(),
       participantEvidence: [perfumeEvidence()]
     });
 
@@ -803,6 +835,8 @@ describe("screening supervision service", () => {
 
     expect(row).toMatchObject({
       Folio: "NAV-001",
+      Elegible: "SI",
+      "Estado screening": "Aprobado",
       Participante: "Participante Uno",
       "Marca perfume": "NAVIGO HOMME AZUL"
     });
@@ -823,6 +857,7 @@ describe("screening supervision service", () => {
         manualMessageStatus: "NOT_SENT",
         referenceCodes: []
       },
+      studyParticipant: ctlReadyStudyParticipant(),
       participantEvidence: [
         perfumeEvidence({ id: "photo-1" }),
         perfumeEvidence({ id: "photo-2" }),
@@ -873,6 +908,8 @@ describe("screening supervision service", () => {
     expect(withPhotos && Object.keys(withPhotos)).toEqual([
       "Folio",
       "Participante",
+      "Estado screening",
+      "Elegible",
       "Marca perfume",
       "Foto perfume 1",
       "Foto perfume 2",
@@ -881,6 +918,111 @@ describe("screening supervision service", () => {
     expect(withoutPhotos?.["Foto perfume 1"]).toBe("");
     expect(withoutPhotos?.["Foto perfume 2"]).toBe("");
     expect(withoutPhotos?.["Foto perfume 3"]).toBe("");
+  });
+
+  it("marks perfume export rows as not eligible when screening is pending or rejected", async () => {
+    vi.stubEnv("PARTICIPANT_PORTAL_HASH_SECRET", "test-secret");
+    const pending = perfumeExportAttempt({
+      id: "attempt-pending",
+      participantConfirmation: null,
+      status: "PENDING_REVIEW",
+      studyParticipant: ctlReadyStudyParticipant({
+        id: "participant-pending",
+        participantProfile: {
+          createdAt: new Date("2026-06-23T14:30:00Z"),
+          email: null,
+          externalReference: null,
+          id: "profile-pending",
+          name: "Participante Pendiente",
+          phone: null
+        },
+        screeningStatus: "PENDING_REVIEW"
+      }),
+      studyParticipantId: "participant-pending"
+    });
+    const rejected = perfumeExportAttempt({
+      id: "attempt-rejected",
+      participantConfirmation: null,
+      status: "TERMINATED",
+      studyParticipant: ctlReadyStudyParticipant({
+        id: "participant-rejected",
+        participantProfile: {
+          createdAt: new Date("2026-06-23T14:30:00Z"),
+          email: null,
+          externalReference: null,
+          id: "profile-rejected",
+          name: "Participante Rechazada",
+          phone: null
+        },
+        screeningStatus: "TERMINATED"
+      }),
+      studyParticipantId: "participant-rejected"
+    });
+
+    const result = await exportScreeningPerfumeParticipantsForStudy({
+      actor: admin,
+      repository: repository([pending, rejected]),
+      requestOrigin: "https://mrblackbox.example",
+      studyId: study.id
+    });
+    const rows = parseTsv(result.ok ? result.data.fileContent : "");
+
+    expect(rows.find((row) => row.Participante === "Participante Pendiente")).toMatchObject({
+      Elegible: "NO",
+      "Estado screening": "Pendiente de revisión"
+    });
+    expect(rows.find((row) => row.Participante === "Participante Rechazada")).toMatchObject({
+      Elegible: "NO",
+      "Estado screening": "Rechazado"
+    });
+  });
+
+  it("uses CTL availability logic for approved perfume export rows", async () => {
+    vi.stubEnv("PARTICIPANT_PORTAL_HASH_SECRET", "test-secret");
+    const approvedWithoutRotation = perfumeExportAttempt({
+      participantConfirmation: {
+        folio: "NAV-004",
+        manualMessageMarkedSentAt: null,
+        manualMessageMarkedSentBy: null,
+        manualMessageStatus: "NOT_SENT",
+        referenceCodes: []
+      },
+      studyParticipant: ctlReadyStudyParticipant({
+        rotationAssignment: null
+      })
+    });
+    const approvedWithOpenCtlSession = perfumeExportAttempt({
+      id: "attempt-with-ctl",
+      participantConfirmation: {
+        folio: "NAV-005",
+        manualMessageMarkedSentAt: null,
+        manualMessageMarkedSentBy: null,
+        manualMessageStatus: "NOT_SENT",
+        referenceCodes: []
+      },
+      studyParticipant: ctlReadyStudyParticipant({
+        ctlSessions: [{ status: "IN_PROGRESS" }],
+        id: "participant-with-ctl"
+      }),
+      studyParticipantId: "participant-with-ctl"
+    });
+
+    const result = await exportScreeningPerfumeParticipantsForStudy({
+      actor: admin,
+      repository: repository([approvedWithoutRotation, approvedWithOpenCtlSession]),
+      requestOrigin: "https://mrblackbox.example",
+      studyId: study.id
+    });
+    const rows = parseTsv(result.ok ? result.data.fileContent : "");
+
+    expect(rows.find((row) => row.Folio === "NAV-004")).toMatchObject({
+      Elegible: "NO",
+      "Estado screening": "Aprobado"
+    });
+    expect(rows.find((row) => row.Folio === "NAV-005")).toMatchObject({
+      Elegible: "NO",
+      "Estado screening": "Aprobado"
+    });
   });
 
   it("creates temporary evidence tokens that validate and reject expired links", () => {

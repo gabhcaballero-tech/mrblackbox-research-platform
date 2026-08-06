@@ -103,8 +103,32 @@ export type SupervisionAttemptExportRecord = SupervisionAttemptDetailRecord & {
   participantEvidence: SupervisionParticipantEvidenceRecord[];
 };
 
-export type SupervisionPerfumeExportRecord = SupervisionAttemptDetailRecord & {
+export type SupervisionPerfumeExportParticipantRecord = SupervisionAttemptRecord["studyParticipant"] & {
+  ctlSessions: Array<{ status: "CANCELLED" | "COMPLETED" | "IN_PROGRESS" | "PENDING" }>;
+  operationalStatus:
+    | "ASSIGNED"
+    | "COMPLETED"
+    | "CREATED"
+    | "IN_PROGRESS"
+    | "SCREENING_PASSED"
+    | "SCREENING_STARTED"
+    | "SCREENING_TERMINATED"
+    | "WITHDRAWN";
+  rotationAssignment: {
+    arms: Array<{
+      applicationOrder: number;
+      studyProduct: {
+        internalCode: string | null;
+      };
+    }>;
+    id: string;
+  } | null;
+  screeningStatus: "INCOMPLETE" | "NOT_STARTED" | "PASSED" | "PENDING_REVIEW" | "STARTED" | "TERMINATED";
+};
+
+export type SupervisionPerfumeExportRecord = Omit<SupervisionAttemptDetailRecord, "studyParticipant"> & {
   participantEvidence: SupervisionPerfumeEvidenceRecord[];
+  studyParticipant: SupervisionPerfumeExportParticipantRecord;
 };
 
 export type ScreeningSupervisionRepository = {
@@ -357,6 +381,38 @@ export function createScreeningSupervisionRepository(
             where: {
               relatedQuestionId: "F6_MARCAS_UTILIZA",
               type: "PERFUME_PHOTO"
+            }
+          },
+          studyParticipant: {
+            select: {
+              ctlSessions: {
+                select: { status: true },
+                where: {
+                  status: { in: ["PENDING", "IN_PROGRESS", "COMPLETED"] }
+                }
+              },
+              id: true,
+              operationalStatus: true,
+              participantProfile: {
+                select: participantProfileSelect
+              },
+              rotationAssignment: {
+                select: {
+                  arms: {
+                    select: {
+                      applicationOrder: true,
+                      studyProduct: {
+                        select: {
+                          internalCode: true
+                        }
+                      }
+                    }
+                  },
+                  id: true
+                }
+              },
+              screeningStatus: true,
+              studyId: true
             }
           }
         },
