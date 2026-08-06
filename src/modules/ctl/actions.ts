@@ -6,6 +6,63 @@ import { requireCapability } from "@/shared/auth/session";
 import { createCtlRepository } from "./repository";
 import { ctlFormDataToAnswerInput, parseCtlAnswers } from "./service";
 
+export type CreateCtlInterviewerCodeActionState = {
+  code?: string;
+  message: string;
+  status: "error" | "idle" | "success";
+};
+
+export async function createCtlInterviewerCodeAction(
+  studyId: string,
+  _previousState: CreateCtlInterviewerCodeActionState,
+  formData: FormData
+): Promise<CreateCtlInterviewerCodeActionState> {
+  const actor = await requireCapability("field:access");
+  const result = await createCtlRepository().createInterviewerCode({
+    actor,
+    label: String(formData.get("label") ?? ""),
+    studyId
+  });
+
+  if (!result.ok) {
+    return {
+      message: result.message,
+      status: "error"
+    };
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/ctl`);
+
+  return {
+    code: result.code,
+    message: "Codigo de encuestador creado. Copialo ahora; no se podra ver despues.",
+    status: "success"
+  };
+}
+
+export async function updateCtlInterviewerCodeStatusAction(
+  studyId: string,
+  ctlInterviewerCodeId: string,
+  status: "ACTIVE" | "DISABLED"
+) {
+  const actor = await requireCapability("field:access");
+  const result = await createCtlRepository().updateInterviewerCodeStatus({
+    actor,
+    ctlInterviewerCodeId,
+    status,
+    studyId
+  });
+
+  if (!result.ok) {
+    redirect(`/admin/studies/${studyId}/ctl?ctlError=${encodeURIComponent(result.message)}`);
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/ctl`);
+  redirect(`/admin/studies/${studyId}/ctl?ctlMessage=${encodeURIComponent(
+    status === "ACTIVE" ? "Codigo reactivado correctamente." : "Codigo desactivado correctamente."
+  )}`);
+}
+
 export async function startCtlSessionAction(studyId: string, formData: FormData) {
   const actor = await requireCapability("field:access");
   const result = await createCtlRepository().startSession({

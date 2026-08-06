@@ -6,6 +6,7 @@ import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { createCtlRepository, ctlStatusLabel } from "@/modules/ctl/repository";
 import { startCtlSessionAction } from "@/modules/ctl/actions";
+import { CtlInterviewerCodesSection } from "./_components/CtlInterviewerCodesSection";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,11 @@ export default async function CtlPage({ params, searchParams }: CtlPageProps) {
   const { studyId } = await params;
   const query = await searchParams;
   const actor = await requireCapability("field:access");
-  const result = await createCtlRepository().listParticipants({ actor, studyId });
+  const repository = createCtlRepository();
+  const result = await repository.listParticipants({ actor, studyId });
+  const interviewerCodesResult = actor.role === "ADMIN"
+    ? await repository.listInterviewerCodes({ actor, studyId })
+    : null;
 
   if (!result.ok) {
     if (result.message === "No encontramos el estudio.") {
@@ -55,6 +60,10 @@ export default async function CtlPage({ params, searchParams }: CtlPageProps) {
           <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
             {query.ctlError}
           </p>
+        ) : null}
+
+        {interviewerCodesResult?.ok ? (
+          <CtlInterviewerCodesSection codes={interviewerCodesResult.codes} studyId={studyId} />
         ) : null}
 
         <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">

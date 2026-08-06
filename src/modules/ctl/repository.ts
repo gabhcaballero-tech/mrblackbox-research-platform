@@ -64,6 +64,7 @@ export type CtlSessionView = {
 };
 
 export type CtlInterviewerCodeView = {
+  createdAt: Date;
   expiresAt: Date | null;
   id: string;
   label: string;
@@ -137,6 +138,10 @@ export type CtlRepository = {
     label: string;
     studyId: string;
   }) => Promise<{ code: string; interviewerCode: CtlInterviewerCodeView; ok: true } | { message: string; ok: false }>;
+  listInterviewerCodes: (input: {
+    actor: CtlActor;
+    studyId: string;
+  }) => Promise<{ codes: CtlInterviewerCodeView[]; ok: true } | { message: string; ok: false }>;
   getSession: (input: { actor: CtlActor; sessionId: string }) => Promise<CtlSessionView | null>;
   getPublicInterviewerActor: (input: {
     ctlInterviewerCodeId: string;
@@ -172,6 +177,12 @@ export type CtlRepository = {
     now?: Date;
     studyCode: string;
   }) => Promise<{ interviewerCode: CtlInterviewerCodeView; ok: true } | { message: string; ok: false }>;
+  updateInterviewerCodeStatus: (input: {
+    actor: CtlActor;
+    ctlInterviewerCodeId: string;
+    status: Extract<CtlInterviewerCodeStatus, "ACTIVE" | "DISABLED">;
+    studyId: string;
+  }) => Promise<{ ok: true } | { message: string; ok: false }>;
 };
 
 export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlRepository {
@@ -272,6 +283,10 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
         return { message: "No tienes permiso para generar codigos CTL.", ok: false };
       }
 
+      if (!input.label.trim()) {
+        return { message: "Captura el nombre del encuestador.", ok: false };
+      }
+
       const prisma = await getPrisma();
       const code = input.code ? normalizeCtlCode(input.code) : generateCtlInterviewerCode();
       const created = (await prisma.ctlInterviewerCode.create?.({
@@ -289,6 +304,24 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
       return {
         code,
         interviewerCode: created,
+        ok: true
+      };
+    },
+
+    async listInterviewerCodes(input) {
+      if (!isInternalAdmin(input.actor)) {
+        return { message: "No tienes permiso para administrar codigos CTL.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+      const codes = (await prisma.ctlInterviewerCode.findMany?.({
+        orderBy: { createdAt: "desc" },
+        select: ctlInterviewerCodeSelect,
+        where: { studyId: input.studyId }
+      })) as CtlInterviewerCodeView[];
+
+      return {
+        codes,
         ok: true
       };
     },
@@ -610,11 +643,38 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
         interviewerCode,
         ok: true
       };
+    },
+
+    async updateInterviewerCodeStatus(input) {
+      if (!isInternalAdmin(input.actor)) {
+        return { message: "No tienes permiso para administrar codigos CTL.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+      const existing = (await prisma.ctlInterviewerCode.findFirst?.({
+        select: { id: true },
+        where: {
+          id: input.ctlInterviewerCodeId,
+          studyId: input.studyId
+        }
+      })) as { id: string } | null;
+
+      if (!existing) {
+        return { message: "No encontramos el codigo CTL.", ok: false };
+      }
+
+      await prisma.ctlInterviewerCode.update?.({
+        data: { status: input.status },
+        where: { id: input.ctlInterviewerCodeId }
+      });
+
+      return { ok: true };
     }
   };
 }
 
 const ctlInterviewerCodeSelect = {
+  createdAt: true,
   expiresAt: true,
   id: true,
   label: true,

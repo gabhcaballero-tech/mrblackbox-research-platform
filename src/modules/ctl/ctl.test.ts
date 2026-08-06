@@ -265,6 +265,54 @@ describe("ctl module", () => {
     expect(result.ok ? "" : result.message).toBe("El codigo de encuestador no es valido.");
   });
 
+  it("lists and toggles CTL interviewer codes for admin", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const created = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-1234",
+      label: "Encuestador IKA 1",
+      studyId: state.study.id
+    });
+
+    const listed = await repository.listInterviewerCodes({
+      actor: admin,
+      studyId: state.study.id
+    });
+    const disabled = await repository.updateInterviewerCodeStatus({
+      actor: admin,
+      ctlInterviewerCodeId: created.ok ? created.interviewerCode.id : "",
+      status: "DISABLED",
+      studyId: state.study.id
+    });
+    const invalidAfterDisable = await repository.validateInterviewerCode({
+      code: "ika-1234",
+      studyCode: state.study.code
+    });
+    const reactivated = await repository.updateInterviewerCodeStatus({
+      actor: admin,
+      ctlInterviewerCodeId: created.ok ? created.interviewerCode.id : "",
+      status: "ACTIVE",
+      studyId: state.study.id
+    });
+    const validAfterReactivate = await repository.validateInterviewerCode({
+      code: "ika-1234",
+      studyCode: state.study.code
+    });
+
+    expect(listed.ok).toBe(true);
+    expect(listed.ok ? listed.codes : []).toMatchObject([
+      {
+        label: "Encuestador IKA 1",
+        status: "ACTIVE"
+      }
+    ]);
+    expect(disabled.ok).toBe(true);
+    expect(invalidAfterDisable.ok).toBe(false);
+    expect(reactivated.ok).toBe(true);
+    expect(validAfterReactivate.ok).toBe(true);
+  });
+
   it("resolves public CTL interviewer actor and previews an available folio", async () => {
     const state = createCtlState();
     const repository = createCtlRepository(state.prisma as never);
@@ -727,21 +775,26 @@ function createCtlState() {
         ctlInterviewerCodes.push(record);
         return record;
       },
-      async findFirst(args: { where: { codeHash?: string; id?: string; study: { code: string } } }) {
+      async findFirst(args: { where: { codeHash?: string; id?: string; study?: { code: string }; studyId?: string } }) {
         return (
           ctlInterviewerCodes.find(
             (code) =>
               (args.where.codeHash === undefined || code.codeHash === args.where.codeHash) &&
               (args.where.id === undefined || code.id === args.where.id) &&
-              code.studyId === study.id &&
-              args.where.study.code === study.code
+              (args.where.studyId === undefined || code.studyId === args.where.studyId) &&
+              (args.where.study === undefined || (code.studyId === study.id && args.where.study.code === study.code))
           ) ?? null
         );
+      },
+      async findMany(args: { where: { studyId: string } }) {
+        return ctlInterviewerCodes
+          .filter((code) => code.studyId === args.where.studyId)
+          .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
       },
       async findUnique(args: { where: { id: string } }) {
         return ctlInterviewerCodes.find((code) => code.id === args.where.id) ?? null;
       },
-      async update(args: { data: { lastUsedAt: Date }; where: { id: string } }) {
+      async update(args: { data: Partial<{ lastUsedAt: Date; status: "ACTIVE" | "DISABLED" | "EXPIRED" }>; where: { id: string } }) {
         const code = ctlInterviewerCodes.find((candidate) => candidate.id === args.where.id);
         if (!code) throw new Error("interviewer code not found");
         Object.assign(code, args.data, { updatedAt: new Date() });
