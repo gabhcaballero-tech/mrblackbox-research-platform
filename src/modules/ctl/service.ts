@@ -138,6 +138,57 @@ export function parseCtlAnswers(
   };
 }
 
+export function parseCtlQuestionAnswer(
+  questionCode: string,
+  input: CtlAnswerInput,
+  definition: CtlDefinition = getCtlDefinition()
+):
+  | {
+      answer: CtlAnswerDraft | null;
+      empty: boolean;
+      ok: true;
+    }
+  | {
+      message: string;
+      missingQuestionCodes: string[];
+      ok: false;
+    } {
+  const question = getCtlQuestions(definition).find((candidate) => candidate.code === questionCode);
+
+  if (!question) {
+    return {
+      message: "No encontramos la pregunta CTL.",
+      missingQuestionCodes: [questionCode],
+      ok: false
+    };
+  }
+
+  const parsed = parseCtlAnswerForQuestion(input, question);
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  if (question.required && parsed.empty) {
+    return {
+      message: "Responde la pregunta obligatoria antes de continuar.",
+      missingQuestionCodes: [question.code],
+      ok: false
+    };
+  }
+
+  return {
+    answer: parsed.empty
+      ? null
+      : {
+          answerValue: parsed.answerValue,
+          questionCode: question.code
+        },
+    empty: parsed.empty,
+    ok: true
+  };
+}
+
 export function ctlFormDataToAnswerInput(formData: FormData): CtlAnswerInput {
   const input: CtlAnswerInput = {};
 

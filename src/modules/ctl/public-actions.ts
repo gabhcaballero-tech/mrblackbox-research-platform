@@ -10,7 +10,13 @@ import {
   ctlPublicSessionCookieName,
   ctlPublicSessionMaxAgeSeconds
 } from "./public-session";
-import { ctlFormDataToAnswerInput, normalizeCtlCode, parseCtlAnswers } from "./service";
+import {
+  ctlFormDataToAnswerInput,
+  normalizeCtlCode,
+  parseCtlAnswers,
+  parseCtlQuestionAnswer,
+  type CtlAnswerInput
+} from "./service";
 
 export async function loginPublicCtlInterviewerAction(studyCode: string, formData: FormData) {
   const secret = getCtlPublicSessionSecret();
@@ -114,6 +120,110 @@ export async function savePublicCtlAnswersAction(studyCode: string, sessionId: s
   );
 }
 
+export async function savePublicCtlQuestionAnswerAction(
+  studyCode: string,
+  sessionId: string,
+  questionCode: string,
+  formData: FormData
+) {
+  const actor = await getPublicCtlInterviewerActor({ studyCode });
+
+  if (!actor) {
+    return {
+      message: "Ingresa tu codigo de encuestador para continuar.",
+      ok: false
+    };
+  }
+
+  const parsed = parseCtlQuestionAnswer(questionCode, ctlFormDataToAnswerInput(formData));
+
+  if (!parsed.ok) {
+    return {
+      message: parsed.message,
+      missingQuestionCodes: parsed.missingQuestionCodes,
+      ok: false
+    };
+  }
+
+  const result = await createCtlRepository().saveAnswers({
+    actor,
+    answers: parsed.answer ? [parsed.answer] : [],
+    complete: false,
+    sessionId
+  });
+
+  if (!result.ok) {
+    return {
+      message: result.message,
+      ok: false
+    };
+  }
+
+  revalidatePath(`/ctl/${studyCode}`);
+  revalidatePath(`/ctl/${studyCode}/sessions/${sessionId}`);
+
+  return {
+    ok: true
+  };
+}
+
+export async function finishPublicCtlSessionAction(studyCode: string, sessionId: string, formData: FormData) {
+  const actor = await getPublicCtlInterviewerActor({ studyCode });
+
+  if (!actor) {
+    return {
+      message: "Ingresa tu codigo de encuestador para continuar.",
+      ok: false
+    };
+  }
+
+  const repository = createCtlRepository();
+  const session = await repository.getSession({ actor, sessionId });
+
+  if (!session) {
+    return {
+      message: "No encontramos la sesion CTL.",
+      ok: false
+    };
+  }
+
+  const mergedInput = mergeCtlAnswerInputs(
+    ctlAnswersRecordToInput(session.answers),
+    ctlFormDataToAnswerInput(formData)
+  );
+  const parsed = parseCtlAnswers(mergedInput);
+
+  if (!parsed.ok) {
+    return {
+      message: parsed.message,
+      missingQuestionCodes: parsed.missingQuestionCodes,
+      ok: false
+    };
+  }
+
+  const result = await repository.saveAnswers({
+    actor,
+    answers: parsed.answers,
+    complete: true,
+    sessionId
+  });
+
+  if (!result.ok) {
+    return {
+      message: result.message,
+      ok: false
+    };
+  }
+
+  revalidatePath(`/ctl/${studyCode}`);
+  revalidatePath(`/ctl/${studyCode}/sessions/${sessionId}`);
+
+  return {
+    ok: true,
+    redirectTo: buildCtlPublicUrl(studyCode, { ctlMessage: "CTL completado correctamente." })
+  };
+}
+
 function buildCtlPublicUrl(studyCode: string, params: Record<string, string> = {}): string {
   const searchParams = new URLSearchParams();
 
@@ -126,4 +236,43 @@ function buildCtlPublicUrl(studyCode: string, params: Record<string, string> = {
   const query = searchParams.toString();
 
   return `/ctl/${encodeURIComponent(studyCode)}${query ? `?${query}` : ""}`;
+}
+
+function ctlAnswersRecordToInput(answers: Record<string, unknown>): CtlAnswerInput {
+  const input: CtlAnswerInput = {};
+
+  for (const [questionCode, answerValue] of Object.entries(answers)) {
+    if (isRecord(answerValue)) {
+      input[questionCode] = Object.fromEntries(
+        Object.entries(answerValue).map(([rowCode, rowValue]) => [rowCode, String(rowValue ?? "")])
+      );
+      continue;
+    }
+
+    input[questionCode] = String(answerValue ?? "");
+  }
+
+  return input;
+}
+
+function mergeCtlAnswerInputs(existing: CtlAnswerInput, current: CtlAnswerInput): CtlAnswerInput {
+  const merged: CtlAnswerInput = { ...existing };
+
+  for (const [questionCode, answerValue] of Object.entries(current)) {
+    if (isRecord(answerValue) && isRecord(merged[questionCode])) {
+      merged[questionCode] = {
+        ...(merged[questionCode] as Record<string, FormDataEntryValue | null | undefined>),
+        ...answerValue
+      };
+      continue;
+    }
+
+    merged[questionCode] = answerValue;
+  }
+
+  return merged;
+}
+
+function isRecord(value: unknown): value is Record<string, FormDataEntryValue | null | undefined> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }

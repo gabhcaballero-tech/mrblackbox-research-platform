@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { getCtlDefinition, getCtlQuestions, type CtlDefinition } from "./definition";
 import { createCtlRepository } from "./repository";
-import { ctlFormDataToAnswerInput, doReferenceCodesMatch, parseCtlAnswers, type CtlAnswerInput } from "./service";
+import {
+  ctlFormDataToAnswerInput,
+  doReferenceCodesMatch,
+  parseCtlAnswers,
+  parseCtlQuestionAnswer,
+  type CtlAnswerInput
+} from "./service";
 
 const interviewer = { id: "interviewer-1", role: "INTERVIEWER" as const, status: "ACTIVE" as const };
 const otherInterviewer = { id: "interviewer-2", role: "INTERVIEWER" as const, status: "ACTIVE" as const };
@@ -158,6 +164,16 @@ describe("ctl module", () => {
     expect(parsed.ok ? [] : parsed.missingQuestionCodes).toEqual(["P5A_GUSTO"]);
   });
 
+  it("validates a single CTL question without requiring the full questionnaire", () => {
+    const parsed = parseCtlQuestionAnswer("P5A_GUSTO", { P5A_GUSTO: "6" }, scaleDefinition);
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.ok ? parsed.answer : null).toEqual({
+      answerValue: 6,
+      questionCode: "P5A_GUSTO"
+    });
+  });
+
   it("keeps matrix answers grouped by row from form data", () => {
     const formData = new FormData();
     formData.set("P8A_ATRIBUTOS.LIMPIA", "4");
@@ -176,6 +192,27 @@ describe("ctl module", () => {
         questionCode: "P8A_ATRIBUTOS"
       }
     ]);
+  });
+
+  it("validates one matrix question for incremental CTL saving", () => {
+    const formData = new FormData();
+    formData.set("P8A_ATRIBUTOS.LIMPIA", "4");
+    formData.set("P8A_ATRIBUTOS.MASCULINA", "5");
+
+    const parsed = parseCtlQuestionAnswer(
+      "P8A_ATRIBUTOS",
+      ctlFormDataToAnswerInput(formData),
+      matrixDefinition
+    );
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.ok ? parsed.answer : null).toEqual({
+      answerValue: {
+        LIMPIA: "4",
+        MASCULINA: "5"
+      },
+      questionCode: "P8A_ATRIBUTOS"
+    });
   });
 
   it("requires all matrix rows when matrix question is required", () => {
