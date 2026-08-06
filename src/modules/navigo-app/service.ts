@@ -1,8 +1,11 @@
 import { calculateParticipantActivities, type ActivitySchedule as BaseActivitySchedule } from "@/modules/activities";
 import {
   NAVIGO_ACTIVITY_CODES,
+  NAVIGO_LEGACY_ACTIVITY_SEQUENCE,
   NAVIGO_T0_IDENTITY_QUESTION_ID,
   createNavigoMeasurementDefinition,
+  isInitialNavigoEvaluation,
+  isSupportedNavigoActivityCode,
   resolveNavigoTimeZone,
   type NavigoActivityCode,
   type NavigoMeasurementDefinition
@@ -245,7 +248,7 @@ export function prepareNavigoParticipantActivities({
         activityScheduleId: activity.activityScheduleId,
         availableFrom: activity.availableFrom,
         availableUntil: activity.availableUntil,
-        code: codeByScheduleId.get(activity.activityScheduleId) ?? "T2_HORAS",
+        code: codeByScheduleId.get(activity.activityScheduleId) ?? NAVIGO_ACTIVITY_CODES[0],
         occurrenceKey: "DEFAULT",
         scheduledAt: activity.scheduledAt,
         status: toPersistenceStatus(activity.status),
@@ -290,14 +293,14 @@ export function buildNavigoActivityTimeline({
 
   for (const activity of activities) {
     const code = activity.code;
-    if (code && NAVIGO_ACTIVITY_CODES.includes(code)) {
+    if (isSupportedNavigoActivityCode(code)) {
       byCode.set(code, activity);
     }
   }
 
   const timeline: NavigoActivityTimelineItem[] = [];
 
-  for (const code of NAVIGO_ACTIVITY_CODES) {
+  for (const code of resolveNavigoTimelineSequence([...byCode.keys()])) {
     const activity = byCode.get(code);
     if (!activity) {
       continue;
@@ -367,12 +370,20 @@ export function validateNavigoMeasurementAnswers({
 
 export function navigoActivityLabel(code: NavigoActivityCode): string {
   switch (code) {
+    case "T0_15_MIN":
+      return "Evaluacion T0 / 15 minutos";
+    case "T3_HORAS":
+      return "Evaluacion 3 horas";
+    case "T4_5_HORAS":
+      return "Evaluacion 4.5 horas";
+    case "T6_HORAS":
+      return "Evaluacion 6 horas";
     case "T0_SALON":
-      return "Evaluacion 0 / T0 en salon";
+      return "Evaluacion 0 / T0 en salon (historica)";
     case "T2_HORAS":
-      return "Evaluacion 2 horas";
+      return "Evaluacion 2 horas (historica)";
     case "T4_HORAS":
-      return "Evaluacion 4 horas";
+      return "Evaluacion 4 horas (historica)";
     case "T8_HORAS":
       return "Evaluacion 8 horas";
   }
@@ -825,7 +836,7 @@ function getNavigoActivityAvailability({
   previousActivities: NavigoActivityTimelineItem[];
   testMode: boolean;
 }): NavigoActivityAvailability {
-  if (activity.code === "T0_SALON") {
+  if (isInitialNavigoEvaluation(activity.code)) {
     if (activity.status === "COMPLETED") {
       return {
         canCapture: false,
@@ -834,11 +845,13 @@ function getNavigoActivityAvailability({
       };
     }
 
-    return {
-      canCapture: true,
-      label: "Disponible",
-      reason: "AVAILABLE"
-    };
+    if (activity.code === "T0_SALON") {
+      return {
+        canCapture: true,
+        label: "Disponible",
+        reason: "AVAILABLE"
+      };
+    }
   }
 
   if (activity.status === "COMPLETED") {
@@ -861,7 +874,7 @@ function getNavigoActivityAvailability({
 
   if (previousMeasurement && previousMeasurement.status !== "COMPLETED") {
     return {
-      blockedByCode: previousMeasurement.code ?? "T0_SALON",
+      blockedByCode: previousMeasurement.code ?? NAVIGO_ACTIVITY_CODES[0],
       canCapture: false,
       label: "Pendiente",
       reason: "PREVIOUS_REQUIRED"
@@ -903,7 +916,7 @@ function getNavigoActivityAvailability({
 
 function hasBlockingIdentityIssue(activities: Array<Pick<NavigoActivityRecord, "code" | "identityReviewStatus" | "identityStatus" | "selfieCount">>): boolean {
   return activities.some((activity) => {
-    if (activity.code === "T0_SALON") {
+    if (isInitialNavigoEvaluation(activity.code)) {
       return activity.identityStatus === "REJECTED";
     }
 
@@ -913,6 +926,18 @@ function hasBlockingIdentityIssue(activities: Array<Pick<NavigoActivityRecord, "
 
     return activity.identityReviewStatus !== "APPROVED";
   });
+}
+
+export function resolveNavigoTimelineSequence(codes: Iterable<NavigoActivityCode>): readonly NavigoActivityCode[] {
+  const codeSet = new Set(codes);
+  const hasCurrentExclusive = NAVIGO_ACTIVITY_CODES.some((code) => code !== "T8_HORAS" && codeSet.has(code));
+  const hasLegacyExclusive = NAVIGO_LEGACY_ACTIVITY_SEQUENCE.some((code) => code !== "T8_HORAS" && codeSet.has(code));
+
+  if (hasLegacyExclusive && !hasCurrentExclusive) {
+    return NAVIGO_LEGACY_ACTIVITY_SEQUENCE;
+  }
+
+  return NAVIGO_ACTIVITY_CODES;
 }
 
 export function isNavigoT0Complete(activity: Pick<NavigoActivityRecord, "identityStatus" | "responseCount" | "status">): boolean {

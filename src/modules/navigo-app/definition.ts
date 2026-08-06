@@ -3,14 +3,18 @@ import type { QuestionnaireQuestion } from "@/modules/questionnaire-engine";
 import { NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
 
 export const NAVIGO_APP_DEFAULT_TIME_ZONE = "America/Mexico_City";
-export const NAVIGO_MEASUREMENT_DRAFT_NAME = "App Navigo - mediciones T0/T2/T4/T8";
+export const NAVIGO_MEASUREMENT_DRAFT_NAME = "App Navigo - mediciones T0/T3/T4.5/T6/T8";
 export const NAVIGO_MEASUREMENT_VERSION_NAME = "App Navigo - AP1 a AP7";
 export const NAVIGO_T0_IDENTITY_QUESTION_ID = "T0_IDENTITY_CONFIRMED";
 
-export const NAVIGO_ACTIVITY_CODES = ["T0_SALON", "T2_HORAS", "T4_HORAS", "T8_HORAS"] as const;
-export const NAVIGO_LEGACY_ACTIVITY_CODES = ["T6_HORAS"] as const;
+export const NAVIGO_ACTIVITY_CODES = ["T0_15_MIN", "T3_HORAS", "T4_5_HORAS", "T6_HORAS", "T8_HORAS"] as const;
+export const NAVIGO_LEGACY_ACTIVITY_CODES = ["T0_SALON", "T2_HORAS", "T4_HORAS"] as const;
+export const NAVIGO_LEGACY_ACTIVITY_SEQUENCE = ["T0_SALON", "T2_HORAS", "T4_HORAS", "T8_HORAS"] as const;
+export const NAVIGO_SUPPORTED_ACTIVITY_CODES = [...NAVIGO_ACTIVITY_CODES, ...NAVIGO_LEGACY_ACTIVITY_CODES] as const;
 
-export type NavigoActivityCode = (typeof NAVIGO_ACTIVITY_CODES)[number];
+export type NavigoCurrentActivityCode = (typeof NAVIGO_ACTIVITY_CODES)[number];
+export type NavigoLegacyActivityCode = (typeof NAVIGO_LEGACY_ACTIVITY_SEQUENCE)[number];
+export type NavigoActivityCode = NavigoCurrentActivityCode | NavigoLegacyActivityCode;
 export type NavigoVisualVerificationMode = "disabled" | "required";
 
 export type NavigoMeasurementDefinition = {
@@ -21,7 +25,7 @@ export type NavigoMeasurementDefinition = {
 };
 
 export type NavigoScheduleSeed = {
-  code: NavigoActivityCode;
+  code: NavigoCurrentActivityCode;
   name: string;
   offsetMinutes: number;
   questionnaireVersionId: string | null;
@@ -106,33 +110,43 @@ export function hashNavigoMeasurementDefinition(definition: NavigoMeasurementDef
 export function createNavigoScheduleSeeds(questionnaireVersionId: string): NavigoScheduleSeed[] {
   return [
     {
-      code: "T0_SALON",
-      name: "T0 en salon",
-      offsetMinutes: 0,
-      questionnaireVersionId: null,
+      code: "T0_15_MIN",
+      name: "Evaluacion T0 - 15 minutos",
+      offsetMinutes: 15,
+      questionnaireVersionId,
       sortOrder: 0,
-      type: "INTERNAL_FOLLOWUP",
-      windowEndsMinutes: 0,
+      type: "QUESTIONNAIRE_MEASUREMENT",
+      windowEndsMinutes: 585,
       windowStartsMinutes: 0
     },
     {
-      code: "T2_HORAS",
-      name: "Medicion 2 horas",
-      offsetMinutes: 120,
+      code: "T3_HORAS",
+      name: "Medicion 3 horas",
+      offsetMinutes: 180,
       questionnaireVersionId,
       sortOrder: 1,
       type: "QUESTIONNAIRE_MEASUREMENT",
-      windowEndsMinutes: 480,
+      windowEndsMinutes: 420,
       windowStartsMinutes: -30
     },
     {
-      code: "T4_HORAS",
-      name: "Medicion 4 horas",
-      offsetMinutes: 240,
+      code: "T4_5_HORAS",
+      name: "Medicion 4.5 horas",
+      offsetMinutes: 270,
       questionnaireVersionId,
       sortOrder: 2,
       type: "QUESTIONNAIRE_MEASUREMENT",
-      windowEndsMinutes: 360,
+      windowEndsMinutes: 330,
+      windowStartsMinutes: -30
+    },
+    {
+      code: "T6_HORAS",
+      name: "Medicion 6 horas",
+      offsetMinutes: 360,
+      questionnaireVersionId,
+      sortOrder: 3,
+      type: "QUESTIONNAIRE_MEASUREMENT",
+      windowEndsMinutes: 240,
       windowStartsMinutes: -30
     },
     {
@@ -140,7 +154,7 @@ export function createNavigoScheduleSeeds(questionnaireVersionId: string): Navig
       name: "Medicion 8 horas",
       offsetMinutes: 480,
       questionnaireVersionId,
-      sortOrder: 3,
+      sortOrder: 4,
       type: "QUESTIONNAIRE_MEASUREMENT",
       windowEndsMinutes: 120,
       windowStartsMinutes: -30
@@ -170,6 +184,31 @@ export const NAVIGO_APP_SUMMARY = {
   ],
   studyCode: NAVIGO_STUDY_CODE
 } as const;
+
+export function isInitialNavigoEvaluation(code: string | null | undefined): code is "T0_15_MIN" | "T0_SALON" {
+  return code === "T0_15_MIN" || code === "T0_SALON";
+}
+
+export function isFollowupNavigoEvaluation(code: string | null | undefined): code is Exclude<NavigoActivityCode, "T0_15_MIN" | "T0_SALON"> {
+  return isSupportedNavigoActivityCode(code) && !isInitialNavigoEvaluation(code);
+}
+
+export function isLegacyNavigoActivity(code: string | null | undefined): code is NavigoLegacyActivityCode {
+  return code === "T0_SALON" || code === "T2_HORAS" || code === "T4_HORAS" || code === "T8_HORAS";
+}
+
+export function isSupportedNavigoActivityCode(code: string | null | undefined): code is NavigoActivityCode {
+  return (
+    code === "T0_15_MIN" ||
+    code === "T3_HORAS" ||
+    code === "T4_5_HORAS" ||
+    code === "T6_HORAS" ||
+    code === "T8_HORAS" ||
+    code === "T0_SALON" ||
+    code === "T2_HORAS" ||
+    code === "T4_HORAS"
+  );
+}
 
 function option(value: string, label: string) {
   return {

@@ -6,6 +6,7 @@ import { requireCapability } from "@/shared/auth/session";
 import { participantTokenSchema } from "@/shared/validation/participant";
 import { ensureNavigoAppFoundation } from "./loader";
 import {
+  appendNavigoTestModeParams,
   isValidNavigoTestMode,
   type NavigoTestModeParams
 } from "./test-mode";
@@ -23,7 +24,7 @@ import {
   type NavigoParticipantImportRowInput,
   type NavigoRotationImportRowInput
 } from "./service";
-import { NAVIGO_ACTIVITY_CODES, type NavigoActivityCode } from "./definition";
+import { isSupportedNavigoActivityCode, type NavigoActivityCode } from "./definition";
 import type { NavigoRotationImportActionState } from "./rotation-import-state";
 import type { NavigoParticipantImportActionState } from "./participant-import-state";
 import type { EvidenceUploadMetadata } from "@/modules/participant-portal/evidence-storage";
@@ -39,7 +40,7 @@ export async function startNavigoT0Action(studyId: string, studyParticipantId: s
   const timeZoneIana = String(formData.get("timeZoneIana") ?? "America/Mexico_City");
   const applicationStartedAt = parseApplicationStartedAt(formData.get("applicationStartedAt"), timeZoneIana);
   if (!applicationStartedAt) {
-    redirectWithNavigoMessage(studyId, { error: "Selecciona la hora base T0." });
+    redirectWithNavigoMessage(studyId, { error: "Selecciona la hora de aplicacion inicial." });
   }
   const t0Answers = parseNavigoAnswersFromFormData(formData);
   const result = await createNavigoAppRepository().startT0({
@@ -216,7 +217,7 @@ export async function deleteNavigoParticipantStagesAction(
     redirectWithNavigoMessage(studyId, { error: "Captura el motivo de la correccion." });
   }
 
-  if (!NAVIGO_ACTIVITY_CODES.includes(fromCode as NavigoActivityCode)) {
+  if (!isSupportedNavigoActivityCode(fromCode)) {
     redirectWithNavigoMessage(studyId, { error: "Selecciona una etapa valida." });
   }
 
@@ -732,6 +733,31 @@ export async function submitNavigoActivityResponsesAction(
     },
     ok: true
   };
+}
+
+export async function registerNavigoInitialApplicationAction(tokenInput: string, formData: FormData) {
+  const token = parseToken(tokenInput);
+  const testModeParams = readNavigoTestModeParams(formData);
+  const result = await createNavigoAppRepository().registerInitialApplication({
+    token
+  });
+
+  if (!result.ok) {
+    redirect(
+      appendNavigoTestModeParams(
+        `/p/${encodeURIComponent(token)}/activities?error=${encodeURIComponent(result.message)}`,
+        testModeParams
+      )
+    );
+  }
+
+  revalidatePath(`/p/${encodeURIComponent(token)}/activities`);
+  redirect(
+    appendNavigoTestModeParams(
+      `/p/${encodeURIComponent(token)}/activities?message=${encodeURIComponent("Aplicacion inicial registrada. T0 estara disponible 15 minutos despues de la aplicacion.")}`,
+      testModeParams
+    )
+  );
 }
 
 export async function confirmNavigoT0IdentityAction(

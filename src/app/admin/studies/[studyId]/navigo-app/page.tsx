@@ -18,16 +18,15 @@ import {
 } from "@/modules/navigo-app/actions";
 import {
   createNavigoAppRepository,
-  createNavigoMeasurementDefinition,
   formatNavigoDateTimeLocal,
-  NAVIGO_ACTIVITY_CODES,
+  isInitialNavigoEvaluation,
   navigoActivityLabel,
   nowInStudyTimezoneForDateTimeLocal,
+  resolveNavigoTimelineSequence,
   type NavigoActivityListItem,
   type NavigoParticipantListItem,
   type NavigoStudyRotationConfiguration
 } from "@/modules/navigo-app";
-import type { QuestionnaireQuestion } from "@/modules/questionnaire-engine";
 import { NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
 import { appendNavigoTestModeParams, createNavigoTestModeParams } from "@/modules/navigo-app/test-mode";
 import { ensureNavigoAppFoundation } from "@/modules/navigo-app/loader";
@@ -78,7 +77,7 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
     <AppShell>
       <PageHeader
         actions={<StatusBadge status={isNavigo ? "ready" : "planned"}>{isNavigo ? "Operable" : "No aplica"}</StatusBadge>}
-        description="Inicio de T0 en salon y seguimiento de las mediciones de participante a 2, 4 y 8 horas."
+        description="Registro de aplicacion inicial y seguimiento de evaluaciones a 15 minutos, 3, 4.5, 6 y 8 horas."
         eyebrow="App Navigo"
         title={`Mediciones de fragancia · ${result.study.name}`}
       />
@@ -124,7 +123,7 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
           {result.participants.length === 0 ? (
             <EmptyState
               title="Sin participantes confirmados"
-              description="Cuando un participante aprobado tenga folio y rotacion asignada, aparecera aqui para iniciar T0."
+              description="Cuando un participante aprobado tenga folio y rotacion asignada, aparecera aqui para registrar la aplicacion inicial."
             />
           ) : (
             <section className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
@@ -305,8 +304,8 @@ function ParticipantRow({
   const pendingMessage = !participant.ctl.completed
     ? "Pendiente para iniciar T0: completar CTL presencial."
     : participant.rotation.startPendingMessage;
-  const t0Activity = participant.activities.find((activity) => activity.code === "T0_SALON");
-  const measurementQuestions = createNavigoMeasurementDefinition().questions;
+  const activityCodes = resolveNavigoTimelineSequence(participant.activities.map((activity) => activity.code));
+  const t0Activity = participant.activities.find((activity) => isInitialNavigoEvaluation(activity.code));
   const participantUrl = participant.participantLinkToken
     ? new URL(`/p/${encodeURIComponent(participant.participantLinkToken)}/activities`, requestOrigin).toString()
     : null;
@@ -357,7 +356,7 @@ function ParticipantRow({
         <CtlPreparation participant={participant} studyId={studyId} timeZoneIana={timeZoneIana} />
         <RotationPreparation participant={participant} studyId={studyId} />
         <div className="grid gap-3 md:grid-cols-4">
-          {NAVIGO_ACTIVITY_CODES.map((code) => (
+          {activityCodes.map((code) => (
             <ActivitySummary
               activity={participant.activities.find((item) => item.code === code)}
               code={code as NavigoActivityListItem["code"]}
@@ -367,7 +366,7 @@ function ParticipantRow({
           ))}
         </div>
         <div className="space-y-3">
-          {NAVIGO_ACTIVITY_CODES.map((code) => (
+          {activityCodes.map((code) => (
             <ActivityDetail
               activity={participant.activities.find((item) => item.code === code)}
               code={code as NavigoActivityListItem["code"]}
@@ -382,7 +381,7 @@ function ParticipantRow({
 
       <div className="space-y-3">
         <section className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-          <h3 className="text-sm font-semibold text-zinc-950">T0 en salón</h3>
+          <h3 className="text-sm font-semibold text-zinc-950">Aplicacion y T0</h3>
           <dl className="mt-3 space-y-1 text-xs text-zinc-700">
             <div>
               <dt className="inline font-medium text-zinc-500">Estado: </dt>
@@ -399,7 +398,7 @@ function ParticipantRow({
           </dl>
           {t0Activity?.identityStatus === "REJECTED" ? (
             <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800">
-              Incidencia de identidad en T0. No continúes con T2/T4/T8 hasta que supervisor revise el caso.
+              Incidencia de identidad en T0. No continúes con las evaluaciones posteriores hasta que supervisor revise el caso.
             </p>
           ) : null}
           {participantUrl ? (
@@ -409,13 +408,13 @@ function ParticipantRow({
               rel="noreferrer"
               target="_blank"
             >
-              Abrir link para capturar T0 en salón
+              Abrir link participante
             </Link>
           ) : null}
         </section>
         <form action={startNavigoT0Action.bind(null, studyId, participant.id)} className="space-y-3">
           <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
-            {participant.applicationStartedAt ? "Corregir hora base T0" : "Hora base T0"}
+            {participant.applicationStartedAt ? "Corregir hora de aplicacion inicial" : "Hora de aplicacion inicial"}
             <input
               className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-950"
               defaultValue={
@@ -428,26 +427,11 @@ function ParticipantRow({
             />
             <input name="timeZoneIana" type="hidden" value={timeZoneIana} />
           </label>
-          <details className="rounded-md border border-zinc-200 bg-white p-3">
-            <summary className="cursor-pointer text-sm font-semibold text-teal-700">
-              Corrección administrativa de T0
-            </summary>
-            <p className="mt-2 text-xs leading-5 text-zinc-600">
-              El flujo normal de T0 se captura desde el link participante en salón. Usa esta sección solo para rescate operativo.
-            </p>
-            <div className="mt-4 space-y-4">
-              {measurementQuestions.map((question, index) => (
-                <AdminT0QuestionControl
-                  answer={t0Activity?.existingResponses[question.id]}
-                  index={index + 1}
-                  key={question.id}
-                  question={question}
-                />
-              ))}
-            </div>
-          </details>
-          <SubmitButton disabled={!canStart} pendingLabel="Guardando corrección T0...">
-            Guardar corrección T0
+          <p className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs leading-5 text-zinc-600">
+            El flujo normal registra la aplicacion inicial desde el link participante. Esta correccion solo ajusta la hora base y recalcula evaluaciones pendientes.
+          </p>
+          <SubmitButton disabled={!canStart} pendingLabel="Guardando aplicacion inicial...">
+            Guardar aplicacion inicial
           </SubmitButton>
         </form>
         {!canStart ? (
@@ -462,7 +446,7 @@ function ParticipantRow({
           </SubmitButton>
         </form>
         {participant.applicationStartedAt ? (
-          <p className="text-xs text-zinc-500">Para corregir hora base T0, ajusta el campo de hora y presiona Guardar corrección T0.</p>
+          <p className="text-xs text-zinc-500">Para corregir la aplicacion inicial, ajusta el campo de hora y presiona Guardar aplicacion inicial.</p>
         ) : null}
         <CorrectionActions participant={participant} studyId={studyId} />
       </div>
@@ -477,6 +461,8 @@ function CorrectionActions({
   participant: NavigoParticipantListItem;
   studyId: string;
 }) {
+  const activityCodes = resolveNavigoTimelineSequence(participant.activities.map((activity) => activity.code));
+
   return (
     <details className="rounded-md border border-rose-200 bg-rose-50 p-3">
       <summary className="cursor-pointer text-sm font-semibold text-rose-800">Acciones de correccion</summary>
@@ -505,10 +491,11 @@ function CorrectionActions({
       <form action={deleteNavigoParticipantStagesAction.bind(null, studyId, participant.id)} className="mt-5 space-y-2">
         <p className="text-sm font-semibold text-rose-950">Eliminar etapa y posteriores</p>
         <select className={inputClass} name="fromCode" required>
-          <option value="T0_SALON">T0 y posteriores</option>
-          <option value="T2_HORAS">T2 y posteriores</option>
-          <option value="T4_HORAS">T4 y posteriores</option>
-          <option value="T8_HORAS">T8 solamente</option>
+          {activityCodes.map((code, index) => (
+            <option key={code} value={code}>
+              {index === activityCodes.length - 1 ? `${navigoActivityLabel(code)} solamente` : `${navigoActivityLabel(code)} y posteriores`}
+            </option>
+          ))}
         </select>
         <input
           className={inputClass}
@@ -783,7 +770,7 @@ function ActivityDetail({
   studyId: string;
   timeZoneIana: string;
 }) {
-  const isT0 = code === "T0_SALON";
+  const isT0 = isInitialNavigoEvaluation(code);
 
   return (
     <details className="rounded-md border border-zinc-200 bg-white p-3">
@@ -883,7 +870,7 @@ function ActivityIdentityReview({
   return (
     <section>
       <h4 className="text-sm font-semibold text-zinc-950">Revisión visual de identidad</h4>
-      <p className="mt-1 text-xs text-zinc-500">T0 mantiene confirmación visual humana. T2/T4/T8 usan verificación facial automática y permiten revisión manual.</p>
+      <p className="mt-1 text-xs text-zinc-500">T0 mantiene confirmacion visual humana. Las evaluaciones posteriores usan verificacion facial automatica y permiten revision manual.</p>
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         <SelfiePreview title="Selfie registrada del filtro" url={registeredSelfie?.signedUrl ?? null} />
         {isT0 ? (
@@ -1008,10 +995,10 @@ function ActivitySummary({
       <p className="mt-1 text-xs text-zinc-500">
         Real: {activity?.actualCompletedAt ? formatDate(activity.actualCompletedAt, timeZoneIana) : "Sin captura"}
       </p>
-      {code === "T0_SALON" ? (
-        <p className="mt-2 text-xs text-zinc-500">T0 en salon · Respuestas {activity?.responseCount ?? 0}/7</p>
+      {isInitialNavigoEvaluation(code) ? (
+        <p className="mt-2 text-xs text-zinc-500">T0 · Respuestas {activity?.responseCount ?? 0}/7</p>
       ) : null}
-      {code !== "T0_SALON" ? (
+      {!isInitialNavigoEvaluation(code) ? (
         <p className="mt-2 text-xs text-zinc-500">
           <span className="block font-semibold text-zinc-700">{navigoMeasurementProgressLabel(activity)}</span>
           Selfies {activity?.evidenceCount ?? 0} · Respuestas {activity?.responseCount ?? 0}/7
@@ -1042,7 +1029,7 @@ function navigoMeasurementProgressLabel(activity?: NavigoActivityListItem): stri
 }
 
 function navigoOperationalStatusLabel(activity: NavigoActivityListItem): string {
-  if (activity.code !== "T0_SALON") {
+  if (!isInitialNavigoEvaluation(activity.code)) {
     if (activity.availability?.reason === "AFTER_WINDOW" && activity.status !== "COMPLETED") {
       return "Requiere llamada";
     }
@@ -1138,66 +1125,6 @@ function formatDate(value: Date, timeZoneIana: string): string {
   }).format(value);
 }
 
-function AdminT0QuestionControl({
-  answer,
-  index,
-  question
-}: {
-  answer: unknown;
-  index: number;
-  question: QuestionnaireQuestion;
-}) {
-  return (
-    <fieldset className="rounded-md border border-zinc-200 p-3">
-      <legend className="px-1 text-xs font-semibold text-teal-700">AP{index}</legend>
-      <p className="text-sm font-semibold text-zinc-950">{question.text}</p>
-      {question.type === "single_choice" ? (
-        <div className="mt-3 space-y-2">
-          {question.options.map((option) => (
-            <label className="flex items-center gap-2 text-sm text-zinc-800" key={option.value}>
-              <input
-                defaultChecked={readAnswerValue(answer) === option.value}
-                name={question.id}
-                required={question.required}
-                type="radio"
-                value={option.value}
-              />
-              {option.label}
-            </label>
-          ))}
-        </div>
-      ) : null}
-      {question.type === "scale" ? (
-        <div className="mt-3 grid grid-cols-5 gap-2">
-          {Array.from({ length: question.max - question.min + 1 }, (_, offset) => question.min + offset).map((value) => (
-            <label
-              className="flex flex-col items-center gap-1 rounded-md border border-zinc-200 px-2 py-2 text-xs text-zinc-800"
-              key={value}
-            >
-              <input
-                defaultChecked={readAnswerValue(answer) === value}
-                name={question.id}
-                required={question.required}
-                type="radio"
-                value={value}
-              />
-              {value}
-            </label>
-          ))}
-        </div>
-      ) : null}
-    </fieldset>
-  );
-}
-
-function readAnswerValue(answer: unknown): string | number | null {
-  if (typeof answer === "object" && answer !== null && "value" in answer) {
-    const value = (answer as { value?: unknown }).value;
-    return typeof value === "string" || typeof value === "number" ? value : null;
-  }
-
-  return null;
-}
 
 const labelClass = "flex flex-col gap-1 text-sm font-medium text-zinc-700";
 const inputClass =

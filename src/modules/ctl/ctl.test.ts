@@ -950,12 +950,7 @@ describe("ctl module", () => {
     expect(Object.fromEntries(state.answers.map((answer) => [answer.questionCode, answer.answerValue]))).toMatchObject({
       DG_HORA_TERMINO: expect.any(String)
     });
-    expect(state.navigoActivities).toMatchObject([
-      {
-        status: "AVAILABLE",
-        studyParticipantId: "participant-1"
-      }
-    ]);
+    expect(state.navigoActivities).toEqual([]);
     expect(state.accessTokens).toHaveLength(1);
   });
 
