@@ -55,22 +55,19 @@ describe("ctl module", () => {
     ).toBe(true);
   });
 
-  it("rejects incorrect participant codes", async () => {
+  it("starts a CTL session without requiring participant reference codes", async () => {
     const state = createCtlState();
     const repository = createCtlRepository(state.prisma as never);
+    state.confirmations[0]!.referenceCodes = [];
 
     const result = await repository.startSession({
       actor: interviewer,
-      code1: "A7K4",
-      code2: "M3P9",
-      code3: "XXXX",
       folio: "NAV-001",
       studyId: state.study.id
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.ok ? "" : result.message).toBe("Los codigos no corresponden al participante.");
-    expect(state.sessions).toHaveLength(0);
+    expect(result.ok).toBe(true);
+    expect(state.sessions).toHaveLength(1);
   });
 
   it("creates a CTL session after validating participant codes", async () => {
@@ -79,9 +76,6 @@ describe("ctl module", () => {
 
     const result = await repository.startSession({
       actor: interviewer,
-      code1: "A7K4",
-      code2: "M3P9",
-      code3: "T8R2",
       folio: "NAV-001",
       studyId: state.study.id
     });
@@ -102,9 +96,6 @@ describe("ctl module", () => {
     const repository = createCtlRepository(state.prisma as never);
     const started = await repository.startSession({
       actor: interviewer,
-      code1: "A7K4",
-      code2: "M3P9",
-      code3: "T8R2",
       folio: "NAV-001",
       studyId: state.study.id
     });
@@ -231,17 +222,11 @@ describe("ctl module", () => {
     const repository = createCtlRepository(state.prisma as never);
     const first = await repository.startSession({
       actor: interviewer,
-      code1: "A7K4",
-      code2: "M3P9",
-      code3: "T8R2",
       folio: "NAV-001",
       studyId: state.study.id
     });
     const second = await repository.startSession({
       actor: otherInterviewer,
-      code1: "A7K4",
-      code2: "M3P9",
-      code3: "T8R2",
       folio: "NAV-001",
       studyId: state.study.id
     });
@@ -375,6 +360,80 @@ describe("ctl module", () => {
     expect(validAfterReactivate.ok).toBe(true);
   });
 
+  it("resets an interviewer code and invalidates the previous code", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const created = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-1234",
+      label: "Encuestador IKA 1",
+      studyId: state.study.id
+    });
+
+    const reset = await repository.resetInterviewerCode({
+      actor: admin,
+      ctlInterviewerCodeId: created.ok ? created.interviewerCode.id : "",
+      studyId: state.study.id
+    });
+    const previousCode = await repository.validateInterviewerCode({
+      code: "ika-1234",
+      studyCode: state.study.code
+    });
+    const newCode = await repository.validateInterviewerCode({
+      code: reset.ok ? reset.code : "",
+      studyCode: state.study.code
+    });
+
+    expect(reset.ok).toBe(true);
+    expect(reset.ok ? reset.code : "").toMatch(/^[ABCDEFGHJKMNPQRSTUVWXYZ2346789]{8}$/);
+    expect(previousCode.ok).toBe(false);
+    expect(newCode.ok).toBe(true);
+  });
+
+  it("deletes an unused interviewer code and disables one with session history", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const unused = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-1111",
+      label: "Encuestador sin uso",
+      studyId: state.study.id
+    });
+    const used = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-2222",
+      label: "Encuestador con uso",
+      studyId: state.study.id
+    });
+
+    await repository.claimFolioForInterviewerCode({
+      ctlInterviewerCodeId: used.ok ? used.interviewerCode.id : "",
+      folio: "NAV-001"
+    });
+    const deleted = await repository.deleteInterviewerCode({
+      actor: admin,
+      ctlInterviewerCodeId: unused.ok ? unused.interviewerCode.id : "",
+      studyId: state.study.id
+    });
+    const disabled = await repository.deleteInterviewerCode({
+      actor: admin,
+      ctlInterviewerCodeId: used.ok ? used.interviewerCode.id : "",
+      studyId: state.study.id
+    });
+    const stillListed = await repository.listInterviewerCodes({ actor: admin, studyId: state.study.id });
+    const usedCodeAccess = await repository.validateInterviewerCode({
+      code: "ika-2222",
+      studyCode: state.study.code
+    });
+
+    expect(deleted).toEqual({ mode: "deleted", ok: true });
+    expect(disabled).toEqual({ mode: "disabled", ok: true });
+    expect(stillListed.ok ? stillListed.codes.map((code) => code.label) : []).toEqual(["Encuestador con uso"]);
+    expect(stillListed.ok ? stillListed.codes[0]?.sessionCount : 0).toBe(1);
+    expect(stillListed.ok ? stillListed.codes[0]?.status : "").toBe("DISABLED");
+    expect(usedCodeAccess.ok).toBe(false);
+  });
+
   it("resolves public CTL interviewer actor and previews an available folio", async () => {
     const state = createCtlState();
     const repository = createCtlRepository(state.prisma as never);
@@ -463,7 +522,7 @@ describe("ctl module", () => {
     state.confirmations.push({
       ...state.confirmations[0]!,
       folio: "NAV-004",
-      referenceCodes: [{ code: "GGGG", slot: 1 }],
+      referenceCodes: [],
       screeningAttempt: { id: "attempt-4", nseClass: "RANGO-1", nseScore: 100, status: "PASSED" },
       studyParticipant: {
         ...state.confirmations[0]!.studyParticipant,
@@ -484,6 +543,12 @@ describe("ctl module", () => {
         folio: "NAV-001",
         id: "participant-1",
         name: "ANA PEREZ"
+      },
+      {
+        ctlStatus: null,
+        folio: "NAV-004",
+        id: "participant-4",
+        name: "DIANA CRUZ"
       }
     ]);
   });
@@ -609,9 +674,6 @@ describe("ctl module", () => {
     const repository = createCtlRepository(state.prisma as never);
     const started = await repository.startSession({
       actor: interviewer,
-      code1: "A7K4",
-      code2: "M3P9",
-      code3: "T8R2",
       folio: "NAV-001",
       studyId: state.study.id
     });
@@ -901,6 +963,15 @@ function createCtlState() {
     };
   }
 
+  function toInterviewerCodeRecord(code: (typeof ctlInterviewerCodes)[number]) {
+    return {
+      ...code,
+      _count: {
+        ctlSessions: sessions.filter((session) => session.ctlInterviewerCodeId === code.id).length
+      }
+    };
+  }
+
   const tx = {
     ctlAnswer: {
       async upsert(args: {
@@ -940,32 +1011,39 @@ function createCtlState() {
           updatedAt: new Date()
         };
         ctlInterviewerCodes.push(record);
-        return record;
+        return toInterviewerCodeRecord(record);
+      },
+      async delete(args: { where: { id: string } }) {
+        const index = ctlInterviewerCodes.findIndex((code) => code.id === args.where.id);
+        if (index === -1) throw new Error("interviewer code not found");
+        const [deleted] = ctlInterviewerCodes.splice(index, 1);
+        return deleted;
       },
       async findFirst(args: { where: { codeHash?: string; id?: string; study?: { code: string }; studyId?: string } }) {
-        return (
-          ctlInterviewerCodes.find(
+        const found = ctlInterviewerCodes.find(
             (code) =>
               (args.where.codeHash === undefined || code.codeHash === args.where.codeHash) &&
               (args.where.id === undefined || code.id === args.where.id) &&
               (args.where.studyId === undefined || code.studyId === args.where.studyId) &&
               (args.where.study === undefined || (code.studyId === study.id && args.where.study.code === study.code))
-          ) ?? null
-        );
+          ) ?? null;
+        return found ? toInterviewerCodeRecord(found) : null;
       },
       async findMany(args: { where: { studyId: string } }) {
         return ctlInterviewerCodes
           .filter((code) => code.studyId === args.where.studyId)
-          .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
+          .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+          .map(toInterviewerCodeRecord);
       },
       async findUnique(args: { where: { id: string } }) {
-        return ctlInterviewerCodes.find((code) => code.id === args.where.id) ?? null;
+        const found = ctlInterviewerCodes.find((code) => code.id === args.where.id) ?? null;
+        return found ? toInterviewerCodeRecord(found) : null;
       },
-      async update(args: { data: Partial<{ lastUsedAt: Date; status: "ACTIVE" | "DISABLED" | "EXPIRED" }>; where: { id: string } }) {
+      async update(args: { data: Partial<{ codeHash: string; lastUsedAt: Date | null; status: "ACTIVE" | "DISABLED" | "EXPIRED" }>; where: { id: string } }) {
         const code = ctlInterviewerCodes.find((candidate) => candidate.id === args.where.id);
         if (!code) throw new Error("interviewer code not found");
         Object.assign(code, args.data, { updatedAt: new Date() });
-        return code;
+        return toInterviewerCodeRecord(code);
       }
     },
     ctlSession: {

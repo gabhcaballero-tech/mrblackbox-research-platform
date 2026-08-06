@@ -4,7 +4,6 @@ import { getCtlDefinition } from "./definition";
 import {
   canAccessCtl,
   ctlStatusLabel,
-  doReferenceCodesMatch,
   generateCtlInterviewerCode,
   hashCtlInterviewerCode,
   isPublicCtlInterviewerActor,
@@ -18,6 +17,7 @@ import {
 
 type Delegate = {
   create?: (args: unknown) => Promise<unknown>;
+  delete?: (args: unknown) => Promise<unknown>;
   findFirst?: (args: unknown) => Promise<unknown>;
   findMany?: (args: unknown) => Promise<unknown[]>;
   findUnique?: (args: unknown) => Promise<unknown>;
@@ -76,6 +76,7 @@ export type CtlInterviewerCodeView = {
   id: string;
   label: string;
   lastUsedAt: Date | null;
+  sessionCount: number;
   status: CtlInterviewerCodeStatus;
   studyId: string;
 };
@@ -148,6 +149,11 @@ export type CtlRepository = {
     label: string;
     studyId: string;
   }) => Promise<{ code: string; interviewerCode: CtlInterviewerCodeView; ok: true } | { message: string; ok: false }>;
+  deleteInterviewerCode: (input: {
+    actor: CtlActor;
+    ctlInterviewerCodeId: string;
+    studyId: string;
+  }) => Promise<{ mode: "deleted" | "disabled"; ok: true } | { message: string; ok: false }>;
   listInterviewerCodes: (input: {
     actor: CtlActor;
     studyId: string;
@@ -172,6 +178,11 @@ export type CtlRepository = {
     folio: string;
     now?: Date;
   }) => Promise<{ ok: true; participant: CtlParticipantSummary } | { message: string; ok: false }>;
+  resetInterviewerCode: (input: {
+    actor: CtlActor;
+    ctlInterviewerCodeId: string;
+    studyId: string;
+  }) => Promise<{ code: string; interviewerCode: CtlInterviewerCodeView; ok: true } | { message: string; ok: false }>;
   saveAnswers: (input: {
     actor: CtlActor;
     answers: CtlAnswerDraft[];
@@ -180,9 +191,6 @@ export type CtlRepository = {
   }) => Promise<{ message: string; ok: false } | { ok: true; sessionId: string }>;
   startSession: (input: {
     actor: CtlActor;
-    code1: string;
-    code2: string;
-    code3: string;
     folio: string;
     studyId: string;
   }) => Promise<{ message: string; ok: false } | { ok: true; sessionId: string }>;
@@ -264,7 +272,7 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
         }
 
         try {
-          const created = (await tx.ctlSession.create?.({
+        const created = (await tx.ctlSession.create?.({
             data: {
               claimedAt: now,
               ctlInterviewerCodeId: interviewerCode.id,
@@ -303,7 +311,7 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
 
       const prisma = await getPrisma();
       const code = input.code ? normalizeCtlCode(input.code) : generateCtlInterviewerCode();
-      const created = (await prisma.ctlInterviewerCode.create?.({
+      const created = await prisma.ctlInterviewerCode.create?.({
         data: {
           codeHash: hashCtlInterviewerCode(code),
           createdByUserId: input.actor.id,
@@ -313,13 +321,47 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
           studyId: input.studyId
         },
         select: ctlInterviewerCodeSelect
-      })) as CtlInterviewerCodeView;
+      });
 
       return {
         code,
-        interviewerCode: created,
+        interviewerCode: toInterviewerCodeView(created)!,
         ok: true
       };
+    },
+
+    async deleteInterviewerCode(input) {
+      if (!isInternalAdmin(input.actor)) {
+        return { message: "No tienes permiso para eliminar codigos CTL.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+      const existing = toInterviewerCodeView(await prisma.ctlInterviewerCode.findFirst?.({
+        select: ctlInterviewerCodeSelect,
+        where: {
+          id: input.ctlInterviewerCodeId,
+          studyId: input.studyId
+        }
+      }));
+
+      if (!existing) {
+        return { message: "No encontramos el codigo CTL.", ok: false };
+      }
+
+      if (existing.sessionCount > 0) {
+        await prisma.ctlInterviewerCode.update?.({
+          data: { status: "DISABLED" },
+          where: { id: input.ctlInterviewerCodeId }
+        });
+
+        return { mode: "disabled", ok: true };
+      }
+
+      await prisma.ctlInterviewerCode.delete?.({
+        where: { id: input.ctlInterviewerCodeId }
+      });
+
+      return { mode: "deleted", ok: true };
     },
 
     async listInterviewerCodes(input) {
@@ -328,14 +370,14 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
       }
 
       const prisma = await getPrisma();
-      const codes = (await prisma.ctlInterviewerCode.findMany?.({
+      const codes = await prisma.ctlInterviewerCode.findMany?.({
         orderBy: { createdAt: "desc" },
         select: ctlInterviewerCodeSelect,
         where: { studyId: input.studyId }
-      })) as CtlInterviewerCodeView[];
+      });
 
       return {
-        codes,
+        codes: (codes ?? []).map(toInterviewerCodeView).filter((code): code is CtlInterviewerCodeView => Boolean(code)),
         ok: true
       };
     },
@@ -361,13 +403,13 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
     async getPublicInterviewerActor(input) {
       const prisma = await getPrisma();
       const now = input.now ?? new Date();
-      const interviewerCode = (await prisma.ctlInterviewerCode.findFirst?.({
+      const interviewerCode = toInterviewerCodeView(await prisma.ctlInterviewerCode.findFirst?.({
         select: ctlInterviewerCodeSelect,
         where: {
           id: input.ctlInterviewerCodeId,
           study: { code: input.studyCode }
         }
-      })) as CtlInterviewerCodeView | null;
+      }));
 
       if (!interviewerCode || !isUsableInterviewerCode(interviewerCode, now)) {
         return null;
@@ -386,10 +428,10 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
     async listAvailableParticipantsForInterviewerCode(input) {
       const prisma = await getPrisma();
       const now = input.now ?? new Date();
-      const interviewerCode = (await prisma.ctlInterviewerCode.findUnique?.({
+      const interviewerCode = toInterviewerCodeView(await prisma.ctlInterviewerCode.findUnique?.({
         select: ctlInterviewerCodeSelect,
         where: { id: input.ctlInterviewerCodeId }
-      })) as CtlInterviewerCodeView | null;
+      }));
 
       if (!interviewerCode || !isUsableInterviewerCode(interviewerCode, now)) {
         return { message: "El codigo de encuestador no es valido.", ok: false };
@@ -484,10 +526,10 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
     async previewFolioForInterviewerCode(input) {
       const prisma = await getPrisma();
       const now = input.now ?? new Date();
-      const interviewerCode = (await prisma.ctlInterviewerCode.findUnique?.({
+      const interviewerCode = toInterviewerCodeView(await prisma.ctlInterviewerCode.findUnique?.({
         select: ctlInterviewerCodeSelect,
         where: { id: input.ctlInterviewerCodeId }
-      })) as CtlInterviewerCodeView | null;
+      }));
 
       if (!interviewerCode || !isUsableInterviewerCode(interviewerCode, now)) {
         return { message: "El codigo de encuestador no es valido.", ok: false };
@@ -539,6 +581,42 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
       return {
         ok: true,
         participant: toParticipantSummary(confirmation, existing)
+      };
+    },
+
+    async resetInterviewerCode(input) {
+      if (!isInternalAdmin(input.actor)) {
+        return { message: "No tienes permiso para regenerar codigos CTL.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+      const existing = await prisma.ctlInterviewerCode.findFirst?.({
+        select: { id: true },
+        where: {
+          id: input.ctlInterviewerCodeId,
+          studyId: input.studyId
+        }
+      }) as { id: string } | null;
+
+      if (!existing) {
+        return { message: "No encontramos el codigo CTL.", ok: false };
+      }
+
+      const code = generateCtlInterviewerCode();
+      const updated = await prisma.ctlInterviewerCode.update?.({
+        data: {
+          codeHash: hashCtlInterviewerCode(code),
+          lastUsedAt: null,
+          status: "ACTIVE"
+        },
+        select: ctlInterviewerCodeSelect,
+        where: { id: input.ctlInterviewerCodeId }
+      });
+
+      return {
+        code,
+        interviewerCode: toInterviewerCodeView(updated)!,
+        ok: true
       };
     },
 
@@ -643,10 +721,6 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
         return { message: "No encontramos un participante con ese folio.", ok: false };
       }
 
-      if (!doReferenceCodesMatch(confirmation.referenceCodes, [input.code1, input.code2, input.code3])) {
-        return { message: "Los codigos no corresponden al participante.", ok: false };
-      }
-
       const existing = (await prisma.ctlSession.findFirst?.({
         orderBy: { createdAt: "desc" },
         select: { interviewerId: true, id: true, status: true },
@@ -686,13 +760,13 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
     async validateInterviewerCode(input) {
       const prisma = await getPrisma();
       const now = input.now ?? new Date();
-      const interviewerCode = (await prisma.ctlInterviewerCode.findFirst?.({
+      const interviewerCode = toInterviewerCodeView(await prisma.ctlInterviewerCode.findFirst?.({
         select: ctlInterviewerCodeSelect,
         where: {
           codeHash: hashCtlInterviewerCode(input.code),
           study: { code: input.studyCode }
         }
-      })) as CtlInterviewerCodeView | null;
+      }));
 
       if (!interviewerCode || !isUsableInterviewerCode(interviewerCode, now)) {
         return { message: "El codigo de encuestador no es valido.", ok: false };
@@ -733,6 +807,9 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
 }
 
 const ctlInterviewerCodeSelect = {
+  _count: {
+    select: { ctlSessions: true }
+  },
   createdAt: true,
   expiresAt: true,
   id: true,
@@ -861,12 +938,9 @@ function isCtlAvailableConfirmation(confirmation: ConfirmationRecord): boolean {
   const hasCompleteRotation =
     Boolean(arms.find((arm) => arm.applicationOrder === 1)?.studyProduct.internalCode) &&
     Boolean(arms.find((arm) => arm.applicationOrder === 2)?.studyProduct.internalCode);
-  const hasThreeCodes = new Set(confirmation.referenceCodes.map((code) => code.slot)).size >= 3;
-
   return (
     confirmation.screeningAttempt.status === "PASSED" &&
     confirmation.studyParticipant.screeningStatus === "PASSED" &&
-    hasThreeCodes &&
     hasCompleteRotation
   );
 }
@@ -944,6 +1018,34 @@ function getSessionInterviewerName(session: {
   interviewer: { name: string } | null;
 }): string {
   return session.interviewer?.name ?? session.ctlInterviewerCode?.label ?? "Encuestador CTL";
+}
+
+function toInterviewerCodeView(value: unknown): CtlInterviewerCodeView | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as {
+    _count?: { ctlSessions?: number };
+    createdAt: Date;
+    expiresAt: Date | null;
+    id: string;
+    label: string;
+    lastUsedAt: Date | null;
+    status: CtlInterviewerCodeStatus;
+    studyId: string;
+  };
+
+  return {
+    createdAt: record.createdAt,
+    expiresAt: record.expiresAt,
+    id: record.id,
+    label: record.label,
+    lastUsedAt: record.lastUsedAt,
+    sessionCount: record._count?.ctlSessions ?? 0,
+    status: record.status,
+    studyId: record.studyId
+  };
 }
 
 export { ctlStatusLabel };

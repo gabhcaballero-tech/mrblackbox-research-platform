@@ -8,6 +8,7 @@ import { ctlFormDataToAnswerInput, parseCtlAnswers } from "./service";
 
 export type CreateCtlInterviewerCodeActionState = {
   code?: string;
+  label?: string;
   message: string;
   status: "error" | "idle" | "success";
 };
@@ -35,9 +36,59 @@ export async function createCtlInterviewerCodeAction(
 
   return {
     code: result.code,
+    label: result.interviewerCode.label,
     message: "Codigo de encuestador creado. Copialo ahora; no se podra ver despues.",
     status: "success"
   };
+}
+
+export async function resetCtlInterviewerCodeAction(
+  studyId: string,
+  _previousState: CreateCtlInterviewerCodeActionState,
+  formData: FormData
+): Promise<CreateCtlInterviewerCodeActionState> {
+  const actor = await requireCapability("field:access");
+  const result = await createCtlRepository().resetInterviewerCode({
+    actor,
+    ctlInterviewerCodeId: String(formData.get("ctlInterviewerCodeId") ?? ""),
+    studyId
+  });
+
+  if (!result.ok) {
+    return {
+      message: result.message,
+      status: "error"
+    };
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/ctl`);
+
+  return {
+    code: result.code,
+    label: result.interviewerCode.label,
+    message: "Codigo regenerado. Copialo ahora; no se podra ver despues.",
+    status: "success"
+  };
+}
+
+export async function deleteCtlInterviewerCodeAction(studyId: string, ctlInterviewerCodeId: string) {
+  const actor = await requireCapability("field:access");
+  const result = await createCtlRepository().deleteInterviewerCode({
+    actor,
+    ctlInterviewerCodeId,
+    studyId
+  });
+
+  if (!result.ok) {
+    redirect(`/admin/studies/${studyId}/ctl?ctlError=${encodeURIComponent(result.message)}`);
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/ctl`);
+  redirect(`/admin/studies/${studyId}/ctl?ctlMessage=${encodeURIComponent(
+    result.mode === "deleted"
+      ? "Encuestador eliminado correctamente."
+      : "Encuestador desactivado porque ya tiene sesiones asociadas."
+  )}`);
 }
 
 export async function updateCtlInterviewerCodeStatusAction(
@@ -67,9 +118,6 @@ export async function startCtlSessionAction(studyId: string, formData: FormData)
   const actor = await requireCapability("field:access");
   const result = await createCtlRepository().startSession({
     actor,
-    code1: String(formData.get("code1") ?? ""),
-    code2: String(formData.get("code2") ?? ""),
-    code3: String(formData.get("code3") ?? ""),
     folio: String(formData.get("folio") ?? ""),
     studyId
   });

@@ -4,6 +4,8 @@ import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   createCtlInterviewerCodeAction,
+  deleteCtlInterviewerCodeAction,
+  resetCtlInterviewerCodeAction,
   updateCtlInterviewerCodeStatusAction,
   type CreateCtlInterviewerCodeActionState
 } from "@/modules/ctl/actions";
@@ -25,12 +27,22 @@ export function CtlInterviewerCodesSection({ codes, studyId }: CtlInterviewerCod
     createCtlInterviewerCodeAction.bind(null, studyId),
     initialState
   );
+  const [resetState, resetAction, resetPending] = useActionState(
+    resetCtlInterviewerCodeAction.bind(null, studyId),
+    initialState
+  );
 
   useEffect(() => {
     if (state.status === "success") {
       router.refresh();
     }
   }, [router, state.status]);
+
+  useEffect(() => {
+    if (resetState.status === "success") {
+      router.refresh();
+    }
+  }, [router, resetState.status]);
 
   return (
     <section className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
@@ -70,12 +82,8 @@ export function CtlInterviewerCodesSection({ codes, studyId }: CtlInterviewerCod
               {state.message}
             </p>
           ) : null}
-          {state.status === "success" && state.code ? (
-            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Codigo visible una sola vez</p>
-              <p className="mt-1 font-mono text-xl font-bold text-amber-950">{state.code}</p>
-            </div>
-          ) : null}
+          <OneTimeCodeNotice state={state} />
+          <OneTimeCodeNotice state={resetState} />
         </form>
 
         <div className="overflow-x-auto rounded-md border border-zinc-200">
@@ -87,6 +95,7 @@ export function CtlInterviewerCodesSection({ codes, studyId }: CtlInterviewerCod
                 <th className="px-4 py-3">Creacion</th>
                 <th className="px-4 py-3">Expiracion</th>
                 <th className="px-4 py-3">Ultimo uso</th>
+                <th className="px-4 py-3">Sesiones</th>
                 <th className="px-4 py-3">Accion</th>
               </tr>
             </thead>
@@ -98,7 +107,9 @@ export function CtlInterviewerCodesSection({ codes, studyId }: CtlInterviewerCod
                   <td className="px-4 py-3 text-zinc-700">{formatDateTime(code.createdAt)}</td>
                   <td className="px-4 py-3 text-zinc-700">{formatDateTime(code.expiresAt)}</td>
                   <td className="px-4 py-3 text-zinc-700">{formatDateTime(code.lastUsedAt)}</td>
+                  <td className="px-4 py-3 text-zinc-700">{code.sessionCount}</td>
                   <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-3">
                     {code.status === "ACTIVE" ? (
                       <form action={updateCtlInterviewerCodeStatusAction.bind(null, studyId, code.id, "DISABLED")}>
                         <button className="font-semibold text-rose-700 hover:text-rose-800" type="submit">
@@ -112,11 +123,27 @@ export function CtlInterviewerCodesSection({ codes, studyId }: CtlInterviewerCod
                         </button>
                       </form>
                     )}
+                      <form action={resetAction}>
+                        <input name="ctlInterviewerCodeId" type="hidden" value={code.id} />
+                        <button
+                          className="font-semibold text-amber-700 hover:text-amber-800 disabled:text-zinc-400"
+                          disabled={resetPending}
+                          type="submit"
+                        >
+                          Regenerar codigo
+                        </button>
+                      </form>
+                      <form action={deleteCtlInterviewerCodeAction.bind(null, studyId, code.id)}>
+                        <button className="font-semibold text-zinc-700 hover:text-zinc-950" type="submit">
+                          Eliminar encuestador
+                        </button>
+                      </form>
+                    </div>
                   </td>
                 </tr>
               )) : (
                 <tr>
-                  <td className="px-4 py-6 text-center text-zinc-500" colSpan={6}>
+                  <td className="px-4 py-6 text-center text-zinc-500" colSpan={7}>
                     Aun no hay codigos de encuestadores IKA para este estudio.
                   </td>
                 </tr>
@@ -126,6 +153,21 @@ export function CtlInterviewerCodesSection({ codes, studyId }: CtlInterviewerCod
         </div>
       </div>
     </section>
+  );
+}
+
+function OneTimeCodeNotice({ state }: { state: CreateCtlInterviewerCodeActionState }) {
+  if (state.status !== "success" || !state.code) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+        Codigo visible una sola vez{state.label ? ` - ${state.label}` : ""}
+      </p>
+      <p className="mt-1 font-mono text-xl font-bold text-amber-950">{state.code}</p>
+    </div>
   );
 }
 

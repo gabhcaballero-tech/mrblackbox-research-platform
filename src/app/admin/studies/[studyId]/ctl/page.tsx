@@ -36,9 +36,9 @@ export default async function CtlPage({ params, searchParams }: CtlPageProps) {
     <AppShell>
       <PageHeader
         actions={<StatusBadge status="ready">Presencial</StatusBadge>}
-        description="Valida folio y codigos enviados por WhatsApp para capturar el CTL con encuestador."
+        description="Toma folios con rotacion lista para capturar el CTL con encuestador."
         eyebrow="CTL"
-        title={`Cuestionario presencial · ${result.study.name}`}
+        title={`Cuestionario presencial - ${result.study.name}`}
       />
 
       <div className="mb-6 flex flex-wrap gap-3 text-sm font-semibold">
@@ -67,30 +67,18 @@ export default async function CtlPage({ params, searchParams }: CtlPageProps) {
         ) : null}
 
         <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-zinc-950">Validar participante</h2>
+          <h2 className="text-lg font-semibold text-zinc-950">Iniciar CTL por folio</h2>
           <p className="mt-1 text-sm leading-6 text-zinc-600">
-            Captura el folio y los tres codigos tal como fueron enviados por WhatsApp. Si no coinciden, no se puede iniciar el CTL.
+            Captura el folio del participante. Los codigos fisicos y triangulares se registran dentro del cuestionario CTL.
           </p>
-          <form action={startCtlSessionAction.bind(null, studyId)} className="mt-5 grid gap-4 md:grid-cols-4">
+          <form action={startCtlSessionAction.bind(null, studyId)} className="mt-5 grid gap-4 md:grid-cols-[minmax(0,240px)_auto]">
             <label className={labelClass}>
               Folio
               <input className={inputClass} name="folio" placeholder="NAV-001" required />
             </label>
-            <label className={labelClass}>
-              Codigo 1
-              <input className={inputClass} name="code1" required />
-            </label>
-            <label className={labelClass}>
-              Codigo 2
-              <input className={inputClass} name="code2" required />
-            </label>
-            <label className={labelClass}>
-              Codigo 3
-              <input className={inputClass} name="code3" required />
-            </label>
-            <div className="md:col-span-4">
+            <div className="flex items-end">
               <button className={primaryButtonClass} type="submit">
-                Validar participante
+                Iniciar CTL
               </button>
             </div>
           </form>
@@ -135,7 +123,7 @@ export default async function CtlPage({ params, searchParams }: CtlPageProps) {
                           {participant.ctlStatus === "COMPLETED" ? "Ver CTL" : "Continuar CTL"}
                         </Link>
                       ) : (
-                        <span className="text-xs text-zinc-500">Validar codigos para iniciar</span>
+                        <span className="text-xs text-zinc-500">Iniciar con folio</span>
                       )}
                     </td>
                   </tr>
