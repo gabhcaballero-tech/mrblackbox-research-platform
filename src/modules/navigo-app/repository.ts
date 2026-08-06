@@ -622,6 +622,7 @@ const participantSelect = {
     orderBy: { createdAt: "desc" },
     select: {
       completedAt: true,
+      ctlInterviewerCode: { select: { label: true } },
       id: true,
       interviewer: { select: { name: true } },
       status: true
@@ -807,8 +808,9 @@ type ParticipantRecord = {
   applicationStartedAt: Date | null;
   ctlSessions?: Array<{
     completedAt: Date | null;
+    ctlInterviewerCode: { label: string } | null;
     id: string;
-    interviewer: { name: string };
+    interviewer: { name: string } | null;
     status: "CANCELLED" | "COMPLETED" | "IN_PROGRESS" | "PENDING";
   }>;
   id: string;
@@ -3509,7 +3511,7 @@ function buildParticipantCtlSummary(participant: ParticipantRecord): NavigoParti
   return {
     completed: Boolean(completed),
     completedAt: completed?.completedAt ?? null,
-    interviewerName: visible?.interviewer.name ?? null,
+    interviewerName: visible?.interviewer?.name ?? visible?.ctlInterviewerCode?.label ?? null,
     sessionId: visible?.id ?? null,
     status: visible?.status ?? null
   };

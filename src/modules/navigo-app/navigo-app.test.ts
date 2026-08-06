@@ -1048,6 +1048,64 @@ describe("navigo app MVP rules", () => {
     expect(state.activities).toHaveLength(0);
   });
 
+  it("loads the admin dashboard for CTL sessions claimed by public IKA interviewer codes", async () => {
+    const previousSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const previousSupabaseSecret = process.env.SUPABASE_SECRET_KEY;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SECRET_KEY = "sb_secret_test_key";
+
+    try {
+      const state = createNavigoParticipantImportState();
+      const repository = createNavigoAppRepository(state.prisma as never);
+      await repository.applyParticipantImport({
+        actorUserId: "admin-1",
+        rows: [
+          {
+            celular: "+525512345678",
+            correo: null,
+            folio: "NAV-010",
+            nombre: "PRUEBA UNO",
+            observaciones: "PRUEBA",
+            primeraFragancia: "AAA",
+            reclutador: "GABY",
+            segundaFragancia: "BBB"
+          }
+        ],
+        studyId: state.study.id
+      });
+      state.ctlSessions.push({
+        completedAt: new Date("2026-06-26T15:00:00.000Z"),
+        createdAt: new Date("2026-06-26T15:00:00.000Z"),
+        ctlInterviewerCode: { label: "Encuestador IKA 3" },
+        id: "ctl-session-ika-1",
+        interviewer: null,
+        status: "COMPLETED",
+        studyParticipantId: state.studyParticipants[0]!.id
+      });
+
+      const dashboard = await repository.getAdminDashboard(state.study.id);
+
+      expect(dashboard?.participants[0]?.ctl).toMatchObject({
+        completed: true,
+        interviewerName: "Encuestador IKA 3",
+        sessionId: "ctl-session-ika-1",
+        status: "COMPLETED"
+      });
+    } finally {
+      if (previousSupabaseUrl === undefined) {
+        delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      } else {
+        process.env.NEXT_PUBLIC_SUPABASE_URL = previousSupabaseUrl;
+      }
+
+      if (previousSupabaseSecret === undefined) {
+        delete process.env.SUPABASE_SECRET_KEY;
+      } else {
+        process.env.SUPABASE_SECRET_KEY = previousSupabaseSecret;
+      }
+    }
+  });
+
   it("deletes a direct App Navigo participant and frees its folio record", async () => {
     const state = createNavigoParticipantImportState();
     const repository = createNavigoAppRepository(state.prisma as never);
@@ -1082,6 +1140,7 @@ describe("navigo app MVP rules", () => {
     state.ctlSessions.push({
       completedAt: new Date("2026-06-26T15:00:00.000Z"),
       createdAt: new Date("2026-06-26T15:00:00.000Z"),
+      ctlInterviewerCode: null,
       id: "ctl-session-delete-1",
       interviewer: { name: "Encuestador Uno" },
       status: "COMPLETED",
@@ -1204,6 +1263,7 @@ describe("navigo app MVP rules", () => {
     state.ctlSessions.push({
       completedAt: new Date("2026-06-26T15:00:00.000Z"),
       createdAt: new Date("2026-06-26T15:00:00.000Z"),
+      ctlInterviewerCode: null,
       id: "ctl-session-export-1",
       interviewer: { name: "Encuestador Uno" },
       status: "COMPLETED",
@@ -1749,6 +1809,7 @@ describe("navigo app MVP rules", () => {
     state.ctlSessions.push({
       completedAt: new Date("2026-06-26T15:00:00.000Z"),
       createdAt: new Date("2026-06-26T15:00:00.000Z"),
+      ctlInterviewerCode: null,
       id: "ctl-session-1",
       interviewer: { name: "Encuestador Uno" },
       status: "COMPLETED",
@@ -1799,6 +1860,7 @@ describe("navigo app MVP rules", () => {
       {
         completedAt: new Date("2026-06-26T15:00:00.000Z"),
         createdAt: new Date("2026-06-26T15:00:00.000Z"),
+        ctlInterviewerCode: null,
         id: "ctl-session-1",
         interviewer: { name: "Encuestador Uno" },
         status: "COMPLETED",
@@ -1807,6 +1869,7 @@ describe("navigo app MVP rules", () => {
       {
         completedAt: new Date("2026-06-26T15:10:00.000Z"),
         createdAt: new Date("2026-06-26T15:10:00.000Z"),
+        ctlInterviewerCode: null,
         id: "ctl-session-2",
         interviewer: { name: "Encuestador Uno" },
         status: "COMPLETED",
@@ -2424,6 +2487,7 @@ function createNavigoParticipantActivityState() {
     ctlSessions: [
       {
         completedAt: new Date("2026-06-25T14:30:00.000Z"),
+        ctlInterviewerCode: null,
         id: "ctl-session-1",
         interviewer: { name: "Encuestador Uno" },
         status: "COMPLETED" as const
@@ -3192,8 +3256,9 @@ function createNavigoParticipantImportState(
   const ctlSessions: Array<{
     completedAt: Date | null;
     createdAt: Date;
+    ctlInterviewerCode: { label: string } | null;
     id: string;
-    interviewer: { name: string };
+    interviewer: { name: string } | null;
     status: "CANCELLED" | "COMPLETED" | "IN_PROGRESS" | "PENDING";
     studyParticipantId: string;
   }> = [];
@@ -3302,6 +3367,7 @@ function createNavigoParticipantImportState(
         .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
         .map((session) => ({
           completedAt: session.completedAt,
+          ctlInterviewerCode: session.ctlInterviewerCode,
           id: session.id,
           interviewer: session.interviewer,
           status: session.status
