@@ -26,8 +26,10 @@ type CtlMobileCaptureProps = {
   completedAtLabel?: string | null;
   definition: CtlDefinition;
   participant: {
+    firstSampleKey?: string | null;
     folio: string;
     name: string;
+    secondSampleKey?: string | null;
   };
   readOnly: boolean;
   sessionId: string;
@@ -67,7 +69,7 @@ export function CtlMobileCapture({
   );
   const [localAnswers, setLocalAnswers] = useState<Record<string, unknown>>(initialAnswers);
   const questions = useMemo(() => flattenCtlQuestions(definition, localAnswers), [definition, localAnswers]);
-  const [currentIndex, setCurrentIndex] = useState(() => getInitialCtlQuestionIndex(definition, answers));
+  const [currentIndex, setCurrentIndex] = useState(() => getInitialCtlQuestionIndex(definition, initialAnswers));
   const [isReviewing, setIsReviewing] = useState(readOnly);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -292,7 +294,7 @@ function QuestionStep({
   answer: unknown;
   flatQuestion: FlatQuestion;
   onAnswer: (questionCode: string, answer: unknown) => void;
-  participant: { folio: string; name: string };
+  participant: { firstSampleKey?: string | null; folio: string; name: string; secondSampleKey?: string | null };
   readOnly: boolean;
   sessionId: string;
 }) {
@@ -309,6 +311,9 @@ function QuestionStep({
         {question.instructions?.map((instruction, index) => (
           <InstructionBox instruction={instruction} key={`${question.code}-${instruction.type}-${index}`} />
         ))}
+        {question.references?.length ? (
+          <ReferenceList answers={answers} participant={participant} references={question.references} />
+        ) : null}
         <h3 className="mt-2 text-lg font-bold leading-7 text-zinc-950">
           {displayLabel}
           {question.required ? <span className="text-rose-700"> *</span> : null}
@@ -535,6 +540,27 @@ function InstructionBox({
   );
 }
 
+function ReferenceList({
+  answers,
+  participant,
+  references
+}: {
+  answers: Record<string, unknown>;
+  participant: { firstSampleKey?: string | null; folio: string; name: string; secondSampleKey?: string | null };
+  references: Array<{ label: string; source: string }>;
+}) {
+  return (
+    <div className="mt-3 space-y-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-950">
+      {references.map((reference) => (
+        <p key={`${reference.source}-${reference.label}`}>
+          <span className="font-bold">{reference.label}:</span>{" "}
+          {formatReferenceValue(resolveReferenceValue(reference.source, answers, participant))}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 function ValidationModal({ message, onClose }: { message: string; onClose: () => void }) {
   return (
     <div
@@ -709,13 +735,15 @@ function buildAutomaticCtlAnswers({
 function resolveQuestionLabel(
   question: CtlQuestionDefinition,
   answers: Record<string, unknown>,
-  participant: { folio: string; name: string }
+  participant: { firstSampleKey?: string | null; folio: string; name: string; secondSampleKey?: string | null }
 ): string {
   const template = question.displayTemplate ?? question.label;
   const values: Record<string, unknown> = {
     ...answers,
+    FIRST_SAMPLE: participant.firstSampleKey,
     FOLIO: participant.folio,
-    PARTICIPANT_NAME: participant.name
+    PARTICIPANT_NAME: participant.name,
+    SECOND_SAMPLE: participant.secondSampleKey
   };
 
   return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_match, token: string) => {
@@ -727,6 +755,40 @@ function resolveQuestionLabel(
     }
     return String(value ?? "pendiente");
   });
+}
+
+function resolveReferenceValue(
+  source: string,
+  answers: Record<string, unknown>,
+  participant: { firstSampleKey?: string | null; folio: string; name: string; secondSampleKey?: string | null }
+): unknown {
+  if (source === "FIRST_SAMPLE") {
+    return participant.firstSampleKey;
+  }
+
+  if (source === "SECOND_SAMPLE") {
+    return participant.secondSampleKey;
+  }
+
+  if (source === "PARTICIPANT_NAME") {
+    return participant.name;
+  }
+
+  if (source === "FOLIO") {
+    return participant.folio;
+  }
+
+  return answers[source];
+}
+
+function formatReferenceValue(value: unknown): string {
+  if (isRecord(value)) {
+    return Object.entries(value)
+      .map(([key, item]) => `${key}: ${String(item ?? "")}`)
+      .join(", ");
+  }
+
+  return String(value ?? "pendiente");
 }
 
 function stableShuffle<T>(items: T[], seed: string): T[] {

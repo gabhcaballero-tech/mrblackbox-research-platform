@@ -13,11 +13,17 @@ export type CtlInstructionDefinition = {
   type: "BEFORE_QUESTION" | "INTERVIEWER_NOTE" | "SECTION";
 };
 
+export type CtlQuestionReference = {
+  label: string;
+  source: string;
+};
+
 export type CtlBaseQuestionDefinition = {
   code: string;
   displayTemplate?: string;
   instructions?: CtlInstructionDefinition[];
   label: string;
+  references?: CtlQuestionReference[];
   required: boolean;
   type: CtlQuestionType;
 };
@@ -294,6 +300,9 @@ const demographicQuestions: CtlQuestionDefinition[] = [
 
 function makeFragranceQuestions(suffix: "A" | "B", labelSuffix: string): CtlQuestionDefinition[] {
   const letter = suffix.toLowerCase();
+  const sampleReference: CtlQuestionReference = suffix === "A"
+    ? { label: "Fragancia aplicada anteriormente", source: "FIRST_SAMPLE" }
+    : { label: "Segunda fragancia aplicada", source: "SECOND_SAMPLE" };
 
   return [
     {
@@ -302,6 +311,7 @@ function makeFragranceQuestions(suffix: "A" | "B", labelSuffix: string): CtlQues
       labels: likingScaleLabels,
       max: 7,
       min: 1,
+      references: [sampleReference],
       required: true,
       type: "SCALE"
     },
@@ -400,6 +410,18 @@ export const CTL_DEFINITION: CtlDefinition = {
       ],
       questions: sampleCodeQuestions,
       title: "CODIGOS FISICOS DE MUESTRAS"
+    },
+    {
+      id: "DATOS_GENERALES",
+      instructions: [
+        {
+          text: "Complementa datos operativos de la entrevista. Si un dato ya viene del screening, confirmalo y completa lo faltante.",
+          title: "INSTRUCCION",
+          type: "SECTION"
+        }
+      ],
+      questions: generalDataQuestions,
+      title: "DATOS GENERALES"
     },
     {
       id: "FILTROS",
@@ -641,21 +663,8 @@ export const CTL_DEFINITION: CtlDefinition = {
       id: "FRAGRANCIA_2",
       questions: makeFragranceQuestions("B", "segunda fragancia"),
       title: "SECCIÓN IV - EVALUACIÓN DE SEGUNDA FRAGANCIA"
-    }
-    // La SECCION V - COMPARATIVA (P14-P20) pertenece al flujo Navigo posterior, no al CTL presencial.
-    ,
-    {
-      id: "DATOS_GENERALES",
-      instructions: [
-        {
-          text: "Complementa datos operativos de la entrevista. Si un dato ya viene del screening, confirmalo y completa lo faltante.",
-          title: "INSTRUCCION",
-          type: "SECTION"
-        }
-      ],
-      questions: generalDataQuestions,
-      title: "DATOS GENERALES"
     },
+    // La SECCION V - COMPARATIVA (P14-P20) pertenece al flujo Navigo posterior, no al CTL presencial.
     {
       id: "DEMOGRAFICOS",
       instructions: [

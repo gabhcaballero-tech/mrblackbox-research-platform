@@ -111,6 +111,8 @@ describe("CtlMobileCapture", () => {
 
     expect(screen.getByText("Lee esta instruccion de seccion.")).toBeInTheDocument();
     expect(screen.getByText(/Participante ANA PEREZ/)).toBeInTheDocument();
+    expect(screen.getByText("Primera fragancia:")).toBeInTheDocument();
+    expect(screen.getByText("247")).toBeInTheDocument();
   });
 });
 
@@ -120,8 +122,10 @@ function renderMobileCapture({ answers = {} }: { answers?: Record<string, unknow
       answers={answers}
       definition={mobileDefinition}
       participant={{
+        firstSampleKey: "247",
         folio: "NAV-001",
-        name: "ANA PEREZ"
+        name: "ANA PEREZ",
+        secondSampleKey: "583"
       }}
       readOnly={false}
       sessionId="session-1"
@@ -150,6 +154,7 @@ const mobileDefinition: CtlDefinition = {
             { label: "Opcion A", value: "A" },
             { label: "Opcion B", value: "B" }
           ],
+          references: [{ label: "Primera fragancia", source: "FIRST_SAMPLE" }],
           required: true,
           type: "SELECT"
         },

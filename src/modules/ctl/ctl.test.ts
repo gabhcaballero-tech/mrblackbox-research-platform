@@ -22,12 +22,12 @@ describe("ctl module", () => {
     expect(definition.version).toBe(2);
     expect(definition.sections.map((section) => section.id)).toEqual([
       "CODIGOS_FISICOS",
+      "DATOS_GENERALES",
       "FILTROS",
       "TRIANGULAR_1",
       "TRIANGULAR_2",
       "FRAGRANCIA_1",
       "FRAGRANCIA_2",
-      "DATOS_GENERALES",
       "DEMOGRAFICOS"
     ]);
     expect(questions).toHaveLength(53);
@@ -56,6 +56,9 @@ describe("ctl module", () => {
       "P20_ADECUADA_JAFRA",
       "D8_NSE_REGISTRADO"
     ]));
+    expect(questions.findIndex((question) => question.code === "DG_NOMBRE")).toBeLessThan(
+      questions.findIndex((question) => question.code === "F0")
+    );
   });
 
   it("marks terminating CTL filter answers as termination conditions", () => {
@@ -107,6 +110,24 @@ describe("ctl module", () => {
 
     expect(result.ok).toBe(true);
     expect(state.sessions).toHaveLength(1);
+  });
+
+  it("saves automatic general data when an admin starts CTL", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+
+    const result = await repository.startSession({
+      actor: interviewer,
+      folio: "NAV-001",
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(true);
+    expect(state.sessions[0]?.startedAt).toBeInstanceOf(Date);
+    expect(Object.fromEntries(state.answers.map((answer) => [answer.questionCode, answer.answerValue]))).toMatchObject({
+      DG_NOMBRE: "ANA PEREZ",
+      DG_HORA_INICIO: expect.any(String)
+    });
   });
 
   it("creates a CTL session after validating participant codes", async () => {
@@ -652,10 +673,16 @@ describe("ctl module", () => {
       {
         ctlInterviewerCodeId: firstCode.ok ? firstCode.interviewerCode.id : "",
         interviewerId: null,
+        startedAt: expect.any(Date),
         status: "PENDING",
         studyParticipantId: "participant-1"
       }
     ]);
+    expect(Object.fromEntries(state.answers.map((answer) => [answer.questionCode, answer.answerValue]))).toMatchObject({
+      DG_FECHA: expect.any(String),
+      DG_HORA_INICIO: expect.any(String),
+      DG_NOMBRE: "ANA PEREZ"
+    });
   });
 
   it("creates the public CTL session from the interviewer flow without admin pre-start", async () => {
@@ -920,6 +947,9 @@ describe("ctl module", () => {
     });
 
     expect(state.sessions[0]?.status).toBe("COMPLETED");
+    expect(Object.fromEntries(state.answers.map((answer) => [answer.questionCode, answer.answerValue]))).toMatchObject({
+      DG_HORA_TERMINO: expect.any(String)
+    });
     expect(state.navigoActivities).toMatchObject([
       {
         status: "AVAILABLE",
@@ -1334,7 +1364,7 @@ function createCtlState() {
     },
     ctlSession: {
       async create(args: {
-        data: Partial<Omit<(typeof sessions)[number], "completedAt" | "createdAt" | "id" | "startedAt">> & {
+        data: Partial<Omit<(typeof sessions)[number], "completedAt" | "createdAt" | "id">> & {
           screeningAttemptId: string | null;
           status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
           studyId: string;
@@ -1360,7 +1390,7 @@ function createCtlState() {
           id: `ctl-session-${sessions.length + 1}`,
           interviewerId: args.data.interviewerId ?? null,
           screeningAttemptId: args.data.screeningAttemptId,
-          startedAt: null,
+          startedAt: args.data.startedAt ?? null,
           status: args.data.status,
           studyId: args.data.studyId,
           studyParticipantId: args.data.studyParticipantId

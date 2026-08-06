@@ -80,10 +80,10 @@ export default async function CtlPublicCapturePage({ params, searchParams }: Ctl
           <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Siguiente paso</p>
             <h2 className="mt-2 text-xl font-bold text-emerald-950">
-              La evaluacion sensorial inicial ha concluido correctamente.
+              Evaluación sensorial concluida.
             </h2>
             <p className="mt-2 text-sm leading-6 text-emerald-900">
-              Ahora continua con la seccion comparativa en Navigo.
+              Continúe en Navigo con la sección comparativa.
             </p>
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
               <Detail label="Participante" value={session.participant.name} />
@@ -110,8 +110,10 @@ export default async function CtlPublicCapturePage({ params, searchParams }: Ctl
           completedAtLabel={formatCtlTimestamp(session.completedAt)}
           definition={session.definition}
           participant={{
+            firstSampleKey: session.participant.rotation.firstSampleKey,
             folio: session.participant.folio,
-            name: session.participant.name
+            name: session.participant.name,
+            secondSampleKey: session.participant.rotation.secondSampleKey
           }}
           readOnly={readOnly}
           sessionId={session.id}

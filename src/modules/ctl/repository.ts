@@ -339,17 +339,24 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
         }
 
         try {
-        const created = (await tx.ctlSession.create?.({
+          const created = (await tx.ctlSession.create?.({
             data: {
               claimedAt: now,
               ctlInterviewerCodeId: interviewerCode.id,
               screeningAttemptId: confirmation.screeningAttempt.id,
+              startedAt: now,
               status: "PENDING",
               studyId: interviewerCode.studyId,
               studyParticipantId: confirmation.studyParticipant.id
             },
             select: { id: true }
           })) as { id: string };
+
+          await upsertAutomaticCtlStartAnswers(tx, {
+            participantName: confirmation.studyParticipant.participantProfile.name,
+            sessionId: created.id,
+            startedAt: now
+          });
 
           await tx.ctlInterviewerCode.update?.({
             data: { lastUsedAt: now },
@@ -801,25 +808,17 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
         }
 
         for (const answer of input.answers) {
-          await tx.ctlAnswer.upsert?.({
-            create: {
-              answerValue: answer.answerValue,
-              ctlSessionId: session.id,
-              questionCode: answer.questionCode
-            },
-            update: {
-              answerValue: answer.answerValue
-            },
-            where: {
-              ctlSessionId_questionCode: {
-                ctlSessionId: session.id,
-                questionCode: answer.questionCode
-              }
-            }
-          });
+          await upsertCtlAnswer(tx, session.id, answer);
         }
 
         const now = new Date();
+        if (input.complete) {
+          await upsertCtlAnswer(tx, session.id, {
+            answerValue: formatCtlTime(now),
+            questionCode: "DG_HORA_TERMINO"
+          });
+        }
+
         await tx.ctlSession.update?.({
           data: {
             completedAt: input.complete ? now : null,
@@ -905,17 +904,25 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
         return { message: "Este folio ya fue tomado por otro encuestador.", ok: false };
       }
 
+      const now = new Date();
       const created = (await prisma.ctlSession.create?.({
         data: {
           interviewerId: input.actor.id,
           screeningAttemptId: confirmation.screeningAttempt.id,
-          claimedAt: new Date(),
+          claimedAt: now,
+          startedAt: now,
           status: "PENDING",
           studyId: input.studyId,
           studyParticipantId: confirmation.studyParticipant.id
         },
         select: { id: true }
       })) as { id: string };
+
+      await upsertAutomaticCtlStartAnswers(prisma as CtlTransactionClient, {
+        participantName: confirmation.studyParticipant.participantProfile.name,
+        sessionId: created.id,
+        startedAt: now
+      });
 
       return { ok: true, sessionId: created.id };
     },
@@ -1071,6 +1078,51 @@ const sessionSelect = {
   studyParticipantId: true
 } as const;
 
+async function upsertAutomaticCtlStartAnswers(
+  tx: CtlTransactionClient,
+  input: {
+    participantName: string;
+    sessionId: string;
+    startedAt: Date;
+  }
+): Promise<void> {
+  await upsertCtlAnswer(tx, input.sessionId, {
+    answerValue: input.participantName,
+    questionCode: "DG_NOMBRE"
+  });
+  await upsertCtlAnswer(tx, input.sessionId, {
+    answerValue: formatCtlDate(input.startedAt),
+    questionCode: "DG_FECHA"
+  });
+  await upsertCtlAnswer(tx, input.sessionId, {
+    answerValue: formatCtlTime(input.startedAt),
+    questionCode: "DG_HORA_INICIO"
+  });
+}
+
+async function upsertCtlAnswer(
+  tx: CtlTransactionClient,
+  sessionId: string,
+  answer: CtlAnswerDraft
+): Promise<void> {
+  await tx.ctlAnswer.upsert?.({
+    create: {
+      answerValue: answer.answerValue,
+      ctlSessionId: sessionId,
+      questionCode: answer.questionCode
+    },
+    update: {
+      answerValue: answer.answerValue
+    },
+    where: {
+      ctlSessionId_questionCode: {
+        ctlSessionId: sessionId,
+        questionCode: answer.questionCode
+      }
+    }
+  });
+}
+
 function canReadSession(
   actor: CtlActor,
   session: Pick<SessionRecord, "ctlInterviewerCodeId" | "interviewerId" | "studyId">
@@ -1180,6 +1232,17 @@ function isUniqueConstraintError(error: unknown): boolean {
       "code" in error &&
       (error as { code?: string }).code === "P2002"
   );
+}
+
+function formatCtlDate(value: Date): string {
+  return value.toLocaleDateString("es-MX");
+}
+
+function formatCtlTime(value: Date): string {
+  return value.toLocaleTimeString("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 function formatNse(input: { nseClass: string | null; nseScore: number | null }): string {

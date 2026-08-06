@@ -246,7 +246,7 @@ export async function finishPublicCtlSessionAction(studyCode: string, sessionId:
     ok: true,
     redirectTo:
       `/ctl/${encodeURIComponent(studyCode)}/sessions/${encodeURIComponent(sessionId)}` +
-      `?ctlMessage=${encodeURIComponent("La evaluacion sensorial inicial ha concluido correctamente.")}`
+      `?ctlMessage=${encodeURIComponent("Evaluación sensorial concluida. Continúe en Navigo con la sección comparativa.")}`
   };
 }
 
