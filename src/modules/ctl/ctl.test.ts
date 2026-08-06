@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { getCtlDefinition, getCtlQuestions, type CtlDefinition } from "./definition";
+import { getCtlApplicableQuestions, getCtlDefinition, getCtlQuestions, type CtlDefinition } from "./definition";
 import { createCtlRepository } from "./repository";
 import {
   ctlFormDataToAnswerInput,
   doReferenceCodesMatch,
+  isCtlTerminatingAnswer,
   parseCtlAnswers,
   parseCtlQuestionAnswer,
   type CtlAnswerInput
@@ -14,32 +15,63 @@ const otherInterviewer = { id: "interviewer-2", role: "INTERVIEWER" as const, st
 const admin = { id: "admin-1", role: "ADMIN" as const, status: "ACTIVE" as const };
 
 describe("ctl module", () => {
-  it("exposes CTL definition by sections while keeping current questions", () => {
+  it("exposes the Navigo Homme CTL v6 definition without the comparative section", () => {
     const definition = getCtlDefinition();
     const questions = getCtlQuestions(definition);
 
     expect(definition.version).toBe(2);
     expect(definition.sections.map((section) => section.id)).toEqual([
+      "FILTROS",
       "TRIANGULAR_1",
       "TRIANGULAR_2",
       "FRAGRANCIA_1",
-      "FRAGRANCIA_2",
-      "COMPARATIVA",
-      "DEMOGRAFICOS"
+      "FRAGRANCIA_2"
     ]);
     expect(questions).toHaveLength(38);
     expect(definition.sections.every((section) => Array.isArray(section.questions))).toBe(true);
     expect(questions.map((question) => question.code)).toEqual(expect.arrayContaining([
-      "P1_TRIANGULAR_1",
-      "P3_TRIANGULAR_2",
-      "P5A_GUSTO_M1",
-      "P5A_GUSTO_M2",
-      "P8A_ATRIBUTOS_M1",
-      "P8A_ATRIBUTOS_M2",
+      "F0",
+      "F1",
+      "F11",
+      "F11A",
+      "F14",
+      "P1",
+      "P3",
+      "P5A",
+      "P5B",
+      "P8A",
+      "P8B",
+      "P13A",
+      "P13B"
+    ]));
+    expect(questions.map((question) => question.code)).not.toEqual(expect.arrayContaining([
       "P14_PREFERENCIA",
-      "D1_ESCOLARIDAD_JEFE",
+      "P20_ADECUADA_JAFRA",
       "D8_NSE_REGISTRADO"
     ]));
+  });
+
+  it("marks terminating CTL filter answers as termination conditions", () => {
+    expect(isCtlTerminatingAnswer("F0", "2")).toBe(true);
+    expect(isCtlTerminatingAnswer("F0", "1")).toBe(false);
+    expect(isCtlTerminatingAnswer("F1", "2")).toBe(true);
+    expect(isCtlTerminatingAnswer("F9", "1")).toBe(true);
+    expect(isCtlTerminatingAnswer("F9", "3")).toBe(false);
+    expect(isCtlTerminatingAnswer("P1", "1")).toBe(false);
+  });
+
+  it("skips F11a when F11 indicates no difference", () => {
+    const applicableCodes = getCtlApplicableQuestions(getCtlDefinition(), {
+      ...createValidCtlAnswerInput(),
+      F11: "2"
+    }).map((question) => question.code);
+    const withoutF11a = createValidCtlAnswerInput();
+    delete withoutF11a.F11A;
+    withoutF11a.F11 = "2";
+    const parsed = parseCtlAnswers(withoutF11a);
+
+    expect(applicableCodes).not.toContain("F11A");
+    expect(parsed.ok).toBe(true);
   });
 
   it("validates participant reference codes in slot order", () => {
@@ -116,23 +148,51 @@ describe("ctl module", () => {
     expect(saved.ok).toBe(true);
     expect(session?.status).toBe("IN_PROGRESS");
     expect(session?.answers).toMatchObject({
-      D8_NSE_REGISTRADO: "C_TIPICO",
-      P1_TRIANGULAR_1: "1",
-      P3_TRIANGULAR_2: "7",
-      P5A_GUSTO_M1: 4,
-      P5A_GUSTO_M2: 5
+      F0: "1",
+      F1: "1",
+      P1: "1",
+      P3: "7",
+      P5A: 4,
+      P5B: 5
     });
+  });
+
+  it("closes a CTL session as not qualified without releasing Navigo", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const started = await repository.startSession({
+      actor: interviewer,
+      folio: "NAV-001",
+      studyId: state.study.id
+    });
+    const saved = await repository.saveAnswers({
+      actor: interviewer,
+      answers: [{ answerValue: "2", questionCode: "F0" }],
+      complete: false,
+      sessionId: started.ok ? started.sessionId : ""
+    });
+    const closed = await repository.cancelSessionAsNotQualified({
+      actor: interviewer,
+      sessionId: started.ok ? started.sessionId : ""
+    });
+
+    expect(saved.ok).toBe(true);
+    expect(closed.ok).toBe(true);
+    expect(state.sessions[0]?.status).toBe("CANCELLED");
+    expect(state.sessions[0]?.completedAt).toBeInstanceOf(Date);
+    expect(state.navigoActivities).toHaveLength(0);
+    expect(state.accessTokens).toHaveLength(0);
   });
 
   it("rejects invalid select options", () => {
     const parsed = parseCtlAnswers({
       ...createValidCtlAnswerInput(),
-      P1_TRIANGULAR_1: "999"
+      P1: "999"
     });
 
     expect(parsed.ok).toBe(false);
     expect(parsed.ok ? "" : parsed.message).toBe("Selecciona una opcion valida.");
-    expect(parsed.ok ? [] : parsed.missingQuestionCodes).toEqual(["P1_TRIANGULAR_1"]);
+    expect(parsed.ok ? [] : parsed.missingQuestionCodes).toEqual(["P1"]);
   });
 
   it("parses scale answers as numeric values", () => {
@@ -467,7 +527,7 @@ describe("ctl module", () => {
     expect(preview.ok ? preview.participant : null).toMatchObject({
       folio: "NAV-001",
       name: "ANA PEREZ",
-      nse: "144 · RANGO-3",
+      nse: "C Tipico (144 pts.)",
       rotation: {
         firstSampleKey: "247",
         secondSampleKey: "583"
@@ -827,7 +887,7 @@ describe("ctl module", () => {
     const result = await repository.listParticipants({ actor: interviewer, studyId: state.study.id });
 
     expect(result.ok).toBe(true);
-    expect(result.ok ? result.participants[0]?.nse : "").toBe("144 · RANGO-3");
+    expect(result.ok ? result.participants[0]?.nse : "").toBe("C Tipico (144 pts.)");
     expect(result.ok ? result.participants[0]?.rotation : null).toEqual({
       firstSampleKey: "247",
       secondSampleKey: "583"
@@ -918,44 +978,44 @@ const matrixDefinition: CtlDefinition = {
 
 function createValidCtlAnswerInput(): CtlAnswerInput {
   return {
-    D1_ESCOLARIDAD_JEFE: "8",
-    D2_BANOS_COMPLETOS: "1",
-    D3_AUTOS: "1",
-    D4_INTERNET: "1",
-    D5_TRABAJADORES: "2",
-    D6_CUARTOS_DORMIR: "3",
-    D7_PUNTAJE_NSE: "144",
-    D8_NSE_REGISTRADO: "C_TIPICO",
-    P1_TRIANGULAR_1: "1",
-    P2_TRIANGULAR_1_RESULTADO: "1",
-    P3_TRIANGULAR_2: "7",
-    P4_TRIANGULAR_2_RESULTADO: "1",
-    P5A_GUSTO_M1: "4",
-    P5A_GUSTO_M2: "5",
-    P6A_INTENSIDAD_PREFERIDA_M1: "3",
-    P6A_INTENSIDAD_PREFERIDA_M2: "3",
-    P7A_INTENSIDAD_PERCIBIDA_M1: "4",
-    P7A_INTENSIDAD_PERCIBIDA_M2: "5",
-    P8A_ATRIBUTOS_M1: createMatrixAnswer("4"),
-    P8A_ATRIBUTOS_M2: createMatrixAnswer("5"),
-    P9A_AROMA_M1: createAromaMatrixAnswer("1"),
-    P9A_AROMA_M2: createAromaMatrixAnswer("0"),
-    P10A_INTENCION_COMPRA_M1: "4",
-    P10A_INTENCION_COMPRA_M2: "5",
-    P11A_COMPARACION_MARCA_USUAL_M1: "3",
-    P11A_COMPARACION_MARCA_USUAL_M2: "4",
-    P12A_INTENCION_CAMBIO_M1: "2",
-    P12A_INTENCION_CAMBIO_M2: "2",
-    P13A_DURACION_M1: "3",
-    P13A_DURACION_M2: "4",
-    P14_PREFERENCIA: "1",
-    P14A_RAZONES_PREFERENCIA: "  aroma mas fresco  ",
-    P15_PREFERENCIA_INTENSIDAD: "1",
-    P16_INTENSIDAD_PRIMERA: "4",
-    P17_INTENSIDAD_SEGUNDA: "5",
-    P18_MAYOR_DURACION: "1",
-    P19_PREFERENCIA_CAMBIO: "2",
-    P20_ADECUADA_JAFRA: "1"
+    F0: "1",
+    F1: "1",
+    F2: "2",
+    F3: "7",
+    F4: "1",
+    F5: "7",
+    F6: "NAVIGO HOMME AZUL",
+    F7: "NAVIGO HOMME AZUL",
+    F8: "AZUL",
+    F9: "3",
+    F10: "2 MESES",
+    F11: "1",
+    F11A: "MAYOR DURACION",
+    F12: "2",
+    F13: "1",
+    F14: "2",
+    P1: "1",
+    P2: "1",
+    P3: "7",
+    P4: "1",
+    P5A: "4",
+    P5B: "5",
+    P6A: "3",
+    P6B: "3",
+    P7A: "4",
+    P7B: "5",
+    P8A: createMatrixAnswer("4"),
+    P8B: createMatrixAnswer("5"),
+    P9A: createAromaMatrixAnswer("1"),
+    P9B: createAromaMatrixAnswer("0"),
+    P10A: "4",
+    P10B: "5",
+    P11A: "3",
+    P11B: "4",
+    P12A: "2",
+    P12B: "2",
+    P13A: "3",
+    P13B: "4"
   };
 }
 
@@ -981,9 +1041,7 @@ function createMatrixAnswer(value: string): Record<string, string> {
       "ME_TRANSMITE_LIBERTAD",
       "ME_HACE_SENTIR_COMODO",
       "ELEGANTE",
-      "ARTIFICIAL",
-      "AUDAZ",
-      "MISTERIOSA"
+      "ARTIFICIAL"
     ].map((rowCode) => [rowCode, value])
   );
 }

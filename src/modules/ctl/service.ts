@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import {
+  getCtlApplicableQuestions,
   getCtlDefinition,
   getCtlQuestions,
   type CtlDefinition,
@@ -98,7 +99,7 @@ export function parseCtlAnswers(
   const answers: CtlAnswerDraft[] = [];
   const missingQuestionCodes: string[] = [];
 
-  for (const question of getCtlQuestions(definition)) {
+  for (const question of getCtlApplicableQuestions(definition, input)) {
     const parsed = parseCtlAnswerForQuestion(input, question);
 
     if (!parsed.ok) {
@@ -187,6 +188,21 @@ export function parseCtlQuestionAnswer(
     empty: parsed.empty,
     ok: true
   };
+}
+
+export function isCtlTerminatingAnswer(
+  questionCode: string,
+  answerValue: unknown,
+  definition: CtlDefinition = getCtlDefinition()
+): boolean {
+  const question = getCtlQuestions(definition).find((candidate) => candidate.code === questionCode);
+
+  if (!question || question.type !== "SELECT") {
+    return false;
+  }
+
+  const normalized = normalizeCtlCode(answerValue);
+  return question.options.some((option) => option.terminates && normalizeCtlCode(option.value) === normalized);
 }
 
 export function ctlFormDataToAnswerInput(formData: FormData): CtlAnswerInput {

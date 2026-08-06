@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import type {
-  CtlDefinition,
-  CtlMatrixQuestionDefinition,
-  CtlQuestionDefinition,
-  CtlQuestionOption,
-  CtlScaleQuestionDefinition
+import {
+  getCtlApplicableQuestions,
+  type CtlDefinition,
+  type CtlMatrixQuestionDefinition,
+  type CtlQuestionDefinition,
+  type CtlQuestionOption,
+  type CtlScaleQuestionDefinition
 } from "@/modules/ctl/definition";
 import {
   finishPublicCtlSessionAction,
@@ -50,8 +51,8 @@ export function CtlMobileCapture({
   sessionId,
   studyCode
 }: CtlMobileCaptureProps) {
-  const questions = useMemo(() => flattenCtlQuestions(definition), [definition]);
   const [localAnswers, setLocalAnswers] = useState<Record<string, unknown>>(answers);
+  const questions = useMemo(() => flattenCtlQuestions(definition, localAnswers), [definition, localAnswers]);
   const [currentIndex, setCurrentIndex] = useState(() => getInitialCtlQuestionIndex(definition, answers));
   const [isReviewing, setIsReviewing] = useState(readOnly);
   const [message, setMessage] = useState<string | null>(null);
@@ -114,6 +115,12 @@ export function CtlMobileCapture({
       if (!result.ok) {
         setMessage(null);
         setError(result.message);
+        return;
+      }
+
+      if (result.redirectTo) {
+        setMessage("Entrevista cerrada como no calificada.");
+        window.location.assign(result.redirectTo);
         return;
       }
 
@@ -509,25 +516,29 @@ function StatusMessages({ error, message }: { error: string | null; message: str
   );
 }
 
-export function flattenCtlQuestions(definition: CtlDefinition): FlatQuestion[] {
+export function flattenCtlQuestions(definition: CtlDefinition, answers: Record<string, unknown> = {}): FlatQuestion[] {
+  const applicableCodes = new Set(getCtlApplicableQuestions(definition, answers).map((question) => question.code));
+
   return definition.sections.flatMap((section) =>
-    section.questions.map((question, index) => ({
-      index,
-      question,
-      sectionTitle: section.title
-    }))
+    section.questions
+      .filter((question) => applicableCodes.has(question.code))
+      .map((question, index) => ({
+        index,
+        question,
+        sectionTitle: section.title
+      }))
   );
 }
 
 export function getInitialCtlQuestionIndex(definition: CtlDefinition, answers: Record<string, unknown>): number {
-  const questions = flattenCtlQuestions(definition);
+  const questions = flattenCtlQuestions(definition, answers);
   const firstPendingIndex = questions.findIndex(({ question }) => !isCtlQuestionAnswered(question, answers[question.code]));
 
   return firstPendingIndex >= 0 ? firstPendingIndex : Math.max(0, questions.length - 1);
 }
 
 export function getPendingCtlQuestionCodes(definition: CtlDefinition, answers: Record<string, unknown>): string[] {
-  return flattenCtlQuestions(definition)
+  return flattenCtlQuestions(definition, answers)
     .filter(({ question }) => question.required && !isCtlQuestionAnswered(question, answers[question.code]))
     .map(({ question }) => question.code);
 }
@@ -572,7 +583,7 @@ function buildQuestionFormData(question: CtlQuestionDefinition, answer: unknown)
 function buildAllAnswersFormData(definition: CtlDefinition, answers: Record<string, unknown>): FormData {
   const formData = new FormData();
 
-  for (const { question } of flattenCtlQuestions(definition)) {
+  for (const { question } of flattenCtlQuestions(definition, answers)) {
     appendQuestionAnswer(formData, question, answers[question.code]);
   }
 

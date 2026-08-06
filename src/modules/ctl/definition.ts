@@ -2,6 +2,8 @@ export type CtlQuestionType = "LONG_TEXT" | "MATRIX" | "SCALE" | "SELECT" | "SHO
 
 export type CtlQuestionOption = {
   label: string;
+  skipTo?: string;
+  terminates?: boolean;
   value: string;
 };
 
@@ -51,6 +53,8 @@ export type CtlDefinition = {
   sections: CtlSectionDefinition[];
   version: 2;
 };
+
+export type CtlAnswerLookup = Record<string, unknown>;
 
 const sameDifferentOptions: CtlQuestionOption[] = [
   { label: "Es una fragancia diferente", value: "1" },
@@ -149,9 +153,7 @@ const fragranceAttributeRows = [
   { code: "ME_TRANSMITE_LIBERTAD", label: "Me transmite libertad" },
   { code: "ME_HACE_SENTIR_COMODO", label: "Me hace sentir cómodo" },
   { code: "ELEGANTE", label: "Elegante" },
-  { code: "ARTIFICIAL", label: "Artificial" },
-  { code: "AUDAZ", label: "Audaz" },
-  { code: "MISTERIOSA", label: "Misteriosa" }
+  { code: "ARTIFICIAL", label: "Artificial" }
 ];
 
 const aromaAttributeRows = [
@@ -170,35 +172,13 @@ const aromaAttributeRows = [
   { code: "ALCOHOL", label: "Alcohol" }
 ];
 
-const preferenceOptions: CtlQuestionOption[] = [
-  { label: "La primera", value: "1" },
-  { label: "La segunda", value: "2" },
-  { label: "Ambas", value: "3" },
-  { label: "Ninguna", value: "4" }
-];
+function makeFragranceQuestions(suffix: "A" | "B", labelSuffix: string): CtlQuestionDefinition[] {
+  const letter = suffix.toLowerCase();
 
-const preferenceWithArmsOptions: CtlQuestionOption[] = [
-  { label: "La primera (izquierda)", value: "1" },
-  { label: "La segunda (derecha)", value: "2" },
-  { label: "Ambas", value: "3" },
-  { label: "Ninguna", value: "4" }
-];
-
-const nseLevelOptions: CtlQuestionOption[] = [
-  { label: "A/B", value: "AB" },
-  { label: "C+", value: "C_PLUS" },
-  { label: "C Típico", value: "C_TIPICO" },
-  { label: "C-", value: "C_MINUS" },
-  { label: "D+", value: "D_PLUS" },
-  { label: "D", value: "D" },
-  { label: "E", value: "E" }
-];
-
-function makeFragranceQuestions(suffix: "M1" | "M2", labelSuffix: string): CtlQuestionDefinition[] {
   return [
     {
-      code: `P5A_GUSTO_${suffix}`,
-      label: `P5${suffix === "M1" ? "a" : "b"}. Por favor huela su antebrazo y díganos ¿Qué tanto le gusta la fragancia que le hemos aplicado, usted diría que...?`,
+      code: `P5${suffix}`,
+      label: `P5${letter}. Por favor huela su antebrazo y díganos ¿Qué tanto le gusta la fragancia que le hemos aplicado, usted diría que...? (RU)`,
       labels: likingScaleLabels,
       max: 7,
       min: 1,
@@ -206,8 +186,8 @@ function makeFragranceQuestions(suffix: "M1" | "M2", labelSuffix: string): CtlQu
       type: "SCALE"
     },
     {
-      code: `P6A_INTENSIDAD_PREFERIDA_${suffix}`,
-      label: `P6${suffix === "M1" ? "a" : "b"}. ¿Pensando en la intensidad de esta fragancia usted diría que es...?`,
+      code: `P6${suffix}`,
+      label: `P6${letter}. ¿Pensando en la intensidad de esta fragancia usted diría que es…? (RU)`,
       labels: preferredIntensityScaleLabels,
       max: 5,
       min: 1,
@@ -215,8 +195,8 @@ function makeFragranceQuestions(suffix: "M1" | "M2", labelSuffix: string): CtlQu
       type: "SCALE"
     },
     {
-      code: `P7A_INTENSIDAD_PERCIBIDA_${suffix}`,
-      label: `P7${suffix === "M1" ? "a" : "b"}. Pensando en la intensidad de esta fragancia, ¿usted diría que es...?`,
+      code: `P7${suffix}`,
+      label: `P7${letter}. Pensando en la intensidad de esta fragancia, ¿usted diría que es…..?`,
       labels: perceivedIntensityScaleLabels,
       max: 7,
       min: 1,
@@ -224,24 +204,24 @@ function makeFragranceQuestions(suffix: "M1" | "M2", labelSuffix: string): CtlQu
       type: "SCALE"
     },
     {
-      code: `P8A_ATRIBUTOS_${suffix}`,
+      code: `P8${suffix}`,
       columns: agreementColumns,
-      label: `P8${suffix === "M1" ? "a" : "b"}. Le voy a leer una lista de atributos que pueden ser usados para DESCRIBIR una fragancia. Para cada uno, por favor dígame ¿En qué medida está de acuerdo con que este atributo aplica para esta fragancia de perfume? (${labelSuffix})`,
+      label: `P8${letter}. Le voy a leer una lista de atributos que pueden ser usados para DESCRIBIR una fragancia. Para cada uno, por favor dígame ¿En qué medida está de acuerdo con que este atributo aplica para esta fragancia de perfume? (RU) (${labelSuffix})`,
       required: true,
       rows: fragranceAttributeRows,
       type: "MATRIX"
     },
     {
-      code: `P9A_AROMA_${suffix}`,
+      code: `P9${suffix}`,
       columns: yesNoColumns,
-      label: `P9${suffix === "M1" ? "a" : "b"}. Voy a leer una lista de atributos sobre el aroma de la fragancia que acaba de probar. Por favor dígame si cada uno de estos atributos aplica o no para esta fragancia. (${labelSuffix})`,
+      label: `P9${letter}. Voy a leer una lista de atributos sobre el aroma de la fragancia que acaba de probar. Por favor dígame si cada uno de estos atributos aplica o no para esta fragancia. (RU) (${labelSuffix})`,
       required: true,
       rows: aromaAttributeRows,
       type: "MATRIX"
     },
     {
-      code: `P10A_INTENCION_COMPRA_${suffix}`,
-      label: `P10${suffix === "M1" ? "a" : "b"}. Si este producto estuviera a la venta en donde habitualmente compra sus fragancias, ¿Qué tan probable es que usted compre esta fragancia? Diría que...`,
+      code: `P10${suffix}`,
+      label: `P10${letter}. Si este producto estuviera a la venta en donde habitualmente compra sus fragancias, ¿Qué tan probable es que usted compre esta fragancia? Diría que… (RU)`,
       labels: purchaseIntentScaleLabels,
       max: 5,
       min: 1,
@@ -249,8 +229,8 @@ function makeFragranceQuestions(suffix: "M1" | "M2", labelSuffix: string): CtlQu
       type: "SCALE"
     },
     {
-      code: `P11A_COMPARACION_MARCA_USUAL_${suffix}`,
-      label: `P11${suffix === "M1" ? "a" : "b"}. Pensando en la fragancia que acaba de conocer, ¿usted diría que ésta es...?`,
+      code: `P11${suffix}`,
+      label: `P11${letter}. Pensando en la fragancia que acaba de conocer, ¿usted diría que ésta es…? (RU)`,
       labels: usualBrandComparisonScaleLabels,
       max: 5,
       min: 1,
@@ -258,8 +238,8 @@ function makeFragranceQuestions(suffix: "M1" | "M2", labelSuffix: string): CtlQu
       type: "SCALE"
     },
     {
-      code: `P12A_INTENCION_CAMBIO_${suffix}`,
-      label: `P12${suffix === "M1" ? "a" : "b"}. Pensando en la fragancia que acaba de conocer, ¿cuál de las siguientes opciones describe mejor su intención de cambio?`,
+      code: `P12${suffix}`,
+      label: `P12${letter}. Pensando en la fragancia que acaba de conocer, ¿cuál de las siguientes opciones describe mejor su intención de cambio? (RU)`,
       labels: switchingIntentScaleLabels,
       max: 3,
       min: 1,
@@ -267,8 +247,8 @@ function makeFragranceQuestions(suffix: "M1" | "M2", labelSuffix: string): CtlQu
       type: "SCALE"
     },
     {
-      code: `P13A_DURACION_${suffix}`,
-      label: `P13${suffix === "M1" ? "a" : "b"}. Pensando en la duración de la fragancia, ¿usted diría que ésta durará...?`,
+      code: `P13${suffix}`,
+      label: `P13${letter}. Pensando en la duración de la fragancia, ¿usted diría que ésta durará…? (RU)`,
       labels: durationScaleLabels,
       max: 5,
       min: 1,
@@ -281,232 +261,247 @@ function makeFragranceQuestions(suffix: "M1" | "M2", labelSuffix: string): CtlQu
 export const CTL_DEFINITION: CtlDefinition = {
   sections: [
     {
-      id: "TRIANGULAR_1",
+      id: "FILTROS",
       questions: [
         {
-          code: "P1_TRIANGULAR_1",
-          label: "P1. Ahora, le pediremos que por favor huela estas tres tiras con fragancia, una de ellas es diferente, por favor, indíquenos: ¿Cuál de ellas es diferente a las otras 2?",
+          code: "F0",
+          label: "F0. Buenos días / tardes. Mi nombre es __________ y trabajo para________, una empresa de investigación de mercados. Estamos realizando un estudio y nos gustaría hacerle unas preguntas. ¿Acepta participar?",
           options: [
-            { label: "K-247 (A)", value: "1" },
-            { label: "O-472 (A)", value: "2" },
-            { label: "C-583 (B)", value: "3" },
-            { label: "G-835 (B)", value: "4" },
-            { label: "H-358 (B)", value: "5" },
-            { label: "Z-724 (A)", value: "6" }
+            { label: "Si", value: "1" },
+            { label: "No", terminates: true, value: "2" }
           ],
           required: true,
           type: "SELECT"
         },
         {
-          code: "P2_TRIANGULAR_1_RESULTADO",
-          label: "P2. Con base en la siguiente tarjeta dígame ¿Qué le parece la fragancia?",
+          code: "F1",
+          label: "F1. REGISTRAR GÉNERO",
+          options: [
+            { label: "Hombre", value: "1" },
+            { label: "Mujer", terminates: true, value: "2" }
+          ],
+          required: true,
+          type: "SELECT"
+        },
+        {
+          code: "F2",
+          label: "F2. ¿Me podría decir cuál es su edad exacta?",
+          options: [
+            { label: "29 años o menos", terminates: true, value: "1" },
+            { label: "30 a 45 años", value: "2" },
+            { label: "46 a 55 años", value: "3" },
+            { label: "55 años o más", terminates: true, value: "4" }
+          ],
+          required: true,
+          type: "SELECT"
+        },
+        {
+          code: "F3",
+          label: "F3. ¿Alguien de su familia trabaja en alguno de estos lugares...?",
+          options: [
+            { label: "Una empresa de publicidad", terminates: true, value: "1" },
+            { label: "Agencia de estudios de mercados", terminates: true, value: "2" },
+            { label: "Medios de comunicación (TV, radio, prensa…)", terminates: true, value: "3" },
+            { label: "Una empresa de relaciones públicas", terminates: true, value: "4" },
+            { label: "Una empresa que fabrica o comercializa productos de cuidado personal", terminates: true, value: "5" },
+            { label: "Una empresa que fabrica fragancias", terminates: true, value: "6" },
+            { label: "Ninguna de las anteriores", value: "7" }
+          ],
+          required: true,
+          type: "SELECT"
+        },
+        {
+          code: "F4",
+          label: "F4. ¿Usted o alguien de su familia ha participado en alguna encuesta (diferente a temas de política) en los últimos tres meses?",
+          options: [
+            { label: "No", value: "1" },
+            { label: "Si, de producto", terminates: true, value: "2" }
+          ],
+          required: true,
+          type: "SELECT"
+        },
+        {
+          code: "F5",
+          label: "F5. ¿Podría decirme si alguna de las siguientes condiciones físicas aplica actualmente a usted? (LEER LISTA)",
+          options: [
+            { label: "Resfriado / sinusitis / Rinitis", terminates: true, value: "1" },
+            { label: "Asma", terminates: true, value: "2" },
+            { label: "Alérgico o sensible / intolerante a fragancias o sabores", terminates: true, value: "3" },
+            { label: "Usando una fragancia en este momento", terminates: true, value: "5" },
+            { label: "Fumador", terminates: true, value: "6" },
+            { label: "Ninguna de las anteriores", value: "7" }
+          ],
+          required: true,
+          type: "SELECT"
+        },
+        {
+          code: "F6",
+          label: "F6. ¿Qué marca(s) de perfume(s) utiliza? (RM)",
+          required: true,
+          type: "SHORT_TEXT"
+        },
+        {
+          code: "F7",
+          label: "F7. ¿Qué marca de perfume utiliza con mayor frecuencia? (RU)",
+          required: true,
+          type: "SHORT_TEXT"
+        },
+        {
+          code: "F8",
+          label: "F8. De la marca que mencionó ¿qué VARIANTE (color) utiliza? (RM)",
+          required: true,
+          type: "SHORT_TEXT"
+        },
+        {
+          code: "F9",
+          label: "F9. Pensando en el uso de su perfume. A la semana ¿Con qué frecuencia utiliza perfume?",
+          options: [
+            { label: "1 día a la semana", terminates: true, value: "1" },
+            { label: "2 días a la semana", terminates: true, value: "2" },
+            { label: "3 días a la semana", value: "3" },
+            { label: "4 días a la semana", value: "4" },
+            { label: "5 días a la semana", value: "5" },
+            { label: "6 días a la semana", value: "6" },
+            { label: "Los 7 días de la semana/todos los días", value: "7" },
+            { label: "Más de una vez al día", value: "8" }
+          ],
+          required: true,
+          type: "SELECT"
+        },
+        {
+          code: "F10",
+          label: "F10. ¿Cuándo fue la última vez que compró perfume de la marca (TRASPASAR MARCA DE P7)?",
+          required: true,
+          type: "SHORT_TEXT"
+        },
+        {
+          code: "F11",
+          label: "F11. ¿Notaste alguna diferencia en tu perfume?",
+          options: [
+            { label: "Si", value: "1" },
+            { label: "No", skipTo: "F12", value: "2" }
+          ],
+          required: true,
+          type: "SELECT"
+        },
+        {
+          code: "F11A",
+          label: "F11a. ¿Qué diferencia (s) notaste?",
+          required: true,
+          type: "LONG_TEXT"
+        },
+        {
+          code: "F12",
+          label: "F12. ¿Cuántas veces al día aplicas tu perfume?",
+          options: [
+            { label: "1 vez al día", value: "1" },
+            { label: "2 veces al día", value: "2" },
+            { label: "3 veces al día", value: "3" },
+            { label: "4 veces o más al día", value: "4" }
+          ],
+          required: true,
+          type: "SELECT"
+        },
+        {
+          code: "F13",
+          label: "F13 ¿En qué momentos aplicas tu perfume?",
+          options: [
+            { label: "Al salir de bañarme", value: "1" },
+            { label: "Después de vestirme", value: "2" },
+            { label: "Antes de salir", value: "3" },
+            { label: "Durante el día", value: "4" },
+            { label: "Por la mañana", value: "5" },
+            { label: "Al medio día", value: "6" },
+            { label: "Por la noche", value: "7" },
+            { label: "Otro (Especifique)", value: "8" }
+          ],
+          required: true,
+          type: "SELECT"
+        },
+        {
+          code: "F14",
+          label: "F14. ¿Cómo aplicas tu perfume?",
+          options: [
+            { label: "Sobre la ropa", value: "1" },
+            { label: "Directamente en la piel (cuello)", value: "2" },
+            { label: "Directamente en los brazos", value: "3" },
+            { label: "Una nube sobre el cuerpo", value: "4" },
+            { label: "En las muñecas", value: "5" },
+            { label: "Otro (Especifique)", value: "6" }
+          ],
+          required: true,
+          type: "SELECT"
+        }
+      ],
+      title: "SECCIÓN I - FILTROS"
+    },
+    {
+      id: "TRIANGULAR_1",
+      questions: [
+        {
+          code: "P1",
+          label: "P1. Ahora, le pediremos que por favor huela estas tres tiras con fragancia, una de ellas es diferente, por favor, indíquenos: ¿Cuál de ellas es diferente a las otras 2?",
+          options: [
+            { label: "K-247", value: "1" },
+            { label: "O-472", value: "2" },
+            { label: "C-583", value: "3" },
+            { label: "G-835", value: "4" },
+            { label: "H-358", value: "5" },
+            { label: "Z-724", value: "6" }
+          ],
+          required: true,
+          type: "SELECT"
+        },
+        {
+          code: "P2",
+          label: "P2. Con base en la siguiente tarjeta dígame ¿Qué le parece la fragancia…..? (MOSTRAR Y LEER TARJETA) (RU)",
           options: sameDifferentOptions,
           required: true,
           type: "SELECT"
         }
       ],
-      title: "Sección II - Triangular 1"
+      title: "SECCIÓN II - TRIANGULAR - 1"
     },
     {
       id: "TRIANGULAR_2",
       questions: [
         {
-          code: "P3_TRIANGULAR_2",
+          code: "P3",
           label: "P3. Ahora, le pediremos que por favor huela estas tres tiras con fragancia, una de ellas es diferente, por favor, indíquenos: ¿Cuál de ellas es diferente a las otras 2?",
           options: [
-            { label: "G-853 (B)", value: "7" },
-            { label: "H-358 (B)", value: "8" },
-            { label: "Z-742 (A)", value: "9" },
-            { label: "K-247 (A)", value: "10" },
-            { label: "O-472 (A)", value: "11" },
-            { label: "C-583 (B)", value: "12" }
+            { label: "G-853", value: "7" },
+            { label: "H-358", value: "8" },
+            { label: "Z-742", value: "9" },
+            { label: "K-247", value: "10" },
+            { label: "O-472", value: "11" },
+            { label: "C-583", value: "12" }
           ],
           required: true,
           type: "SELECT"
         },
         {
-          code: "P4_TRIANGULAR_2_RESULTADO",
-          label: "P4. Con base en la siguiente tarjeta dígamos ¿Qué le parece la fragancia?",
+          code: "P4",
+          label: "P4. Con base en la siguiente tarjeta dígamos ¿Qué le parece la fragancia…..? (MOSTRAR Y LEER TARJETA) (RU)",
           options: sameDifferentOptions,
           required: true,
           type: "SELECT"
         }
       ],
-      title: "Sección II - Triangular 2"
+      title: "SECCIÓN II - TRIANGULAR - 2"
     },
     {
-      description: "Evaluación de la primera fragancia aplicada en el antebrazo izquierdo.",
+      description: "POR FAVOR, HUELA SU ANTEBRAZO. ENSEGUIDA LE APLICAREMOS EN SU ANTEBRAZO IZQUIERDO UNA FRAGANCIA Y LE HAREMOS UNAS PREGUNTAS.",
       id: "FRAGRANCIA_1",
-      questions: makeFragranceQuestions("M1", "primera fragancia"),
-      title: "Sección III - Evaluación de primera fragancia"
+      questions: makeFragranceQuestions("A", "primera fragancia"),
+      title: "SECCIÓN III - EVALUACIÓN DE PRIMERA FRAGANCIA"
     },
     {
-      description: "Evaluación de la segunda fragancia aplicada en el antebrazo derecho.",
+      description: "POR FAVOR, HUELA SU ANTEBRAZO. ENSEGUIDA LE APLICAREMOS EN SU ANTEBRAZO DERECHO UNA FRAGANCIA Y LE HAREMOS UNAS PREGUNTAS.",
       id: "FRAGRANCIA_2",
-      questions: makeFragranceQuestions("M2", "segunda fragancia"),
-      title: "Sección IV - Evaluación de segunda fragancia"
-    },
-    {
-      description: "Comparativa a 15 minutos entre ambas fragancias.",
-      id: "COMPARATIVA",
-      questions: [
-        {
-          code: "P14_PREFERENCIA",
-          label: "P14. ¿Cuál de las dos fragancias prefiere?",
-          options: preferenceWithArmsOptions,
-          required: true,
-          type: "SELECT"
-        },
-        {
-          code: "P14A_RAZONES_PREFERENCIA",
-          label: "P14a. ¿Cuáles son las razones por las que prefiere la fragancia que prefirió en P14?",
-          required: true,
-          type: "LONG_TEXT"
-        },
-        {
-          code: "P15_PREFERENCIA_INTENSIDAD",
-          label: "P15. Pensando en la intensidad del aroma de estas fragancias, ¿cuál de las dos prefiere en intensidad?",
-          options: preferenceOptions,
-          required: true,
-          type: "SELECT"
-        },
-        {
-          code: "P16_INTENSIDAD_PRIMERA",
-          label: "P16. Pensando en la intensidad la PRIMERA fragancia (BRAZO IZQUIERDO), ¿Diría que es...?",
-          labels: perceivedIntensityScaleLabels,
-          max: 7,
-          min: 1,
-          required: true,
-          type: "SCALE"
-        },
-        {
-          code: "P17_INTENSIDAD_SEGUNDA",
-          label: "P17. Pensando en la intensidad la SEGUNDA fragancia (BRAZO DERECHO), ¿Diría que es...?",
-          labels: perceivedIntensityScaleLabels,
-          max: 7,
-          min: 1,
-          required: true,
-          type: "SCALE"
-        },
-        {
-          code: "P18_MAYOR_DURACION",
-          label: "P18. ¿Cuál de las dos fragancias considera que tiene mayor duración?",
-          options: preferenceOptions,
-          required: true,
-          type: "SELECT"
-        },
-        {
-          code: "P19_PREFERENCIA_CAMBIO",
-          label: "P19. Si decidieras cambiar tu fragancia de uso habitual, ¿Por cuál de estas dos fragancias preferirías cambiarla?",
-          options: preferenceOptions,
-          required: true,
-          type: "SELECT"
-        },
-        {
-          code: "P20_ADECUADA_JAFRA",
-          label: "P20. ¿Cuál de las dos fragancias es más adecuada para la marca Jafra?",
-          options: preferenceOptions,
-          required: true,
-          type: "SELECT"
-        }
-      ],
-      title: "Sección V - Comparativa"
-    },
-    {
-      id: "DEMOGRAFICOS",
-      questions: [
-        {
-          code: "D1_ESCOLARIDAD_JEFE",
-          label: "D1. Pensando en el jefe o jefa de hogar, ¿cuál fue el último año de estudios que aprobó en la escuela?",
-          options: [
-            { label: "Sin instrucción / Preescolar", value: "0" },
-            { label: "Primaria incompleta", value: "1" },
-            { label: "Primaria completa", value: "2" },
-            { label: "Secundaria incompleta", value: "3" },
-            { label: "Secundaria completa", value: "4" },
-            { label: "Preparatoria incompleta", value: "5" },
-            { label: "Preparatoria completa", value: "6" },
-            { label: "Licenciatura incompleta", value: "7" },
-            { label: "Licenciatura completa", value: "8" },
-            { label: "Posgrado", value: "9" }
-          ],
-          required: true,
-          type: "SELECT"
-        },
-        {
-          code: "D2_BANOS_COMPLETOS",
-          label: "D2. ¿Cuántos baños completos con regadera y W.C. hay en esta vivienda?",
-          options: [
-            { label: "Ningún baño completo", value: "0" },
-            { label: "1 baño completo", value: "1" },
-            { label: "2 o más baños completos", value: "2" }
-          ],
-          required: true,
-          type: "SELECT"
-        },
-        {
-          code: "D3_AUTOS",
-          label: "D3. ¿Cuántos automóviles para su uso particular tienen en su hogar, sin contar taxis?",
-          options: [
-            { label: "0 autos", value: "0" },
-            { label: "1 auto", value: "1" },
-            { label: "2 o más autos", value: "2" }
-          ],
-          required: true,
-          type: "SELECT"
-        },
-        {
-          code: "D4_INTERNET",
-          label: "D4. Sin tomar en cuenta la conexión móvil que pudiera tener desde algún celular ¿este hogar cuenta con internet?",
-          options: [
-            { label: "No tiene", value: "0" },
-            { label: "Sí tiene", value: "1" }
-          ],
-          required: true,
-          type: "SELECT"
-        },
-        {
-          code: "D5_TRABAJADORES",
-          label: "D5. De todas las personas de más de 14 años que viven en el hogar, ¿cuántas trabajaron en el último mes?",
-          options: [
-            { label: "Ninguna", value: "0" },
-            { label: "1 persona", value: "1" },
-            { label: "2 personas", value: "2" },
-            { label: "3 personas", value: "3" },
-            { label: "4 o más personas", value: "4" }
-          ],
-          required: true,
-          type: "SELECT"
-        },
-        {
-          code: "D6_CUARTOS_DORMIR",
-          label: "D6. En esta vivienda, ¿cuántos cuartos se usan para dormir, sin contar pasillos ni baños?",
-          options: [
-            { label: "0 no tiene", value: "0" },
-            { label: "1 cuarto", value: "1" },
-            { label: "2 cuartos", value: "2" },
-            { label: "3 cuartos", value: "3" },
-            { label: "4 o más cuartos", value: "4" }
-          ],
-          required: true,
-          type: "SELECT"
-        },
-        {
-          code: "D7_PUNTAJE_NSE",
-          label: "Registrar puntaje total NSE de acuerdo a D1-D6.",
-          required: true,
-          type: "SHORT_TEXT"
-        },
-        {
-          code: "D8_NSE_REGISTRADO",
-          label: "Registrar NSE de acuerdo a puntaje.",
-          options: nseLevelOptions,
-          required: true,
-          type: "SELECT"
-        }
-      ],
-      title: "Demográficos"
+      questions: makeFragranceQuestions("B", "segunda fragancia"),
+      title: "SECCIÓN IV - EVALUACIÓN DE SEGUNDA FRAGANCIA"
     }
+    // La SECCIÓN V - COMPARATIVA (P14-P20) y DEMOGRÁFICOS pertenecen al flujo Navigo posterior, no al CTL presencial.
   ],
   version: 2
 };
@@ -517,4 +512,44 @@ export function getCtlDefinition(): CtlDefinition {
 
 export function getCtlQuestions(definition: CtlDefinition = getCtlDefinition()): CtlQuestionDefinition[] {
   return definition.sections.flatMap((section) => section.questions);
+}
+
+export function getCtlApplicableQuestions(
+  definition: CtlDefinition = getCtlDefinition(),
+  answers: CtlAnswerLookup = {}
+): CtlQuestionDefinition[] {
+  const questions = getCtlQuestions(definition);
+  const indexByCode = new Map(questions.map((question, index) => [question.code, index]));
+  const applicable: CtlQuestionDefinition[] = [];
+  let index = 0;
+
+  while (index < questions.length) {
+    const question = questions[index]!;
+    applicable.push(question);
+
+    if (question.type !== "SELECT") {
+      index += 1;
+      continue;
+    }
+
+    const answerValue = normalizeDefinitionAnswer(answers[question.code]);
+    const selected = question.options.find((option) => normalizeDefinitionAnswer(option.value) === answerValue);
+    const nextIndex = selected?.skipTo ? indexByCode.get(selected.skipTo) : undefined;
+
+    if (nextIndex !== undefined && nextIndex > index) {
+      index = nextIndex;
+      continue;
+    }
+
+    index += 1;
+  }
+
+  return applicable;
+}
+
+function normalizeDefinitionAnswer(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFC")
+    .replace(/\s+/g, "")
+    .toUpperCase();
 }

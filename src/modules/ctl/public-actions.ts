@@ -12,6 +12,7 @@ import {
 } from "./public-session";
 import {
   ctlFormDataToAnswerInput,
+  isCtlTerminatingAnswer,
   normalizeCtlCode,
   parseCtlAnswers,
   parseCtlQuestionAnswer,
@@ -145,7 +146,8 @@ export async function savePublicCtlQuestionAnswerAction(
     };
   }
 
-  const result = await createCtlRepository().saveAnswers({
+  const repository = createCtlRepository();
+  const result = await repository.saveAnswers({
     actor,
     answers: parsed.answer ? [parsed.answer] : [],
     complete: false,
@@ -156,6 +158,28 @@ export async function savePublicCtlQuestionAnswerAction(
     return {
       message: result.message,
       ok: false
+    };
+  }
+
+  if (parsed.answer && isCtlTerminatingAnswer(parsed.answer.questionCode, parsed.answer.answerValue)) {
+    const cancelled = await repository.cancelSessionAsNotQualified({
+      actor,
+      sessionId
+    });
+
+    if (!cancelled.ok) {
+      return {
+        message: cancelled.message,
+        ok: false
+      };
+    }
+
+    revalidatePath(`/ctl/${studyCode}`);
+    revalidatePath(`/ctl/${studyCode}/sessions/${sessionId}`);
+
+    return {
+      ok: true,
+      redirectTo: buildCtlPublicUrl(studyCode, { ctlMessage: "Entrevista cerrada como no calificada." })
     };
   }
 

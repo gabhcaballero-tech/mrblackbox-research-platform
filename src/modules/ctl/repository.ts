@@ -145,6 +145,10 @@ type SessionRecord = {
 };
 
 export type CtlRepository = {
+  cancelSessionAsNotQualified: (input: {
+    actor: CtlActor;
+    sessionId: string;
+  }) => Promise<{ message: string; ok: false } | { ok: true; sessionId: string }>;
   claimFolioForInterviewerCode: (input: {
     ctlInterviewerCodeId: string;
     folio: string;
@@ -226,6 +230,45 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
   }
 
   return {
+    async cancelSessionAsNotQualified(input) {
+      if (!canAccessCtl(input.actor)) {
+        return { message: "No tienes permiso para capturar CTL.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const session = (await tx.ctlSession.findUnique?.({
+          select: sessionSelect,
+          where: { id: input.sessionId }
+        })) as SessionRecord | null;
+
+        if (!session || !canReadSession(input.actor, session)) {
+          return { message: "No encontramos la sesion CTL.", ok: false };
+        }
+
+        if (session.status === "COMPLETED") {
+          return { message: "Esta sesion CTL ya fue completada.", ok: false };
+        }
+
+        if (session.status === "CANCELLED") {
+          return { ok: true, sessionId: session.id };
+        }
+
+        const now = new Date();
+        await tx.ctlSession.update?.({
+          data: {
+            completedAt: now,
+            startedAt: session.startedAt ?? now,
+            status: "CANCELLED"
+          },
+          where: { id: session.id }
+        });
+
+        return { ok: true, sessionId: session.id };
+      });
+    },
+
     async claimFolioForInterviewerCode(input) {
       const prisma = await getPrisma();
       const now = input.now ?? new Date();
@@ -1086,11 +1129,50 @@ function isUniqueConstraintError(error: unknown): boolean {
 }
 
 function formatNse(input: { nseClass: string | null; nseScore: number | null }): string {
-  if (input.nseScore === null && !input.nseClass) {
+  const level = input.nseClass ? nseClassLabel(input.nseClass) : null;
+
+  if (input.nseScore === null && !level) {
     return "Sin NSE";
   }
 
-  return [input.nseScore ?? null, input.nseClass ?? null].filter((value) => value !== null).join(" · ");
+  if (level && input.nseScore !== null) {
+    return `${level} (${input.nseScore} pts.)`;
+  }
+
+  return level ?? `${input.nseScore} pts.`;
+}
+
+function nseClassLabel(value: string): string | null {
+  switch (value.toUpperCase()) {
+    case "AB":
+    case "A/B":
+    case "RANGO-1":
+      return "A/B";
+    case "C_PLUS":
+    case "C+":
+    case "RANGO-2":
+      return "C+";
+    case "C_TIPICO":
+    case "C TIPICO":
+    case "RANGO-3":
+      return "C Tipico";
+    case "C_MINUS":
+    case "C-":
+    case "RANGO-4":
+      return "C-";
+    case "D_PLUS":
+    case "D+":
+    case "RANGO-5":
+      return "D+";
+    case "D":
+    case "RANGO-6":
+      return "D";
+    case "E":
+    case "RANGO-7":
+      return "E";
+    default:
+      return value;
+  }
 }
 
 function getSessionInterviewerName(session: {
