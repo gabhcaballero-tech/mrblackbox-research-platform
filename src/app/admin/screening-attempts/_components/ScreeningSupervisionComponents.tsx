@@ -112,6 +112,10 @@ function exportHref(data: ScreeningAttemptListData): string {
   return queryString ? `${path}?${queryString}` : path;
 }
 
+function perfumeExportHref(data: ScreeningAttemptListData): string {
+  return `/admin/studies/${data.study.id}/screening-attempts/perfumes-export`;
+}
+
 export function ScreeningAttemptFilters({ data }: { data: ScreeningAttemptListData }) {
   return (
     <form className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm" method="get">
@@ -168,11 +172,16 @@ export function ScreeningAttemptFilters({ data }: { data: ScreeningAttemptListDa
           Limpiar filtros
         </Link>
         <ExportCsvButton disabled={data.attempts.length === 0} href={exportHref(data)} />
+        <ExportCsvButton
+          disabled={data.attempts.length === 0}
+          href={perfumeExportHref(data)}
+          label="Exportar perfumes participantes"
+        />
       </div>
       <p className="mt-3 text-xs leading-5 text-zinc-500">
         {data.attempts.length === 0
           ? "No hay intentos con los filtros actuales para exportar."
-          : "La exportacion descarga un archivo tabulado compatible con Excel y respeta los filtros actuales."}
+          : "La exportacion descarga archivos tabulados compatibles con Excel. El export de perfumes genera enlaces temporales protegidos para las fotos."}
       </p>
     </form>
   );

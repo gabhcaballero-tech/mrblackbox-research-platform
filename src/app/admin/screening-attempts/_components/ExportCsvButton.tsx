@@ -1,9 +1,11 @@
 export function ExportCsvButton({
   disabled = false,
-  href
+  href,
+  label = "Exportar Excel (TSV)"
 }: {
   disabled?: boolean;
   href: string;
+  label?: string;
 }) {
   const className = `inline-flex w-fit rounded-md px-4 py-2 text-sm font-semibold transition ${
     disabled
@@ -14,14 +16,14 @@ export function ExportCsvButton({
   if (disabled) {
     return (
       <span aria-disabled="true" className={className}>
-        Exportar Excel (TSV)
+        {label}
       </span>
     );
   }
 
   return (
     <a className={className} href={href}>
-      Exportar Excel (TSV)
+      {label}
     </a>
   );
 }

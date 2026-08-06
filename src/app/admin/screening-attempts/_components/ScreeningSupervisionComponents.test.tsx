@@ -150,8 +150,12 @@ describe("ScreeningSupervisionComponents", () => {
       "href",
       "/admin/studies/study-1/screening-attempts/export?participantQuery=Gabriela&code=PASSED"
     );
+    expect(screen.getByRole("link", { name: "Exportar perfumes participantes" })).toHaveAttribute(
+      "href",
+      "/admin/studies/study-1/screening-attempts/perfumes-export"
+    );
     expect(
-      screen.getByText("La exportacion descarga un archivo tabulado compatible con Excel y respeta los filtros actuales.")
+      screen.getByText("La exportacion descarga archivos tabulados compatibles con Excel. El export de perfumes genera enlaces temporales protegidos para las fotos.")
     ).toBeInTheDocument();
   });
 
@@ -160,6 +164,8 @@ describe("ScreeningSupervisionComponents", () => {
 
     expect(screen.queryByRole("link", { name: "Exportar Excel (TSV)" })).not.toBeInTheDocument();
     expect(screen.getByText("Exportar Excel (TSV)")).toHaveAttribute("aria-disabled", "true");
+    expect(screen.queryByRole("link", { name: "Exportar perfumes participantes" })).not.toBeInTheDocument();
+    expect(screen.getByText("Exportar perfumes participantes")).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByText("No hay intentos con los filtros actuales para exportar.")).toBeInTheDocument();
   });
 
@@ -167,9 +173,12 @@ describe("ScreeningSupervisionComponents", () => {
     render(<ScreeningAttemptFilters data={listData} />);
 
     const exportLink = screen.getByRole("link", { name: "Exportar Excel (TSV)" });
+    const perfumeExportLink = screen.getByRole("link", { name: "Exportar perfumes participantes" });
 
     expect(exportLink.getAttribute("href")).toBe("/admin/studies/study-1/screening-attempts/export?participantQuery=Gabriela");
     expect(exportLink.getAttribute("onClick")).toBeNull();
+    expect(perfumeExportLink.getAttribute("href")).toBe("/admin/studies/study-1/screening-attempts/perfumes-export");
+    expect(perfumeExportLink.getAttribute("onClick")).toBeNull();
   });
 
   it("keeps Ver detalle visible in the participant column without a separate action column", () => {

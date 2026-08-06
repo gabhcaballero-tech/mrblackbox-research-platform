@@ -43,6 +43,15 @@ export type SupervisionParticipantEvidenceRecord = {
   type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION";
 };
 
+export type SupervisionPerfumeEvidenceRecord = {
+  id: string;
+  privateStorageKey: string;
+  relatedQuestionId: string | null;
+  storageBucket: string;
+  type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION";
+  uploadedAt: Date;
+};
+
 export type SupervisionAttemptRecord = {
   answers?: SupervisionAnswerRecord[];
   completedAt: Date | null;
@@ -94,6 +103,10 @@ export type SupervisionAttemptExportRecord = SupervisionAttemptDetailRecord & {
   participantEvidence: SupervisionParticipantEvidenceRecord[];
 };
 
+export type SupervisionPerfumeExportRecord = SupervisionAttemptDetailRecord & {
+  participantEvidence: SupervisionPerfumeEvidenceRecord[];
+};
+
 export type ScreeningSupervisionRepository = {
   getAttemptDetail: (attemptId: string) => Promise<SupervisionAttemptDetailRecord | null>;
   getStudy: (studyId: string) => Promise<SupervisionStudyRecord | null>;
@@ -102,6 +115,10 @@ export type ScreeningSupervisionRepository = {
     filters: ScreeningAttemptFilters;
     studyId: string;
   }) => Promise<SupervisionAttemptExportRecord[]>;
+  listStudyAttemptsForPerfumeExport: (input: {
+    studyId: string;
+  }) => Promise<SupervisionPerfumeExportRecord[]>;
+  getParticipantEvidenceForSignedLink: (evidenceId: string) => Promise<SupervisionPerfumeEvidenceRecord | null>;
   listStudyAttempts: (input: {
     filters: ScreeningAttemptFilters;
     studyId: string;
@@ -115,6 +132,9 @@ type ScreeningSupervisionPrismaClient = PrismaClientLike & {
   screeningAttempt: {
     findMany: (args: unknown) => Promise<unknown[]>;
     findUnique: (args: unknown) => Promise<SupervisionAttemptDetailRecord | null>;
+  };
+  participantEvidence: {
+    findUnique: (args: unknown) => Promise<SupervisionPerfumeEvidenceRecord | null>;
   };
   study: {
     findUnique: (args: unknown) => Promise<SupervisionStudyRecord | null>;
@@ -226,6 +246,15 @@ const participantEvidenceSelect = {
   type: true
 } as const;
 
+const perfumeEvidenceSelect = {
+  id: true,
+  privateStorageKey: true,
+  relatedQuestionId: true,
+  storageBucket: true,
+  type: true,
+  uploadedAt: true
+} as const;
+
 export function createScreeningSupervisionRepository(
   prismaClient?: ScreeningSupervisionPrismaClient
 ): ScreeningSupervisionRepository {
@@ -310,6 +339,39 @@ export function createScreeningSupervisionRepository(
         },
         where
       }) as Promise<SupervisionAttemptExportRecord[]>;
+    },
+    async listStudyAttemptsForPerfumeExport(input) {
+      const prisma = await getPrisma();
+
+      return prisma.screeningAttempt.findMany({
+        orderBy: { startedAt: "desc" },
+        select: {
+          ...attemptSelect,
+          answers: {
+            orderBy: { createdAt: "asc" },
+            select: answerSelect
+          },
+          participantEvidence: {
+            orderBy: { uploadedAt: "asc" },
+            select: perfumeEvidenceSelect,
+            where: {
+              relatedQuestionId: "F6_MARCAS_UTILIZA",
+              type: "PERFUME_PHOTO"
+            }
+          }
+        },
+        where: {
+          studyParticipant: { studyId: input.studyId }
+        }
+      }) as Promise<SupervisionPerfumeExportRecord[]>;
+    },
+    async getParticipantEvidenceForSignedLink(evidenceId) {
+      const prisma = await getPrisma();
+
+      return prisma.participantEvidence.findUnique({
+        select: perfumeEvidenceSelect,
+        where: { id: evidenceId }
+      });
     }
   };
 }

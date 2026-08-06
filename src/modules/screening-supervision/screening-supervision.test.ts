@@ -1,8 +1,13 @@
-﻿import { describe, expect, it } from "vitest";
+﻿import { afterEach, describe, expect, it, vi } from "vitest";
 import type { InternalUserRole } from "@/shared/auth/permissions";
 import type { ScreenerDefinition } from "@/modules/screener";
 import { DETERGENTS_STUDY_CODE, DETERGENT_RECRUITER_QUESTION_ID } from "@/modules/screener/study-overrides";
 import { exportScreeningAttemptsCsvForStudy } from "./export";
+import { exportScreeningPerfumeParticipantsForStudy } from "./perfume-export";
+import {
+  createSignedEvidenceToken,
+  verifySignedEvidenceToken
+} from "./signed-evidence-links";
 import {
   getScreeningAttemptSupervisionDetail,
   listScreeningAttemptsForStudy,
@@ -13,6 +18,8 @@ import type {
   SupervisionAttemptDetailRecord,
   SupervisionAttemptExportRecord,
   SupervisionFieldUserRecord,
+  SupervisionPerfumeEvidenceRecord,
+  SupervisionPerfumeExportRecord,
   SupervisionStudyRecord
 } from "./repository";
 import type { ScreeningAttemptFilters } from "./validation";
@@ -35,6 +42,10 @@ const admin = actor("ADMIN");
 const supervisor = actor("SUPERVISOR");
 const interviewer = actor("INTERVIEWER");
 const analyst = actor("ANALYST");
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 function actor(role: InternalUserRole): ScreeningSupervisionActor {
   return {
@@ -135,7 +146,7 @@ function attempt(input: Partial<SupervisionAttemptDetailRecord> = {}): Supervisi
   const completedAt = status === "STARTED" || status === "INCOMPLETE" ? null : new Date("2026-06-23T16:00:00Z");
 
   return {
-    answers: [
+    answers: input.answers ?? [
       { answerJson: "HOMBRE", questionId: "F1_GENERO" },
       { answerJson: { otherText: "Marca local", values: ["NAVIGO", "OTRA"] }, questionId: "F6_MARCAS" },
       { answerJson: 3, questionId: "F9A_VECES_AL_DIA" },
@@ -183,7 +194,7 @@ function attempt(input: Partial<SupervisionAttemptDetailRecord> = {}): Supervisi
       },
       studyId: study.id
     },
-    studyParticipantId: "study-participant-1",
+    studyParticipantId: input.studyParticipantId ?? "study-participant-1",
     source: input.source ?? "FIELD",
     terminationCode: input.terminationCode ?? (status === "TERMINATED" ? "GENERO_NO_ELEGIBLE" : null),
     terminationReason: input.terminationReason ?? (status === "TERMINATED" ? "No califica." : null)
@@ -196,6 +207,28 @@ function exportAttempt(input: Partial<SupervisionAttemptExportRecord> = {}): Sup
   return {
     ...attempt(detailInput),
     participantEvidence: input.participantEvidence ?? []
+  };
+}
+
+function perfumeExportAttempt(input: Partial<SupervisionPerfumeExportRecord> = {}): SupervisionPerfumeExportRecord {
+  const detailInput = input as Partial<SupervisionAttemptDetailRecord>;
+
+  return {
+    ...attempt(detailInput),
+    participantEvidence: input.participantEvidence ?? []
+  };
+}
+
+function perfumeEvidence(input: Partial<SupervisionPerfumeEvidenceRecord> = {}): SupervisionPerfumeEvidenceRecord {
+  const id = input.id ?? "perfume-evidence-1";
+
+  return {
+    id,
+    privateStorageKey: input.privateStorageKey ?? `studies/study-1/participants/profile-1/screening-attempts/attempt-1/perfume_photo/${id}.jpg`,
+    relatedQuestionId: input.relatedQuestionId ?? "F6_MARCAS_UTILIZA",
+    storageBucket: input.storageBucket ?? "participant-evidence",
+    type: input.type ?? "PERFUME_PHOTO",
+    uploadedAt: input.uploadedAt ?? new Date("2026-06-23T16:30:00Z")
   };
 }
 
@@ -227,8 +260,41 @@ function repository(
           ...record,
           participantEvidence: "participantEvidence" in record ? record.participantEvidence : []
         }));
+    },
+    async listStudyAttemptsForPerfumeExport({ studyId }) {
+      return records
+        .filter((record) => record.studyParticipant.studyId === studyId)
+        .sort((left, right) => right.startedAt.getTime() - left.startedAt.getTime())
+        .map((record) => ({
+          ...record,
+          participantEvidence: ("participantEvidence" in record ? record.participantEvidence as unknown[] : [])
+            .filter(isPerfumeEvidenceRecord)
+        })) as unknown as SupervisionPerfumeExportRecord[];
+    },
+    async getParticipantEvidenceForSignedLink(evidenceId) {
+      for (const record of records) {
+        const evidence = ("participantEvidence" in record ? record.participantEvidence as unknown[] : [])
+          .find((item): item is SupervisionPerfumeEvidenceRecord => isPerfumeEvidenceRecord(item) && item.id === evidenceId);
+
+        if (evidence) {
+          return evidence;
+        }
+      }
+
+      return null;
     }
   };
+}
+
+function isPerfumeEvidenceRecord(value: unknown): value is SupervisionPerfumeEvidenceRecord {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      typeof (value as { id?: unknown }).id === "string" &&
+      typeof (value as { privateStorageKey?: unknown }).privateStorageKey === "string" &&
+      typeof (value as { storageBucket?: unknown }).storageBucket === "string" &&
+      (value as { type?: unknown }).type === "PERFUME_PHOTO"
+  );
 }
 
 function matchesFilters(record: SupervisionAttemptDetailRecord, filters: ScreeningAttemptFilters): boolean {
@@ -705,6 +771,151 @@ describe("screening supervision service", () => {
       expect(row?.D1).toBe("Alto");
       expect(row?.F0_RECLUTADOR).toBe("MAR\u00cdA \u00d1AND\u00da");
     }
+  });
+
+  it("exports participant perfume brands with one temporary photo link", async () => {
+    vi.stubEnv("PARTICIPANT_PORTAL_HASH_SECRET", "test-secret");
+    vi.stubEnv("SCREENING_EVIDENCE_SIGNED_LINK_TTL_SECONDS", "604800");
+    const record = perfumeExportAttempt({
+      answers: [{ answerJson: "NAVIGO HOMME AZUL", questionId: "F6_MARCAS_UTILIZA" }],
+      participantConfirmation: {
+        folio: "NAV-001",
+        manualMessageMarkedSentAt: null,
+        manualMessageMarkedSentBy: null,
+        manualMessageStatus: "NOT_SENT",
+        referenceCodes: []
+      },
+      participantEvidence: [perfumeEvidence()]
+    });
+
+    const result = await exportScreeningPerfumeParticipantsForStudy({
+      actor: admin,
+      now: new Date("2026-06-24T12:00:00Z"),
+      repository: repository([record]),
+      requestOrigin: "https://mrblackbox.example",
+      studyId: study.id
+    });
+
+    expect(result.ok ? result.data.filename : null).toBe("FMASCULINA-NAVIGO-2026_perfumes_participantes_2026-06-24.tsv");
+    expect(result.ok ? result.data.contentType : null).toBe("text/tab-separated-values; charset=utf-8");
+    expect(result.ok ? result.data.linkTtlSeconds : null).toBe(604800);
+    const [row] = parseTsv(result.ok ? result.data.fileContent : "");
+
+    expect(row).toMatchObject({
+      Folio: "NAV-001",
+      Participante: "Participante Uno",
+      "Marca perfume": "NAVIGO HOMME AZUL"
+    });
+    expect(row?.["Foto perfume 1"]).toContain("https://mrblackbox.example/evidence/signed/");
+    expect(row?.["Foto perfume 2"]).toBe("");
+    expect(result.ok ? result.data.fileContent : "").not.toContain("privateStorageKey");
+    expect(result.ok ? result.data.fileContent : "").not.toContain("perfume_photo");
+  });
+
+  it("exports multiple perfume photos in separated columns and leaves missing photos blank", async () => {
+    vi.stubEnv("PARTICIPANT_PORTAL_HASH_SECRET", "test-secret");
+    const recordWithPhotos = perfumeExportAttempt({
+      answers: [{ answerJson: "MARCA CON\tESPACIO\nNUEVO", questionId: "F6_MARCAS_UTILIZA" }],
+      participantConfirmation: {
+        folio: "NAV-002",
+        manualMessageMarkedSentAt: null,
+        manualMessageMarkedSentBy: null,
+        manualMessageStatus: "NOT_SENT",
+        referenceCodes: []
+      },
+      participantEvidence: [
+        perfumeEvidence({ id: "photo-1" }),
+        perfumeEvidence({ id: "photo-2" }),
+        perfumeEvidence({ id: "photo-3" }),
+        perfumeEvidence({ id: "photo-4" })
+      ]
+    });
+    const recordWithoutPhotos = perfumeExportAttempt({
+      answers: [{ answerJson: "", questionId: "F6_MARCAS_UTILIZA" }],
+      id: "attempt-empty",
+      participantConfirmation: {
+        folio: "NAV-003",
+        manualMessageMarkedSentAt: null,
+        manualMessageMarkedSentBy: null,
+        manualMessageStatus: "NOT_SENT",
+        referenceCodes: []
+      },
+      studyParticipant: {
+        id: "study-participant-empty",
+        participantProfile: {
+          createdAt: new Date("2026-06-23T14:30:00Z"),
+          email: null,
+          externalReference: null,
+          id: "profile-empty",
+          name: "Participante Sin Fotos",
+          phone: null
+        },
+        studyId: study.id
+      },
+      studyParticipantId: "study-participant-empty"
+    });
+
+    const result = await exportScreeningPerfumeParticipantsForStudy({
+      actor: admin,
+      repository: repository([recordWithPhotos, recordWithoutPhotos]),
+      requestOrigin: "https://mrblackbox.example",
+      studyId: study.id
+    });
+    const rows = parseTsv(result.ok ? result.data.fileContent : "");
+    const withPhotos = rows.find((row) => row.Folio === "NAV-002");
+    const withoutPhotos = rows.find((row) => row.Folio === "NAV-003");
+
+    expect(result.ok ? result.data.rowCount : null).toBe(2);
+    expect(withPhotos?.["Marca perfume"]).toBe("MARCA CON ESPACIO NUEVO");
+    expect(withPhotos?.["Foto perfume 1"]).toContain("/evidence/signed/");
+    expect(withPhotos?.["Foto perfume 2"]).toContain("/evidence/signed/");
+    expect(withPhotos?.["Foto perfume 3"]).toContain("/evidence/signed/");
+    expect(withPhotos && Object.keys(withPhotos)).toEqual([
+      "Folio",
+      "Participante",
+      "Marca perfume",
+      "Foto perfume 1",
+      "Foto perfume 2",
+      "Foto perfume 3"
+    ]);
+    expect(withoutPhotos?.["Foto perfume 1"]).toBe("");
+    expect(withoutPhotos?.["Foto perfume 2"]).toBe("");
+    expect(withoutPhotos?.["Foto perfume 3"]).toBe("");
+  });
+
+  it("creates temporary evidence tokens that validate and reject expired links", () => {
+    const validToken = createSignedEvidenceToken({
+      evidenceId: "evidence-1",
+      now: new Date("2026-06-24T12:00:00Z"),
+      secret: "test-secret",
+      ttlSeconds: 60
+    });
+
+    expect(validToken).not.toBeNull();
+    expect(verifySignedEvidenceToken({
+      now: new Date("2026-06-24T12:00:30Z"),
+      secret: "test-secret",
+      token: validToken ?? ""
+    })).toMatchObject({ evidenceId: "evidence-1", ok: true });
+    expect(verifySignedEvidenceToken({
+      now: new Date("2026-06-24T12:02:00Z"),
+      secret: "test-secret",
+      token: validToken ?? ""
+    })).toMatchObject({ code: "EXPIRED", ok: false });
+  });
+
+  it("denies perfume export to non-admin users", async () => {
+    vi.stubEnv("PARTICIPANT_PORTAL_HASH_SECRET", "test-secret");
+
+    await expect(exportScreeningPerfumeParticipantsForStudy({
+      actor: supervisor,
+      repository: repository([perfumeExportAttempt()]),
+      requestOrigin: "https://mrblackbox.example",
+      studyId: study.id
+    })).resolves.toMatchObject({
+      code: "UNAUTHORIZED",
+      ok: false
+    });
   });
 
   it("exports every screener question column and leaves missing answers blank", async () => {
