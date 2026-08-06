@@ -1,5 +1,9 @@
 import { getPublicCtlInterviewerActor } from "@/shared/auth/ctl-public";
-import { createCtlRepository, ctlStatusLabel, type CtlParticipantSummary } from "@/modules/ctl/repository";
+import {
+  createCtlRepository,
+  ctlStatusLabel,
+  type CtlAvailableParticipantSummary
+} from "@/modules/ctl/repository";
 import {
   claimPublicCtlFolioAction,
   loginPublicCtlInterviewerAction,
@@ -10,18 +14,16 @@ export const dynamic = "force-dynamic";
 
 type CtlPublicPageProps = {
   params: Promise<{ studyCode: string }>;
-  searchParams?: Promise<{ ctlError?: string; ctlMessage?: string; folio?: string }>;
+  searchParams?: Promise<{ ctlError?: string; ctlMessage?: string }>;
 };
 
 export default async function CtlPublicPage({ params, searchParams }: CtlPublicPageProps) {
   const { studyCode } = await params;
   const query = await searchParams;
   const actor = await getPublicCtlInterviewerActor({ studyCode });
-  const folio = String(query?.folio ?? "").trim();
-  const preview = actor && folio
-    ? await createCtlRepository().previewFolioForInterviewerCode({
-        ctlInterviewerCodeId: actor.id,
-        folio
+  const availableParticipants = actor
+    ? await createCtlRepository().listAvailableParticipantsForInterviewerCode({
+        ctlInterviewerCodeId: actor.id
       })
     : null;
 
@@ -72,24 +74,16 @@ export default async function CtlPublicPage({ params, searchParams }: CtlPublicP
                 </form>
               </div>
 
-              <form className="mt-5 flex flex-col gap-3 sm:flex-row" method="get">
-                <label className="flex flex-1 flex-col gap-1 text-sm font-medium text-zinc-700">
-                  Folio
-                  <input className={inputClass} defaultValue={folio} name="folio" placeholder="NAV-104" required />
-                </label>
-                <div className="flex items-end">
-                  <button className={secondaryButtonClass} type="submit">
-                    Buscar folio
-                  </button>
-                </div>
-              </form>
+              <p className="mt-4 text-sm leading-6 text-zinc-600">
+                Selecciona un folio disponible. Al iniciar CTL, el folio queda tomado por tu codigo de encuestador.
+              </p>
             </section>
 
-            {preview?.ok ? (
-              <ParticipantPreview participant={preview.participant} studyCode={studyCode} />
-            ) : preview ? (
+            {availableParticipants?.ok ? (
+              <AvailableParticipantsTable participants={availableParticipants.participants} studyCode={studyCode} />
+            ) : availableParticipants ? (
               <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
-                {preview.message}
+                {availableParticipants.message}
               </p>
             ) : null}
           </>
@@ -99,35 +93,54 @@ export default async function CtlPublicPage({ params, searchParams }: CtlPublicP
   );
 }
 
-function ParticipantPreview({ participant, studyCode }: { participant: CtlParticipantSummary; studyCode: string }) {
+function AvailableParticipantsTable({
+  participants,
+  studyCode
+}: {
+  participants: CtlAvailableParticipantSummary[];
+  studyCode: string;
+}) {
   return (
-    <section className="rounded-lg border border-teal-200 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-semibold">Participante encontrado</h2>
-      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-        <Detail label="Nombre" value={participant.name} />
-        <Detail label="Folio" value={participant.folio} />
-        <Detail label="NSE" value={participant.nse} />
-        <Detail label="Estado CTL" value={ctlStatusLabel(participant.ctlStatus)} />
-        <Detail
-          label="Rotacion"
-          value={
-            participant.rotation.firstSampleKey && participant.rotation.secondSampleKey
-              ? `${participant.rotation.firstSampleKey} -> ${participant.rotation.secondSampleKey}`
-              : "Rotacion pendiente"
-          }
-        />
-        <Detail
-          label="Codigos de validacion"
-          value={participant.referenceCodes.map((code) => `${code.slot}: ${code.code}`).join(" / ") || "Sin codigos"}
-        />
-      </dl>
-
-      <form action={claimPublicCtlFolioAction.bind(null, studyCode)} className="mt-5">
-        <input name="folio" type="hidden" value={participant.folio} />
-        <button className={primaryButtonClass} type="submit">
-          Iniciar CTL
-        </button>
-      </form>
+    <section className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+      <div className="border-b border-zinc-200 px-4 py-3">
+        <h2 className="text-lg font-semibold">Folios disponibles</h2>
+        <p className="mt-1 text-sm text-zinc-600">Solo se muestran participantes listos para entrevista CTL.</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-left text-sm">
+          <thead className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500">
+            <tr>
+              <th className="px-4 py-3">Folio</th>
+              <th className="px-4 py-3">Nombre</th>
+              <th className="px-4 py-3">Estado CTL</th>
+              <th className="px-4 py-3">Accion</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-100">
+            {participants.length > 0 ? participants.map((participant) => (
+              <tr key={participant.id}>
+                <td className="px-4 py-3 font-mono text-xs font-semibold text-zinc-950">{participant.folio}</td>
+                <td className="px-4 py-3 font-semibold text-zinc-950">{participant.name}</td>
+                <td className="px-4 py-3 text-zinc-700">{ctlStatusLabel(participant.ctlStatus)}</td>
+                <td className="px-4 py-3">
+                  <form action={claimPublicCtlFolioAction.bind(null, studyCode)}>
+                    <input name="folio" type="hidden" value={participant.folio} />
+                    <button className={primaryButtonClass} type="submit">
+                      Iniciar CTL
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            )) : (
+              <tr>
+                <td className="px-4 py-6 text-center text-zinc-500" colSpan={4}>
+                  No hay folios disponibles para entrevista CTL en este momento.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -149,18 +162,7 @@ function Messages({ error, message }: { error?: string; message?: string }) {
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-      <dt className="text-xs font-medium text-zinc-500">{label}</dt>
-      <dd className="mt-1 font-semibold text-zinc-950">{value}</dd>
-    </div>
-  );
-}
-
 const labelClass = "flex flex-col gap-1 text-sm font-medium text-zinc-700";
 const inputClass = "rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-950";
 const primaryButtonClass =
   "inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800";
-const secondaryButtonClass =
-  "inline-flex rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50";

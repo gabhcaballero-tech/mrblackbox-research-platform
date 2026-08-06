@@ -245,6 +245,31 @@ describe("ctl module", () => {
     expect(invalid.ok).toBe(false);
   });
 
+  it("validates the generated plain CTL interviewer code through public access lookup", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+
+    const created = await repository.createInterviewerCode({
+      actor: admin,
+      label: "Encuestador IKA generado",
+      studyId: state.study.id
+    });
+    const validByStudyCode = await repository.validateInterviewerCode({
+      code: created.ok ? created.code : "",
+      studyCode: state.study.code
+    });
+    const invalidByStudyId = await repository.validateInterviewerCode({
+      code: created.ok ? created.code : "",
+      studyCode: state.study.id
+    });
+
+    expect(created.ok).toBe(true);
+    expect(created.ok ? created.code : "").toMatch(/^[ABCDEFGHJKMNPQRSTUVWXYZ2346789]{8}$/);
+    expect(validByStudyCode.ok).toBe(true);
+    expect(validByStudyCode.ok ? validByStudyCode.interviewerCode.label : "").toBe("Encuestador IKA generado");
+    expect(invalidByStudyId.ok).toBe(false);
+  });
+
   it("rejects disabled public CTL interviewer codes", async () => {
     const state = createCtlState();
     const repository = createCtlRepository(state.prisma as never);
@@ -356,6 +381,76 @@ describe("ctl module", () => {
     expect(deniedList.ok ? "" : deniedList.message).toBe("No tienes permiso para capturar CTL.");
   });
 
+  it("lists only available CTL participants for public interviewers", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const created = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-1234",
+      label: "Encuestador IKA 1",
+      studyId: state.study.id
+    });
+    state.confirmations.push({
+      ...state.confirmations[0]!,
+      folio: "NAV-002",
+      referenceCodes: [
+        { code: "AAAA", slot: 1 },
+        { code: "BBBB", slot: 2 },
+        { code: "CCCC", slot: 3 }
+      ],
+      screeningAttempt: { id: "attempt-2", nseClass: "RANGO-2", nseScore: 120, status: "PASSED" },
+      studyParticipant: {
+        ...state.confirmations[0]!.studyParticipant,
+        id: "participant-2",
+        participantProfile: { name: "BEA LOPEZ" },
+        screeningStatus: "TERMINATED" as never
+      }
+    });
+    state.confirmations.push({
+      ...state.confirmations[0]!,
+      folio: "NAV-003",
+      referenceCodes: [
+        { code: "DDDD", slot: 1 },
+        { code: "EEEE", slot: 2 },
+        { code: "FFFF", slot: 3 }
+      ],
+      screeningAttempt: { id: "attempt-3", nseClass: "RANGO-1", nseScore: 100, status: "PASSED" },
+      studyParticipant: {
+        ...state.confirmations[0]!.studyParticipant,
+        id: "participant-3",
+        participantProfile: { name: "CARLA DIAZ" },
+        rotationAssignment: null as never,
+        screeningStatus: "PASSED"
+      }
+    });
+    state.confirmations.push({
+      ...state.confirmations[0]!,
+      folio: "NAV-004",
+      referenceCodes: [{ code: "GGGG", slot: 1 }],
+      screeningAttempt: { id: "attempt-4", nseClass: "RANGO-1", nseScore: 100, status: "PASSED" },
+      studyParticipant: {
+        ...state.confirmations[0]!.studyParticipant,
+        id: "participant-4",
+        participantProfile: { name: "DIANA CRUZ" },
+        screeningStatus: "PASSED"
+      }
+    });
+
+    const available = await repository.listAvailableParticipantsForInterviewerCode({
+      ctlInterviewerCodeId: created.ok ? created.interviewerCode.id : ""
+    });
+
+    expect(available.ok).toBe(true);
+    expect(available.ok ? available.participants : []).toEqual([
+      {
+        ctlStatus: null,
+        folio: "NAV-001",
+        id: "participant-1",
+        name: "ANA PEREZ"
+      }
+    ]);
+  });
+
   it("claims a CTL folio for a public interviewer code and blocks a second code", async () => {
     const state = createCtlState();
     const repository = createCtlRepository(state.prisma as never);
@@ -392,6 +487,40 @@ describe("ctl module", () => {
         studyParticipantId: "participant-1"
       }
     ]);
+  });
+
+  it("removes occupied CTL folios from public availability", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const firstCode = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-1111",
+      label: "Encuestador IKA 1",
+      studyId: state.study.id
+    });
+    const secondCode = await repository.createInterviewerCode({
+      actor: admin,
+      code: "ika-2222",
+      label: "Encuestador IKA 2",
+      studyId: state.study.id
+    });
+
+    await repository.claimFolioForInterviewerCode({
+      ctlInterviewerCodeId: firstCode.ok ? firstCode.interviewerCode.id : "",
+      folio: "NAV-001"
+    });
+    const available = await repository.listAvailableParticipantsForInterviewerCode({
+      ctlInterviewerCodeId: secondCode.ok ? secondCode.interviewerCode.id : ""
+    });
+    const secondClaim = await repository.claimFolioForInterviewerCode({
+      ctlInterviewerCodeId: secondCode.ok ? secondCode.interviewerCode.id : "",
+      folio: "NAV-001"
+    });
+
+    expect(available.ok).toBe(true);
+    expect(available.ok ? available.participants : []).toEqual([]);
+    expect(secondClaim.ok).toBe(false);
+    expect(secondClaim.ok ? "" : secondClaim.message).toBe("Este folio ya fue tomado por otro encuestador.");
   });
 
   it("reports an occupied folio before a public interviewer claims it", async () => {
@@ -656,10 +785,11 @@ function createCtlState() {
       { code: "M3P9", slot: 2 },
       { code: "T8R2", slot: 3 }
     ],
-    screeningAttempt: { id: "attempt-1", nseClass: "RANGO-3", nseScore: 144 },
+    screeningAttempt: { id: "attempt-1", nseClass: "RANGO-3", nseScore: 144, status: "PASSED" },
     studyId: study.id,
     studyParticipant: participant
   };
+  const confirmations = [confirmation];
   const sessions: Array<{
     claimedAt: Date | null;
     completedAt: Date | null;
@@ -916,10 +1046,12 @@ function createCtlState() {
     },
     participantConfirmation: {
       async findFirst(args: { where: { folio: string; studyId: string } }) {
-        return args.where.studyId === study.id && args.where.folio === confirmation.folio ? confirmation : null;
+        return confirmations.find(
+          (candidate) => args.where.studyId === study.id && args.where.folio === candidate.folio
+        ) ?? null;
       },
       async findMany(args: { where: { studyId: string } }) {
-        return args.where.studyId === study.id ? [confirmation] : [];
+        return args.where.studyId === study.id ? confirmations : [];
       }
     },
     study: {
@@ -978,6 +1110,7 @@ function createCtlState() {
     answers,
     accessTokens,
     armAssignments,
+    confirmations,
     ctlInterviewerCodes,
     navigoActivities,
     prisma,

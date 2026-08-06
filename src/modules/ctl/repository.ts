@@ -52,6 +52,13 @@ export type CtlParticipantSummary = {
   sessionId: string | null;
 };
 
+export type CtlAvailableParticipantSummary = {
+  ctlStatus: CtlSessionStatus | null;
+  folio: string;
+  id: string;
+  name: string;
+};
+
 export type CtlSessionView = {
   answers: Record<string, unknown>;
   completedAt: Date | null;
@@ -80,6 +87,7 @@ type ConfirmationRecord = {
     id: string;
     nseClass: string | null;
     nseScore: number | null;
+    status: string;
   };
   studyParticipant: ParticipantRecord;
 };
@@ -97,6 +105,7 @@ type ParticipantRecord = {
       };
     }>;
   } | null;
+  screeningStatus: string;
 };
 
 type SessionRecord = {
@@ -119,6 +128,7 @@ type SessionRecord = {
         id: string;
         nseClass: string | null;
         nseScore: number | null;
+        status: string;
       };
     } | null;
   };
@@ -148,6 +158,10 @@ export type CtlRepository = {
     now?: Date;
     studyCode: string;
   }) => Promise<CtlPublicInterviewerActor | null>;
+  listAvailableParticipantsForInterviewerCode: (input: {
+    ctlInterviewerCodeId: string;
+    now?: Date;
+  }) => Promise<{ ok: true; participants: CtlAvailableParticipantSummary[] } | { message: string; ok: false }>;
   listParticipants: (input: { actor: CtlActor; studyId: string }) => Promise<{
     ok: true;
     participants: CtlParticipantSummary[];
@@ -366,6 +380,51 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
         role: "CTL_INTERVIEWER",
         status: "ACTIVE",
         studyId: interviewerCode.studyId
+      };
+    },
+
+    async listAvailableParticipantsForInterviewerCode(input) {
+      const prisma = await getPrisma();
+      const now = input.now ?? new Date();
+      const interviewerCode = (await prisma.ctlInterviewerCode.findUnique?.({
+        select: ctlInterviewerCodeSelect,
+        where: { id: input.ctlInterviewerCodeId }
+      })) as CtlInterviewerCodeView | null;
+
+      if (!interviewerCode || !isUsableInterviewerCode(interviewerCode, now)) {
+        return { message: "El codigo de encuestador no es valido.", ok: false };
+      }
+
+      const confirmations = (await prisma.participantConfirmation.findMany?.({
+        orderBy: { folioSequence: "asc" },
+        select: confirmationSelect,
+        where: { studyId: interviewerCode.studyId }
+      })) as ConfirmationRecord[];
+      const sessions = (await prisma.ctlSession.findMany?.({
+        select: {
+          status: true,
+          studyParticipantId: true
+        },
+        where: {
+          status: { in: ["PENDING", "IN_PROGRESS", "COMPLETED"] },
+          studyId: interviewerCode.studyId
+        }
+      })) as Array<{ status: CtlSessionStatus; studyParticipantId: string }>;
+      const unavailableParticipantIds = new Set(sessions.map((session) => session.studyParticipantId));
+
+      return {
+        ok: true,
+        participants: confirmations
+          .filter((confirmation) =>
+            isCtlAvailableConfirmation(confirmation) &&
+            !unavailableParticipantIds.has(confirmation.studyParticipant.id)
+          )
+          .map((confirmation) => ({
+            ctlStatus: null,
+            folio: confirmation.folio,
+            id: confirmation.studyParticipant.id,
+            name: confirmation.studyParticipant.participantProfile.name
+          }))
       };
     },
 
@@ -690,7 +749,7 @@ const confirmationSelect = {
     select: { code: true, slot: true }
   },
   screeningAttempt: {
-    select: { id: true, nseClass: true, nseScore: true }
+    select: { id: true, nseClass: true, nseScore: true, status: true }
   },
   studyParticipant: {
     select: {
@@ -706,7 +765,8 @@ const confirmationSelect = {
             }
           }
         }
-      }
+      },
+      screeningStatus: true
     }
   }
 } as const;
@@ -737,7 +797,7 @@ const sessionSelect = {
             select: { code: true, slot: true }
           },
           screeningAttempt: {
-            select: { id: true, nseClass: true, nseScore: true }
+            select: { id: true, nseClass: true, nseScore: true, status: true }
           }
         }
       },
@@ -752,7 +812,8 @@ const sessionSelect = {
             }
           }
         }
-      }
+      },
+      screeningStatus: true
     }
   },
   studyParticipantId: true
@@ -793,6 +854,21 @@ function toParticipantSummary(
     },
     sessionId: session?.id ?? null
   };
+}
+
+function isCtlAvailableConfirmation(confirmation: ConfirmationRecord): boolean {
+  const arms = confirmation.studyParticipant.rotationAssignment?.arms ?? [];
+  const hasCompleteRotation =
+    Boolean(arms.find((arm) => arm.applicationOrder === 1)?.studyProduct.internalCode) &&
+    Boolean(arms.find((arm) => arm.applicationOrder === 2)?.studyProduct.internalCode);
+  const hasThreeCodes = new Set(confirmation.referenceCodes.map((code) => code.slot)).size >= 3;
+
+  return (
+    confirmation.screeningAttempt.status === "PASSED" &&
+    confirmation.studyParticipant.screeningStatus === "PASSED" &&
+    hasThreeCodes &&
+    hasCompleteRotation
+  );
 }
 
 function toSessionView(session: SessionRecord): CtlSessionView {
