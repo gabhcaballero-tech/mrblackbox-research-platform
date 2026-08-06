@@ -2,6 +2,7 @@ const PUBLIC_FILE_PATTERN =
   /\.(?:avif|css|gif|ico|jpeg|jpg|js|map|png|svg|txt|webmanifest|webp|woff2?)$/i;
 
 const INTERNAL_ENTRY_PATHS = ["/admin", "/field", "/exports"] as const;
+const PUBLIC_CTL_PATTERN = /^\/ctl\/[^/]+(?:\/sessions\/[^/]+)?\/?$/;
 const PUBLIC_FIELD_SCREENING_NEW_PATTERN = /^\/field\/studies\/[^/]+\/screening\/new$/;
 const PUBLIC_FIELD_SCREENING_ATTEMPT_PATTERN = /^\/field\/screening\/[^/]+(?:\/result|\/selfie|\/evidences)?$/;
 
@@ -15,7 +16,7 @@ export function isPublicPath(pathname: string): boolean {
     pathname === "/login" ||
     pathname === "/unauthorized" ||
     pathname === "/api/health" ||
-    pathname.startsWith("/ctl/") ||
+    isPublicCtlPath(pathname) ||
     pathname.startsWith("/p/") ||
     pathname.startsWith("/participar/") ||
     PUBLIC_FIELD_SCREENING_NEW_PATTERN.test(pathname) ||
@@ -24,6 +25,10 @@ export function isPublicPath(pathname: string): boolean {
     pathname === "/favicon.ico" ||
     PUBLIC_FILE_PATTERN.test(pathname)
   );
+}
+
+export function isPublicCtlPath(pathname: string): boolean {
+  return PUBLIC_CTL_PATTERN.test(pathname);
 }
 
 export function isInternalPath(pathname: string): boolean {
