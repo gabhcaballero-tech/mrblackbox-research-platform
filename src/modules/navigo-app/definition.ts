@@ -3,17 +3,18 @@ import type { QuestionnaireQuestion } from "@/modules/questionnaire-engine";
 import { NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
 
 export const NAVIGO_APP_DEFAULT_TIME_ZONE = "America/Mexico_City";
-export const NAVIGO_MEASUREMENT_DRAFT_NAME = "App Navigo - mediciones T0/T3/T4.5/T6/T8";
+export const NAVIGO_MEASUREMENT_DRAFT_NAME = "App Navigo - mediciones T3/T4.5/T6";
 export const NAVIGO_MEASUREMENT_VERSION_NAME = "App Navigo - AP1 a AP7";
 export const NAVIGO_T0_IDENTITY_QUESTION_ID = "T0_IDENTITY_CONFIRMED";
 
-export const NAVIGO_ACTIVITY_CODES = ["T0_15_MIN", "T3_HORAS", "T4_5_HORAS", "T6_HORAS", "T8_HORAS"] as const;
-export const NAVIGO_LEGACY_ACTIVITY_CODES = ["T0_SALON", "T2_HORAS", "T4_HORAS"] as const;
+export const NAVIGO_ACTIVITY_CODES = ["T3_HORAS", "T4_5_HORAS", "T6_HORAS"] as const;
+export const NAVIGO_PREVIOUS_ACTIVITY_SEQUENCE = ["T0_15_MIN", "T3_HORAS", "T4_5_HORAS", "T6_HORAS", "T8_HORAS"] as const;
+export const NAVIGO_LEGACY_ACTIVITY_CODES = ["T0_15_MIN", "T8_HORAS", "T0_SALON", "T2_HORAS", "T4_HORAS"] as const;
 export const NAVIGO_LEGACY_ACTIVITY_SEQUENCE = ["T0_SALON", "T2_HORAS", "T4_HORAS", "T8_HORAS"] as const;
 export const NAVIGO_SUPPORTED_ACTIVITY_CODES = [...NAVIGO_ACTIVITY_CODES, ...NAVIGO_LEGACY_ACTIVITY_CODES] as const;
 
 export type NavigoCurrentActivityCode = (typeof NAVIGO_ACTIVITY_CODES)[number];
-export type NavigoLegacyActivityCode = (typeof NAVIGO_LEGACY_ACTIVITY_SEQUENCE)[number];
+export type NavigoLegacyActivityCode = (typeof NAVIGO_LEGACY_ACTIVITY_CODES)[number];
 export type NavigoActivityCode = NavigoCurrentActivityCode | NavigoLegacyActivityCode;
 export type NavigoVisualVerificationMode = "disabled" | "required";
 
@@ -138,23 +139,12 @@ export function hashNavigoMeasurementDefinition(definition: NavigoMeasurementDef
 
 export function createNavigoScheduleSeeds(questionnaireVersionId: string): NavigoScheduleSeed[] {
   return [
-    // APP v3 documents AP1-AP7 for 3, 4.5, 6 and 8 hours; keeping T0_15_MIN active needs client confirmation.
-    {
-      code: "T0_15_MIN",
-      name: "Evaluacion T0 - 15 minutos",
-      offsetMinutes: 15,
-      questionnaireVersionId,
-      sortOrder: 0,
-      type: "QUESTIONNAIRE_MEASUREMENT",
-      windowEndsMinutes: 585,
-      windowStartsMinutes: 0
-    },
     {
       code: "T3_HORAS",
       name: "Medicion 3 horas",
       offsetMinutes: 180,
       questionnaireVersionId,
-      sortOrder: 1,
+      sortOrder: 0,
       type: "QUESTIONNAIRE_MEASUREMENT",
       windowEndsMinutes: 420,
       windowStartsMinutes: -30
@@ -164,7 +154,7 @@ export function createNavigoScheduleSeeds(questionnaireVersionId: string): Navig
       name: "Medicion 4.5 horas",
       offsetMinutes: 270,
       questionnaireVersionId,
-      sortOrder: 2,
+      sortOrder: 1,
       type: "QUESTIONNAIRE_MEASUREMENT",
       windowEndsMinutes: 330,
       windowStartsMinutes: -30
@@ -174,19 +164,9 @@ export function createNavigoScheduleSeeds(questionnaireVersionId: string): Navig
       name: "Medicion 6 horas",
       offsetMinutes: 360,
       questionnaireVersionId,
-      sortOrder: 3,
+      sortOrder: 2,
       type: "QUESTIONNAIRE_MEASUREMENT",
       windowEndsMinutes: 240,
-      windowStartsMinutes: -30
-    },
-    {
-      code: "T8_HORAS",
-      name: "Medicion 8 horas",
-      offsetMinutes: 480,
-      questionnaireVersionId,
-      sortOrder: 4,
-      type: "QUESTIONNAIRE_MEASUREMENT",
-      windowEndsMinutes: 120,
       windowStartsMinutes: -30
     }
   ];
@@ -224,7 +204,7 @@ export function isFollowupNavigoEvaluation(code: string | null | undefined): cod
 }
 
 export function isLegacyNavigoActivity(code: string | null | undefined): code is NavigoLegacyActivityCode {
-  return code === "T0_SALON" || code === "T2_HORAS" || code === "T4_HORAS" || code === "T8_HORAS";
+  return code === "T0_15_MIN" || code === "T8_HORAS" || code === "T0_SALON" || code === "T2_HORAS" || code === "T4_HORAS";
 }
 
 export function isSupportedNavigoActivityCode(code: string | null | undefined): code is NavigoActivityCode {

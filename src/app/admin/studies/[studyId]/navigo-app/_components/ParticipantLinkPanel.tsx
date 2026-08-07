@@ -9,7 +9,7 @@ type ParticipantLinkPanelProps = {
 
 export function ParticipantLinkPanel({ testUrl, url }: ParticipantLinkPanelProps) {
   const [copied, setCopied] = useState(false);
-  const message = `Hola, gracias por participar en el estudio Navigo Homme. Para registrar tu aplicacion inicial y realizar tus evaluaciones de fragancia a 15 minutos, 3, 4.5, 6 y 8 horas, entra a este enlace: ${url}. Por favor conserva este mensaje y realiza cada evaluacion cuando corresponda.`;
+  const message = `Hola, gracias por participar en el estudio Navigo Homme. Para registrar tu aplicacion inicial y realizar tus evaluaciones de fragancia a 3, 4.5 y 6 horas, entra a este enlace: ${url}. Por favor conserva este mensaje y realiza cada evaluacion cuando corresponda.`;
 
   async function copyLink() {
     await navigator.clipboard.writeText(url);

@@ -197,7 +197,7 @@ export function createDefaultSimulatorServiceCatalog(): NavigoHommeSimulatorServ
       canValidatePhase: typeof hutRepository.validatePhaseCode === "function"
     },
     navigo: {
-      canCreateActivities: typeof prepareNavigoParticipantActivities === "function" && NAVIGO_ACTIVITY_CODES.length === 5,
+      canCreateActivities: typeof prepareNavigoParticipantActivities === "function" && NAVIGO_ACTIVITY_CODES.length === 3,
       canCreateToken: typeof navigoRepository.generateParticipantLink === "function",
       canRegisterInitialApplication: typeof navigoRepository.registerInitialApplication === "function",
       canReleaseParticipant: typeof navigoRepository.releaseParticipantAfterCtl === "function"

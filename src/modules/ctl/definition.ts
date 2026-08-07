@@ -137,8 +137,8 @@ const durationScaleLabels = {
 };
 
 const comparativePreferenceOptions: CtlQuestionOption[] = [
-  { label: "La primera fragancia (izquierda)", value: "1" },
-  { label: "La segunda fragancia (derecha)", value: "2" },
+  { label: "La primera (izquierda)", value: "1" },
+  { label: "La segunda (derecha)", value: "2" },
   { label: "Ambas", value: "3" },
   { label: "Ninguna", value: "4" }
 ];
@@ -357,7 +357,7 @@ const comparative15MinQuestions: CtlQuestionDefinition[] = [
     code: "P14",
     instructions: [
       {
-        text: "Verifique el orden de las claves según la rotación. La primera fragancia corresponde al brazo izquierdo y la segunda al brazo derecho.",
+        text: "VERIFIQUE EL ORDEN DE LAS CLAVES SEGÚN LA CARÁTULA DE ROTACIÓN E IDENTIFIQUE EN QUÉ BRAZO SE COLOCÓ CADA CLAVE ANTES DE REALIZAR LAS SIGUIENTES PREGUNTAS.",
         title: "INSTRUCCIÓN",
         type: "BEFORE_QUESTION"
       }
@@ -373,7 +373,7 @@ const comparative15MinQuestions: CtlQuestionDefinition[] = [
   },
   {
     code: "P14A",
-    label: "P14a. ¿Cuáles son las razones por las que prefiere la fragancia seleccionada en P14?",
+    label: "P14a. ¿Cuáles son las razones por las que prefiere (MENCIONAR LA FRAGANCIA QUE PREFIRIÓ EN P14)?",
     references: [{ label: "Respuesta P14", source: "P14" }],
     required: true,
     type: "LONG_TEXT"
@@ -437,7 +437,9 @@ function makeFragranceQuestions(suffix: "A" | "B", labelSuffix: string): CtlQues
   return [
     {
       code: `P5${suffix}`,
-      label: `P5${letter}. Por favor huela su antebrazo y díganos ¿Qué tanto le gusta la fragancia que le hemos aplicado, usted diría que...? (RU)`,
+      label: suffix === "A"
+        ? `P5${letter}. Por favor huela su antebrazo IZQUIERDO y díganos ¿Qué tanto le gusta la fragancia que le hemos aplicado, usted diría que...? (RU)`
+        : `P5${letter}. Por favor huela su antebrazo DERECHO y díganos ¿Qué tanto le gusta la fragancia que le hemos aplicado, usted diría que...? (RU)`,
       labels: likingScaleLabels,
       max: 7,
       min: 1,
@@ -718,6 +720,13 @@ export const CTL_DEFINITION: CtlDefinition = {
     },
     {
       id: "TRIANGULAR_1",
+      instructions: [
+        {
+          text: "ENTREVISTADOR: IR A LA MESA DE CONTROL POR LAS TRES PRIMERAS TIRAS.",
+          title: "INSTRUCCIÓN OPERATIVA",
+          type: "SECTION"
+        }
+      ],
       questions: [
         {
           code: "P1",
@@ -742,6 +751,13 @@ export const CTL_DEFINITION: CtlDefinition = {
     },
     {
       id: "TRIANGULAR_2",
+      instructions: [
+        {
+          text: "ENTREVISTADOR: IR A LA MESA DE CONTROL POR LAS TRES SEGUNDAS TIRAS.",
+          title: "INSTRUCCIÓN OPERATIVA",
+          type: "SECTION"
+        }
+      ],
       questions: [
         {
           code: "P3",
@@ -765,23 +781,37 @@ export const CTL_DEFINITION: CtlDefinition = {
       title: "SECCIÓN II - TRIANGULAR - 2"
     },
     {
-      description: "POR FAVOR, HUELA SU ANTEBRAZO. ENSEGUIDA LE APLICAREMOS EN SU ANTEBRAZO IZQUIERDO UNA FRAGANCIA Y LE HAREMOS UNAS PREGUNTAS.",
+      description: "ENTREVISTADOR: LLEVAR AL ENTREVISTADO A LA MESA DE CONTROL PARA QUE LE APLIQUEN LA PRIMERA FRAGANCIA EN EL BRAZO IZQUIERDO.",
       id: "FRAGRANCIA_1",
+      instructions: [
+        {
+          text: "ENTREVISTADOR: VERIFICAR QUE LA CLAVE A EVALUAR COINCIDE CON LA CARÁTULA DE ROTACIÓN. DESPUÉS APLIQUE LA CLAVE A EVALUAR AL ENTREVISTADO.",
+          title: "INSTRUCCIÓN OPERATIVA",
+          type: "SECTION"
+        }
+      ],
       questions: makeFragranceQuestions("A", "primera fragancia"),
       title: "SECCIÓN III - EVALUACIÓN DE PRIMERA FRAGANCIA"
     },
     {
-      description: "POR FAVOR, HUELA SU ANTEBRAZO. ENSEGUIDA LE APLICAREMOS EN SU ANTEBRAZO DERECHO UNA FRAGANCIA Y LE HAREMOS UNAS PREGUNTAS.",
+      description: "ENTREVISTADOR: LLEVAR AL ENTREVISTADO A LA MESA DE CONTROL PARA QUE LE APLIQUEN LA SEGUNDA FRAGANCIA EN EL BRAZO DERECHO.",
       id: "FRAGRANCIA_2",
+      instructions: [
+        {
+          text: "ENTREVISTADOR: VERIFICAR QUE LA CLAVE A EVALUAR COINCIDE CON LA CARÁTULA DE ROTACIÓN. DESPUÉS APLIQUE LA CLAVE A EVALUAR AL ENTREVISTADO.",
+          title: "INSTRUCCIÓN OPERATIVA",
+          type: "SECTION"
+        }
+      ],
       questions: makeFragranceQuestions("B", "segunda fragancia"),
       title: "SECCIÓN IV - EVALUACIÓN DE SEGUNDA FRAGANCIA"
     },
     {
-      description: "Han pasado 15 minutos después de la aplicación de las dos fragancias. Pida al participante que huela ambos antebrazos antes de responder.",
+      description: "VAMOS A REALIZAR UNA EVALUACIÓN. VERIFIQUE EL ORDEN DE LAS CLAVES SEGÚN LA CARÁTULA DE ROTACIÓN E IDENTIFIQUE EN QUÉ BRAZO SE COLOCÓ CADA CLAVE ANTES DE REALIZAR LAS SIGUIENTES PREGUNTAS.",
       id: "COMPARATIVA_15_MIN",
       instructions: [
         {
-          text: "Identifique la clave del brazo izquierdo y la clave del brazo derecho antes de iniciar la comparación.",
+          text: "POR FAVOR HUELA AMBOS ANTEBRAZOS Y RESPONDA LAS SIGUIENTES PREGUNTAS.",
           title: "INSTRUCCIÓN",
           type: "SECTION"
         }

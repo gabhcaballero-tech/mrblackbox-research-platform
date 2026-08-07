@@ -243,11 +243,9 @@ function completeSnapshot(overrides: Partial<FolioDiagnosticSnapshot> = {}): Fol
           }
         ],
         activities: [
-          activity("T0_15_MIN"),
           activity("T3_HORAS"),
           activity("T4_5_HORAS"),
-          activity("T6_HORAS"),
-          activity("T8_HORAS")
+          activity("T6_HORAS")
         ],
         applicationStartedAt: new Date("2026-08-06T17:00:00.000Z"),
         ctlSessions: [],
@@ -307,11 +305,9 @@ function completeSnapshot(overrides: Partial<FolioDiagnosticSnapshot> = {}): Fol
     hutParticipantByFolio: null,
     now,
     schedules: [
-      schedule("T0_15_MIN", 15),
       schedule("T3_HORAS", 180),
       schedule("T4_5_HORAS", 270),
-      schedule("T6_HORAS", 360),
-      schedule("T8_HORAS", 480)
+      schedule("T6_HORAS", 360)
     ],
     study: {
       code: "FMASCULINA-NAVIGO-2026",

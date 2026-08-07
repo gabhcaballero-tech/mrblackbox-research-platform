@@ -59,7 +59,7 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
     <PublicParticipantShell>
       <PageHeader
         actions={<StatusBadge status="ready">{data.folio}</StatusBadge>}
-        description="Aqui veras tu aplicacion inicial y las evaluaciones de fragancia a 15 minutos, 3, 4.5, 6 y 8 horas. Realiza cada toma lo mas cerca posible del horario recomendado."
+        description="Aqui veras tu aplicacion inicial y las evaluaciones de fragancia a 3, 4.5 y 6 horas. Realiza cada toma lo mas cerca posible del horario recomendado."
         eyebrow="App Navigo"
         title="Evaluaciones de fragancia"
       />
@@ -108,7 +108,7 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
             <div>
               <h2 className="text-lg font-semibold text-zinc-950">Aplicacion inicial de fragancia</h2>
               <p className="mt-2 text-sm text-zinc-600">
-                Este momento es la base para calcular T0 a 15 minutos y las evaluaciones posteriores.
+                Este momento es la base para calcular las evaluaciones posteriores de 3, 4.5 y 6 horas.
               </p>
               {data.applicationStartedAt ? (
                 <p className="mt-3 text-sm font-semibold text-zinc-950">
@@ -129,7 +129,7 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
                 </>
               ) : null}
               <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-                Presiona este boton justo despues de aplicar las fragancias. La primera evaluacion se abrira 15 minutos despues.
+                Presiona este boton justo despues de aplicar las fragancias. La primera evaluacion de App Navigo se abrira a las 3 horas.
               </p>
               <button className="inline-flex w-full justify-center rounded-md bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-800" type="submit">
                 Registrar aplicacion inicial
@@ -141,10 +141,10 @@ export default async function NavigoActivitiesPage({ params, searchParams }: Nav
         {data.timeline.length === 0 ? (
           <EmptyState
             title="Tus evaluaciones aun no estan programadas"
-            description="Registra primero la aplicacion inicial para calcular los horarios de T0, T3, T4.5, T6 y T8."
+            description="Registra primero la aplicacion inicial para calcular los horarios de T3, T4.5 y T6."
           />
         ) : (
-          <section className="grid gap-4 md:grid-cols-5">
+          <section className="grid gap-4 md:grid-cols-3">
             {data.timeline.map((activity) => (
               <article className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm" key={activity.id}>
                 <div className="flex items-start justify-between gap-3">

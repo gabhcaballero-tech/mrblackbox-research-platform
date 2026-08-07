@@ -2,6 +2,7 @@ import { calculateParticipantActivities, type ActivitySchedule as BaseActivitySc
 import {
   NAVIGO_ACTIVITY_CODES,
   NAVIGO_LEGACY_ACTIVITY_SEQUENCE,
+  NAVIGO_PREVIOUS_ACTIVITY_SEQUENCE,
   NAVIGO_T0_IDENTITY_QUESTION_ID,
   createNavigoMeasurementDefinition,
   isInitialNavigoEvaluation,
@@ -385,7 +386,7 @@ export function navigoActivityLabel(code: NavigoActivityCode): string {
     case "T4_HORAS":
       return "Evaluacion 4 horas (historica)";
     case "T8_HORAS":
-      return "Evaluacion 8 horas";
+      return "Evaluacion 8 horas (historica)";
   }
 }
 
@@ -930,11 +931,15 @@ function hasBlockingIdentityIssue(activities: Array<Pick<NavigoActivityRecord, "
 
 export function resolveNavigoTimelineSequence(codes: Iterable<NavigoActivityCode>): readonly NavigoActivityCode[] {
   const codeSet = new Set(codes);
-  const hasCurrentExclusive = NAVIGO_ACTIVITY_CODES.some((code) => code !== "T8_HORAS" && codeSet.has(code));
+  const hasPreviousProtocol = codeSet.has("T0_15_MIN") || codeSet.has("T8_HORAS");
   const hasLegacyExclusive = NAVIGO_LEGACY_ACTIVITY_SEQUENCE.some((code) => code !== "T8_HORAS" && codeSet.has(code));
 
-  if (hasLegacyExclusive && !hasCurrentExclusive) {
+  if (hasLegacyExclusive) {
     return NAVIGO_LEGACY_ACTIVITY_SEQUENCE;
+  }
+
+  if (hasPreviousProtocol) {
+    return NAVIGO_PREVIOUS_ACTIVITY_SEQUENCE;
   }
 
   return NAVIGO_ACTIVITY_CODES;

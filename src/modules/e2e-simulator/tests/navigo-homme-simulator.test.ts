@@ -132,11 +132,9 @@ describe("Navigo Homme E2E simulator precheck", () => {
     });
 
     expect(report.activitySchedulePreview.map((item) => [item.activityCode, item.expectedAt.toISOString()])).toEqual([
-      ["T0_15_MIN", "2026-08-07T14:15:00.000Z"],
       ["T3_HORAS", "2026-08-07T17:00:00.000Z"],
       ["T4_5_HORAS", "2026-08-07T18:30:00.000Z"],
-      ["T6_HORAS", "2026-08-07T20:00:00.000Z"],
-      ["T8_HORAS", "2026-08-07T22:00:00.000Z"]
+      ["T6_HORAS", "2026-08-07T20:00:00.000Z"]
     ]);
   });
 

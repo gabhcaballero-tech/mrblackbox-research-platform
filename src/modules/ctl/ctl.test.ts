@@ -15,7 +15,7 @@ const otherInterviewer = { id: "interviewer-2", role: "INTERVIEWER" as const, st
 const admin = { id: "admin-1", role: "ADMIN" as const, status: "ACTIVE" as const };
 
 describe("ctl module", () => {
-  it("exposes the Navigo Homme CTL v6 definition with comparative and demographic sections", () => {
+  it("exposes the Navigo Homme CTL v7 definition with comparative and demographic sections", () => {
     const definition = getCtlDefinition();
     const questions = getCtlQuestions(definition);
 
@@ -85,8 +85,15 @@ describe("ctl module", () => {
       throw new Error("P14 must be a SELECT question");
     }
     expect(p14?.options?.map((option) => option.value)).toEqual(["1", "2", "3", "4"]);
+    expect(p14?.options?.map((option) => option.label)).toEqual([
+      "La primera (izquierda)",
+      "La segunda (derecha)",
+      "Ambas",
+      "Ninguna"
+    ]);
     expect(p14?.references?.map((reference) => reference.source)).toEqual(["FIRST_SAMPLE", "SECOND_SAMPLE"]);
     expect(p14a?.type).toBe("LONG_TEXT");
+    expect(p14a?.label).toContain("MENCIONAR LA FRAGANCIA QUE PREFIRIÓ EN P14");
     expect(p16).toMatchObject({ max: 7, min: 1, type: "SCALE" });
     expect(p17).toMatchObject({ max: 7, min: 1, type: "SCALE" });
     expect(p20?.type).toBe("SELECT");
@@ -94,6 +101,30 @@ describe("ctl module", () => {
       throw new Error("P20 must be a SELECT question");
     }
     expect(p20.options.map((option) => option.value)).toEqual(["1", "2", "3", "4"]);
+  });
+
+  it("includes v7 operational instructions for triangular strips and fragrance application arms", () => {
+    const definition = getCtlDefinition();
+    const triangular1 = definition.sections.find((section) => section.id === "TRIANGULAR_1");
+    const triangular2 = definition.sections.find((section) => section.id === "TRIANGULAR_2");
+    const fragrance1 = definition.sections.find((section) => section.id === "FRAGRANCIA_1");
+    const fragrance2 = definition.sections.find((section) => section.id === "FRAGRANCIA_2");
+    const comparative = definition.sections.find((section) => section.id === "COMPARATIVA_15_MIN");
+    const p5a = getCtlQuestions(definition).find((question) => question.code === "P5A");
+    const p5b = getCtlQuestions(definition).find((question) => question.code === "P5B");
+    const p14 = getCtlQuestions(definition).find((question) => question.code === "P14");
+
+    expect(triangular1?.instructions?.[0]?.text).toContain("TRES PRIMERAS TIRAS");
+    expect(triangular2?.instructions?.[0]?.text).toContain("TRES SEGUNDAS TIRAS");
+    expect(fragrance1?.description).toContain("PRIMERA FRAGANCIA EN EL BRAZO IZQUIERDO");
+    expect(fragrance2?.description).toContain("SEGUNDA FRAGANCIA EN EL BRAZO DERECHO");
+    expect(fragrance1?.instructions?.[0]?.text).toContain("CARÁTULA DE ROTACIÓN");
+    expect(fragrance2?.instructions?.[0]?.text).toContain("CARÁTULA DE ROTACIÓN");
+    expect(p5a?.label).toContain("antebrazo IZQUIERDO");
+    expect(p5b?.label).toContain("antebrazo DERECHO");
+    expect(comparative?.description).toContain("IDENTIFIQUE EN QUÉ BRAZO SE COLOCÓ CADA CLAVE");
+    expect(comparative?.instructions?.[0]?.text).toContain("HUELA AMBOS ANTEBRAZOS");
+    expect(p14?.instructions?.[0]?.text).toContain("CARÁTULA DE ROTACIÓN");
   });
 
   it("defines real demographic NSE capture questions without automatic score calculation", () => {

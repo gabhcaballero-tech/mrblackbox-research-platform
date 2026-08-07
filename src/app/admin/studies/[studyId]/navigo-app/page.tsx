@@ -78,7 +78,7 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
     <AppShell>
       <PageHeader
         actions={<StatusBadge status={isNavigo ? "ready" : "planned"}>{isNavigo ? "Operable" : "No aplica"}</StatusBadge>}
-        description="Registro de aplicacion inicial y seguimiento de evaluaciones a 15 minutos, 3, 4.5, 6 y 8 horas."
+        description="Registro de aplicacion inicial y seguimiento de evaluaciones a 3, 4.5 y 6 horas."
         eyebrow="App Navigo"
         title={`Mediciones de fragancia · ${result.study.name}`}
       />

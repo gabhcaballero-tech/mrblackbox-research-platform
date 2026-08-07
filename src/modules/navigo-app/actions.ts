@@ -953,7 +953,7 @@ export async function registerNavigoInitialApplicationAction(tokenInput: string,
   revalidatePath(`/p/${encodeURIComponent(token)}/activities`);
   redirect(
     appendNavigoTestModeParams(
-      `/p/${encodeURIComponent(token)}/activities?message=${encodeURIComponent("Aplicacion inicial registrada. T0 estara disponible 15 minutos despues de la aplicacion.")}`,
+      `/p/${encodeURIComponent(token)}/activities?message=${encodeURIComponent("Aplicacion inicial registrada. La primera evaluacion estara disponible a las 3 horas.")}`,
       testModeParams
     )
   );

@@ -616,6 +616,7 @@ type NavigoPrismaClient = PrismaClientLike & {
   participantAttributeOrder?: Delegate;
   participantConsent?: Delegate;
   participantConfirmation: Delegate;
+  ctlSession?: Delegate;
   ctlTriangularRotationAssignment: Delegate;
   hutBlock?: Delegate;
   hutCallEvaluation?: Delegate;
@@ -3095,17 +3096,19 @@ async function submitNavigoT0FromParticipantLink({
   prisma: NavigoTransactionClient;
 }): Promise<NavigoActionResult<null>> {
   const timeZoneIana = resolveNavigoTimeZone(participant.study.timeZoneIana);
-  const schedules = await getNavigoSchedules({
+  const questionnaireVersionId = await resolveNavigoMeasurementQuestionnaireVersionId({
     participant,
     prisma
   });
-  const questionnaireVersionId = schedules.find((schedule) => schedule.questionnaireVersionId)?.questionnaireVersionId;
 
   if (!questionnaireVersionId) {
     return { message: "No encontramos cuestionario AP1 a AP7 para T0.", ok: false };
   }
 
   const applicationStartedAt = participant.applicationStartedAt ?? (activity.activitySchedule.code === "T0_SALON" ? now : null);
+  const schedules = (participant.activities ?? [])
+    .map((participantActivity) => participantActivity.activitySchedule)
+    .filter((schedule) => isSupportedNavigoActivityCode(schedule.code)) as NavigoScheduleRecord[];
 
   if (!applicationStartedAt) {
     return {
@@ -3534,7 +3537,22 @@ async function resolveNavigoMeasurementQuestionnaireVersionId({
   prisma: NavigoTransactionClient;
 }): Promise<string | null> {
   const schedules = await getNavigoSchedules({ participant, prisma });
-  return schedules.find((schedule) => schedule.questionnaireVersionId)?.questionnaireVersionId ?? null;
+  const scheduleVersionId = schedules.find((schedule) => schedule.questionnaireVersionId)?.questionnaireVersionId ?? null;
+
+  if (scheduleVersionId) {
+    return scheduleVersionId;
+  }
+
+  const version = (await prisma.questionnaireVersion.findFirst?.({
+    orderBy: { versionNumber: "desc" },
+    select: { id: true },
+    where: {
+      status: "ACTIVE",
+      studyId: participant.study.id
+    }
+  })) as { id: string } | null;
+
+  return version?.id ?? null;
 }
 
 async function saveNavigoMeasurementResponses({
@@ -5754,6 +5772,9 @@ async function deleteNavigoAppOwnedRelations(
     where: { studyParticipantId }
   });
   await tx.participantAccessToken.deleteMany?.({
+    where: { studyParticipantId }
+  });
+  await tx.ctlSession?.deleteMany?.({
     where: { studyParticipantId }
   });
 }
