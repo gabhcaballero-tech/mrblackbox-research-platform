@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getCtlApplicableQuestions, getCtlDefinition, getCtlQuestions, type CtlDefinition } from "./definition";
 import { createCtlRepository } from "./repository";
 import {
+  buildCtlTriangularAnswerValue,
   ctlFormDataToAnswerInput,
   isCtlTerminatingAnswer,
   parseCtlAnswers,
@@ -64,7 +65,7 @@ describe("ctl module", () => {
     expect(isCtlTerminatingAnswer("F1", "2")).toBe(true);
     expect(isCtlTerminatingAnswer("F9", "1")).toBe(true);
     expect(isCtlTerminatingAnswer("F9", "3")).toBe(false);
-    expect(isCtlTerminatingAnswer("P1", "1")).toBe(false);
+    expect(isCtlTerminatingAnswer("P1", "PR1")).toBe(false);
   });
 
   it("skips F11a when F11 indicates no difference", () => {
@@ -135,6 +136,78 @@ describe("ctl module", () => {
     ]);
   });
 
+  it("snapshots triangular rotation when CTL session is created", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+
+    const result = await repository.startSession({
+      actor: interviewer,
+      folio: "NAV-001",
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(true);
+    expect(state.sessions[0]?.triangularRotationSnapshot).toEqual({
+      assignmentId: "triangular-1",
+      triangular1: {
+        pr1: "K-247",
+        pr2: "0-472",
+        pr3: "H-358",
+        verify: "H-358"
+      },
+      triangular2: {
+        pr1: "G-835",
+        pr2: "Z-724",
+        pr3: "C-583",
+        verify: "Z-724"
+      }
+    });
+    expect(state.answers.some((answer) => answer.questionCode.startsWith("SYS_TRIANGULAR"))).toBe(false);
+  });
+
+  it("uses the CTL session triangular snapshot even if the live assignment changes later", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const result = await repository.startSession({
+      actor: interviewer,
+      folio: "NAV-001",
+      studyId: state.study.id
+    });
+
+    state.participant.ctlTriangularRotationAssignment = {
+      ...state.participant.ctlTriangularRotationAssignment!,
+      triangular1Pr1: "999",
+      triangular1Verify: "999"
+    };
+
+    const session = await repository.getSession({
+      actor: interviewer,
+      sessionId: result.ok ? result.sessionId : ""
+    });
+
+    expect(session?.participant.triangularRotation?.triangular1).toEqual({
+      pr1: "K-247",
+      pr2: "0-472",
+      pr3: "H-358",
+      verify: "H-358"
+    });
+  });
+
+  it("does not make new CTL sessions available without triangular rotation", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    state.participant.ctlTriangularRotationAssignment = null;
+
+    const started = await repository.startSession({
+      actor: interviewer,
+      folio: "NAV-001",
+      studyId: state.study.id
+    });
+
+    expect(started.ok).toBe(false);
+    expect(started.ok ? "" : started.message).toBe("Este folio aun no esta listo para CTL.");
+  });
+
   it("saves answers and continues capture later", async () => {
     const state = createCtlState();
     const repository = createCtlRepository(state.prisma as never);
@@ -162,8 +235,8 @@ describe("ctl module", () => {
     expect(session?.answers).toMatchObject({
       F0: "1",
       F1: "1",
-      P1: "1",
-      P3: "7",
+      P1: "PR1",
+      P3: "PR1",
       P5A: 4,
       P5B: 5
     });
@@ -205,6 +278,42 @@ describe("ctl module", () => {
     expect(parsed.ok).toBe(false);
     expect(parsed.ok ? "" : parsed.message).toBe("Selecciona una opcion valida.");
     expect(parsed.ok ? [] : parsed.missingQuestionCodes).toEqual(["P1"]);
+  });
+
+  it("builds auditable triangular answers with selected position, shown key and correctness", () => {
+    const correct = buildCtlTriangularAnswerValue({
+      answerValue: "PR2",
+      questionCode: "P1",
+      triangularRotation: {
+        triangular1: { pr1: "247", pr2: "583", pr3: "912", verify: "583" },
+        triangular2: { pr1: "835", pr2: "724", pr3: "583", verify: "724" }
+      }
+    });
+    const incorrect = buildCtlTriangularAnswerValue({
+      answerValue: "PR1",
+      questionCode: "P3",
+      triangularRotation: {
+        triangular1: { pr1: "247", pr2: "583", pr3: "912", verify: "583" },
+        triangular2: { pr1: "835", pr2: "724", pr3: "583", verify: "724" }
+      }
+    });
+
+    expect(correct).toEqual({
+      answerValue: {
+        correct: 1,
+        selectedKey: "583",
+        selectedPosition: "PR2"
+      },
+      ok: true
+    });
+    expect(incorrect).toEqual({
+      answerValue: {
+        correct: 0,
+        selectedKey: "835",
+        selectedPosition: "PR1"
+      },
+      ok: true
+    });
   });
 
   it("parses scale answers as numeric values", () => {
@@ -1042,9 +1151,9 @@ function createValidCtlAnswerInput(): CtlAnswerInput {
     F12: "2",
     F13: "1",
     F14: "2",
-    P1: "1",
+    P1: "PR1",
     P2: "1",
-    P3: "7",
+    P3: "PR1",
     P4: "1",
     P5A: "4",
     P5B: "5",
@@ -1135,6 +1244,27 @@ function createCtlState() {
   ];
   const participant = {
     applicationStartedAt: null as Date | null,
+    ctlTriangularRotationAssignment: {
+      id: "triangular-1",
+      triangular1Pr1: "K-247",
+      triangular1Pr2: "0-472",
+      triangular1Pr3: "H-358",
+      triangular1Verify: "H-358",
+      triangular2Pr1: "G-835",
+      triangular2Pr2: "Z-724",
+      triangular2Pr3: "C-583",
+      triangular2Verify: "Z-724"
+    } as null | {
+      id: string;
+      triangular1Pr1: string;
+      triangular1Pr2: string;
+      triangular1Pr3: string;
+      triangular1Verify: string;
+      triangular2Pr1: string;
+      triangular2Pr2: string;
+      triangular2Pr3: string;
+      triangular2Verify: string;
+    },
     id: "participant-1",
     participantEvidence: [],
     participantProfile: { name: "ANA PEREZ" },
@@ -1185,6 +1315,7 @@ function createCtlState() {
     status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
     studyId: string;
     studyParticipantId: string;
+    triangularRotationSnapshot?: unknown;
   }> = [];
   const ctlInterviewerCodes: Array<{
     codeHash: string;
@@ -1345,6 +1476,7 @@ function createCtlState() {
           status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
           studyId: string;
           studyParticipantId: string;
+          triangularRotationSnapshot?: unknown;
         };
         select: { id: true };
       }) {
@@ -1369,7 +1501,8 @@ function createCtlState() {
           startedAt: args.data.startedAt ?? null,
           status: args.data.status,
           studyId: args.data.studyId,
-          studyParticipantId: args.data.studyParticipantId
+          studyParticipantId: args.data.studyParticipantId,
+          triangularRotationSnapshot: args.data.triangularRotationSnapshot
         };
         sessions.push(record);
         return { id: record.id };
@@ -1534,6 +1667,7 @@ function createCtlState() {
     confirmations,
     ctlInterviewerCodes,
     navigoActivities,
+    participant,
     prisma,
     sessions,
     study

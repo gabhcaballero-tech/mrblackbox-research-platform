@@ -565,12 +565,9 @@ export const CTL_DEFINITION: CtlDefinition = {
           code: "P1",
           label: "P1. Ahora, le pediremos que por favor huela estas tres tiras con fragancia, una de ellas es diferente, por favor, indíquenos: ¿Cuál de ellas es diferente a las otras 2?",
           options: [
-            { label: "K-247", value: "1" },
-            { label: "O-472", value: "2" },
-            { label: "C-583", value: "3" },
-            { label: "G-835", value: "4" },
-            { label: "H-358", value: "5" },
-            { label: "Z-724", value: "6" }
+            { label: "{{TRIANGULAR_1_PR1}}", value: "PR1" },
+            { label: "{{TRIANGULAR_1_PR2}}", value: "PR2" },
+            { label: "{{TRIANGULAR_1_PR3}}", value: "PR3" }
           ],
           required: true,
           type: "SELECT"
@@ -592,12 +589,9 @@ export const CTL_DEFINITION: CtlDefinition = {
           code: "P3",
           label: "P3. Ahora, le pediremos que por favor huela estas tres tiras con fragancia, una de ellas es diferente, por favor, indíquenos: ¿Cuál de ellas es diferente a las otras 2?",
           options: [
-            { label: "G-853", value: "7" },
-            { label: "H-358", value: "8" },
-            { label: "Z-742", value: "9" },
-            { label: "K-247", value: "10" },
-            { label: "O-472", value: "11" },
-            { label: "C-583", value: "12" }
+            { label: "{{TRIANGULAR_2_PR1}}", value: "PR1" },
+            { label: "{{TRIANGULAR_2_PR2}}", value: "PR2" },
+            { label: "{{TRIANGULAR_2_PR3}}", value: "PR3" }
           ],
           required: true,
           type: "SELECT"

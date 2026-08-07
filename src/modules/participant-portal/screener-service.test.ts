@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ScreenerDefinition } from "@/modules/screener";
-import { DETERGENTS_STUDY_CODE, DETERGENT_RECRUITER_QUESTION_ID } from "@/modules/screener/study-overrides";
+import {
+  DETERGENTS_STUDY_CODE,
+  DETERGENT_RECRUITER_QUESTION_ID,
+  NAVIGO_HUT_ACCESS_QUESTION_ID,
+  NAVIGO_HUT_ACCESS_YES_VALUE,
+  NAVIGO_STUDY_CODE
+} from "@/modules/screener/study-overrides";
 import { createDetergentsScreenerDefinition } from "@/modules/study-templates/detergents";
 import type { ParticipantPortalIdentity } from "@/shared/auth/participant-portal";
 import { createParticipantPortalScreenerRepository } from "./screener-repository";
@@ -503,6 +509,10 @@ async function answerEligible(
   for (const questionId of ["D1", "D2", "D3", "D4", "D5", "D6"]) {
     await answer(repository, attemptId, questionId, "HIGH", "", studyCode);
   }
+
+  if (studyCode === NAVIGO_STUDY_CODE) {
+    await answer(repository, attemptId, NAVIGO_HUT_ACCESS_QUESTION_ID, NAVIGO_HUT_ACCESS_YES_VALUE, "", studyCode);
+  }
 }
 
 async function answerEligibleDetergents(
@@ -884,14 +894,15 @@ describe("participant portal screener service", () => {
       await answer(repository, attemptId, questionId, "HIGH");
     }
 
-    const saved = await answer(repository, attemptId, "D6", "HIGH");
+    await answer(repository, attemptId, "D6", "HIGH");
+    const saved = await answer(repository, attemptId, NAVIGO_HUT_ACCESS_QUESTION_ID, NAVIGO_HUT_ACCESS_YES_VALUE);
 
     expect(saved.ok).toBe(true);
     expect(confirmations).toHaveLength(1);
     expect(attempts[0].participantConfirmation?.folio).toBe("NAV-001");
     expect(attempts[0].participantConfirmation?.referenceCodes).toHaveLength(3);
 
-    const retry = await answer(repository, attemptId, "D6", "HIGH");
+    const retry = await answer(repository, attemptId, NAVIGO_HUT_ACCESS_QUESTION_ID, NAVIGO_HUT_ACCESS_YES_VALUE);
 
     expect(retry.ok).toBe(false);
     expect(confirmations).toHaveLength(1);

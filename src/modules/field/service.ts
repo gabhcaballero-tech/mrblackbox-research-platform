@@ -11,6 +11,7 @@ import {
   type ScreenerEvaluationResult,
   type ScreenerQuestion
 } from "@/modules/screener";
+import { applyStudyScreenerDefinitionOverrides } from "@/modules/screener/study-overrides";
 import {
   fieldAnswerInputSchema,
   fieldParticipantInputSchema,
@@ -294,7 +295,7 @@ export async function getFieldStudy({
   }
 
   try {
-    parseScreenerDefinition(study.activeScreenerVersion.definitionJson);
+    parseFieldScreenerDefinition(study.code, study.activeScreenerVersion.definitionJson);
   } catch {
     return {
       code: "STUDY_NOT_AVAILABLE",
@@ -347,7 +348,7 @@ export async function startFieldScreeningAttempt({
   }
 
   try {
-    parseScreenerDefinition(study.activeScreenerVersion.definitionJson);
+    parseFieldScreenerDefinition(study.code, study.activeScreenerVersion.definitionJson);
   } catch {
     return {
       code: "STUDY_NOT_AVAILABLE",
@@ -1131,7 +1132,10 @@ async function loadAttemptContext({
   let definition: ScreenerDefinition;
 
   try {
-    definition = parseScreenerDefinition(attempt.questionnaireVersion.definitionJson);
+    definition = parseFieldScreenerDefinition(
+      attempt.questionnaireVersion.study.code,
+      attempt.questionnaireVersion.definitionJson
+    );
   } catch {
     return {
       code: "STUDY_NOT_AVAILABLE",
@@ -1455,6 +1459,10 @@ function buildAttemptScreen(
 
 function recordsToAnswers(answerRecords: FieldScreeningAnswerRecord[]): ScreenerAnswers {
   return Object.fromEntries(answerRecords.map((answer) => [answer.questionId, answer.answerJson as ScreenerAnswer]));
+}
+
+function parseFieldScreenerDefinition(studyCode: string, definitionJson: unknown): ScreenerDefinition {
+  return applyStudyScreenerDefinitionOverrides(studyCode, parseScreenerDefinition(definitionJson));
 }
 
 function normalizeAnswerForQuestion(question: ScreenerQuestion, input: FieldAnswerInput): ScreenerAnswer {

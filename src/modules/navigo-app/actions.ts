@@ -26,6 +26,12 @@ import {
 } from "./service";
 import { isSupportedNavigoActivityCode, type NavigoActivityCode } from "./definition";
 import type { NavigoRotationImportActionState } from "./rotation-import-state";
+import type { NavigoRotationWorkbookImportActionState } from "./rotation-workbook-import-state";
+import {
+  parseNavigoRotationWorkbook,
+  type NavigoHutRotationWorkbookRowInput,
+  type NavigoRotationWorkbookRowInput
+} from "./rotation-workbook";
 import type { NavigoParticipantImportActionState } from "./participant-import-state";
 import type { EvidenceUploadMetadata } from "@/modules/participant-portal/evidence-storage";
 
@@ -505,6 +511,169 @@ export async function applyNavigoRotationImportRowsAction(
   };
 }
 
+export async function previewNavigoRotationWorkbookImportAction(
+  studyId: string,
+  formData: FormData
+): Promise<NavigoRotationWorkbookImportActionState> {
+  await requireCapability("rotation:register");
+  const file = formData.get("rotationWorkbookFile");
+
+  if (!(file instanceof File) || file.size === 0) {
+    return {
+      filename: null,
+      hutRows: [],
+      message: "Selecciona ROTACIONES NAVIGO.xlsx.",
+      preview: null,
+      rows: [],
+      status: "error"
+    };
+  }
+
+  let parsed: ReturnType<typeof parseNavigoRotationWorkbook>;
+  try {
+    parsed = parseNavigoRotationWorkbook({
+      bytes: await file.arrayBuffer(),
+      filename: file.name
+    });
+  } catch (error) {
+    logNavigoRotationImportError({
+      error,
+      step: "parse-workbook",
+      studyId
+    });
+
+    return {
+      filename: file.name,
+      hutRows: [],
+      message: "No fue posible previsualizar el XLSX oficial. Revisa el archivo y vuelve a intentarlo.",
+      preview: null,
+      rows: [],
+      status: "error"
+    };
+  }
+
+  if (!parsed.ok) {
+    return {
+      filename: file.name,
+      hutRows: [],
+      message: parsed.message,
+      preview: null,
+      rows: [],
+      status: "error"
+    };
+  }
+
+  try {
+    const result = await createNavigoAppRepository().previewRotationWorkbookImport({
+      hutRows: parsed.hutRows,
+      rows: parsed.rows,
+      studyId
+    });
+
+    if (!result.ok) {
+      return {
+        filename: file.name,
+        hutRows: parsed.hutRows,
+        message: result.message,
+        preview: null,
+        rows: parsed.rows,
+        status: "error"
+      };
+    }
+
+    return {
+      filename: file.name,
+      hutRows: parsed.hutRows,
+      message: "Previsualizacion XLSX lista. Revisa los errores antes de aplicar.",
+      preview: result.data,
+      rows: parsed.rows,
+      status: result.data.summary.rowsWithError > 0 ? "error" : "success"
+    };
+  } catch (error) {
+    logNavigoRotationImportError({
+      error,
+      step: "preview-workbook",
+      studyId
+    });
+
+    return {
+      filename: file.name,
+      hutRows: parsed.hutRows,
+      message: "No fue posible previsualizar el XLSX oficial. Revisa logs.",
+      preview: null,
+      rows: parsed.rows,
+      status: "error"
+    };
+  }
+}
+
+export async function applyNavigoRotationWorkbookImportRowsAction(
+  studyId: string,
+  filename: string,
+  rows: NavigoRotationWorkbookRowInput[],
+  hutRows: NavigoHutRotationWorkbookRowInput[] = []
+): Promise<NavigoRotationWorkbookImportActionState> {
+  const actor = await requireCapability("rotation:register");
+
+  if (rows.length === 0) {
+    return {
+      filename,
+      hutRows,
+      message: "Primero previsualiza ROTACIONES NAVIGO.xlsx.",
+      preview: null,
+      rows: [],
+      status: "error"
+    };
+  }
+
+  try {
+    const result = await createNavigoAppRepository().applyRotationWorkbookImport({
+      actorUserId: actor.id,
+      filename,
+      hutRows,
+      rows,
+      studyId
+    });
+
+    if (!result.ok) {
+      return {
+        filename,
+        hutRows,
+        message: result.message,
+        preview: result.data ?? null,
+        rows,
+        status: "error"
+      };
+    }
+
+    revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+
+    return {
+      filename,
+      hutRows,
+      message: `ROTACIONES NAVIGO.xlsx importado correctamente. Filas CLT aplicadas: ${result.data.summary.validRows}. Rotaciones triangulares listas: ${result.data.summary.triangularComplete}. Filas HUT listas: ${result.data.summary.hut.validRows}.`,
+      preview: result.data,
+      rows,
+      status: "success"
+    };
+  } catch (error) {
+    logNavigoRotationImportError({
+      error,
+      step: "apply-workbook",
+      studyId
+    });
+
+    return {
+      filename,
+      hutRows,
+      message: "No fue posible guardar ROTACIONES NAVIGO.xlsx. Revisa logs.",
+      preview: null,
+      rows,
+      status: "error"
+    };
+  }
+}
+
 export async function previewNavigoParticipantImportTextAction(
   studyId: string,
   filename: string,
@@ -629,7 +798,7 @@ function logNavigoRotationImportError({
   studyId
 }: {
   error: unknown;
-  step: "apply" | "parse" | "preview" | "preview-file";
+  step: "apply" | "apply-workbook" | "parse" | "parse-workbook" | "preview" | "preview-file" | "preview-workbook";
   studyId: string;
 }) {
   const message = error instanceof Error ? error.message : "unknown";

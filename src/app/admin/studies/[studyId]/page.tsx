@@ -142,6 +142,14 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
               App Navigo
             </Link>
           ) : null}
+          {config.study.code === NAVIGO_STUDY_CODE ? (
+            <Link
+              className="text-sm font-semibold text-zinc-700 transition hover:text-zinc-950"
+              href={`/admin/studies/${studyId}/diagnostico-folio`}
+            >
+              Diagnostico por folio
+            </Link>
+          ) : null}
           <Link
             className="text-sm font-semibold text-zinc-700 transition hover:text-zinc-950"
             href={`/admin/studies/${studyId}/hut`}

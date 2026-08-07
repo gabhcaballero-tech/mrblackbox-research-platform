@@ -43,6 +43,7 @@ import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { resolveRequestOrigin } from "@/shared/utils/request-origin";
 import { ParticipantLinkPanel } from "./_components/ParticipantLinkPanel";
 import { NavigoRotationImportPanel } from "./_components/NavigoRotationImportPanel";
+import { NavigoRotationWorkbookImportPanel } from "./_components/NavigoRotationWorkbookImportPanel";
 import { NavigoParticipantOperationsPanel } from "./_components/NavigoParticipantOperationsPanel";
 
 export const dynamic = "force-dynamic";
@@ -118,6 +119,7 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
           <StudyRotationConfigurationPanel rotationConfig={result.rotationConfig} studyId={studyId} />
           <DirectParticipantRegistration studyId={studyId} />
           <BulkLinkGeneration studyId={studyId} />
+          <NavigoRotationWorkbookImportPanel studyId={studyId} />
           <NavigoRotationImportPanel studyId={studyId} />
 
           {result.participants.length === 0 ? (

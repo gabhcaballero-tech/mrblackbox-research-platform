@@ -114,18 +114,75 @@ describe("CtlMobileCapture", () => {
     expect(screen.getByText("Primera fragancia:")).toBeInTheDocument();
     expect(screen.getByText("247")).toBeInTheDocument();
   });
+
+  it("renders P1 with triangular 1 keys from the participant rotation", () => {
+    renderMobileCapture({ definition: triangularDefinition });
+
+    expect(screen.getByRole("button", { name: "247" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "583" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "912" })).toBeInTheDocument();
+    expect(screen.queryByText("SECRET-1")).not.toBeInTheDocument();
+  });
+
+  it("renders P3 with triangular 2 keys from the participant rotation", () => {
+    renderMobileCapture({
+      answers: {
+        P1: {
+          correct: 1,
+          selectedKey: "583",
+          selectedPosition: "PR2"
+        }
+      },
+      definition: triangularDefinition
+    });
+
+    expect(screen.getByText("Pregunta 2 de 2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "835" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "724" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "555" })).toBeInTheDocument();
+    expect(screen.queryByText("SECRET-2")).not.toBeInTheDocument();
+  });
+
+  it("saves triangular answers as selected position from dynamic key buttons", async () => {
+    renderMobileCapture({ definition: triangularDefinition });
+
+    fireEvent.click(screen.getByRole("button", { name: "583" }));
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    await waitFor(() => expect(saveQuestionMock).toHaveBeenCalledTimes(1));
+    expect(saveQuestionMock.mock.calls[0]?.[2]).toBe("P1");
+    expect((saveQuestionMock.mock.calls[0]?.[3] as FormData).get("P1")).toBe("PR2");
+  });
 });
 
-function renderMobileCapture({ answers = {} }: { answers?: Record<string, unknown> } = {}) {
+function renderMobileCapture({
+  answers = {},
+  definition = mobileDefinition
+}: {
+  answers?: Record<string, unknown>;
+  definition?: CtlDefinition;
+} = {}) {
   render(
     <CtlMobileCapture
       answers={answers}
-      definition={mobileDefinition}
+      definition={definition}
       participant={{
         firstSampleKey: "247",
         folio: "NAV-001",
         name: "ANA PEREZ",
-        secondSampleKey: "583"
+        secondSampleKey: "583",
+        triangularRotation: {
+          triangular1: {
+            pr1: "247",
+            pr2: "583",
+            pr3: "912"
+          },
+          triangular2: {
+            pr1: "835",
+            pr2: "724",
+            pr3: "555"
+          }
+        }
       }}
       readOnly={false}
       sessionId="session-1"
@@ -183,6 +240,40 @@ const mobileDefinition: CtlDefinition = {
         }
       ],
       title: "Seccion inicial"
+    }
+  ],
+  version: 2
+};
+
+const triangularDefinition: CtlDefinition = {
+  sections: [
+    {
+      id: "TRIANGULAR",
+      questions: [
+        {
+          code: "P1",
+          label: "Triangular 1",
+          options: [
+            { label: "{{TRIANGULAR_1_PR1}}", value: "PR1" },
+            { label: "{{TRIANGULAR_1_PR2}}", value: "PR2" },
+            { label: "{{TRIANGULAR_1_PR3}}", value: "PR3" }
+          ],
+          required: true,
+          type: "SELECT"
+        },
+        {
+          code: "P3",
+          label: "Triangular 2",
+          options: [
+            { label: "{{TRIANGULAR_2_PR1}}", value: "PR1" },
+            { label: "{{TRIANGULAR_2_PR2}}", value: "PR2" },
+            { label: "{{TRIANGULAR_2_PR3}}", value: "PR3" }
+          ],
+          required: true,
+          type: "SELECT"
+        }
+      ],
+      title: "Triangular"
     }
   ],
   version: 2

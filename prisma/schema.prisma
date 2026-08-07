@@ -409,37 +409,38 @@ model InternalUser {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  createdStudies                      Study[]                         @relation("StudyCreatedBy")
-  createdParticipantProfiles          ParticipantProfile[]            @relation("ParticipantProfileCreatedBy")
-  createdStudyParticipants            StudyParticipant[]              @relation("StudyParticipantCreatedBy")
-  registeredApplicationTimes          StudyParticipant[]              @relation("ApplicationTimeRegisteredBy")
-  applicationTimeEvents               ApplicationTimeEvent[]          @relation("ApplicationTimeEventCreatedBy")
-  createdAccessTokens                 ParticipantAccessToken[]        @relation("ParticipantAccessTokenCreatedBy")
-  revokedAccessTokens                 ParticipantAccessToken[]        @relation("ParticipantAccessTokenRevokedBy")
-  createdQuestionnaireDrafts          QuestionnaireDraft[]            @relation("QuestionnaireDraftCreatedBy")
-  updatedQuestionnaireDrafts          QuestionnaireDraft[]            @relation("QuestionnaireDraftUpdatedBy")
-  publishedQuestionnaires             QuestionnaireVersion[]          @relation("QuestionnaireVersionPublishedBy")
-  retiredQuestionnaires               QuestionnaireVersion[]          @relation("QuestionnaireVersionRetiredBy")
-  createdLibraryItems                 LibraryItem[]                   @relation("LibraryItemCreatedBy")
-  createdLibraryRevisions             LibraryItemRevision[]           @relation("LibraryItemRevisionCreatedBy")
-  retiredLibraryRevisions             LibraryItemRevision[]           @relation("LibraryItemRevisionRetiredBy")
-  insertedLibraryUses                 QuestionnaireDraftLibraryUse[]  @relation("QuestionnaireDraftLibraryUseInsertedBy")
-  screeningAttempts                   ScreeningAttempt[]              @relation("ScreeningAttemptFieldUser")
-  reviewedParticipantEvidence         ParticipantEvidence[]           @relation("ParticipantEvidenceReviewedBy")
-  reviewedParticipantActivityEvidence ParticipantActivityEvidence[]   @relation("ParticipantActivityEvidenceReviewedBy")
-  reviewedParticipantScreeningReviews ParticipantScreeningReview[]    @relation("ParticipantScreeningReviewReviewedBy")
-  approvedParticipantConfirmations    ParticipantConfirmation[]       @relation("ParticipantConfirmationApprovedBy")
-  manualParticipantMessagesMarkedSent ParticipantConfirmation[]       @relation("ParticipantConfirmationManualMessageMarkedSentBy")
-  rotationAssignments                 ParticipantRotationAssignment[] @relation("ParticipantRotationAssignedBy")
-  ctlSessions                         CtlSession[]                    @relation("CtlSessionInterviewer")
-  createdCtlInterviewerCodes          CtlInterviewerCode[]            @relation("CtlInterviewerCodeCreatedBy")
-  reopenedActivities                  ParticipantActivity[]           @relation("ParticipantActivityReopenedBy")
-  reviewedMediaEvidence               MediaEvidencePlaceholder[]      @relation("MediaEvidenceReviewedBy")
-  exportJobs                          ExportJob[]                     @relation("ExportJobRequestedBy")
-  auditLogs                           AuditLog[]                      @relation("AuditLogActor")
-  capturedHutReferenceSelfies         HutReferenceSelfie[]            @relation("HutReferenceSelfieCapturedBy")
-  reviewedHutVisualVerifications      HutVisualVerification[]         @relation("HutVisualVerificationReviewedBy")
-  hutVisualOverrides                  HutParticipant[]                @relation("HutVisualOverrideBy")
+  createdStudies                      Study[]                           @relation("StudyCreatedBy")
+  createdParticipantProfiles          ParticipantProfile[]              @relation("ParticipantProfileCreatedBy")
+  createdStudyParticipants            StudyParticipant[]                @relation("StudyParticipantCreatedBy")
+  registeredApplicationTimes          StudyParticipant[]                @relation("ApplicationTimeRegisteredBy")
+  applicationTimeEvents               ApplicationTimeEvent[]            @relation("ApplicationTimeEventCreatedBy")
+  createdAccessTokens                 ParticipantAccessToken[]          @relation("ParticipantAccessTokenCreatedBy")
+  revokedAccessTokens                 ParticipantAccessToken[]          @relation("ParticipantAccessTokenRevokedBy")
+  createdQuestionnaireDrafts          QuestionnaireDraft[]              @relation("QuestionnaireDraftCreatedBy")
+  updatedQuestionnaireDrafts          QuestionnaireDraft[]              @relation("QuestionnaireDraftUpdatedBy")
+  publishedQuestionnaires             QuestionnaireVersion[]            @relation("QuestionnaireVersionPublishedBy")
+  retiredQuestionnaires               QuestionnaireVersion[]            @relation("QuestionnaireVersionRetiredBy")
+  createdLibraryItems                 LibraryItem[]                     @relation("LibraryItemCreatedBy")
+  createdLibraryRevisions             LibraryItemRevision[]             @relation("LibraryItemRevisionCreatedBy")
+  retiredLibraryRevisions             LibraryItemRevision[]             @relation("LibraryItemRevisionRetiredBy")
+  insertedLibraryUses                 QuestionnaireDraftLibraryUse[]    @relation("QuestionnaireDraftLibraryUseInsertedBy")
+  screeningAttempts                   ScreeningAttempt[]                @relation("ScreeningAttemptFieldUser")
+  reviewedParticipantEvidence         ParticipantEvidence[]             @relation("ParticipantEvidenceReviewedBy")
+  reviewedParticipantActivityEvidence ParticipantActivityEvidence[]     @relation("ParticipantActivityEvidenceReviewedBy")
+  reviewedParticipantScreeningReviews ParticipantScreeningReview[]      @relation("ParticipantScreeningReviewReviewedBy")
+  approvedParticipantConfirmations    ParticipantConfirmation[]         @relation("ParticipantConfirmationApprovedBy")
+  manualParticipantMessagesMarkedSent ParticipantConfirmation[]         @relation("ParticipantConfirmationManualMessageMarkedSentBy")
+  rotationAssignments                 ParticipantRotationAssignment[]   @relation("ParticipantRotationAssignedBy")
+  ctlSessions                         CtlSession[]                      @relation("CtlSessionInterviewer")
+  createdCtlInterviewerCodes          CtlInterviewerCode[]              @relation("CtlInterviewerCodeCreatedBy")
+  importedCtlTriangularRotations      CtlTriangularRotationAssignment[] @relation("CtlTriangularRotationImportedBy")
+  reopenedActivities                  ParticipantActivity[]             @relation("ParticipantActivityReopenedBy")
+  reviewedMediaEvidence               MediaEvidencePlaceholder[]        @relation("MediaEvidenceReviewedBy")
+  exportJobs                          ExportJob[]                       @relation("ExportJobRequestedBy")
+  auditLogs                           AuditLog[]                        @relation("AuditLogActor")
+  capturedHutReferenceSelfies         HutReferenceSelfie[]              @relation("HutReferenceSelfieCapturedBy")
+  reviewedHutVisualVerifications      HutVisualVerification[]           @relation("HutVisualVerificationReviewedBy")
+  hutVisualOverrides                  HutParticipant[]                  @relation("HutVisualOverrideBy")
 
   @@map("internal_users")
 }
@@ -620,10 +621,10 @@ model StudyParticipant {
   createdAt                              DateTime                          @default(now())
   updatedAt                              DateTime                          @updatedAt
 
-  participantProfile               ParticipantProfile             @relation(fields: [participantProfileId], references: [id])
-  study                            Study                          @relation(fields: [studyId], references: [id])
-  createdBy                        InternalUser?                  @relation("StudyParticipantCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  applicationStartedAtRegisteredBy InternalUser?                  @relation("ApplicationTimeRegisteredBy", fields: [applicationStartedAtRegisteredByUserId], references: [id])
+  participantProfile               ParticipantProfile               @relation(fields: [participantProfileId], references: [id])
+  study                            Study                            @relation(fields: [studyId], references: [id])
+  createdBy                        InternalUser?                    @relation("StudyParticipantCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  applicationStartedAtRegisteredBy InternalUser?                    @relation("ApplicationTimeRegisteredBy", fields: [applicationStartedAtRegisteredByUserId], references: [id])
   applicationTimeEvents            ApplicationTimeEvent[]
   accessTokens                     ParticipantAccessToken[]
   screeningAttempts                ScreeningAttempt[]
@@ -634,10 +635,12 @@ model StudyParticipant {
   participantConfirmation          ParticipantConfirmation?
   quotaEvaluations                 QuotaEvaluation[]
   rotationAssignment               ParticipantRotationAssignment?
+  ctlTriangularRotationAssignment  CtlTriangularRotationAssignment?
   armAssignments                   ParticipantArmAssignment[]
   activities                       ParticipantActivity[]
   attributeOrders                  ParticipantAttributeOrder[]
   ctlSessions                      CtlSession[]
+  hutParticipant                   HutParticipant?
 
   @@unique([participantProfileId, studyId])
   @@index([studyId, operationalStatus])
@@ -695,6 +698,7 @@ model ParticipantAccessToken {
 model HutParticipant {
   id                      String               @id @default(uuid()) @db.Uuid
   studyId                 String               @db.Uuid
+  studyParticipantId      String?              @unique @db.Uuid
   folio                   String?
   name                    String
   phone                   String?
@@ -715,10 +719,11 @@ model HutParticipant {
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
 
-  study               Study                   @relation(fields: [studyId], references: [id])
-  visualOverrideBy    InternalUser?           @relation("HutVisualOverrideBy", fields: [visualOverrideByUserId], references: [id])
+  study               Study                     @relation(fields: [studyId], references: [id])
+  studyParticipant    StudyParticipant?         @relation(fields: [studyParticipantId], references: [id])
+  visualOverrideBy    InternalUser?             @relation("HutVisualOverrideBy", fields: [visualOverrideByUserId], references: [id])
   referenceSelfie     HutReferenceSelfie?
-  registrationSlot    HutRegistrationSlot?    @relation("HutRegistrationSlotParticipant")
+  registrationSlot    HutRegistrationSlot?      @relation("HutRegistrationSlotParticipant")
   phaseCodes          HutParticipantPhaseCode[]
   blocks              HutBlock[]
   videoSubmissions    HutVideoSubmission[]
@@ -728,6 +733,7 @@ model HutParticipant {
 
   @@unique([studyId, folio])
   @@index([studyId, status])
+  @@index([studyParticipantId])
   @@index([token])
   @@index([visualOverrideByUserId])
   @@map("hut_participants")
@@ -1112,18 +1118,19 @@ model ScreeningAnswer {
 }
 
 model CtlSession {
-  id                   String           @id @default(uuid()) @db.Uuid
-  studyId              String           @db.Uuid
-  studyParticipantId   String           @db.Uuid
-  screeningAttemptId   String?          @db.Uuid
-  interviewerId        String?          @db.Uuid
-  ctlInterviewerCodeId String?          @db.Uuid
-  status               CtlSessionStatus @default(PENDING)
-  claimedAt            DateTime?
-  startedAt            DateTime?
-  completedAt          DateTime?
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
+  id                         String           @id @default(uuid()) @db.Uuid
+  studyId                    String           @db.Uuid
+  studyParticipantId         String           @db.Uuid
+  screeningAttemptId         String?          @db.Uuid
+  interviewerId              String?          @db.Uuid
+  ctlInterviewerCodeId       String?          @db.Uuid
+  triangularRotationSnapshot Json?
+  status                     CtlSessionStatus @default(PENDING)
+  claimedAt                  DateTime?
+  startedAt                  DateTime?
+  completedAt                DateTime?
+  createdAt                  DateTime         @default(now())
+  updatedAt                  DateTime         @updatedAt
 
   study              Study               @relation(fields: [studyId], references: [id])
   studyParticipant   StudyParticipant    @relation(fields: [studyParticipantId], references: [id])
@@ -1174,6 +1181,30 @@ model CtlAnswer {
   @@unique([ctlSessionId, questionCode])
   @@index([questionCode])
   @@map("ctl_answers")
+}
+
+model CtlTriangularRotationAssignment {
+  id                 String   @id @default(uuid()) @db.Uuid
+  studyParticipantId String   @unique @db.Uuid
+  triangular1Pr1     String
+  triangular1Pr2     String
+  triangular1Pr3     String
+  triangular1Verify  String
+  triangular2Pr1     String
+  triangular2Pr2     String
+  triangular2Pr3     String
+  triangular2Verify  String
+  sourceFileName     String?
+  importedByUserId   String?  @db.Uuid
+  importedAt         DateTime @default(now())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  studyParticipant StudyParticipant @relation(fields: [studyParticipantId], references: [id])
+  importedBy       InternalUser?    @relation("CtlTriangularRotationImportedBy", fields: [importedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([importedByUserId])
+  @@map("ctl_triangular_rotation_assignments")
 }
 
 model ParticipantConsent {

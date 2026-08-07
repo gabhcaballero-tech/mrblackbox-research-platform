@@ -729,7 +729,9 @@ describe("screening supervision service", () => {
     expect(result.ok ? result.data.rowCount : null).toBe(1);
     expect(result.ok ? result.data.fileContent.startsWith("\uFEFF") : false).toBe(true);
     expect(result.ok ? result.data.fileContent : "").toContain("Folio\tNombre\tTeléfono\tWhatsApp");
-    expect(result.ok ? result.data.fileContent : "").toContain("F1_GENERO\tF6_MARCAS\tF9A_VECES_AL_DIA\tD1\tF0_RECLUTADOR");
+    expect(result.ok ? result.data.fileContent : "").toContain(
+      "F1_GENERO\tF6_MARCAS\tF9A_VECES_AL_DIA\tD1\tHUT_ACCESO_CORRIDO\tF0_RECLUTADOR"
+    );
     expect(result.ok ? result.data.fileContent : "").toContain("MAR\u00cdA \u00d1AND\u00da");
     expect(result.ok ? result.data.fileContent : "").toContain("Portal participante");
     expect(result.ok ? result.data.fileContent : "").toContain("Elegible confirmado");
@@ -752,7 +754,7 @@ describe("screening supervision service", () => {
       expect(lines[1]).toContain("\t");
       expect(lines[0]).not.toContain("Código del estudio;Nombre del estudio");
       expect(row?.Folio).toBe("NAV-001");
-      expect(lines[0]?.replace(/^\uFEFF/, "").split("\t").slice(0, 29)).toEqual([
+      expect(lines[0]?.replace(/^\uFEFF/, "").split("\t").slice(0, 30)).toEqual([
         "Folio",
         "Nombre",
         "Teléfono",
@@ -781,6 +783,7 @@ describe("screening supervision service", () => {
         "F6_MARCAS",
         "F9A_VECES_AL_DIA",
         "D1",
+        "HUT_ACCESO_CORRIDO",
         "F0_RECLUTADOR"
       ]);
       expect(row?.Nombre).toBe("Participante Uno");

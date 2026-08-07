@@ -52,6 +52,7 @@ export type CtlParticipantSummary = {
     secondSampleKey: string | null;
   };
   sessionId: string | null;
+  triangularRotation: CtlTriangularRotationSnapshot | null;
 };
 
 export type CtlAvailableParticipantSummary = {
@@ -105,6 +106,7 @@ type ConfirmationRecord = {
 
 type ParticipantRecord = {
   accessTokens?: Array<{ expiresAt: Date; id: string; status: string; tokenHash: string }>;
+  ctlTriangularRotationAssignment?: CtlTriangularRotationAssignmentRecord | null;
   id: string;
   participantProfile: {
     name: string;
@@ -120,6 +122,34 @@ type ParticipantRecord = {
   screeningStatus: string;
 };
 
+type CtlTriangularRotationAssignmentRecord = {
+  id: string;
+  triangular1Pr1: string;
+  triangular1Pr2: string;
+  triangular1Pr3: string;
+  triangular1Verify: string;
+  triangular2Pr1: string;
+  triangular2Pr2: string;
+  triangular2Pr3: string;
+  triangular2Verify: string;
+};
+
+export type CtlTriangularRotationSnapshot = {
+  assignmentId: string;
+  triangular1: {
+    pr1: string;
+    pr2: string;
+    pr3: string;
+    verify: string;
+  };
+  triangular2: {
+    pr1: string;
+    pr2: string;
+    pr3: string;
+    verify: string;
+  };
+};
+
 type SessionRecord = {
   answers?: Array<{ answerValue: unknown; questionCode: string }>;
   completedAt: Date | null;
@@ -132,6 +162,7 @@ type SessionRecord = {
   startedAt: Date | null;
   status: CtlSessionStatus;
   studyId: string;
+  triangularRotationSnapshot: unknown;
   studyParticipant: ParticipantRecord & {
     participantConfirmation: {
       folio: string;
@@ -347,7 +378,10 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
               startedAt: now,
               status: "PENDING",
               studyId: interviewerCode.studyId,
-              studyParticipantId: confirmation.studyParticipant.id
+              studyParticipantId: confirmation.studyParticipant.id,
+              triangularRotationSnapshot: buildCtlTriangularRotationSnapshot(
+                confirmation.studyParticipant.ctlTriangularRotationAssignment ?? null
+              )
             },
             select: { id: true }
           })) as { id: string };
@@ -913,7 +947,10 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
           startedAt: now,
           status: "PENDING",
           studyId: input.studyId,
-          studyParticipantId: confirmation.studyParticipant.id
+          studyParticipantId: confirmation.studyParticipant.id,
+          triangularRotationSnapshot: buildCtlTriangularRotationSnapshot(
+            confirmation.studyParticipant.ctlTriangularRotationAssignment ?? null
+          )
         },
         select: { id: true }
       })) as { id: string };
@@ -1007,6 +1044,19 @@ const confirmationSelect = {
         where: { status: "ACTIVE" }
       },
       id: true,
+      ctlTriangularRotationAssignment: {
+        select: {
+          id: true,
+          triangular1Pr1: true,
+          triangular1Pr2: true,
+          triangular1Pr3: true,
+          triangular1Verify: true,
+          triangular2Pr1: true,
+          triangular2Pr2: true,
+          triangular2Pr3: true,
+          triangular2Verify: true
+        }
+      },
       participantProfile: { select: { name: true } },
       rotationAssignment: {
         select: {
@@ -1039,6 +1089,7 @@ const sessionSelect = {
   startedAt: true,
   status: true,
   studyId: true,
+  triangularRotationSnapshot: true,
   studyParticipant: {
     select: {
       accessTokens: {
@@ -1134,6 +1185,68 @@ function canReadSession(
   return actor.role === "ADMIN" || actor.role === "SUPERVISOR" || session.interviewerId === actor.id;
 }
 
+function buildCtlTriangularRotationSnapshot(
+  assignment: CtlTriangularRotationAssignmentRecord | null
+): CtlTriangularRotationSnapshot | null {
+  if (!assignment) {
+    return null;
+  }
+
+  return {
+    assignmentId: assignment.id,
+    triangular1: {
+      pr1: assignment.triangular1Pr1,
+      pr2: assignment.triangular1Pr2,
+      pr3: assignment.triangular1Pr3,
+      verify: assignment.triangular1Verify
+    },
+    triangular2: {
+      pr1: assignment.triangular2Pr1,
+      pr2: assignment.triangular2Pr2,
+      pr3: assignment.triangular2Pr3,
+      verify: assignment.triangular2Verify
+    }
+  };
+}
+
+function parseCtlTriangularRotationSnapshot(value: unknown): CtlTriangularRotationSnapshot | null {
+  if (!isRecord(value) || !isRecord(value.triangular1) || !isRecord(value.triangular2)) {
+    return null;
+  }
+
+  const snapshot = {
+    assignmentId: String(value.assignmentId ?? ""),
+    triangular1: {
+      pr1: String(value.triangular1.pr1 ?? ""),
+      pr2: String(value.triangular1.pr2 ?? ""),
+      pr3: String(value.triangular1.pr3 ?? ""),
+      verify: String(value.triangular1.verify ?? "")
+    },
+    triangular2: {
+      pr1: String(value.triangular2.pr1 ?? ""),
+      pr2: String(value.triangular2.pr2 ?? ""),
+      pr3: String(value.triangular2.pr3 ?? ""),
+      verify: String(value.triangular2.verify ?? "")
+    }
+  };
+
+  return snapshot.assignmentId &&
+    snapshot.triangular1.pr1 &&
+    snapshot.triangular1.pr2 &&
+    snapshot.triangular1.pr3 &&
+    snapshot.triangular1.verify &&
+    snapshot.triangular2.pr1 &&
+    snapshot.triangular2.pr2 &&
+    snapshot.triangular2.pr3 &&
+    snapshot.triangular2.verify
+    ? snapshot
+    : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
 function toParticipantSummary(
   confirmation: ConfirmationRecord,
   session: {
@@ -1141,7 +1254,10 @@ function toParticipantSummary(
     id: string;
     interviewer: { name: string } | null;
     status: CtlSessionStatus;
-  } | null
+  } | null,
+  triangularRotation: CtlTriangularRotationSnapshot | null = buildCtlTriangularRotationSnapshot(
+    confirmation.studyParticipant.ctlTriangularRotationAssignment ?? null
+  )
 ): CtlParticipantSummary {
   const arms = confirmation.studyParticipant.rotationAssignment?.arms ?? [];
   return {
@@ -1157,7 +1273,8 @@ function toParticipantSummary(
       firstSampleKey: arms.find((arm) => arm.applicationOrder === 1)?.studyProduct.internalCode ?? null,
       secondSampleKey: arms.find((arm) => arm.applicationOrder === 2)?.studyProduct.internalCode ?? null
     },
-    sessionId: session?.id ?? null
+    sessionId: session?.id ?? null,
+    triangularRotation
   };
 }
 
@@ -1166,16 +1283,21 @@ function isCtlAvailableConfirmation(confirmation: ConfirmationRecord): boolean {
   const hasCompleteRotation =
     Boolean(arms.find((arm) => arm.applicationOrder === 1)?.studyProduct.internalCode) &&
     Boolean(arms.find((arm) => arm.applicationOrder === 2)?.studyProduct.internalCode);
+  const hasTriangularRotation = Boolean(confirmation.studyParticipant.ctlTriangularRotationAssignment);
   return (
     confirmation.screeningAttempt.status === "PASSED" &&
     confirmation.studyParticipant.screeningStatus === "PASSED" &&
-    hasCompleteRotation
+    hasCompleteRotation &&
+    hasTriangularRotation
   );
 }
 
 function toSessionView(session: SessionRecord): CtlSessionView {
   const confirmation = session.studyParticipant.participantConfirmation;
   const interviewerName = getSessionInterviewerName(session);
+  const triangularRotation =
+    parseCtlTriangularRotationSnapshot(session.triangularRotationSnapshot) ??
+    buildCtlTriangularRotationSnapshot(session.studyParticipant.ctlTriangularRotationAssignment ?? null);
   return {
     answers: Object.fromEntries((session.answers ?? []).map((answer) => [answer.questionCode, answer.answerValue])),
     completedAt: session.completedAt,
@@ -1195,7 +1317,8 @@ function toSessionView(session: SessionRecord): CtlSessionView {
             id: session.id,
             interviewer: session.interviewer,
             status: session.status
-          }
+          },
+          triangularRotation
         )
       : {
           ctlStatus: session.status,
@@ -1207,7 +1330,8 @@ function toSessionView(session: SessionRecord): CtlSessionView {
           participantLinkToken: session.studyParticipant.accessTokens?.[0]?.id ?? null,
           referenceCodes: [],
           rotation: { firstSampleKey: null, secondSampleKey: null },
-          sessionId: session.id
+          sessionId: session.id,
+          triangularRotation
         },
     startedAt: session.startedAt,
     status: session.status

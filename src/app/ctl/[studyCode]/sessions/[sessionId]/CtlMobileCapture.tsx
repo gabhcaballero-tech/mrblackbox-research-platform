@@ -30,12 +30,26 @@ type CtlMobileCaptureProps = {
     folio: string;
     name: string;
     secondSampleKey?: string | null;
+    triangularRotation?: CtlTriangularRotationDisplay | null;
   };
   readOnly: boolean;
   sessionId: string;
   startedAtLabel?: string | null;
   studyCode: string;
   todayLabel?: string;
+};
+
+type CtlTriangularRotationDisplay = {
+  triangular1: {
+    pr1: string;
+    pr2: string;
+    pr3: string;
+  };
+  triangular2: {
+    pr1: string;
+    pr2: string;
+    pr3: string;
+  };
 };
 
 type ActionResult =
@@ -77,6 +91,8 @@ export function CtlMobileCapture({
   const [isPending, startTransition] = useTransition();
 
   const current = questions[currentIndex];
+  const needsTriangularRotation = questions.some(({ question }) => isTriangularQuestionCode(question.code));
+  const isMissingTriangularRotation = needsTriangularRotation && !participant.triangularRotation && !readOnly;
   const completedCount = questions.filter(({ question }) => isCtlQuestionAnswered(question, localAnswers[question.code])).length;
   const progressPercent = questions.length > 0 ? Math.round((completedCount / questions.length) * 100) : 0;
   const pendingQuestionCodes = getPendingCtlQuestionCodes(definition, localAnswers);
@@ -207,6 +223,17 @@ export function CtlMobileCapture({
     );
   }
 
+  if (isMissingTriangularRotation) {
+    return (
+      <section className="rounded-xl border border-rose-200 bg-rose-50 p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-rose-950">No existe rotacion triangular asignada para este participante.</h2>
+        <p className="mt-2 text-sm leading-6 text-rose-900">
+          Carga ROTACIONES NAVIGO.xlsx desde Administracion antes de continuar con la entrevista CTL.
+        </p>
+      </section>
+    );
+  }
+
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6">
       <header className="space-y-4">
@@ -294,7 +321,13 @@ function QuestionStep({
   answer: unknown;
   flatQuestion: FlatQuestion;
   onAnswer: (questionCode: string, answer: unknown) => void;
-  participant: { firstSampleKey?: string | null; folio: string; name: string; secondSampleKey?: string | null };
+  participant: {
+    firstSampleKey?: string | null;
+    folio: string;
+    name: string;
+    secondSampleKey?: string | null;
+    triangularRotation?: CtlTriangularRotationDisplay | null;
+  };
   readOnly: boolean;
   sessionId: string;
 }) {
@@ -320,7 +353,7 @@ function QuestionStep({
         </h3>
         <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">{question.code}</p>
       </div>
-      {renderMobileQuestionInput(question, answer, onAnswer, readOnly, sessionId)}
+      {renderMobileQuestionInput(question, answer, onAnswer, participant, readOnly, sessionId)}
     </article>
   );
 }
@@ -329,6 +362,13 @@ function renderMobileQuestionInput(
   question: CtlQuestionDefinition,
   answer: unknown,
   onAnswer: (questionCode: string, answer: unknown) => void,
+  participant: {
+    firstSampleKey?: string | null;
+    folio: string;
+    name: string;
+    secondSampleKey?: string | null;
+    triangularRotation?: CtlTriangularRotationDisplay | null;
+  },
   readOnly: boolean,
   sessionId: string
 ) {
@@ -338,7 +378,10 @@ function renderMobileQuestionInput(
         answer={answer}
         disabled={readOnly}
         onSelect={(value) => onAnswer(question.code, value)}
-        options={question.options}
+        options={question.options.map((option) => ({
+          ...option,
+          label: resolveTemplate(option.label, {}, participant)
+        }))}
       />
     );
   }
@@ -395,7 +438,7 @@ function OptionCards({
   onSelect: (value: string) => void;
   options: CtlQuestionOption[];
 }) {
-  const selected = String(answer ?? "");
+  const selected = getSelectAnswerValue(answer);
 
   return (
     <div className="grid gap-3">
@@ -659,6 +702,10 @@ export function isCtlQuestionAnswered(question: CtlQuestionDefinition, answer: u
     return question.rows.every((row) => String(matrixAnswer[row.code] ?? "").trim().length > 0);
   }
 
+  if (question.type === "SELECT" && isRecord(answer) && "selectedPosition" in answer) {
+    return String(answer.selectedPosition ?? "").trim().length > 0;
+  }
+
   return String(answer ?? "").trim().length > 0;
 }
 
@@ -697,6 +744,11 @@ function buildAllAnswersFormData(definition: CtlDefinition, answers: Record<stri
 }
 
 function appendQuestionAnswer(formData: FormData, question: CtlQuestionDefinition, answer: unknown): void {
+  if (question.type === "SELECT" && isRecord(answer) && "selectedPosition" in answer) {
+    formData.set(question.code, String(answer.selectedPosition ?? ""));
+    return;
+  }
+
   if (question.type === "MATRIX") {
     const matrixAnswer = isRecord(answer) ? answer : {};
     for (const row of question.rows) {
@@ -735,15 +787,40 @@ function buildAutomaticCtlAnswers({
 function resolveQuestionLabel(
   question: CtlQuestionDefinition,
   answers: Record<string, unknown>,
-  participant: { firstSampleKey?: string | null; folio: string; name: string; secondSampleKey?: string | null }
+  participant: {
+    firstSampleKey?: string | null;
+    folio: string;
+    name: string;
+    secondSampleKey?: string | null;
+    triangularRotation?: CtlTriangularRotationDisplay | null;
+  }
 ): string {
-  const template = question.displayTemplate ?? question.label;
+  return resolveTemplate(question.displayTemplate ?? question.label, answers, participant);
+}
+
+function resolveTemplate(
+  template: string,
+  answers: Record<string, unknown>,
+  participant: {
+    firstSampleKey?: string | null;
+    folio: string;
+    name: string;
+    secondSampleKey?: string | null;
+    triangularRotation?: CtlTriangularRotationDisplay | null;
+  }
+): string {
   const values: Record<string, unknown> = {
     ...answers,
     FIRST_SAMPLE: participant.firstSampleKey,
     FOLIO: participant.folio,
     PARTICIPANT_NAME: participant.name,
-    SECOND_SAMPLE: participant.secondSampleKey
+    SECOND_SAMPLE: participant.secondSampleKey,
+    TRIANGULAR_1_PR1: participant.triangularRotation?.triangular1.pr1,
+    TRIANGULAR_1_PR2: participant.triangularRotation?.triangular1.pr2,
+    TRIANGULAR_1_PR3: participant.triangularRotation?.triangular1.pr3,
+    TRIANGULAR_2_PR1: participant.triangularRotation?.triangular2.pr1,
+    TRIANGULAR_2_PR2: participant.triangularRotation?.triangular2.pr2,
+    TRIANGULAR_2_PR3: participant.triangularRotation?.triangular2.pr3
   };
 
   return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_match, token: string) => {
@@ -760,7 +837,13 @@ function resolveQuestionLabel(
 function resolveReferenceValue(
   source: string,
   answers: Record<string, unknown>,
-  participant: { firstSampleKey?: string | null; folio: string; name: string; secondSampleKey?: string | null }
+  participant: {
+    firstSampleKey?: string | null;
+    folio: string;
+    name: string;
+    secondSampleKey?: string | null;
+    triangularRotation?: CtlTriangularRotationDisplay | null;
+  }
 ): unknown {
   if (source === "FIRST_SAMPLE") {
     return participant.firstSampleKey;
@@ -777,6 +860,13 @@ function resolveReferenceValue(
   if (source === "FOLIO") {
     return participant.folio;
   }
+
+  if (source === "TRIANGULAR_1_PR1") return participant.triangularRotation?.triangular1.pr1;
+  if (source === "TRIANGULAR_1_PR2") return participant.triangularRotation?.triangular1.pr2;
+  if (source === "TRIANGULAR_1_PR3") return participant.triangularRotation?.triangular1.pr3;
+  if (source === "TRIANGULAR_2_PR1") return participant.triangularRotation?.triangular2.pr1;
+  if (source === "TRIANGULAR_2_PR2") return participant.triangularRotation?.triangular2.pr2;
+  if (source === "TRIANGULAR_2_PR3") return participant.triangularRotation?.triangular2.pr3;
 
   return answers[source];
 }
@@ -816,6 +906,18 @@ function optionButtonClass(isSelected: boolean): string {
       ? "border-teal-700 bg-teal-700 text-white"
       : "border-zinc-300 bg-white text-zinc-950 hover:border-teal-600"
   }`;
+}
+
+function getSelectAnswerValue(answer: unknown): string {
+  if (isRecord(answer) && "selectedPosition" in answer) {
+    return String(answer.selectedPosition ?? "");
+  }
+
+  return String(answer ?? "");
+}
+
+function isTriangularQuestionCode(questionCode: string): boolean {
+  return questionCode === "P1" || questionCode === "P3";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

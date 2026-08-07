@@ -40,6 +40,21 @@ export type CtlAnswerDraft = {
   questionCode: string;
 };
 
+export type CtlTriangularRotationForAnswer = {
+  triangular1: {
+    pr1: string;
+    pr2: string;
+    pr3: string;
+    verify: string;
+  };
+  triangular2: {
+    pr1: string;
+    pr2: string;
+    pr3: string;
+    verify: string;
+  };
+};
+
 export function normalizeCtlCode(value: unknown): string {
   return String(value ?? "")
     .normalize("NFC")
@@ -227,6 +242,64 @@ export function ctlFormDataToAnswerInput(formData: FormData): CtlAnswerInput {
   return input;
 }
 
+export function buildCtlTriangularAnswerValue({
+  answerValue,
+  questionCode,
+  triangularRotation
+}: {
+  answerValue: unknown;
+  questionCode: string;
+  triangularRotation: CtlTriangularRotationForAnswer;
+}):
+  | {
+      answerValue: {
+        correct: 0 | 1;
+        selectedKey: string;
+        selectedPosition: "PR1" | "PR2" | "PR3";
+      };
+      ok: true;
+    }
+  | {
+      message: string;
+      ok: false;
+    } {
+  const selectedPosition = normalizeCtlCode(
+    isGenericRecord(answerValue) && "selectedPosition" in answerValue
+      ? answerValue.selectedPosition
+      : answerValue
+  );
+  const triangular = questionCode === "P1" ? triangularRotation.triangular1 : triangularRotation.triangular2;
+  const positions = {
+    PR1: triangular.pr1,
+    PR2: triangular.pr2,
+    PR3: triangular.pr3
+  } as const;
+
+  if (selectedPosition !== "PR1" && selectedPosition !== "PR2" && selectedPosition !== "PR3") {
+    return {
+      message: "Selecciona una opcion triangular valida.",
+      ok: false
+    };
+  }
+
+  const selectedKey = positions[selectedPosition];
+  if (!selectedKey) {
+    return {
+      message: "Selecciona una opcion triangular valida.",
+      ok: false
+    };
+  }
+
+  return {
+    answerValue: {
+      correct: selectedKey === triangular.verify ? 1 : 0,
+      selectedKey,
+      selectedPosition
+    },
+    ok: true
+  };
+}
+
 function parseCtlAnswerForQuestion(input: CtlAnswerInput, question: CtlQuestionDefinition):
   | {
       answerValue: unknown;
@@ -340,6 +413,10 @@ function parseMatrixAnswer(
 }
 
 function isMatrixValueRecord(value: unknown): value is Record<string, FormDataEntryValue | null | undefined> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function isGenericRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 

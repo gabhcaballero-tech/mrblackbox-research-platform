@@ -58,6 +58,24 @@ import {
   type NavigoFaceVerificationClientResult
 } from "./face-verification-contract";
 import { generateParticipantReferenceCode, generateReferenceCodes } from "@/modules/participant-portal/review";
+import {
+  NAVIGO_HUT_ACCESS_QUESTION_ID,
+  isNavigoHutAccessEnabled
+} from "@/modules/screener/study-overrides";
+import {
+  HUT_MAX_MISSED_DAYS_PER_BLOCK,
+  HUT_REQUIRED_VIDEOS_PER_BLOCK,
+  createHutRegistrationToken,
+  createHutParticipantToken
+} from "@/modules/hut/service";
+import {
+  encryptHutPhaseCode,
+  hashHutPhaseCode,
+  hutPhaseForSlot,
+  resolveHutPhaseCodeSecret,
+  type HutPhase
+} from "@/modules/hut/phase-codes";
+import type { NavigoHutRotationWorkbookRowInput, NavigoRotationWorkbookRowInput } from "./rotation-workbook";
 
 export type NavigoInternalActor = {
   id: string;
@@ -230,6 +248,41 @@ export type NavigoRotationImportPreview = {
     updatable: number;
     validRows: number;
     missingFolios: number;
+  };
+};
+
+export type NavigoRotationWorkbookPreviewRow = NavigoRotationImportPreviewRow & NavigoRotationWorkbookRowInput & {
+  existingTriangularRotation: boolean;
+  triangularComplete: boolean;
+};
+
+export type NavigoHutRotationWorkbookPreviewRow = NavigoHutRotationWorkbookRowInput & {
+  errors: string[];
+  existingHutParticipant: boolean;
+  existingHutSlot: boolean;
+  hasHutProgress: boolean;
+  linkedStudyParticipantId: string | null;
+  rowNumber: number;
+  updatable: boolean;
+};
+
+export type NavigoRotationWorkbookPreview = {
+  hutRows: NavigoHutRotationWorkbookPreviewRow[];
+  rows: NavigoRotationWorkbookPreviewRow[];
+  summary: NavigoRotationImportPreview["summary"] & {
+    existingTriangularRotations: number;
+    hut: {
+      existingParticipants: number;
+      existingSlots: number;
+      foundFolios: number;
+      missingFolios: number;
+      rowsWithError: number;
+      totalRows: number;
+      updatable: number;
+      validRows: number;
+      withProgress: number;
+    };
+    triangularComplete: number;
   };
 };
 
@@ -455,6 +508,11 @@ export type NavigoAppRepository = {
     rows: NavigoRotationImportRowInput[];
     studyId: string;
   }) => Promise<NavigoActionResult<NavigoRotationImportPreview>>;
+  previewRotationWorkbookImport: (input: {
+    hutRows?: NavigoHutRotationWorkbookRowInput[];
+    rows: NavigoRotationWorkbookRowInput[];
+    studyId: string;
+  }) => Promise<NavigoActionResult<NavigoRotationWorkbookPreview>>;
   registerDirectParticipant: (input: NavigoParticipantRegistrationInput) => Promise<NavigoActionResult<{
     linkToken: string | null;
     studyParticipantId: string;
@@ -464,6 +522,13 @@ export type NavigoAppRepository = {
     rows: NavigoRotationImportRowInput[];
     studyId: string;
   }) => Promise<NavigoActionResult<NavigoRotationImportPreview>>;
+  applyRotationWorkbookImport: (input: {
+    actorUserId: string;
+    filename: string;
+    hutRows?: NavigoHutRotationWorkbookRowInput[];
+    rows: NavigoRotationWorkbookRowInput[];
+    studyId: string;
+  }) => Promise<NavigoActionResult<NavigoRotationWorkbookPreview>>;
   requestActivitySelfieUpload: (input: {
     activityId: string;
     metadata: EvidenceUploadMetadata;
@@ -551,6 +616,12 @@ type NavigoPrismaClient = PrismaClientLike & {
   participantAttributeOrder?: Delegate;
   participantConsent?: Delegate;
   participantConfirmation: Delegate;
+  ctlTriangularRotationAssignment: Delegate;
+  hutBlock?: Delegate;
+  hutCallEvaluation?: Delegate;
+  hutParticipant?: Delegate;
+  hutParticipantPhaseCode?: Delegate;
+  hutRegistrationSlot?: Delegate;
   participantEvidence: Delegate;
   participantProfile: Delegate;
   participantReferenceCode: Delegate;
@@ -628,6 +699,56 @@ const activitySelect = {
   status: true
 } as const;
 
+const hutParticipantWorkbookSelect = {
+  blocks: {
+    select: {
+      status: true,
+      submittedVideosCount: true
+    }
+  },
+  callEvaluations: {
+    select: {
+      completedAt: true,
+      status: true
+    }
+  },
+  dailyChecks: {
+    select: { id: true }
+  },
+  email: true,
+  firstFragranceLeftArm: true,
+  folio: true,
+  id: true,
+  name: true,
+  phone: true,
+  phaseCodes: {
+    select: {
+      id: true,
+      phase: true,
+      slot: true,
+      status: true
+    }
+  },
+  secondFragranceRightArm: true,
+  status: true,
+  studyId: true,
+  studyParticipantId: true,
+  token: true,
+  videoSubmissions: {
+    select: { id: true }
+  }
+} as const;
+
+const hutRegistrationSlotWorkbookSelect = {
+  firstFragranceLeftArm: true,
+  folio: true,
+  id: true,
+  participantId: true,
+  secondFragranceRightArm: true,
+  status: true,
+  studyId: true
+} as const;
+
 const participantSelect = {
   applicationStartedAt: true,
   ctlSessions: {
@@ -642,6 +763,19 @@ const participantSelect = {
     take: 5
   },
   id: true,
+  ctlTriangularRotationAssignment: {
+    select: {
+      id: true,
+      triangular1Pr1: true,
+      triangular1Pr2: true,
+      triangular1Pr3: true,
+      triangular1Verify: true,
+      triangular2Pr1: true,
+      triangular2Pr2: true,
+      triangular2Pr3: true,
+      triangular2Verify: true
+    }
+  },
   visualVerificationMode: true,
   participantConfirmation: {
     select: {
@@ -649,6 +783,12 @@ const participantSelect = {
       folio: true,
       screeningAttempt: {
         select: {
+          answers: {
+            select: {
+              answerJson: true,
+              questionId: true
+            }
+          },
           id: true,
           evaluationJson: true,
           source: true
@@ -798,7 +938,11 @@ type ParticipantImportLookupRecord = {
   id: string;
   participantConfirmation: {
     folio: string;
-    screeningAttempt?: { evaluationJson: unknown; id: string } | null;
+    screeningAttempt?: {
+      answers?: Array<{ answerJson: unknown; questionId: string }>;
+      evaluationJson: unknown;
+      id: string;
+    } | null;
   } | null;
   participantProfile: {
     email: string | null;
@@ -826,11 +970,27 @@ type ParticipantRecord = {
     status: "CANCELLED" | "COMPLETED" | "IN_PROGRESS" | "PENDING";
   }>;
   id: string;
+  ctlTriangularRotationAssignment: {
+    id: string;
+    triangular1Pr1: string;
+    triangular1Pr2: string;
+    triangular1Pr3: string;
+    triangular1Verify: string;
+    triangular2Pr1: string;
+    triangular2Pr2: string;
+    triangular2Pr3: string;
+    triangular2Verify: string;
+  } | null;
   participantConfirmation: {
     id: string;
     folio: string;
     referenceCodes: Array<{ code: string; slot: number }>;
-    screeningAttempt?: { evaluationJson: unknown; id: string; source?: string } | null;
+    screeningAttempt?: {
+      answers?: Array<{ answerJson: unknown; questionId: string }>;
+      evaluationJson: unknown;
+      id: string;
+      source?: string;
+    } | null;
   } | null;
   participantEvidence: Array<{
     id: string;
@@ -879,6 +1039,38 @@ type ActivityRecord = NavigoActivityRecord & {
 type ConfirmationWithParticipant = {
   folio: string;
   studyParticipant: ParticipantRecord;
+};
+type HutParticipantWorkbookRecord = {
+  blocks?: Array<{ status: string; submittedVideosCount: number }>;
+  callEvaluations?: Array<{ completedAt: Date | null; status: string }>;
+  dailyChecks?: Array<{ id?: string }>;
+  email: string | null;
+  firstFragranceLeftArm: string | null;
+  folio: string | null;
+  id: string;
+  name: string;
+  phone: string | null;
+  phaseCodes?: Array<{
+    id: string;
+    phase: HutPhase;
+    slot: number;
+    status: string;
+  }>;
+  secondFragranceRightArm: string | null;
+  status: string;
+  studyId: string;
+  studyParticipantId: string | null;
+  token: string;
+  videoSubmissions?: Array<{ id?: string }>;
+};
+type HutRegistrationSlotWorkbookRecord = {
+  firstFragranceLeftArm: string;
+  folio: string;
+  id: string;
+  participantId: string | null;
+  secondFragranceRightArm: string;
+  status: "AVAILABLE" | "CANCELLED" | "REGISTERED";
+  studyId: string;
 };
 
 export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): NavigoAppRepository {
@@ -1509,6 +1701,27 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
       return { data: preview, ok: true };
     },
 
+    async previewRotationWorkbookImport(input) {
+      const prisma = await getPrisma();
+      const study = (await prisma.study.findUnique?.({
+        select: studySelect,
+        where: { id: input.studyId }
+      })) as StudyRecord | null;
+
+      if (!study || study.code !== NAVIGO_STUDY_CODE) {
+        return { message: "Solo el estudio Navigo permite importar rotacion.", ok: false };
+      }
+
+      const preview = await buildRotationWorkbookImportPreview({
+        hutRows: input.hutRows ?? [],
+        prisma,
+        rows: input.rows,
+        studyId: input.studyId
+      });
+
+      return { data: preview, ok: true };
+    },
+
     async applyRotationImport(input) {
       const prisma = await getPrisma();
 
@@ -1597,6 +1810,123 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
             folio: failure.folio,
             message: sanitizeRotationImportLogMessage(previewError),
             step: "preview-after-failure",
+            studyId: input.studyId
+          });
+        }
+
+        return {
+          data: preview,
+          message: failure.message,
+          ok: false
+        };
+      }
+    },
+
+    async applyRotationWorkbookImport(input) {
+      const prisma = await getPrisma();
+
+      try {
+        return await prisma.$transaction(async (tx) => {
+          const study = (await tx.study.findUnique?.({
+            select: studySelect,
+            where: { id: input.studyId }
+          })) as StudyRecord | null;
+
+          if (!study || study.code !== NAVIGO_STUDY_CODE) {
+            return { message: "Solo el estudio Navigo permite importar rotacion.", ok: false };
+          }
+
+          const preview = await buildRotationWorkbookImportPreview({
+            hutRows: input.hutRows ?? [],
+            prisma: tx,
+            rows: input.rows,
+            studyId: input.studyId
+          });
+
+          if (preview.summary.rowsWithError > 0) {
+            return {
+              data: preview,
+              message: "Corrige los errores de la previsualizacion antes de aplicar la importacion.",
+              ok: false
+            };
+          }
+
+          const confirmations = await findConfirmationsByFolio({
+            prisma: tx,
+            rows: input.rows,
+            studyId: input.studyId
+          });
+
+          for (const row of preview.rows) {
+            const confirmation = confirmations.get(row.folio);
+
+            if (!confirmation) {
+              throw new NavigoRotationApplyError({
+                folio: row.folio,
+                message: `No se encontro confirmacion para el folio ${row.folio}.`,
+                step: "confirmation"
+              });
+            }
+
+            await upsertParticipantRotationForCodes({
+              actorUserId: input.actorUserId,
+              leftFragranceCode: row.primeraFragancia,
+              participant: confirmation.studyParticipant,
+              prisma: tx,
+              rightFragranceCode: row.segundaFragancia
+            });
+
+            await upsertCtlTriangularRotationAssignment({
+              actorUserId: input.actorUserId,
+              filename: input.filename,
+              prisma: tx,
+              row,
+              studyParticipantId: confirmation.studyParticipant.id
+            });
+          }
+
+          await applyHutRotationWorkbookRows({
+            prisma: tx,
+            rows: input.hutRows ?? [],
+            studyId: input.studyId
+          });
+
+          const appliedPreview = await buildRotationWorkbookImportPreview({
+            hutRows: input.hutRows ?? [],
+            prisma: tx,
+            rows: input.rows,
+            studyId: input.studyId
+          });
+
+          return {
+            data: appliedPreview,
+            ok: true
+          };
+        });
+      } catch (error) {
+        const failure = toNavigoRotationApplyFailure(error);
+        logNavigoRotationApplyFailure({
+          error,
+          folio: failure.folio,
+          message: failure.logMessage,
+          step: failure.step,
+          studyId: input.studyId
+        });
+
+        let preview: NavigoRotationWorkbookPreview | undefined;
+        try {
+          preview = await buildRotationWorkbookImportPreview({
+            hutRows: input.hutRows ?? [],
+            prisma,
+            rows: input.rows,
+            studyId: input.studyId
+          });
+        } catch (previewError) {
+          logNavigoRotationApplyFailure({
+            error: previewError,
+            folio: failure.folio,
+            message: sanitizeRotationImportLogMessage(previewError),
+            step: "preview-workbook-after-failure",
             studyId: input.studyId
           });
         }
@@ -3682,13 +4012,515 @@ async function buildRotationImportPreview({
   };
 }
 
+async function buildRotationWorkbookImportPreview({
+  hutRows,
+  prisma,
+  rows,
+  studyId
+}: {
+  hutRows?: NavigoHutRotationWorkbookRowInput[];
+  prisma: NavigoPrismaClient | NavigoTransactionClient;
+  rows: NavigoRotationWorkbookRowInput[];
+  studyId: string;
+}): Promise<NavigoRotationWorkbookPreview> {
+  const basePreview = await buildRotationImportPreview({ prisma, rows, studyId });
+  const hutPreview = await buildHutRotationWorkbookPreview({
+    prisma,
+    rows: hutRows ?? [],
+    studyId
+  });
+  const previewRows = basePreview.rows.map((row, index): NavigoRotationWorkbookPreviewRow => {
+    const workbookRow = rows[index] ?? {
+      folio: row.folio,
+      primeraFragancia: row.primeraFragancia,
+      segundaFragancia: row.segundaFragancia,
+      triangular1Pr1: "",
+      triangular1Pr2: "",
+      triangular1Pr3: "",
+      triangular1Verify: "",
+      triangular2Pr1: "",
+      triangular2Pr2: "",
+      triangular2Pr3: "",
+      triangular2Verify: ""
+    };
+    const errors = [...row.errors, ...validateTriangularRotationRow(workbookRow)];
+
+    return {
+      ...row,
+      ...workbookRow,
+      errors,
+      existingTriangularRotation: false,
+      triangularComplete: errors.length === 0,
+      updatable: errors.length === 0
+    };
+  });
+
+  const confirmations = await findConfirmationsByFolio({ prisma, rows, studyId });
+  const rowsWithTriangularState = previewRows.map((row) => {
+    const participant = confirmations.get(row.folio)?.studyParticipant ?? null;
+    const existingTriangularRotation = Boolean(participant?.ctlTriangularRotationAssignment);
+
+    return {
+      ...row,
+      existingTriangularRotation,
+      triangularComplete: validateTriangularRotationRow(row).length === 0
+    };
+  });
+
+  return {
+    hutRows: hutPreview.rows,
+    rows: rowsWithTriangularState,
+    summary: {
+      ...basePreview.summary,
+      existingTriangularRotations: rowsWithTriangularState.filter((row) => row.existingTriangularRotation).length,
+      hut: hutPreview.summary,
+      rowsWithError: rowsWithTriangularState.filter((row) => row.errors.length > 0).length + hutPreview.summary.rowsWithError,
+      triangularComplete: rowsWithTriangularState.filter((row) => row.triangularComplete).length,
+      updatable: rowsWithTriangularState.filter((row) => row.updatable).length,
+      validRows: rowsWithTriangularState.filter((row) => row.errors.length === 0).length
+    }
+  };
+}
+
+async function buildHutRotationWorkbookPreview({
+  prisma,
+  rows,
+  studyId
+}: {
+  prisma: NavigoPrismaClient | NavigoTransactionClient;
+  rows: NavigoHutRotationWorkbookRowInput[];
+  studyId: string;
+}): Promise<{
+  rows: NavigoHutRotationWorkbookPreviewRow[];
+  summary: NavigoRotationWorkbookPreview["summary"]["hut"];
+}> {
+  const confirmations = await findConfirmationsByFolio({ prisma, rows, studyId });
+  const hutParticipants = await findHutParticipantsByFolio({ folios: rows.map((row) => row.folio), prisma, studyId });
+  const hutSlots = await findHutRegistrationSlotsByFolio({ folios: rows.map((row) => row.folio), prisma, studyId });
+  const phaseCodeSecretReady = rows.length === 0 || Boolean(resolveHutPhaseCodeSecret());
+  const seenFolios = new Set<string>();
+  const duplicateFolios = new Set<string>();
+
+  for (const row of rows) {
+    if (!row.folio) {
+      continue;
+    }
+    if (seenFolios.has(row.folio)) {
+      duplicateFolios.add(row.folio);
+    }
+    seenFolios.add(row.folio);
+  }
+
+  const previewRows = rows.map((row, index): NavigoHutRotationWorkbookPreviewRow => {
+    const errors: string[] = [];
+    const confirmation = row.folio ? confirmations.get(row.folio) : null;
+    const hutParticipant = row.folio ? hutParticipants.get(row.folio) ?? null : null;
+    const hutSlot = row.folio ? hutSlots.get(row.folio) ?? null : null;
+    const hasHutProgress = hutParticipant ? hutParticipantHasProgress(hutParticipant) : false;
+
+    if (!row.folio) {
+      errors.push("folio HUT vacio");
+    } else if (duplicateFolios.has(row.folio)) {
+      errors.push("folio HUT duplicado dentro del archivo");
+    } else if (!confirmation) {
+      errors.push("folio HUT sin ParticipantConfirmation");
+    }
+    if (!row.hutEva1) {
+      errors.push("EVA1 HUT vacia");
+    }
+    if (!row.hutEva2) {
+      errors.push("EVA2 HUT vacia");
+    }
+    if (!phaseCodeSecretReady) {
+      errors.push("falta configuracion segura para codigos HUT");
+    }
+    if (confirmation && participantStatus(confirmation.studyParticipant) !== "APPROVED") {
+      errors.push("participante no confirmado para HUT");
+    }
+    if (confirmation && !participantHasHutAccessFromScreening(confirmation.studyParticipant)) {
+      errors.push("participante no marcado para HUT en screening");
+    }
+    if (hutParticipant?.studyParticipantId && confirmation && hutParticipant.studyParticipantId !== confirmation.studyParticipant.id) {
+      errors.push("participante HUT vinculado a otro StudyParticipant");
+    }
+    if (hutParticipant && hasHutProgress && hutRotationDiffers(hutParticipant, row)) {
+      errors.push("participante HUT con avance; no se sobrescribe rotacion");
+    }
+    if (hutSlot?.participantId && hutParticipant && hutSlot.participantId !== hutParticipant.id) {
+      errors.push("slot HUT registrado a otro participante");
+    }
+
+    return {
+      ...row,
+      errors,
+      existingHutParticipant: Boolean(hutParticipant),
+      existingHutSlot: Boolean(hutSlot),
+      hasHutProgress,
+      linkedStudyParticipantId: hutParticipant?.studyParticipantId ?? confirmation?.studyParticipant.id ?? null,
+      rowNumber: index + 2,
+      updatable: errors.length === 0
+    };
+  });
+
+  return {
+    rows: previewRows,
+    summary: {
+      existingParticipants: previewRows.filter((row) => row.existingHutParticipant).length,
+      existingSlots: previewRows.filter((row) => row.existingHutSlot).length,
+      foundFolios: previewRows.filter((row) => row.folio && confirmations.has(row.folio)).length,
+      missingFolios: previewRows.filter((row) => row.errors.includes("folio HUT sin ParticipantConfirmation")).length,
+      rowsWithError: previewRows.filter((row) => row.errors.length > 0).length,
+      totalRows: previewRows.length,
+      updatable: previewRows.filter((row) => row.updatable).length,
+      validRows: previewRows.filter((row) => row.errors.length === 0).length,
+      withProgress: previewRows.filter((row) => row.hasHutProgress).length
+    }
+  };
+}
+
+async function applyHutRotationWorkbookRows({
+  prisma,
+  rows,
+  studyId
+}: {
+  prisma: NavigoTransactionClient;
+  rows: NavigoHutRotationWorkbookRowInput[];
+  studyId: string;
+}) {
+  if (rows.length === 0) {
+    return;
+  }
+
+  const preview = await buildHutRotationWorkbookPreview({ prisma, rows, studyId });
+  if (preview.summary.rowsWithError > 0) {
+    const firstError = preview.rows.find((row) => row.errors.length > 0);
+    throw new NavigoRotationApplyError({
+      folio: firstError?.folio,
+      message: `No se aplico HUT: ${firstError?.errors.join("; ") ?? "corrige la previsualizacion HUT"}.`,
+      step: "hut-preview"
+    });
+  }
+
+  const confirmations = await findConfirmationsByFolio({ prisma, rows, studyId });
+  for (const row of rows) {
+    const confirmation = confirmations.get(row.folio);
+    if (!confirmation) {
+      throw new NavigoRotationApplyError({
+        folio: row.folio,
+        message: `No se encontro confirmacion para el folio HUT ${row.folio}.`,
+        step: "hut-confirmation"
+      });
+    }
+
+    const participant = await upsertHutParticipantFromWorkbookRow({
+      prisma,
+      row,
+      studyParticipant: confirmation.studyParticipant,
+      studyId
+    });
+
+    await upsertHutRegistrationSlotFromWorkbookRow({
+      participantId: participant.id,
+      prisma,
+      row,
+      studyId
+    });
+
+    await ensureHutPhaseCodesForWorkbookParticipant({
+      participant,
+      prisma,
+      referenceCodes: confirmation.studyParticipant.participantConfirmation?.referenceCodes ?? []
+    });
+  }
+}
+
+async function upsertHutParticipantFromWorkbookRow({
+  prisma,
+  row,
+  studyParticipant,
+  studyId
+}: {
+  prisma: NavigoTransactionClient;
+  row: NavigoHutRotationWorkbookRowInput;
+  studyId: string;
+  studyParticipant: ParticipantRecord;
+}): Promise<HutParticipantWorkbookRecord> {
+  const existingByStudyParticipant = prisma.hutParticipant?.findFirst
+    ? ((await prisma.hutParticipant.findFirst({
+        select: hutParticipantWorkbookSelect,
+        where: {
+          studyId,
+          studyParticipantId: studyParticipant.id
+        }
+      })) as HutParticipantWorkbookRecord | null)
+    : null;
+  const existingByFolio = prisma.hutParticipant?.findFirst
+    ? ((await prisma.hutParticipant.findFirst({
+        select: hutParticipantWorkbookSelect,
+        where: {
+          folio: row.folio,
+          studyId
+        }
+      })) as HutParticipantWorkbookRecord | null)
+    : null;
+  const existing = existingByStudyParticipant ?? existingByFolio;
+
+  if (existing) {
+    const hasProgress = hutParticipantHasProgress(existing);
+    const rotationDiffers = hutRotationDiffers(existing, row);
+    const data: Record<string, unknown> = {
+      studyParticipantId: existing.studyParticipantId ?? studyParticipant.id
+    };
+
+    if (!hasProgress || !rotationDiffers) {
+      data.firstFragranceLeftArm = row.hutEva1;
+      data.folio = row.folio;
+      data.secondFragranceRightArm = row.hutEva2;
+    }
+
+    const updated = prisma.hutParticipant?.update
+      ? ((await prisma.hutParticipant.update({
+          data,
+          select: hutParticipantWorkbookSelect,
+          where: { id: existing.id }
+        })) as HutParticipantWorkbookRecord)
+      : { ...existing, ...data } as HutParticipantWorkbookRecord;
+
+    return updated;
+  }
+
+  if (!prisma.hutParticipant?.create) {
+    throw new NavigoRotationApplyError({
+      folio: row.folio,
+      message: "No se pudo crear participante HUT.",
+      step: "hut-participant"
+    });
+  }
+
+  const created = (await prisma.hutParticipant.create({
+    data: {
+      currentBlockNumber: 1,
+      currentVideoSequence: 1,
+      email: studyParticipant.participantProfile.email,
+      firstFragranceLeftArm: row.hutEva1,
+      folio: row.folio,
+      name: studyParticipant.participantProfile.name,
+      phone: studyParticipant.participantProfile.phone,
+      recruiter: null,
+      secondFragranceRightArm: row.hutEva2,
+      startDate: null,
+      status: "NOT_STARTED",
+      studyId,
+      studyParticipantId: studyParticipant.id,
+      token: createHutParticipantToken()
+    },
+    select: hutParticipantWorkbookSelect
+  })) as HutParticipantWorkbookRecord;
+
+  await createHutWorkbookParticipantFoundation(prisma, created.id);
+
+  return created;
+}
+
+async function upsertHutRegistrationSlotFromWorkbookRow({
+  participantId,
+  prisma,
+  row,
+  studyId
+}: {
+  participantId: string;
+  prisma: NavigoTransactionClient;
+  row: NavigoHutRotationWorkbookRowInput;
+  studyId: string;
+}) {
+  const existing = prisma.hutRegistrationSlot?.findUnique
+    ? ((await prisma.hutRegistrationSlot.findUnique({
+        select: hutRegistrationSlotWorkbookSelect,
+        where: {
+          studyId_folio: {
+            folio: row.folio,
+            studyId
+          }
+        }
+      })) as HutRegistrationSlotWorkbookRecord | null)
+    : null;
+
+  if (existing) {
+    await prisma.hutRegistrationSlot?.update?.({
+      data: {
+        firstFragranceLeftArm: row.hutEva1,
+        participantId: existing.participantId ?? participantId,
+        secondFragranceRightArm: row.hutEva2,
+        status: existing.status === "CANCELLED" ? "CANCELLED" : "REGISTERED"
+      },
+      where: { id: existing.id }
+    });
+    return;
+  }
+
+  await prisma.hutRegistrationSlot?.create?.({
+    data: {
+      firstFragranceLeftArm: row.hutEva1,
+      folio: row.folio,
+      participantId,
+      registrationToken: createHutRegistrationToken(),
+      secondFragranceRightArm: row.hutEva2,
+      status: "REGISTERED",
+      studyId
+    }
+  });
+}
+
+async function ensureHutPhaseCodesForWorkbookParticipant({
+  participant,
+  prisma,
+  referenceCodes
+}: {
+  participant: HutParticipantWorkbookRecord;
+  prisma: NavigoTransactionClient;
+  referenceCodes: Array<{ code: string; slot: number }>;
+}) {
+  const secret = resolveHutPhaseCodeSecret();
+  if (!secret) {
+    throw new NavigoRotationApplyError({
+      folio: participant.folio ?? undefined,
+      message: "No se pudieron preparar codigos HUT seguros.",
+      step: "hut-phase-secret"
+    });
+  }
+
+  const existingCodes = participant.phaseCodes ?? [];
+  const existingByPhase = new Map(existingCodes.map((code) => [code.phase, code]));
+  const referenceBySlot = new Map(referenceCodes.map((code) => [code.slot, code]));
+
+  for (const slot of [1, 2, 3] as const) {
+    const phase = hutPhaseForSlot(slot);
+    if (!phase || existingByPhase.has(phase)) {
+      continue;
+    }
+
+    const source = referenceBySlot.get(slot);
+    if (!source?.code) {
+      throw new NavigoRotationApplyError({
+        folio: participant.folio ?? undefined,
+        message: `Falta codigo de referencia ${slot} para sincronizar HUT.`,
+        step: "hut-phase-code"
+      });
+    }
+
+    await prisma.hutParticipantPhaseCode?.create?.({
+      data: {
+        codeHash: hashHutPhaseCode(source.code, secret),
+        encryptedCode: encryptHutPhaseCode(source.code, secret),
+        encryptionVersion: 1,
+        participantId: participant.id,
+        phase,
+        slot,
+        status: "GENERATED"
+      }
+    });
+  }
+}
+
+async function createHutWorkbookParticipantFoundation(prisma: NavigoTransactionClient, participantId: string) {
+  await prisma.hutBlock?.create?.({
+    data: {
+      blockNumber: 1,
+      maxMissedDaysAllowed: HUT_MAX_MISSED_DAYS_PER_BLOCK,
+      participantId,
+      requiredVideos: HUT_REQUIRED_VIDEOS_PER_BLOCK,
+      startDate: null,
+      status: "NOT_STARTED"
+    }
+  });
+  await prisma.hutBlock?.create?.({
+    data: {
+      blockNumber: 2,
+      maxMissedDaysAllowed: HUT_MAX_MISSED_DAYS_PER_BLOCK,
+      participantId,
+      requiredVideos: HUT_REQUIRED_VIDEOS_PER_BLOCK,
+      status: "NOT_STARTED"
+    }
+  });
+  await prisma.hutCallEvaluation?.create?.({
+    data: {
+      blockNumber: 1,
+      participantId,
+      status: "PENDING"
+    }
+  });
+  await prisma.hutCallEvaluation?.create?.({
+    data: {
+      blockNumber: 2,
+      participantId,
+      status: "PENDING"
+    }
+  });
+}
+
+function hutParticipantHasProgress(participant: HutParticipantWorkbookRecord): boolean {
+  return Boolean(
+    participant.status !== "NOT_STARTED" ||
+      participant.videoSubmissions?.length ||
+      participant.dailyChecks?.length ||
+      participant.blocks?.some((block) => block.status !== "NOT_STARTED" || block.submittedVideosCount > 0) ||
+      participant.callEvaluations?.some((call) => call.status !== "PENDING" || call.completedAt)
+  );
+}
+
+function hutRotationDiffers(participant: HutParticipantWorkbookRecord, row: NavigoHutRotationWorkbookRowInput): boolean {
+  return participant.firstFragranceLeftArm !== row.hutEva1 || participant.secondFragranceRightArm !== row.hutEva2;
+}
+
+function validateTriangularRotationRow(row: NavigoTriangularRotationLike): string[] {
+  const errors: string[] = [];
+  const triangular1 = [row.triangular1Pr1, row.triangular1Pr2, row.triangular1Pr3];
+  const triangular2 = [row.triangular2Pr1, row.triangular2Pr2, row.triangular2Pr3];
+
+  for (const [label, value] of [
+    ["PR1", row.triangular1Pr1],
+    ["PR2", row.triangular1Pr2],
+    ["PR3", row.triangular1Pr3],
+    ["VERI_1", row.triangular1Verify],
+    ["PR4", row.triangular2Pr1],
+    ["PR5", row.triangular2Pr2],
+    ["PR6", row.triangular2Pr3],
+    ["VERI_2", row.triangular2Verify]
+  ] as const) {
+    if (!value) {
+      errors.push(`${label} vacio`);
+    }
+  }
+
+  if (row.triangular1Verify && !triangular1.includes(row.triangular1Verify)) {
+    errors.push("VERI_1 no coincide con PR1/PR2/PR3");
+  }
+  if (row.triangular2Verify && !triangular2.includes(row.triangular2Verify)) {
+    errors.push("VERI_2 no coincide con PR4/PR5/PR6");
+  }
+
+  return errors;
+}
+
+type NavigoTriangularRotationLike = Pick<
+  NavigoRotationWorkbookRowInput,
+  | "triangular1Pr1"
+  | "triangular1Pr2"
+  | "triangular1Pr3"
+  | "triangular1Verify"
+  | "triangular2Pr1"
+  | "triangular2Pr2"
+  | "triangular2Pr3"
+  | "triangular2Verify"
+>;
+
 async function findConfirmationsByFolio({
   prisma,
   rows,
   studyId
 }: {
   prisma: NavigoPrismaClient | NavigoTransactionClient;
-  rows: NavigoRotationImportRowInput[];
+  rows: Array<{ folio: string }>;
   studyId: string;
 }): Promise<Map<string, ConfirmationWithParticipant>> {
   const folios = [...new Set(rows.map((row) => row.folio).filter(Boolean))];
@@ -3713,6 +4545,56 @@ async function findConfirmationsByFolio({
   })) as ConfirmationWithParticipant[];
 
   return new Map(confirmations.map((confirmation) => [confirmation.folio, confirmation]));
+}
+
+async function findHutParticipantsByFolio({
+  folios,
+  prisma,
+  studyId
+}: {
+  folios: string[];
+  prisma: NavigoPrismaClient | NavigoTransactionClient;
+  studyId: string;
+}): Promise<Map<string, HutParticipantWorkbookRecord>> {
+  const normalizedFolios = [...new Set(folios.filter(Boolean))];
+  if (normalizedFolios.length === 0 || !prisma.hutParticipant?.findMany) {
+    return new Map();
+  }
+
+  const participants = (await prisma.hutParticipant.findMany({
+    select: hutParticipantWorkbookSelect,
+    where: {
+      folio: { in: normalizedFolios },
+      studyId
+    }
+  })) as HutParticipantWorkbookRecord[];
+
+  return new Map(participants.map((participant) => [participant.folio ?? "", participant]));
+}
+
+async function findHutRegistrationSlotsByFolio({
+  folios,
+  prisma,
+  studyId
+}: {
+  folios: string[];
+  prisma: NavigoPrismaClient | NavigoTransactionClient;
+  studyId: string;
+}): Promise<Map<string, HutRegistrationSlotWorkbookRecord>> {
+  const normalizedFolios = [...new Set(folios.filter(Boolean))];
+  if (normalizedFolios.length === 0 || !prisma.hutRegistrationSlot?.findMany) {
+    return new Map();
+  }
+
+  const slots = (await prisma.hutRegistrationSlot.findMany({
+    select: hutRegistrationSlotWorkbookSelect,
+    where: {
+      folio: { in: normalizedFolios },
+      studyId
+    }
+  })) as HutRegistrationSlotWorkbookRecord[];
+
+  return new Map(slots.map((slot) => [slot.folio, slot]));
 }
 
 async function findNavigoParticipantsByFolio({
@@ -4428,6 +5310,56 @@ async function upsertParticipantRotationForCodes({
   return {
     rotationCode
   };
+}
+
+async function upsertCtlTriangularRotationAssignment({
+  actorUserId,
+  filename,
+  prisma,
+  row,
+  studyParticipantId
+}: {
+  actorUserId: string;
+  filename: string;
+  prisma: NavigoTransactionClient;
+  row: NavigoRotationWorkbookRowInput;
+  studyParticipantId: string;
+}) {
+  await runNavigoRotationImportStep({
+    folio: row.folio,
+    operation: () =>
+      prisma.ctlTriangularRotationAssignment.upsert?.({
+        create: {
+          importedByUserId: actorUserId,
+          sourceFileName: filename,
+          studyParticipantId,
+          triangular1Pr1: row.triangular1Pr1,
+          triangular1Pr2: row.triangular1Pr2,
+          triangular1Pr3: row.triangular1Pr3,
+          triangular1Verify: row.triangular1Verify,
+          triangular2Pr1: row.triangular2Pr1,
+          triangular2Pr2: row.triangular2Pr2,
+          triangular2Pr3: row.triangular2Pr3,
+          triangular2Verify: row.triangular2Verify
+        },
+        update: {
+          importedAt: new Date(),
+          importedByUserId: actorUserId,
+          sourceFileName: filename,
+          triangular1Pr1: row.triangular1Pr1,
+          triangular1Pr2: row.triangular1Pr2,
+          triangular1Pr3: row.triangular1Pr3,
+          triangular1Verify: row.triangular1Verify,
+          triangular2Pr1: row.triangular2Pr1,
+          triangular2Pr2: row.triangular2Pr2,
+          triangular2Pr3: row.triangular2Pr3,
+          triangular2Verify: row.triangular2Verify
+        },
+        where: { studyParticipantId }
+      }) as Promise<unknown>,
+    step: "ctl-triangular-rotation-assignment",
+    userMessage: "No se pudo guardar la rotacion triangular CTL."
+  });
 }
 
 async function upsertNavigoStudyProduct({
@@ -5344,6 +6276,8 @@ function mapNavigoRotationStepToParticipantImportMessage(step: string): string {
       return "no se pudieron guardar RotationPlanArm.";
     case "participant-rotation-assignment":
       return "no se pudo crear ParticipantRotationAssignment.";
+    case "ctl-triangular-rotation-assignment":
+      return "no se pudo guardar CtlTriangularRotationAssignment.";
     case "participant-arm-left":
       return "no se pudo crear ParticipantArmAssignment LEFT.";
     case "participant-arm-right":
@@ -5644,6 +6578,13 @@ function activityStateAtEvent(activities: NavigoActivityRecord[]): "COMPLETED_EX
   }
 
   return "NONE_STARTED";
+}
+
+function participantHasHutAccessFromScreening(participant: ParticipantRecord): boolean {
+  const answers = participant.participantConfirmation?.screeningAttempt?.answers ?? [];
+  const answer = answers.find((candidate) => candidate.questionId === NAVIGO_HUT_ACCESS_QUESTION_ID)?.answerJson;
+
+  return isNavigoHutAccessEnabled(answer);
 }
 
 function hasT0Started(participant: ParticipantRecord): boolean {

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   applyHutMissedDay,
@@ -14,6 +16,10 @@ import {
 } from ".";
 import type { OneuiWhatsAppMessageRecord, OneuiWhatsAppRepository } from "@/modules/oneui-whatsapp";
 import type { HutStorageClient } from "./storage";
+
+function readWorkspaceFile(...segments: string[]) {
+  return readFileSync(join(process.cwd(), ...segments), "utf8");
+}
 
 describe("HUT module foundation", () => {
   afterEach(() => {
@@ -70,6 +76,22 @@ describe("HUT module foundation", () => {
     expect(result.ok ? result.data.link : "").toContain("https://example.com/hut/p/");
     expect(prisma.state.participants[0]?.status).toBe("BLOCK_1_IN_PROGRESS");
     expect(prisma.state.participants[0]?.blocks).toHaveLength(2);
+  });
+
+  it("defines an optional StudyParticipant link for HUT participants", () => {
+    const schema = readWorkspaceFile("prisma", "schema.prisma");
+    const migration = readWorkspaceFile(
+      "prisma",
+      "migrations",
+      "20260806120000_add_hut_study_participant_link",
+      "migration.sql"
+    );
+
+    expect(schema).toContain("studyParticipantId      String?");
+    expect(schema).toContain("studyParticipant    StudyParticipant?");
+    expect(schema).toContain("hutParticipant                   HutParticipant?");
+    expect(migration).toContain('ADD COLUMN "studyParticipantId" UUID');
+    expect(migration).toContain('FOREIGN KEY ("studyParticipantId") REFERENCES "study_participants"("id")');
   });
 
   it("syncs HUT phase codes from participant reference codes without overwriting existing records", async () => {

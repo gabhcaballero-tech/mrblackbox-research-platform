@@ -1,6 +1,7 @@
 ﻿import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { deflateRawSync } from "node:zlib";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createNavigoFoundationRepository,
   createNavigoMeasurementDefinition,
@@ -33,6 +34,11 @@ import {
   type NavigoActivityCode
 } from "./index";
 import { DETERGENTS_STUDY_CODE, NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
+import {
+  NAVIGO_HUT_ACCESS_NO_VALUE,
+  NAVIGO_HUT_ACCESS_QUESTION_ID,
+  NAVIGO_HUT_ACCESS_YES_VALUE
+} from "@/modules/screener/study-overrides";
 import { resolveRequestOrigin } from "@/shared/utils/request-origin";
 import {
   appendNavigoTestModeParams,
@@ -46,6 +52,11 @@ import {
   classifyNavigoFaceSimilarity,
   normalizeNavigoFaceVerificationForStorage
 } from "./face-verification-contract";
+import { parseNavigoRotationWorkbook } from "./rotation-workbook";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("navigo app schema foundation", () => {
   it("adds optional ActivitySchedule.code and composite uniqueness by study", () => {
@@ -860,6 +871,38 @@ describe("navigo app MVP rules", () => {
     });
     expect(csv.ok ? csv.rows[0]?.folio : null).toBe("NAV-002");
     expect(xlsx.ok).toBe(false);
+  });
+
+  it("parses the official Navigo XLSX workbook without using the CSV importer", () => {
+    const workbook = createMinimalRotationWorkbook();
+    const parsed = parseNavigoRotationWorkbook({
+      bytes: workbook,
+      filename: "ROTACIONES NAVIGO.xlsx"
+    });
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.ok ? parsed.rows : []).toEqual([
+      {
+        folio: "NAV-001",
+        primeraFragancia: "247",
+        segundaFragancia: "583",
+        triangular1Pr1: "K-247",
+        triangular1Pr2: "0-472",
+        triangular1Pr3: "H-358",
+        triangular1Verify: "H-358",
+        triangular2Pr1: "G-835",
+        triangular2Pr2: "Z-724",
+        triangular2Pr3: "C-583",
+        triangular2Verify: "Z-724"
+      }
+    ]);
+    expect(parsed.ok ? parsed.hutRows : []).toEqual([
+      {
+        folio: "NAV-001",
+        hutEva1: "901",
+        hutEva2: "902"
+      }
+    ]);
   });
 
   it("parses rotation imports with BOM, semicolon files and header aliases", () => {
@@ -1755,6 +1798,28 @@ describe("navigo app MVP rules", () => {
     expect(panel).not.toContain("useActionState");
   });
 
+  it("shows the official XLSX rotation workbook importer in Navigo admin", () => {
+    const page = readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "page.tsx");
+    const panel = readWorkspaceFile(
+      "src",
+      "app",
+      "admin",
+      "studies",
+      "[studyId]",
+      "navigo-app",
+      "_components",
+      "NavigoRotationWorkbookImportPanel.tsx"
+    );
+
+    expect(page).toContain("NavigoRotationWorkbookImportPanel");
+    expect(panel).toContain("ROTACIONES NAVIGO.xlsx");
+    expect(panel).toContain("previewNavigoRotationWorkbookImportAction");
+    expect(panel).toContain("applyNavigoRotationWorkbookImportRowsAction");
+    expect(panel).toContain("EVA1/EVA2");
+    expect(panel).toContain("triangular CTL");
+    expect(panel).toContain("Hoja HUT");
+  });
+
   it("applies valid rotation import rows with LEFT and RIGHT assignments", async () => {
     const state = createNavigoRotationImportState();
     const repository = createNavigoAppRepository(state.prisma as never);
@@ -1777,6 +1842,116 @@ describe("navigo app MVP rules", () => {
       { applicationOrder: 1, participantVisibleLabel: "Primera fragancia" },
       { applicationOrder: 2, participantVisibleLabel: "Segunda fragancia" }
     ]);
+  });
+
+  it("applies official workbook rows to Navigo rotation and CTL triangular rotation", async () => {
+    vi.stubEnv("HUT_PHASE_CODE_SECRET", "hut-phase-secret-for-tests");
+    const state = createNavigoRotationImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const parsed = parseNavigoRotationWorkbook({
+      bytes: createMinimalRotationWorkbook(),
+      filename: "ROTACIONES NAVIGO.xlsx"
+    });
+
+    expect(parsed.ok).toBe(true);
+
+    const preview = parsed.ok
+      ? await repository.previewRotationWorkbookImport({
+          hutRows: parsed.hutRows,
+          rows: parsed.rows,
+          studyId: state.study.id
+        })
+      : null;
+
+    expect(preview?.ok ? preview.data.summary.triangularComplete : 0).toBe(1);
+
+    const applied = parsed.ok
+      ? await repository.applyRotationWorkbookImport({
+          actorUserId: "admin-1",
+          filename: "ROTACIONES NAVIGO.xlsx",
+          hutRows: parsed.hutRows,
+          rows: parsed.rows,
+          studyId: state.study.id
+        })
+      : null;
+
+    expect(applied?.ok).toBe(true);
+    expect(state.rotationAssignments).toHaveLength(1);
+    expect(state.ctlTriangularRotationAssignments).toMatchObject([
+      {
+        sourceFileName: "ROTACIONES NAVIGO.xlsx",
+        studyParticipantId: state.participant.id,
+        triangular1Pr1: "K-247",
+        triangular1Pr2: "0-472",
+        triangular1Pr3: "H-358",
+        triangular1Verify: "H-358",
+        triangular2Pr1: "G-835",
+        triangular2Pr2: "Z-724",
+        triangular2Pr3: "C-583",
+        triangular2Verify: "Z-724"
+      }
+    ]);
+    expect(state.hutParticipants).toMatchObject([
+      {
+        firstFragranceLeftArm: "901",
+        folio: "NAV-001",
+        secondFragranceRightArm: "902",
+        status: "NOT_STARTED",
+        studyParticipantId: state.participant.id
+      }
+    ]);
+    expect(state.hutRegistrationSlots).toMatchObject([
+      {
+        firstFragranceLeftArm: "901",
+        folio: "NAV-001",
+        secondFragranceRightArm: "902",
+        status: "REGISTERED"
+      }
+    ]);
+    expect(state.hutParticipantPhaseCodes).toMatchObject([
+      { phase: "COLOCACION", slot: 1, status: "GENERATED" },
+      { phase: "REGRESO_1", slot: 2, status: "GENERATED" },
+      { phase: "REGRESO_2", slot: 3, status: "GENERATED" }
+    ]);
+  });
+
+  it("does not synchronize HUT rows when screening marks the participant as Navigo only", async () => {
+    vi.stubEnv("HUT_PHASE_CODE_SECRET", "hut-phase-secret-for-tests");
+    const state = createNavigoRotationImportState({ hutAccessAnswer: NAVIGO_HUT_ACCESS_NO_VALUE });
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const parsed = parseNavigoRotationWorkbook({
+      bytes: createMinimalRotationWorkbook(),
+      filename: "ROTACIONES NAVIGO.xlsx"
+    });
+
+    expect(parsed.ok).toBe(true);
+
+    const preview = parsed.ok
+      ? await repository.previewRotationWorkbookImport({
+          hutRows: parsed.hutRows,
+          rows: parsed.rows,
+          studyId: state.study.id
+        })
+      : null;
+
+    expect(preview?.ok ? preview.data.hutRows[0]?.errors : []).toContain(
+      "participante no marcado para HUT en screening"
+    );
+
+    const applied = parsed.ok
+      ? await repository.applyRotationWorkbookImport({
+          actorUserId: "admin-1",
+          filename: "ROTACIONES NAVIGO.xlsx",
+          hutRows: parsed.hutRows,
+          rows: parsed.rows,
+          studyId: state.study.id
+        })
+      : null;
+
+    expect(applied?.ok).toBe(false);
+    expect(state.hutParticipants).toHaveLength(0);
+    expect(state.hutRegistrationSlots).toHaveLength(0);
+    expect(state.hutParticipantPhaseCodes).toHaveLength(0);
   });
 
   it("retries rotation import without duplicating plans or assignments", async () => {
@@ -2540,7 +2715,11 @@ function createNavigoParticipantActivityState() {
     participantConfirmation: {
       id: "confirmation-1",
       folio: "NAV-001",
-      referenceCodes: [],
+      referenceCodes: [
+        { code: "CODE-1", slot: 1 },
+        { code: "CODE-2", slot: 2 },
+        { code: "CODE-3", slot: 3 }
+      ],
       screeningAttempt: {
         evaluationJson: null,
         id: "attempt-1",
@@ -4015,7 +4194,13 @@ function createNavigoParticipantImportState(
   };
 }
 
-function createNavigoRotationImportState({ failProductUpsert = false }: { failProductUpsert?: boolean } = {}) {
+function createNavigoRotationImportState({
+  failProductUpsert = false,
+  hutAccessAnswer = NAVIGO_HUT_ACCESS_YES_VALUE
+}: {
+  failProductUpsert?: boolean;
+  hutAccessAnswer?: string;
+} = {}) {
   const study = {
     code: NAVIGO_STUDY_CODE,
     id: "study-navigo",
@@ -4027,12 +4212,33 @@ function createNavigoRotationImportState({ failProductUpsert = false }: { failPr
     accessTokens: [],
     activities: [],
     applicationStartedAt: null as Date | null,
+    ctlTriangularRotationAssignment: null as null | {
+      id: string;
+      triangular1Pr1: string;
+      triangular1Pr2: string;
+      triangular1Pr3: string;
+      triangular1Verify: string;
+      triangular2Pr1: string;
+      triangular2Pr2: string;
+      triangular2Pr3: string;
+      triangular2Verify: string;
+    },
     id: "study-participant-1",
     participantConfirmation: {
       id: "confirmation-1",
       folio: "NAV-001",
-      referenceCodes: [],
+      referenceCodes: [
+        { code: "CODE-1", slot: 1 },
+        { code: "CODE-2", slot: 2 },
+        { code: "CODE-3", slot: 3 }
+      ],
       screeningAttempt: {
+        answers: [
+          {
+            answerJson: hutAccessAnswer,
+            questionId: NAVIGO_HUT_ACCESS_QUESTION_ID
+          }
+        ],
         evaluationJson: null,
         id: "attempt-1",
         source: "FIELD"
@@ -4092,6 +4298,59 @@ function createNavigoRotationImportState({ failProductUpsert = false }: { failPr
     studyParticipantId: string;
     studyProductId: string;
   }> = [];
+  const ctlTriangularRotationAssignments: Array<{
+    id: string;
+    importedAt?: Date;
+    importedByUserId: string | null;
+    sourceFileName: string | null;
+    studyParticipantId: string;
+    triangular1Pr1: string;
+    triangular1Pr2: string;
+    triangular1Pr3: string;
+    triangular1Verify: string;
+    triangular2Pr1: string;
+    triangular2Pr2: string;
+    triangular2Pr3: string;
+    triangular2Verify: string;
+  }> = [];
+  const hutParticipants: Array<{
+    blocks: Array<{ status: string; submittedVideosCount: number }>;
+    callEvaluations: Array<{ completedAt: Date | null; status: string }>;
+    dailyChecks: Array<{ id: string }>;
+    email: string | null;
+    firstFragranceLeftArm: string | null;
+    folio: string | null;
+    id: string;
+    name: string;
+    phone: string | null;
+    phaseCodes: Array<{ id: string; phase: string; slot: number; status: string }>;
+    secondFragranceRightArm: string | null;
+    status: string;
+    studyId: string;
+    studyParticipantId: string | null;
+    token: string;
+    videoSubmissions: Array<{ id: string }>;
+  }> = [];
+  const hutRegistrationSlots: Array<{
+    firstFragranceLeftArm: string;
+    folio: string;
+    id: string;
+    participantId: string | null;
+    registrationToken: string;
+    secondFragranceRightArm: string;
+    status: string;
+    studyId: string;
+  }> = [];
+  const hutParticipantPhaseCodes: Array<{
+    codeHash: string;
+    encryptedCode: string;
+    encryptionVersion: number;
+    id: string;
+    participantId: string;
+    phase: string;
+    slot: number;
+    status: string;
+  }> = [];
 
   function syncParticipantRotation() {
     const assignment = rotationAssignments.find((candidate) => candidate.studyParticipantId === participant.id) ?? null;
@@ -4128,7 +4387,133 @@ function createNavigoRotationImportState({ failProductUpsert = false }: { failPr
     };
   }
 
+  function syncCtlTriangularRotation() {
+    participant.ctlTriangularRotationAssignment =
+      ctlTriangularRotationAssignments.find((assignment) => assignment.studyParticipantId === participant.id) ?? null;
+  }
+
   const tx = {
+    ctlTriangularRotationAssignment: {
+      async upsert(args: {
+        create: Omit<(typeof ctlTriangularRotationAssignments)[number], "id">;
+        update: Partial<(typeof ctlTriangularRotationAssignments)[number]>;
+        where: { studyParticipantId: string };
+      }) {
+        const target = ctlTriangularRotationAssignments.find(
+          (assignment) => assignment.studyParticipantId === args.where.studyParticipantId
+        );
+
+        if (target) {
+          Object.assign(target, args.update);
+          syncCtlTriangularRotation();
+          return target;
+        }
+
+        const record = { ...args.create, id: `ctl-triangular-${ctlTriangularRotationAssignments.length + 1}` };
+        ctlTriangularRotationAssignments.push(record);
+        syncCtlTriangularRotation();
+        return record;
+      }
+    },
+    hutBlock: {
+      async create(args: { data: { participantId: string; status: string; submittedVideosCount?: number } }) {
+        const target = hutParticipants.find((item) => item.id === args.data.participantId);
+        target?.blocks.push({
+          status: args.data.status,
+          submittedVideosCount: args.data.submittedVideosCount ?? 0
+        });
+        return { id: `hut-block-${target?.blocks.length ?? 1}` };
+      }
+    },
+    hutCallEvaluation: {
+      async create(args: { data: { completedAt?: Date | null; participantId: string; status: string } }) {
+        const target = hutParticipants.find((item) => item.id === args.data.participantId);
+        target?.callEvaluations.push({
+          completedAt: args.data.completedAt ?? null,
+          status: args.data.status
+        });
+        return { id: `hut-call-${target?.callEvaluations.length ?? 1}` };
+      }
+    },
+    hutParticipant: {
+      async create(args: {
+        data: Omit<(typeof hutParticipants)[number], "blocks" | "callEvaluations" | "dailyChecks" | "id" | "phaseCodes" | "videoSubmissions">;
+      }) {
+        const record = {
+          ...args.data,
+          blocks: [],
+          callEvaluations: [],
+          dailyChecks: [],
+          id: `hut-participant-${hutParticipants.length + 1}`,
+          phaseCodes: [],
+          videoSubmissions: []
+        };
+        hutParticipants.push(record);
+        return record;
+      },
+      async findFirst(args: { where: { folio?: string; studyId: string; studyParticipantId?: string } }) {
+        return (
+          hutParticipants.find(
+            (item) =>
+              item.studyId === args.where.studyId &&
+              (args.where.folio === undefined || item.folio === args.where.folio) &&
+              (args.where.studyParticipantId === undefined || item.studyParticipantId === args.where.studyParticipantId)
+          ) ?? null
+        );
+      },
+      async findMany(args: { where: { folio: { in: string[] }; studyId: string } }) {
+        return hutParticipants.filter((item) => item.studyId === args.where.studyId && item.folio && args.where.folio.in.includes(item.folio));
+      },
+      async update(args: { data: Partial<(typeof hutParticipants)[number]>; where: { id: string } }) {
+        const target = hutParticipants.find((item) => item.id === args.where.id);
+        if (!target) {
+          throw new Error("hut participant not found");
+        }
+        Object.assign(target, args.data);
+        return target;
+      }
+    },
+    hutParticipantPhaseCode: {
+      async create(args: { data: Omit<(typeof hutParticipantPhaseCodes)[number], "id"> }) {
+        const record = { ...args.data, id: `hut-phase-code-${hutParticipantPhaseCodes.length + 1}` };
+        hutParticipantPhaseCodes.push(record);
+        const participantRecord = hutParticipants.find((item) => item.id === record.participantId);
+        participantRecord?.phaseCodes.push({
+          id: record.id,
+          phase: record.phase,
+          slot: record.slot,
+          status: record.status
+        });
+        return record;
+      }
+    },
+    hutRegistrationSlot: {
+      async create(args: { data: Omit<(typeof hutRegistrationSlots)[number], "id"> }) {
+        const record = { ...args.data, id: `hut-slot-${hutRegistrationSlots.length + 1}` };
+        hutRegistrationSlots.push(record);
+        return record;
+      },
+      async findMany(args: { where: { folio: { in: string[] }; studyId: string } }) {
+        return hutRegistrationSlots.filter((item) => item.studyId === args.where.studyId && args.where.folio.in.includes(item.folio));
+      },
+      async findUnique(args: { where: { studyId_folio: { folio: string; studyId: string } } }) {
+        return (
+          hutRegistrationSlots.find(
+            (item) =>
+              item.studyId === args.where.studyId_folio.studyId &&
+              item.folio === args.where.studyId_folio.folio
+          ) ?? null
+        );
+      },
+      async update(args: { data: Partial<(typeof hutRegistrationSlots)[number]>; where: { id: string } }) {
+        const target = hutRegistrationSlots.find((item) => item.id === args.where.id);
+        if (!target) {
+          throw new Error("hut slot not found");
+        }
+        Object.assign(target, args.data);
+        return target;
+      }
+    },
     participantArmAssignment: {
       async upsert(args: {
         create: Omit<(typeof armAssignments)[number], "id">;
@@ -4160,6 +4545,7 @@ function createNavigoRotationImportState({ failProductUpsert = false }: { failPr
         }
 
         syncParticipantRotation();
+        syncCtlTriangularRotation();
         return [
           {
             folio: participant.participantConfirmation.folio,
@@ -4337,6 +4723,10 @@ function createNavigoRotationImportState({ failProductUpsert = false }: { failPr
   return {
     armAssignments,
     arms,
+    ctlTriangularRotationAssignments,
+    hutParticipantPhaseCodes,
+    hutParticipants,
+    hutRegistrationSlots,
     participant,
     prisma,
     products,
@@ -4349,6 +4739,137 @@ function createNavigoRotationImportState({ failProductUpsert = false }: { failPr
 
 function readWorkspaceFile(...segments: string[]) {
   return readFileSync(join(process.cwd(), ...segments), "utf8");
+}
+
+function createMinimalRotationWorkbook(): Buffer {
+  const files = new Map([
+    [
+      "xl/workbook.xml",
+      [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">',
+        '<sheets><sheet name="CLT" sheetId="1" r:id="rId1"/><sheet name="HUT" sheetId="2" r:id="rId2"/></sheets>',
+        "</workbook>"
+      ].join("")
+    ],
+    [
+      "xl/_rels/workbook.xml.rels",
+      [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>',
+        '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>',
+        "</Relationships>"
+      ].join("")
+    ],
+    [
+      "xl/worksheets/sheet1.xml",
+      [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
+        "<sheetData>",
+        '<row r="1"><c r="A1" t="inlineStr"><is><t>FOLIO</t></is></c></row>',
+        [
+          '<row r="2">',
+          '<c r="B2" t="inlineStr"><is><t>PR1</t></is></c>',
+          '<c r="C2" t="inlineStr"><is><t>PR2</t></is></c>',
+          '<c r="D2" t="inlineStr"><is><t>PR3</t></is></c>',
+          '<c r="E2" t="inlineStr"><is><t>VERI_1</t></is></c>',
+          '<c r="F2" t="inlineStr"><is><t>PR4</t></is></c>',
+          '<c r="G2" t="inlineStr"><is><t>PR5</t></is></c>',
+          '<c r="H2" t="inlineStr"><is><t>PR6</t></is></c>',
+          '<c r="I2" t="inlineStr"><is><t>VERI_2</t></is></c>',
+          '<c r="J2" t="inlineStr"><is><t>EVA1</t></is></c>',
+          '<c r="K2" t="inlineStr"><is><t>EVA2</t></is></c>',
+          "</row>"
+        ].join(""),
+        [
+          '<row r="3">',
+          '<c r="A3"><v>1</v></c>',
+          '<c r="B3" t="inlineStr"><is><t>K-247</t></is></c>',
+          '<c r="C3" t="inlineStr"><is><t>0-472</t></is></c>',
+          '<c r="D3" t="inlineStr"><is><t>H-358</t></is></c>',
+          '<c r="E3" t="inlineStr"><is><t>H-358</t></is></c>',
+          '<c r="F3" t="inlineStr"><is><t>G-835</t></is></c>',
+          '<c r="G3" t="inlineStr"><is><t>Z-724</t></is></c>',
+          '<c r="H3" t="inlineStr"><is><t>C-583</t></is></c>',
+          '<c r="I3" t="inlineStr"><is><t>Z-724</t></is></c>',
+          '<c r="J3"><v>247</v></c>',
+          '<c r="K3"><v>583</v></c>',
+          "</row>"
+        ].join(""),
+        "</sheetData></worksheet>"
+      ].join("")
+    ],
+    [
+      "xl/worksheets/sheet2.xml",
+      [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
+        "<sheetData>",
+        [
+          '<row r="1">',
+          '<c r="A1" t="inlineStr"><is><t>FOLIO</t></is></c>',
+          '<c r="B1" t="inlineStr"><is><t>EVA1</t></is></c>',
+          '<c r="C1" t="inlineStr"><is><t>EVA2</t></is></c>',
+          "</row>"
+        ].join(""),
+        [
+          '<row r="2">',
+          '<c r="A2"><v>1</v></c>',
+          '<c r="B2"><v>901</v></c>',
+          '<c r="C2"><v>902</v></c>',
+          "</row>"
+        ].join(""),
+        "</sheetData></worksheet>"
+      ].join("")
+    ]
+  ]);
+
+  return createZip(files);
+}
+
+function createZip(files: Map<string, string>): Buffer {
+  const localParts: Buffer[] = [];
+  const centralParts: Buffer[] = [];
+  let offset = 0;
+
+  for (const [filename, text] of files) {
+    const filenameBuffer = Buffer.from(filename, "utf8");
+    const compressed = deflateRawSync(Buffer.from(text, "utf8"));
+    const localHeader = Buffer.alloc(30);
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(8, 8);
+    localHeader.writeUInt32LE(compressed.length, 18);
+    localHeader.writeUInt32LE(Buffer.byteLength(text, "utf8"), 22);
+    localHeader.writeUInt16LE(filenameBuffer.length, 26);
+
+    localParts.push(localHeader, filenameBuffer, compressed);
+
+    const centralHeader = Buffer.alloc(46);
+    centralHeader.writeUInt32LE(0x02014b50, 0);
+    centralHeader.writeUInt16LE(20, 4);
+    centralHeader.writeUInt16LE(20, 6);
+    centralHeader.writeUInt16LE(8, 10);
+    centralHeader.writeUInt32LE(compressed.length, 20);
+    centralHeader.writeUInt32LE(Buffer.byteLength(text, "utf8"), 24);
+    centralHeader.writeUInt16LE(filenameBuffer.length, 28);
+    centralHeader.writeUInt32LE(offset, 42);
+    centralParts.push(centralHeader, filenameBuffer);
+
+    offset += localHeader.length + filenameBuffer.length + compressed.length;
+  }
+
+  const centralDirectory = Buffer.concat(centralParts);
+  const endOfCentralDirectory = Buffer.alloc(22);
+  endOfCentralDirectory.writeUInt32LE(0x06054b50, 0);
+  endOfCentralDirectory.writeUInt16LE(files.size, 8);
+  endOfCentralDirectory.writeUInt16LE(files.size, 10);
+  endOfCentralDirectory.writeUInt32LE(centralDirectory.length, 12);
+  endOfCentralDirectory.writeUInt32LE(offset, 16);
+
+  return Buffer.concat([...localParts, centralDirectory, endOfCentralDirectory]);
 }
 
 function parseTsv(value: string) {

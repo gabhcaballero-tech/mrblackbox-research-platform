@@ -3,8 +3,14 @@ import type { ScreenerDefinition } from "./definition";
 import {
   DETERGENTS_STUDY_CODE,
   DETERGENT_RECRUITER_QUESTION_ID,
+  NAVIGO_HUT_ACCESS_NO_VALUE,
+  NAVIGO_HUT_ACCESS_QUESTION_ID,
+  NAVIGO_HUT_ACCESS_YES_VALUE,
+  NAVIGO_STUDY_CODE,
   applyStudyScreenerDefinitionOverrides,
-  ensureDetergentRecruiterQuestion
+  ensureDetergentRecruiterQuestion,
+  ensureNavigoHutAccessQuestion,
+  isNavigoHutAccessEnabled
 } from "./study-overrides";
 
 function baseDefinition(): ScreenerDefinition {
@@ -75,8 +81,44 @@ describe("study screener definition overrides", () => {
 
   it("does not alter other studies", () => {
     const original = baseDefinition();
-    const definition = applyStudyScreenerDefinitionOverrides("FMASCULINA-NAVIGO-2026", original);
+    const definition = applyStudyScreenerDefinitionOverrides("OTRO-ESTUDIO-2026", original);
 
     expect(definition).toBe(original);
+  });
+
+  it("adds the Navigo HUT access question at the end without eligibility actions", () => {
+    const definition = applyStudyScreenerDefinitionOverrides(NAVIGO_STUDY_CODE, baseDefinition());
+
+    expect(definition.questions.map((question) => question.id)).toEqual([
+      "F1_CIUDAD",
+      "F2_EDAD",
+      NAVIGO_HUT_ACCESS_QUESTION_ID
+    ]);
+    expect(definition.questions[2]).toMatchObject({
+      dataDestination: "OPERATIONAL_INTERNAL",
+      id: NAVIGO_HUT_ACCESS_QUESTION_ID,
+      order: 3,
+      required: true,
+      type: "SINGLE_CHOICE"
+    });
+    expect(definition.questions[2] && "options" in definition.questions[2] ? definition.questions[2].options : []).toEqual([
+      expect.objectContaining({ actions: [], value: NAVIGO_HUT_ACCESS_YES_VALUE }),
+      expect.objectContaining({ actions: [], value: NAVIGO_HUT_ACCESS_NO_VALUE })
+    ]);
+  });
+
+  it("keeps the Navigo HUT access override idempotent", () => {
+    const once = ensureNavigoHutAccessQuestion(baseDefinition());
+    const twice = ensureNavigoHutAccessQuestion(once);
+
+    expect(twice.questions.filter((question) => question.id === NAVIGO_HUT_ACCESS_QUESTION_ID)).toHaveLength(1);
+    expect(twice.questions.map((question) => question.order)).toEqual([1, 2, 3]);
+  });
+
+  it("detects the affirmative HUT screening answer", () => {
+    expect(isNavigoHutAccessEnabled(NAVIGO_HUT_ACCESS_YES_VALUE)).toBe(true);
+    expect(isNavigoHutAccessEnabled({ value: NAVIGO_HUT_ACCESS_YES_VALUE })).toBe(true);
+    expect(isNavigoHutAccessEnabled(NAVIGO_HUT_ACCESS_NO_VALUE)).toBe(false);
+    expect(isNavigoHutAccessEnabled(undefined)).toBe(false);
   });
 });

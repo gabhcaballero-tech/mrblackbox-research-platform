@@ -106,7 +106,21 @@ export default async function CtlPublicCapturePage({ params, searchParams }: Ctl
             firstSampleKey: session.participant.rotation.firstSampleKey,
             folio: session.participant.folio,
             name: session.participant.name,
-            secondSampleKey: session.participant.rotation.secondSampleKey
+            secondSampleKey: session.participant.rotation.secondSampleKey,
+            triangularRotation: session.participant.triangularRotation
+              ? {
+                  triangular1: {
+                    pr1: session.participant.triangularRotation.triangular1.pr1,
+                    pr2: session.participant.triangularRotation.triangular1.pr2,
+                    pr3: session.participant.triangularRotation.triangular1.pr3
+                  },
+                  triangular2: {
+                    pr1: session.participant.triangularRotation.triangular2.pr1,
+                    pr2: session.participant.triangularRotation.triangular2.pr2,
+                    pr3: session.participant.triangularRotation.triangular2.pr3
+                  }
+                }
+              : null
           }}
           readOnly={readOnly}
           sessionId={session.id}

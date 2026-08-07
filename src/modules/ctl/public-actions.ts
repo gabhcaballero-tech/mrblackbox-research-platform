@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCtlPublicSessionSecret, getPublicCtlInterviewerActor } from "@/shared/auth/ctl-public";
 import { createCtlRepository } from "./repository";
+import type { CtlSessionView } from "./repository";
 import {
   createCtlPublicSessionToken,
   ctlPublicSessionCookieName,
@@ -12,6 +13,7 @@ import {
 } from "./public-session";
 import {
   ctlFormDataToAnswerInput,
+  buildCtlTriangularAnswerValue,
   isCtlTerminatingAnswer,
   normalizeCtlCode,
   parseCtlAnswers,
@@ -147,9 +149,25 @@ export async function savePublicCtlQuestionAnswerAction(
   }
 
   const repository = createCtlRepository();
+  const session = await repository.getSession({ actor, sessionId });
+  if (!session) {
+    return {
+      message: "No encontramos la sesion CTL.",
+      ok: false
+    };
+  }
+
+  const answer = parsed.answer ? enrichCtlTriangularAnswer(parsed.answer, session) : null;
+  if (answer && !answer.ok) {
+    return {
+      message: answer.message,
+      ok: false
+    };
+  }
+
   const result = await repository.saveAnswers({
     actor,
-    answers: parsed.answer ? [parsed.answer] : [],
+    answers: answer?.ok ? [answer.answer] : [],
     complete: false,
     sessionId
   });
@@ -225,9 +243,17 @@ export async function finishPublicCtlSessionAction(studyCode: string, sessionId:
     };
   }
 
+  const enrichedAnswers = enrichCtlTriangularAnswers(parsed.answers, session);
+  if (!enrichedAnswers.ok) {
+    return {
+      message: enrichedAnswers.message,
+      ok: false
+    };
+  }
+
   const result = await repository.saveAnswers({
     actor,
-    answers: parsed.answers,
+    answers: enrichedAnswers.answers,
     complete: true,
     sessionId
   });
@@ -268,6 +294,11 @@ function ctlAnswersRecordToInput(answers: Record<string, unknown>): CtlAnswerInp
   const input: CtlAnswerInput = {};
 
   for (const [questionCode, answerValue] of Object.entries(answers)) {
+    if (isTriangularQuestionCode(questionCode) && isRecord(answerValue) && "selectedPosition" in answerValue) {
+      input[questionCode] = String(answerValue.selectedPosition ?? "");
+      continue;
+    }
+
     if (isRecord(answerValue)) {
       input[questionCode] = Object.fromEntries(
         Object.entries(answerValue).map(([rowCode, rowValue]) => [rowCode, String(rowValue ?? "")])
@@ -301,4 +332,65 @@ function mergeCtlAnswerInputs(existing: CtlAnswerInput, current: CtlAnswerInput)
 
 function isRecord(value: unknown): value is Record<string, FormDataEntryValue | null | undefined> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function enrichCtlTriangularAnswers(
+  answers: Array<{ answerValue: unknown; questionCode: string }>,
+  session: CtlSessionView
+): { answers: Array<{ answerValue: unknown; questionCode: string }>; ok: true } | { message: string; ok: false } {
+  const enriched: Array<{ answerValue: unknown; questionCode: string }> = [];
+
+  for (const answer of answers) {
+    const result = enrichCtlTriangularAnswer(answer, session);
+    if (!result.ok) {
+      return result;
+    }
+    enriched.push(result.answer);
+  }
+
+  return { answers: enriched, ok: true };
+}
+
+function enrichCtlTriangularAnswer(
+  answer: { answerValue: unknown; questionCode: string },
+  session: CtlSessionView
+): { answer: { answerValue: unknown; questionCode: string }; ok: true } | { message: string; ok: false } {
+  if (!isTriangularQuestionCode(answer.questionCode)) {
+    return { answer, ok: true };
+  }
+
+  const triangularRotation = session.participant.triangularRotation;
+  if (!triangularRotation) {
+    return {
+      message: "No existe rotacion triangular asignada para este participante.",
+      ok: false
+    };
+  }
+
+  const selectedPosition = normalizeCtlCode(
+    isRecord(answer.answerValue) && "selectedPosition" in answer.answerValue
+      ? answer.answerValue.selectedPosition
+      : answer.answerValue
+  );
+  const built = buildCtlTriangularAnswerValue({
+    answerValue: selectedPosition,
+    questionCode: answer.questionCode,
+    triangularRotation
+  });
+
+  if (!built.ok) {
+    return built;
+  }
+
+  return {
+    answer: {
+      answerValue: built.answerValue,
+      questionCode: answer.questionCode
+    },
+    ok: true
+  };
+}
+
+function isTriangularQuestionCode(questionCode: string): boolean {
+  return questionCode === "P1" || questionCode === "P3";
 }
