@@ -1,4 +1,5 @@
 import type {
+  NavigoHommePhase2Report,
   NavigoHommePrecheckReport,
   SimulationCheck,
   SimulationCheckStatus,
@@ -55,6 +56,35 @@ export function formatSimulationPrecheckReport(report: NavigoHommePrecheckReport
     }
 
     lines.push("");
+  }
+
+  return lines.join("\n").trimEnd();
+}
+
+export function formatSimulationPhase2Report(report: NavigoHommePhase2Report): string {
+  const lines = [
+    "SIMULACION FASE 2",
+    "",
+    `Participante: ${report.fixtures.participant.externalReference}`,
+    `Modo seguro: ${report.simulationMode ? "SI" : "NO"}`,
+    `Estado general: ${formatStatus(report.status)}`,
+    ""
+  ];
+
+  for (const section of report.sections) {
+    lines.push(`${section.title}:`);
+    lines.push(formatStatus(section.status));
+
+    for (const check of section.checks) {
+      lines.push(`- ${check.label}: ${formatStatus(check.status)}${check.detail ? ` (${check.detail})` : ""}`);
+    }
+
+    lines.push("");
+  }
+
+  lines.push("HORARIOS ESPERADOS:");
+  for (const item of report.activitySchedulePreview) {
+    lines.push(`- ${item.activityCode}: ${item.expectedAt.toISOString()}`);
   }
 
   return lines.join("\n").trimEnd();

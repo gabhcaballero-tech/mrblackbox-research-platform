@@ -9,18 +9,30 @@ import {
 import { applyStudyScreenerDefinitionOverrides, NAVIGO_HUT_ACCESS_QUESTION_ID } from "@/modules/screener/study-overrides";
 import { parseScreenerDefinition } from "@/modules/screener";
 import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
+import {
+  createDefaultNavigoHommeSimulationClock,
+  previewNavigoActivitySchedule,
+  type SimulationClock
+} from "./clock";
 import { createNavigoHommeSimulationFixtures, NAVIGO_HOMME_SIMULATION_STUDY_CODE } from "./fixtures";
 import {
   createSimulationReportSection,
+  summarizeSimulationChecks,
   summarizeSimulationSections
 } from "./report";
 import type {
+  NavigoHommePhase2Report,
   NavigoHommePrecheckReport,
   NavigoHommePrecheckStudy,
+  NavigoHommeSimulationExecutionPort,
   NavigoHommeSimulationFixtures,
+  NavigoHommeSimulationParticipantResult,
+  NavigoHommeSimulationReadinessResult,
+  NavigoHommeSimulationRotationResult,
   NavigoHommeSimulatorRepository,
   NavigoHommeSimulatorServiceCatalog,
-  SimulationCheck
+  SimulationCheck,
+  SimulationReportSection
 } from "./types";
 
 type RunNavigoHommePrecheckInput = {
@@ -29,6 +41,11 @@ type RunNavigoHommePrecheckInput = {
   repository?: NavigoHommeSimulatorRepository;
   serviceCatalog?: NavigoHommeSimulatorServiceCatalog;
   studyCode?: string;
+};
+
+type RunNavigoHommePhase2Input = RunNavigoHommePrecheckInput & {
+  clock?: SimulationClock;
+  executor: NavigoHommeSimulationExecutionPort;
 };
 
 type StudyReadClient = PrismaClientLike & {
@@ -76,6 +93,87 @@ export async function runNavigoHommeSimulationPrecheck({
     simulationMode: true,
     status: summarizeSimulationSections(sections),
     study,
+    studyCode
+  };
+}
+
+export async function runNavigoHommeSimulationPhase2({
+  clock = createDefaultNavigoHommeSimulationClock(),
+  executor,
+  fixtures = createNavigoHommeSimulationFixtures(),
+  now = clock.now(),
+  repository = createE2ESimulatorReadRepository(),
+  serviceCatalog = createDefaultSimulatorServiceCatalog(),
+  studyCode = NAVIGO_HOMME_SIMULATION_STUDY_CODE
+}: RunNavigoHommePhase2Input): Promise<NavigoHommePhase2Report> {
+  const precheck = await runNavigoHommeSimulationPrecheck({
+    fixtures,
+    now,
+    repository,
+    serviceCatalog,
+    studyCode
+  });
+  const activitySchedulePreview = previewNavigoActivitySchedule(clock);
+
+  if (precheck.status === "BLOCKED" || !precheck.study) {
+    const sections = createPhase2Sections({
+      participant: null,
+      readiness: null,
+      rotations: null,
+      precheckBlocked: true
+    });
+
+    return {
+      activitySchedulePreview,
+      fixtures,
+      generatedAt: now,
+      participant: null,
+      precheck,
+      readiness: null,
+      rotations: null,
+      sections,
+      simulationMode: true,
+      status: summarizeSimulationSections(sections),
+      studyCode
+    };
+  }
+
+  const participant = await executor.createScreeningParticipant({
+    clock,
+    fixtures,
+    study: precheck.study
+  });
+  const rotations = await executor.applyRotationFixtures({
+    clock,
+    fixtures,
+    participant,
+    study: precheck.study
+  });
+  const readiness = await executor.validateInitialReadiness({
+    clock,
+    fixtures,
+    participant,
+    rotations,
+    study: precheck.study
+  });
+  const sections = createPhase2Sections({
+    participant,
+    readiness,
+    rotations,
+    precheckBlocked: false
+  });
+
+  return {
+    activitySchedulePreview,
+    fixtures,
+    generatedAt: now,
+    participant,
+    precheck,
+    readiness,
+    rotations,
+    sections,
+    simulationMode: true,
+    status: summarizeSimulationSections(sections),
     studyCode
   };
 }
@@ -284,6 +382,100 @@ function serviceCheck(code: string, label: string, ok: boolean): SimulationCheck
     label,
     status: ok ? "OK" : "BLOCKED"
   };
+}
+
+function createPhase2Sections({
+  participant,
+  precheckBlocked,
+  readiness,
+  rotations
+}: {
+  participant: NavigoHommeSimulationParticipantResult | null;
+  precheckBlocked: boolean;
+  readiness: NavigoHommeSimulationReadinessResult | null;
+  rotations: NavigoHommeSimulationRotationResult | null;
+}): SimulationReportSection[] {
+  if (precheckBlocked) {
+    return [
+      createSimulationReportSection("SIMULACION FASE 2", [
+        {
+          code: "phase2.precheck",
+          label: "PRECHECK completo",
+          status: "BLOCKED"
+        }
+      ])
+    ];
+  }
+
+  return [
+    createSimulationReportSection("PARTICIPANTE", [
+      {
+        code: "phase2.participant",
+        detail: participant ? `${participant.participantName} / ${participant.participantId}` : undefined,
+        label: "SIM-NAV-001 creado",
+        status: participant ? "OK" : "BLOCKED"
+      }
+    ]),
+    createSimulationReportSection("SCREENING", [
+      {
+        code: "phase2.screening",
+        detail: participant?.screeningAttemptId,
+        label: "Screening aprobado",
+        status: participant?.screeningStatus === "PASSED" ? "OK" : "BLOCKED"
+      }
+    ]),
+    createSimulationReportSection("FOLIO", [
+      {
+        code: "phase2.folio",
+        detail: participant?.folio,
+        label: "Folio generado",
+        status: participant?.folio ? "OK" : "BLOCKED"
+      }
+    ]),
+    createSimulationReportSection("CODIGOS", [
+      {
+        code: "phase2.reference_codes",
+        detail: participant ? `${participant.referenceCodes.length} slots` : undefined,
+        label: "3 codigos generados",
+        status: participant?.referenceCodes.length === 3 && participant.referenceCodes.every((code) => code.generated)
+          ? "OK"
+          : "BLOCKED"
+      }
+    ]),
+    createSimulationReportSection("ROTACION", [
+      {
+        code: "phase2.rotation.navigo",
+        label: "Navigo OK",
+        status: rotations?.navigo.ready ? "OK" : "BLOCKED"
+      },
+      {
+        code: "phase2.rotation.ctl",
+        label: "CTL OK",
+        status: rotations?.ctl.ready ? "OK" : "BLOCKED"
+      },
+      {
+        code: "phase2.rotation.hut",
+        label: "HUT OK",
+        status: rotations?.hut.ready ? "OK" : "BLOCKED"
+      }
+    ]),
+    createSimulationReportSection("CTL", [
+      {
+        code: "phase2.ctl.ready",
+        detail: readiness?.reasons.join("; "),
+        label: "Listo para iniciar",
+        status: readiness?.ctlReady ? "OK" : "BLOCKED"
+      },
+      {
+        code: "phase2.hut.candidate",
+        label: "Candidato HUT",
+        status: readiness?.candidateHut ? "OK" : "PENDING"
+      }
+    ])
+  ].map((section) => ({
+    ...section,
+    status: summarizeSimulationChecks(section.checks)
+  }));
 }
 
 function hasCompleteCtlRotationFixture(fixtures: NavigoHommeSimulationFixtures): boolean {
