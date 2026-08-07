@@ -58,6 +58,15 @@ export type ScreenerNseEvaluation = {
 };
 
 export type ScreeningAttemptEvaluationJson = {
+  closureDiagnostics?: {
+    closedBy: "participant_portal" | "field";
+    flagCodes: string[];
+    missingQuestionIds: string[];
+    reasonCodes: string[];
+    result: ScreenerEvaluationResultKind;
+    status: ScreenerEvaluationStatus;
+    triggerQuestionId?: string;
+  };
   flags: ScreenerEvaluationFlag[];
   missingQuestionIds: string[];
   nse: ScreenerNseEvaluation | null;

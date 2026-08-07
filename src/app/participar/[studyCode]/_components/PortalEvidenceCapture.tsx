@@ -248,7 +248,7 @@ export function PortalEvidenceCapture({
         setError(null);
         clearCapturedPhoto();
       } catch {
-        setError("No fue posible subir la foto. Revisa tu conexión e intenta nuevamente.");
+        setError("No fue posible subir la foto. Revisa tu conexión e intenta nuevamente. La foto sigue en pantalla para reintentar.");
       } finally {
         setIsUploading(false);
       }
@@ -385,7 +385,7 @@ async function uploadEvidenceFile(
 
   if (!signed.data.token) {
     return {
-      message: "No fue posible preparar la carga. Intenta de nuevo.",
+      message: "No fue posible preparar la carga. Revisa tu conexión e intenta nuevamente.",
       ok: false
     };
   }
@@ -399,7 +399,7 @@ async function uploadEvidenceFile(
 
   if (error) {
     return {
-      message: "No fue posible subir la foto. Revisa tu conexión e intenta nuevamente.",
+      message: "No fue posible subir la foto. Revisa tu conexión e intenta nuevamente. La foto sigue en pantalla para reintentar.",
       ok: false
     };
   }
@@ -412,7 +412,7 @@ async function uploadEvidenceFile(
 
   if (!confirmed.ok) {
     return {
-      message: "La foto se subió, pero no fue posible registrarla. Contacta al administrador.",
+      message: "La foto se subió, pero no fue posible registrarla. Presiona Usar esta foto para reintentar o toma otra foto.",
       ok: false
     };
   }

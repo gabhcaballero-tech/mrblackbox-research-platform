@@ -1,4 +1,5 @@
 import { PARTICIPANT_PORTAL_UNAVAILABLE_MESSAGE } from "./access";
+import { F6_PERFUME_EVIDENCE_QUESTION_ID } from "./evidence-storage";
 import { PARTICIPANT_PORTAL_DUPLICATE_REGISTRATION_MESSAGE } from "./registration-service";
 import { normalizeParticipantTextInput } from "./text-normalization";
 import type {
@@ -267,6 +268,18 @@ export async function saveParticipantPortalScreenerAnswer({
     };
   }
 
+  if (questionId === F6_PERFUME_EVIDENCE_QUESTION_ID && getStudyBehavior(context.data.study.code).requiresPerfumeEvidence) {
+    const perfumePhotoCount = countPerfumePhotos(attempt.participantEvidence);
+
+    if (perfumePhotoCount < context.data.study.portalConfig.minPerfumePhotos) {
+      return {
+        code: "VALIDATION_ERROR",
+        message: `Debes registrar al menos ${context.data.study.portalConfig.minPerfumePhotos} foto de perfume y volver a presionar Guardar y continuar.`,
+        ok: false
+      };
+    }
+  }
+
   await repository.upsertAnswer({
     answerJson: answer,
     questionId,
@@ -282,7 +295,11 @@ export async function saveParticipantPortalScreenerAnswer({
   if (immediateTermination) {
     await closePortalAttempt({
       attempt,
-      evaluation: buildImmediateTerminationEvaluation(definition, answers, immediateTermination),
+      evaluation: withClosureDiagnostics(
+        buildImmediateTerminationEvaluation(definition, answers, immediateTermination),
+        questionId,
+        "participant_portal"
+      ),
       repository
     });
 
@@ -299,20 +316,12 @@ export async function saveParticipantPortalScreenerAnswer({
 
   const evaluation = evaluateScreener(definition, answers);
 
-  if (questionId === "F6_MARCAS_UTILIZA" && getStudyBehavior(context.data.study.code).requiresPerfumeEvidence) {
-    const perfumePhotoCount = countPerfumePhotos(attempt.participantEvidence);
-
-    if (perfumePhotoCount < context.data.study.portalConfig.minPerfumePhotos) {
-      return {
-        code: "VALIDATION_ERROR",
-        message: `Debes registrar al menos ${context.data.study.portalConfig.minPerfumePhotos} foto de perfume antes de continuar.`,
-        ok: false
-      };
-    }
-  }
-
   if (evaluation.status === "TERMINATED") {
-    await closePortalAttempt({ attempt, evaluation, repository });
+    await closePortalAttempt({
+      attempt,
+      evaluation: withClosureDiagnostics(evaluation, questionId, "participant_portal"),
+      repository
+    });
 
     return {
       data: {
@@ -326,7 +335,11 @@ export async function saveParticipantPortalScreenerAnswer({
   }
 
   if (evaluation.status === "PASSED" || evaluation.status === "PENDING_REVIEW") {
-    const finalEvaluation = toPreliminaryPassedEvaluation(evaluation);
+    const finalEvaluation = withClosureDiagnostics(
+      toPreliminaryPassedEvaluation(evaluation),
+      questionId,
+      "participant_portal"
+    );
 
     await closePortalAttempt({
       attempt,
@@ -376,7 +389,7 @@ export async function saveParticipantPortalScreenerAnswer({
     data: {
       attemptId,
       closed: false,
-      nextQuestionId: getNextPendingQuestionId(definition, answers, questionId),
+      nextQuestionId: getNextPendingQuestionId(definition, answers, questionId, attempt, context.data.study),
       status: "INCOMPLETE"
     },
     ok: true
@@ -623,7 +636,7 @@ function buildAttemptScreen({
   const visibleQuestions = getVisibleQuestions(definition, answers);
   const currentQuestion =
     visibleQuestions.find((question) => question.id === questionId) ??
-    visibleQuestions.find((question) => !hasAnswer(answers[question.id])) ??
+    visibleQuestions.find((question) => !hasCompleteAnswerForAttempt(question, answers[question.id], attempt, study)) ??
     visibleQuestions[0] ??
     null;
   const currentIndex = currentQuestion
@@ -642,11 +655,13 @@ function buildAttemptScreen({
       selfieComplete: hasExactlyOneSelfie(attempt)
     },
     photoNotice:
-      currentQuestion?.id === "F6_MARCAS_UTILIZA" && getStudyBehavior(study.code).requiresPerfumeEvidence
+      currentQuestion?.id === F6_PERFUME_EVIDENCE_QUESTION_ID && getStudyBehavior(study.code).requiresPerfumeEvidence
         ? PARTICIPANT_PORTAL_F6_PHOTOS_NOTE
         : null,
     progress: {
-      answeredVisibleQuestions: visibleQuestions.filter((question) => hasAnswer(answers[question.id])).length,
+      answeredVisibleQuestions: visibleQuestions.filter((question) =>
+        hasCompleteAnswerForAttempt(question, answers[question.id], attempt, study)
+      ).length,
       currentIndex,
       totalVisibleQuestions: visibleQuestions.length
     },
@@ -853,6 +868,28 @@ function toPreliminaryPassedEvaluation(evaluation: ScreenerEvaluationResult): Sc
   };
 }
 
+function withClosureDiagnostics(
+  evaluation: ScreenerEvaluationResult,
+  triggerQuestionId: string,
+  closedBy: "participant_portal" | "field"
+): ScreenerEvaluationResult {
+  return {
+    ...evaluation,
+    evaluationJson: {
+      ...evaluation.evaluationJson,
+      closureDiagnostics: {
+        closedBy,
+        flagCodes: evaluation.evaluationJson.flags.map((flag) => flag.code),
+        missingQuestionIds: evaluation.evaluationJson.missingQuestionIds,
+        reasonCodes: evaluation.evaluationJson.reasons.map((reason) => reason.code),
+        result: evaluation.result,
+        status: evaluation.status,
+        triggerQuestionId
+      }
+    }
+  };
+}
+
 async function closePortalAttempt({
   attempt,
   evaluation,
@@ -892,15 +929,22 @@ function operationalStatusFromScreeningStatus(status: PortalScreeningStatus): Po
 function getNextPendingQuestionId(
   definition: ScreenerDefinition,
   answers: ScreenerAnswers,
-  currentQuestionId: string
+  currentQuestionId: string,
+  attempt: PortalScreeningAttemptRecord,
+  study: PortalContext["study"]
 ): string | null {
   const visibleQuestions = getVisibleQuestions(definition, answers);
   const currentIndex = visibleQuestions.findIndex((question) => question.id === currentQuestionId);
   const nextAfterCurrent = visibleQuestions
     .slice(currentIndex + 1)
-    .find((question) => !hasAnswer(answers[question.id]));
+    .find((question) => !hasCompleteAnswerForAttempt(question, answers[question.id], attempt, study));
 
-  return nextAfterCurrent?.id ?? visibleQuestions.find((question) => !hasAnswer(answers[question.id]))?.id ?? null;
+  return (
+    nextAfterCurrent?.id ??
+    visibleQuestions.find((question) => !hasCompleteAnswerForAttempt(question, answers[question.id], attempt, study))
+      ?.id ??
+    null
+  );
 }
 
 function selectedAnswerValues(answer: ScreenerAnswer | undefined): string[] {
@@ -941,6 +985,23 @@ function hasAnswer(answer: ScreenerAnswer | undefined): boolean {
   }
 
   return String(answer).trim().length > 0;
+}
+
+function hasCompleteAnswerForAttempt(
+  question: ScreenerQuestion,
+  answer: ScreenerAnswer | undefined,
+  attempt: PortalScreeningAttemptRecord,
+  study: PortalContext["study"]
+): boolean {
+  if (!hasAnswer(answer)) {
+    return false;
+  }
+
+  if (question.id !== F6_PERFUME_EVIDENCE_QUESTION_ID || !getStudyBehavior(study.code).requiresPerfumeEvidence) {
+    return true;
+  }
+
+  return countPerfumePhotos(attempt.participantEvidence) >= study.portalConfig.minPerfumePhotos;
 }
 
 function hasExactlyOneSelfie(attempt: PortalScreeningAttemptRecord): boolean {

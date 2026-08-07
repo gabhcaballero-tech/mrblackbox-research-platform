@@ -777,14 +777,23 @@ describe("field service", () => {
     await answer(repository, attemptId, "F2_EDAD", "25", PUBLIC_FIELD_ACTOR);
 
     const withoutPhoto = await answer(repository, attemptId, "F6_MARCAS_UTILIZA", "NAVIGO HOMME", PUBLIC_FIELD_ACTOR);
-    await addPerfumePhoto(repository, attemptId, PUBLIC_FIELD_ACTOR);
-    const withPhoto = await answer(repository, attemptId, "F6_MARCAS_UTILIZA", "NAVIGO HOMME", PUBLIC_FIELD_ACTOR);
 
     expect(withoutPhoto).toMatchObject({
       code: "VALIDATION_ERROR",
       message: "Debes registrar al menos 1 foto de perfume antes de continuar.",
       ok: false
     });
+    const screenAfterBlockedF6 = await getFieldScreeningAttemptScreen({
+      actor: PUBLIC_FIELD_ACTOR,
+      attemptId,
+      repository
+    });
+
+    expect(screenAfterBlockedF6.ok ? screenAfterBlockedF6.data.currentQuestion?.id : null).toBe("F6_MARCAS_UTILIZA");
+    expect(screenAfterBlockedF6.ok ? screenAfterBlockedF6.data.answers.F6_MARCAS_UTILIZA : "unexpected").toBeUndefined();
+    await addPerfumePhoto(repository, attemptId, PUBLIC_FIELD_ACTOR);
+    const withPhoto = await answer(repository, attemptId, "F6_MARCAS_UTILIZA", "NAVIGO HOMME", PUBLIC_FIELD_ACTOR);
+
     expect(withPhoto).toMatchObject({
       data: {
         closed: false,

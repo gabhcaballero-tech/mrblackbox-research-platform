@@ -15,7 +15,7 @@ const otherInterviewer = { id: "interviewer-2", role: "INTERVIEWER" as const, st
 const admin = { id: "admin-1", role: "ADMIN" as const, status: "ACTIVE" as const };
 
 describe("ctl module", () => {
-  it("exposes the Navigo Homme CTL v6 definition without the comparative section", () => {
+  it("exposes the Navigo Homme CTL v6 definition with comparative and demographic sections", () => {
     const definition = getCtlDefinition();
     const questions = getCtlQuestions(definition);
 
@@ -27,9 +27,10 @@ describe("ctl module", () => {
       "TRIANGULAR_2",
       "FRAGRANCIA_1",
       "FRAGRANCIA_2",
+      "COMPARATIVA_15_MIN",
       "DEMOGRAFICOS"
     ]);
-    expect(questions).toHaveLength(50);
+    expect(questions).toHaveLength(62);
     expect(definition.sections.every((section) => Array.isArray(section.questions))).toBe(true);
     expect(questions.map((question) => question.code)).toEqual(expect.arrayContaining([
       "F0",
@@ -45,18 +46,79 @@ describe("ctl module", () => {
       "P8B",
       "P13A",
       "P13B",
+      "P14",
+      "P14A",
+      "P15",
+      "P16",
+      "P17",
+      "P18",
+      "P19",
+      "P20",
       "DG_NOMBRE",
       "DG_TELEFONO",
-      "D1_OCUPACION"
-    ]));
-    expect(questions.map((question) => question.code)).not.toEqual(expect.arrayContaining([
-      "P14_PREFERENCIA",
-      "P20_ADECUADA_JAFRA",
-      "D8_NSE_REGISTRADO"
+      "D1_ESCOLARIDAD_JEFE_HOGAR",
+      "D6_CUARTOS_DORMIR",
+      "D_TOTAL_PUNTOS_NSE",
+      "D_NSE_CLASIFICACION"
     ]));
     expect(questions.findIndex((question) => question.code === "DG_NOMBRE")).toBeLessThan(
       questions.findIndex((question) => question.code === "F0")
     );
+    expect(questions.findIndex((question) => question.code === "P14")).toBeGreaterThan(
+      questions.findIndex((question) => question.code === "P13B")
+    );
+    expect(questions.findIndex((question) => question.code === "P20")).toBeLessThan(
+      questions.findIndex((question) => question.code === "D1_ESCOLARIDAD_JEFE_HOGAR")
+    );
+  });
+
+  it("defines the CTL 15-minute comparative questions from P14 to P20", () => {
+    const questions = getCtlQuestions(getCtlDefinition());
+    const p14 = questions.find((question) => question.code === "P14");
+    const p14a = questions.find((question) => question.code === "P14A");
+    const p16 = questions.find((question) => question.code === "P16");
+    const p17 = questions.find((question) => question.code === "P17");
+    const p20 = questions.find((question) => question.code === "P20");
+
+    expect(p14?.type).toBe("SELECT");
+    if (!p14 || p14.type !== "SELECT") {
+      throw new Error("P14 must be a SELECT question");
+    }
+    expect(p14?.options?.map((option) => option.value)).toEqual(["1", "2", "3", "4"]);
+    expect(p14?.references?.map((reference) => reference.source)).toEqual(["FIRST_SAMPLE", "SECOND_SAMPLE"]);
+    expect(p14a?.type).toBe("LONG_TEXT");
+    expect(p16).toMatchObject({ max: 7, min: 1, type: "SCALE" });
+    expect(p17).toMatchObject({ max: 7, min: 1, type: "SCALE" });
+    expect(p20?.type).toBe("SELECT");
+    if (!p20 || p20.type !== "SELECT") {
+      throw new Error("P20 must be a SELECT question");
+    }
+    expect(p20.options.map((option) => option.value)).toEqual(["1", "2", "3", "4"]);
+  });
+
+  it("defines real demographic NSE capture questions without automatic score calculation", () => {
+    const questions = getCtlQuestions(getCtlDefinition());
+    const d1 = questions.find((question) => question.code === "D1_ESCOLARIDAD_JEFE_HOGAR");
+    const nse = questions.find((question) => question.code === "D_NSE_CLASIFICACION");
+
+    expect(d1?.type).toBe("SELECT");
+    if (!d1 || d1.type !== "SELECT") {
+      throw new Error("D1 must be a SELECT question");
+    }
+    expect(d1.options).toHaveLength(10);
+    expect(nse?.type).toBe("SELECT");
+    if (!nse || nse.type !== "SELECT") {
+      throw new Error("D_NSE_CLASIFICACION must be a SELECT question");
+    }
+    expect(nse.options.map((option) => option.value)).toEqual([
+      "A_B",
+      "C_PLUS",
+      "C_TIPICO",
+      "C_MINUS",
+      "D_PLUS",
+      "D",
+      "E"
+    ]);
   });
 
   it("marks terminating CTL filter answers as termination conditions", () => {
@@ -1173,6 +1235,14 @@ function createValidCtlAnswerInput(): CtlAnswerInput {
     P12B: "2",
     P13A: "3",
     P13B: "4",
+    P14: "1",
+    P14A: "PREFIERE LA PRIMERA POR EL AROMA",
+    P15: "1",
+    P16: "4",
+    P17: "5",
+    P18: "2",
+    P19: "1",
+    P20: "1",
     DG_NOMBRE: "ANA PEREZ",
     DG_DIRECCION: "CALLE 1",
     DG_COLONIA: "CENTRO",
@@ -1181,10 +1251,14 @@ function createValidCtlAnswerInput(): CtlAnswerInput {
     DG_FECHA: "2026-08-05",
     DG_HORA_INICIO: "10:00",
     DG_HORA_TERMINO: "11:00",
-    D1_OCUPACION: "EMPLEADO",
-    D2_ESCOLARIDAD: "LICENCIATURA",
-    D3_ESTADO_CIVIL: "SOLTERO",
-    D4_OBSERVACIONES: "SIN OBSERVACIONES"
+    D1_ESCOLARIDAD_JEFE_HOGAR: "8",
+    D2_BANOS_COMPLETOS: "1",
+    D3_AUTOS: "1",
+    D4_INTERNET: "1",
+    D5_PERSONAS_TRABAJARON: "1",
+    D6_CUARTOS_DORMIR: "2",
+    D_TOTAL_PUNTOS_NSE: "152",
+    D_NSE_CLASIFICACION: "C_TIPICO"
   };
 }
 

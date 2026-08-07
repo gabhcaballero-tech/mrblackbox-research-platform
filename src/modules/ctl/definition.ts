@@ -136,6 +136,23 @@ const durationScaleLabels = {
   5: "Más de 10 hrs."
 };
 
+const comparativePreferenceOptions: CtlQuestionOption[] = [
+  { label: "La primera fragancia (izquierda)", value: "1" },
+  { label: "La segunda fragancia (derecha)", value: "2" },
+  { label: "Ambas", value: "3" },
+  { label: "Ninguna", value: "4" }
+];
+
+const nseClassificationOptions: CtlQuestionOption[] = [
+  { label: "A/B (202 puntos o más)", value: "A_B" },
+  { label: "C+ (168 a 201 puntos)", value: "C_PLUS" },
+  { label: "C típico (141 a 167 puntos)", value: "C_TIPICO" },
+  { label: "C- (116 a 140 puntos)", value: "C_MINUS" },
+  { label: "D+ (95 a 115 puntos)", value: "D_PLUS" },
+  { label: "D (48 a 84 puntos)", value: "D" },
+  { label: "E (0 a 47 puntos)", value: "E" }
+];
+
 const agreementColumns = [
   { label: "Totalmente en desacuerdo", value: 1 },
   { label: "En desacuerdo", value: 2 },
@@ -245,28 +262,169 @@ const generalDataQuestions: CtlQuestionDefinition[] = [
 
 const demographicQuestions: CtlQuestionDefinition[] = [
   {
-    code: "D1_OCUPACION",
-    label: "Ocupacion",
+    code: "D1_ESCOLARIDAD_JEFE_HOGAR",
+    label: "D1. Pensando en el jefe o jefa de hogar, ¿cuál fue el último año de estudios que aprobó en la escuela?",
+    options: [
+      { label: "Sin instrucción / Preescolar (0 puntos)", value: "0" },
+      { label: "Primaria incompleta (6 puntos)", value: "1" },
+      { label: "Primaria completa (11 puntos)", value: "2" },
+      { label: "Secundaria incompleta (12 puntos)", value: "3" },
+      { label: "Secundaria completa (18 puntos)", value: "4" },
+      { label: "Preparatoria incompleta (23 puntos)", value: "5" },
+      { label: "Preparatoria completa (27 puntos)", value: "6" },
+      { label: "Licenciatura incompleta (36 puntos)", value: "7" },
+      { label: "Licenciatura completa (59 puntos)", value: "8" },
+      { label: "Posgrado (85 puntos)", value: "9" }
+    ],
+    required: true,
+    type: "SELECT"
+  },
+  {
+    code: "D2_BANOS_COMPLETOS",
+    label: "D2. ¿Cuántos baños completos con regadera y excusado hay en esta vivienda?",
+    options: [
+      { label: "Ningún baño completo (0 puntos)", value: "0" },
+      { label: "1 baño completo (24 puntos)", value: "1" },
+      { label: "2 o más baños completos (47 puntos)", value: "2" }
+    ],
+    required: true,
+    type: "SELECT"
+  },
+  {
+    code: "D3_AUTOS",
+    label: "D3. ¿Cuántos automóviles o camionetas tienen en su hogar?",
+    options: [
+      { label: "0 autos (0 puntos)", value: "0" },
+      { label: "1 auto (22 puntos)", value: "1" },
+      { label: "2 o más autos (43 puntos)", value: "2" }
+    ],
+    required: true,
+    type: "SELECT"
+  },
+  {
+    code: "D4_INTERNET",
+    label: "D4. Sin tomar en cuenta la conexión móvil que pudiera tener desde algún celular, ¿este hogar cuenta con internet?",
+    options: [
+      { label: "No tiene (0 puntos)", value: "0" },
+      { label: "Sí tiene (32 puntos)", value: "1" }
+    ],
+    required: true,
+    type: "SELECT"
+  },
+  {
+    code: "D5_PERSONAS_TRABAJARON",
+    label: "D5. De todas las personas de 14 años o más que viven en el hogar, ¿cuántas trabajaron el mes pasado?",
+    options: [
+      { label: "Ninguna (0 puntos)", value: "0" },
+      { label: "1 persona (15 puntos)", value: "1" },
+      { label: "2 personas (31 puntos)", value: "2" },
+      { label: "3 personas (46 puntos)", value: "3" },
+      { label: "4 o más personas (61 puntos)", value: "4" }
+    ],
+    required: true,
+    type: "SELECT"
+  },
+  {
+    code: "D6_CUARTOS_DORMIR",
+    label: "D6. En esta vivienda, ¿cuántos cuartos se usan para dormir, sin contar pasillos ni baños?",
+    options: [
+      { label: "0, no tiene (0 puntos)", value: "0" },
+      { label: "1 cuarto (8 puntos)", value: "1" },
+      { label: "2 cuartos (16 puntos)", value: "2" },
+      { label: "3 cuartos (24 puntos)", value: "3" },
+      { label: "4 o más cuartos (32 puntos)", value: "4" }
+    ],
+    required: true,
+    type: "SELECT"
+  },
+  {
+    code: "D_TOTAL_PUNTOS_NSE",
+    label: "TOTAL de puntos NSE",
     required: false,
     type: "SHORT_TEXT"
   },
   {
-    code: "D2_ESCOLARIDAD",
-    label: "Escolaridad",
+    code: "D_NSE_CLASIFICACION",
+    label: "Registrar NSE de acuerdo al puntaje",
+    options: nseClassificationOptions,
     required: false,
-    type: "SHORT_TEXT"
+    type: "SELECT"
+  }
+];
+
+const comparative15MinQuestions: CtlQuestionDefinition[] = [
+  {
+    code: "P14",
+    instructions: [
+      {
+        text: "Verifique el orden de las claves según la rotación. La primera fragancia corresponde al brazo izquierdo y la segunda al brazo derecho.",
+        title: "INSTRUCCIÓN",
+        type: "BEFORE_QUESTION"
+      }
+    ],
+    label: "P14. ¿Cuál de las dos fragancias prefiere?",
+    options: comparativePreferenceOptions,
+    references: [
+      { label: "Primera fragancia / brazo izquierdo", source: "FIRST_SAMPLE" },
+      { label: "Segunda fragancia / brazo derecho", source: "SECOND_SAMPLE" }
+    ],
+    required: true,
+    type: "SELECT"
   },
   {
-    code: "D3_ESTADO_CIVIL",
-    label: "Estado civil",
-    required: false,
-    type: "SHORT_TEXT"
-  },
-  {
-    code: "D4_OBSERVACIONES",
-    label: "Observaciones demograficas o complementos no capturados en screening",
-    required: false,
+    code: "P14A",
+    label: "P14a. ¿Cuáles son las razones por las que prefiere la fragancia seleccionada en P14?",
+    references: [{ label: "Respuesta P14", source: "P14" }],
+    required: true,
     type: "LONG_TEXT"
+  },
+  {
+    code: "P15",
+    label: "P15. Pensando en la intensidad del aroma de estas fragancias, ¿cuál de las dos prefiere en intensidad? (RU)",
+    options: comparativePreferenceOptions,
+    required: true,
+    type: "SELECT"
+  },
+  {
+    code: "P16",
+    label: "P16. Pensando en la intensidad de la PRIMERA fragancia (BRAZO IZQUIERDO), ¿diría que es...?",
+    labels: perceivedIntensityScaleLabels,
+    max: 7,
+    min: 1,
+    references: [{ label: "Primera fragancia / brazo izquierdo", source: "FIRST_SAMPLE" }],
+    required: true,
+    type: "SCALE"
+  },
+  {
+    code: "P17",
+    label: "P17. Pensando en la intensidad de la SEGUNDA fragancia (BRAZO DERECHO), ¿diría que es...?",
+    labels: perceivedIntensityScaleLabels,
+    max: 7,
+    min: 1,
+    references: [{ label: "Segunda fragancia / brazo derecho", source: "SECOND_SAMPLE" }],
+    required: true,
+    type: "SCALE"
+  },
+  {
+    code: "P18",
+    label: "P18. ¿Cuál de las dos fragancias considera que tiene mayor duración? (RU)",
+    options: comparativePreferenceOptions,
+    required: true,
+    type: "SELECT"
+  },
+  {
+    code: "P19",
+    label: "P19. Si decidieras cambiar tu fragancia de uso habitual, ¿por cuál de estas dos fragancias preferirías cambiarla? (RU)",
+    options: comparativePreferenceOptions,
+    required: true,
+    type: "SELECT"
+  },
+  {
+    code: "P20",
+    label: "P20. ¿Cuál de las dos fragancias es más adecuada para la marca Jafra?",
+    options: comparativePreferenceOptions,
+    required: true,
+    type: "SELECT"
   }
 ];
 
@@ -618,12 +776,24 @@ export const CTL_DEFINITION: CtlDefinition = {
       questions: makeFragranceQuestions("B", "segunda fragancia"),
       title: "SECCIÓN IV - EVALUACIÓN DE SEGUNDA FRAGANCIA"
     },
-    // La SECCION V - COMPARATIVA (P14-P20) pertenece al flujo Navigo posterior, no al CTL presencial.
+    {
+      description: "Han pasado 15 minutos después de la aplicación de las dos fragancias. Pida al participante que huela ambos antebrazos antes de responder.",
+      id: "COMPARATIVA_15_MIN",
+      instructions: [
+        {
+          text: "Identifique la clave del brazo izquierdo y la clave del brazo derecho antes de iniciar la comparación.",
+          title: "INSTRUCCIÓN",
+          type: "SECTION"
+        }
+      ],
+      questions: comparative15MinQuestions,
+      title: "SECCIÓN V - COMPARATIVA - 15 MINUTOS"
+    },
     {
       id: "DEMOGRAFICOS",
       instructions: [
         {
-          text: "No repitas informacion ya capturada en screening salvo que necesite correccion o complemento. El NSE se conserva desde screening.",
+          text: "Registra los datos necesarios para calcular NSE. El cálculo automático queda pendiente de confirmación operativa; por ahora captura total y clasificación cuando estén disponibles.",
           title: "NOTA PARA ENCUESTADOR",
           type: "SECTION"
         }

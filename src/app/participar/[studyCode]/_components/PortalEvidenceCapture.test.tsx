@@ -200,7 +200,11 @@ describe("PortalEvidenceCapture", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Tomar foto" }));
     fireEvent.click(await screen.findByRole("button", { name: "Usar esta foto" }));
 
-    expect(await screen.findByText("No fue posible subir la foto. Revisa tu conexión e intenta nuevamente.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "No fue posible subir la foto. Revisa tu conexión e intenta nuevamente. La foto sigue en pantalla para reintentar."
+      )
+    ).toBeInTheDocument();
     expect(screen.getByAltText("Vista previa de la foto capturada")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("button", { name: "Usar esta foto" })).toBeEnabled());
 
@@ -209,7 +213,9 @@ describe("PortalEvidenceCapture", () => {
     fireEvent.click(screen.getByRole("button", { name: "Usar esta foto" }));
 
     expect(
-      await screen.findByText("La foto se subió, pero no fue posible registrarla. Contacta al administrador.")
+      await screen.findByText(
+        "La foto se subió, pero no fue posible registrarla. Presiona Usar esta foto para reintentar o toma otra foto."
+      )
     ).toBeInTheDocument();
   });
 

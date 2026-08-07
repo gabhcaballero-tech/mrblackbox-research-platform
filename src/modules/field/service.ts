@@ -632,7 +632,11 @@ export async function saveFieldScreeningAnswer({
   if (immediateTermination) {
     await closeAttempt({
       attempt: loaded.data.attempt,
-      evaluation: buildImmediateTerminationEvaluation(loaded.data.definition, answers, immediateTermination),
+      evaluation: withClosureDiagnostics(
+        buildImmediateTerminationEvaluation(loaded.data.definition, answers, immediateTermination),
+        questionId,
+        "field"
+      ),
       repository
     });
 
@@ -652,7 +656,7 @@ export async function saveFieldScreeningAnswer({
   if (evaluation.status === "PASSED" || evaluation.status === "PENDING_REVIEW" || evaluation.status === "TERMINATED") {
     await closeAttempt({
       attempt: loaded.data.attempt,
-      evaluation,
+      evaluation: withClosureDiagnostics(evaluation, questionId, "field"),
       repository
     });
 
@@ -685,7 +689,7 @@ export async function saveFieldScreeningAnswer({
     data: {
       attemptId,
       closed: false,
-      nextQuestionId: getNextPendingQuestionId(loaded.data.definition, answers, questionId),
+      nextQuestionId: getNextPendingQuestionId(loaded.data.definition, answers, questionId, loaded.data.attempt),
       status: "INCOMPLETE"
     },
     ok: true
@@ -1435,7 +1439,7 @@ function buildAttemptScreen(
   const result = evaluateScreener(definition, answers);
   const currentQuestion =
     visibleQuestions.find((question) => question.id === requestedQuestionId) ??
-    visibleQuestions.find((question) => !hasAnswer(answers[question.id])) ??
+    visibleQuestions.find((question) => !hasCompleteAnswerForAttempt(question, answers[question.id], attempt)) ??
     visibleQuestions[0] ??
     null;
   const currentIndex = currentQuestion
@@ -1448,7 +1452,9 @@ function buildAttemptScreen(
     currentQuestion: isClosedStatus(attempt.status) ? null : currentQuestion,
     definition,
     progress: {
-      answeredVisibleQuestions: visibleQuestions.filter((question) => hasAnswer(answers[question.id])).length,
+      answeredVisibleQuestions: visibleQuestions.filter((question) =>
+        hasCompleteAnswerForAttempt(question, answers[question.id], attempt)
+      ).length,
       currentIndex,
       totalVisibleQuestions: visibleQuestions.length
     },
@@ -1640,18 +1646,45 @@ async function closeAttempt({
   });
 }
 
+function withClosureDiagnostics(
+  evaluation: ScreenerEvaluationResult,
+  triggerQuestionId: string,
+  closedBy: "participant_portal" | "field"
+): ScreenerEvaluationResult {
+  return {
+    ...evaluation,
+    evaluationJson: {
+      ...evaluation.evaluationJson,
+      closureDiagnostics: {
+        closedBy,
+        flagCodes: evaluation.evaluationJson.flags.map((flag) => flag.code),
+        missingQuestionIds: evaluation.evaluationJson.missingQuestionIds,
+        reasonCodes: evaluation.evaluationJson.reasons.map((reason) => reason.code),
+        result: evaluation.result,
+        status: evaluation.status,
+        triggerQuestionId
+      }
+    }
+  };
+}
+
 function getNextPendingQuestionId(
   definition: ScreenerDefinition,
   answers: ScreenerAnswers,
-  currentQuestionId: string
+  currentQuestionId: string,
+  attempt: FieldScreeningAttemptRecord
 ): string | null {
   const visibleQuestions = getVisibleQuestions(definition, answers);
   const currentIndex = visibleQuestions.findIndex((question) => question.id === currentQuestionId);
   const nextAfterCurrent = visibleQuestions
     .slice(currentIndex + 1)
-    .find((question) => !hasAnswer(answers[question.id]));
+    .find((question) => !hasCompleteAnswerForAttempt(question, answers[question.id], attempt));
 
-  return nextAfterCurrent?.id ?? visibleQuestions.find((question) => !hasAnswer(answers[question.id]))?.id ?? null;
+  return (
+    nextAfterCurrent?.id ??
+    visibleQuestions.find((question) => !hasCompleteAnswerForAttempt(question, answers[question.id], attempt))?.id ??
+    null
+  );
 }
 
 function operationalStatusFromScreeningStatus(status: FieldScreeningStatus): FieldOperationalStatus {
@@ -1708,6 +1741,25 @@ function hasAnswer(answer: ScreenerAnswer | undefined): boolean {
   }
 
   return true;
+}
+
+function hasCompleteAnswerForAttempt(
+  question: ScreenerQuestion,
+  answer: ScreenerAnswer | undefined,
+  attempt: FieldScreeningAttemptRecord
+): boolean {
+  if (!hasAnswer(answer)) {
+    return false;
+  }
+
+  if (
+    question.id !== F6_PERFUME_EVIDENCE_QUESTION_ID ||
+    !getStudyBehavior(attempt.questionnaireVersion.study.code).requiresPerfumeEvidence
+  ) {
+    return true;
+  }
+
+  return fieldAttemptHasRequiredPerfumePhotos(attempt);
 }
 
 function isClosedStatus(status: FieldScreeningStatus): boolean {

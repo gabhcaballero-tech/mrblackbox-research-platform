@@ -770,6 +770,14 @@ describe("participant portal screener service", () => {
       status: "TERMINATED",
       terminationCode: "NO_USA_DETERGENTE"
     });
+    expect(attempts[0]?.evaluationJson).toMatchObject({
+      closureDiagnostics: {
+        closedBy: "participant_portal",
+        reasonCodes: ["NO_USA_DETERGENTE"],
+        status: "TERMINATED",
+        triggerQuestionId: "F10_PRODUCTOS_USO_FRECUENTE"
+      }
+    });
     expect(confirmations).toEqual([]);
   });
 
@@ -808,7 +816,7 @@ describe("participant portal screener service", () => {
   });
 
   it("blocks F6 when there are no perfume photos yet", async () => {
-    const { repository } = createMemoryRepository({
+    const { answers, repository } = createMemoryRepository({
       initialEvidence: [portalEvidence("SELFIE_IDENTIFICATION")]
     });
     const attemptId = await start(repository);
@@ -821,6 +829,30 @@ describe("participant portal screener service", () => {
       code: "VALIDATION_ERROR",
       ok: false
     });
+    expect(answers.get(attemptId)?.some((item) => item.questionId === "F6_MARCAS_UTILIZA")).toBe(false);
+  });
+
+  it("keeps F6 as the pending question when a previous answer exists without required perfume photos", async () => {
+    const { answers, repository } = createMemoryRepository({
+      initialEvidence: [portalEvidence("SELFIE_IDENTIFICATION")]
+    });
+    const attemptId = await start(repository);
+
+    await answer(repository, attemptId, "CONSENTIMIENTO", "SI");
+    await answer(repository, attemptId, "F1_GENERO", "HOMBRE");
+    answers.get(attemptId)?.push({
+      answerJson: "NAVIGO HOMME",
+      questionId: "F6_MARCAS_UTILIZA"
+    });
+
+    const screen = await getParticipantPortalScreenerScreen({
+      identity,
+      repository,
+      studyCode: "FMASCULINA-NAVIGO-2026"
+    });
+
+    expect(screen.ok ? screen.data.currentQuestion?.id : null).toBe("F6_MARCAS_UTILIZA");
+    expect(screen.ok ? screen.data.progress.answeredVisibleQuestions : 0).toBe(2);
   });
 
   it("shows generic public termination for insufficient frequency and hides reason or code", async () => {

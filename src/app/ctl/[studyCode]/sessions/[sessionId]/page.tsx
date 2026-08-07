@@ -76,7 +76,7 @@ export default async function CtlPublicCapturePage({ params, searchParams }: Ctl
               Evaluación sensorial concluida.
             </h2>
             <p className="mt-2 text-sm leading-6 text-emerald-900">
-              Continúe en Navigo con la sección comparativa.
+              Continúe en Navigo con las evaluaciones posteriores.
             </p>
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
               <Detail label="Participante" value={session.participant.name} />
