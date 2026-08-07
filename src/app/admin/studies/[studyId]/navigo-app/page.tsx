@@ -140,6 +140,8 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
                   <ParticipantRow
                     key={participant.id}
                     canUseTestMode={actor.role === "ADMIN"}
+                    navigoError={query?.participant === participant.id ? query?.navigoError : undefined}
+                    navigoMessage={query?.participant === participant.id ? query?.navigoMessage : undefined}
                     participant={participant}
                     requestOrigin={requestOrigin}
                     studyId={studyId}
@@ -291,12 +293,16 @@ function BulkLinkGeneration({ studyId }: { studyId: string }) {
 
 function ParticipantRow({
   canUseTestMode,
+  navigoError,
+  navigoMessage,
   participant,
   requestOrigin,
   studyId,
   timeZoneIana
 }: {
   canUseTestMode: boolean;
+  navigoError?: string;
+  navigoMessage?: string;
   participant: NavigoParticipantListItem;
   requestOrigin: string;
   studyId: string;
@@ -355,6 +361,16 @@ function ParticipantRow({
       </div>
 
       <div className="space-y-4">
+        {navigoMessage ? (
+          <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            {navigoMessage}
+          </p>
+        ) : null}
+        {navigoError ? (
+          <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+            {navigoError}
+          </p>
+        ) : null}
         <CtlPreparation participant={participant} studyId={studyId} timeZoneIana={timeZoneIana} />
         <RotationPreparation participant={participant} studyId={studyId} />
         <div className="grid gap-3 md:grid-cols-4">
@@ -704,20 +720,12 @@ function RotationPreparation({
               Este codigo se usara para identificar la fragancia aplicada en el antebrazo derecho.
             </span>
           </label>
-          <label className={labelClass}>
-            Codigo triangular 1
-            <input className={inputClass} name="triangularCode1" />
-            <span className="text-xs font-normal leading-5 text-zinc-500">Opcional. No bloquea T0 en esta fase.</span>
-          </label>
-          <label className={labelClass}>
-            Codigo triangular 2
-            <input className={inputClass} name="triangularCode2" />
-            <span className="text-xs font-normal leading-5 text-zinc-500">Opcional. No bloquea T0 en esta fase.</span>
-          </label>
-          <div className="flex items-end">
-            <button className="inline-flex w-full justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800" type="submit">
-              Guardar rotacion
-            </button>
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900 md:col-span-2">
+            La rotacion triangular CTL requiere PR1-PR6 y VERI_1/VERI_2. Para conservar trazabilidad, se actualiza desde
+            ROTACIONES NAVIGO.xlsx; este ajuste manual solo guarda la primera y segunda fragancia de Navigo.
+          </div>
+          <div className="flex items-end md:col-span-2">
+            <SubmitButton pendingLabel="Guardando rotacion...">Guardar rotacion</SubmitButton>
           </div>
         </form>
         {participant.rotation.ready ? (

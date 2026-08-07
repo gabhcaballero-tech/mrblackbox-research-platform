@@ -248,9 +248,7 @@ export async function configureNavigoRotationAction(studyId: string, studyPartic
     actorUserId: actor.id,
     leftFragranceCode: String(formData.get("leftFragranceCode") ?? ""),
     rightFragranceCode: String(formData.get("rightFragranceCode") ?? ""),
-    studyParticipantId,
-    triangularCode1: String(formData.get("triangularCode1") ?? ""),
-    triangularCode2: String(formData.get("triangularCode2") ?? "")
+    studyParticipantId
   });
 
   if (!result.ok) {
@@ -259,7 +257,8 @@ export async function configureNavigoRotationAction(studyId: string, studyPartic
 
   revalidatePath(`/admin/studies/${studyId}/navigo-app`);
   redirectWithNavigoMessage(studyId, {
-    message: "Rotacion configurada correctamente.",
+    message:
+      "Rotacion Navigo configurada correctamente. La rotacion triangular CTL se conserva desde ROTACIONES NAVIGO.xlsx.",
     participant: studyParticipantId
   });
 }
