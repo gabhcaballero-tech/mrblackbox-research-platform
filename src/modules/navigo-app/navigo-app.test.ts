@@ -657,12 +657,22 @@ describe("navigo app MVP rules", () => {
 
   it("adds visible rotation preparation UI without exposing real product names to participants", () => {
     const adminPage = readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "page.tsx");
+    const manualRotationForm = readWorkspaceFile(
+      "src",
+      "app",
+      "admin",
+      "studies",
+      "[studyId]",
+      "navigo-app",
+      "_components",
+      "NavigoManualRotationForm.tsx"
+    );
     const participantPage = readWorkspaceFile("src", "app", "p", "[token]", "activities", "page.tsx");
     const participantShell = readWorkspaceFile("src", "shared", "ui", "PublicParticipantShell.tsx");
 
     expect(readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "_components", "NavigoRotationImportPanel.tsx")).toContain("Importar rotacion");
     expect(adminPage).toContain("Preparacion de rotacion");
-    expect(adminPage).toContain("Codigo primera fragancia / brazo izquierdo");
+    expect(manualRotationForm).toContain("Codigo primera fragancia / brazo izquierdo");
     expect(adminPage).not.toContain("Codigo aplicacion / kit ambos brazos");
     expect(participantPage).toContain("Primera fragancia");
     expect(participantPage).not.toContain("realName");
@@ -790,16 +800,34 @@ describe("navigo app MVP rules", () => {
 
   it("renders manual rotation save as a visible Navigo-only adjustment with row-level feedback", () => {
     const adminPage = readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "page.tsx");
+    const manualRotationForm = readWorkspaceFile(
+      "src",
+      "app",
+      "admin",
+      "studies",
+      "[studyId]",
+      "navigo-app",
+      "_components",
+      "NavigoManualRotationForm.tsx"
+    );
     const actions = readWorkspaceFile("src", "modules", "navigo-app", "actions.ts");
 
-    expect(adminPage).toContain("Actualizar rotacion");
-    expect(adminPage).toContain("Guardar rotacion");
-    expect(adminPage).toContain("Guardando rotacion...");
+    expect(adminPage).toContain("NavigoManualRotationForm");
+    expect(manualRotationForm).toContain("Actualizar rotacion");
+    expect(manualRotationForm).toContain('"use client"');
+    expect(manualRotationForm).toContain("useActionState");
+    expect(manualRotationForm).toContain("configureNavigoRotationInlineAction");
+    expect(manualRotationForm).toContain("Guardar rotacion");
+    expect(manualRotationForm).toContain("Guardando rotacion...");
+    expect(manualRotationForm).toContain("disabled={pending}");
+    expect(manualRotationForm).toContain("state.message");
     expect(adminPage).toContain("query?.participant === participant.id");
-    expect(adminPage).toContain("La rotacion triangular CTL requiere PR1-PR6 y VERI_1/VERI_2");
-    expect(adminPage).toContain("ROTACIONES NAVIGO.xlsx");
-    expect(adminPage).not.toContain("name=\"triangularCode1\"");
-    expect(adminPage).not.toContain("name=\"triangularCode2\"");
+    expect(manualRotationForm).toContain("La rotacion triangular CTL requiere PR1-PR6 y VERI_1/VERI_2");
+    expect(manualRotationForm).toContain("ROTACIONES NAVIGO.xlsx");
+    expect(adminPage).not.toContain("configureNavigoRotationAction");
+    expect(manualRotationForm).not.toContain("name=\"triangularCode1\"");
+    expect(manualRotationForm).not.toContain("name=\"triangularCode2\"");
+    expect(actions).toContain("configureNavigoRotationInlineAction");
     expect(actions).toContain("Rotacion Navigo configurada correctamente");
     expect(actions).not.toContain("formData.get(\"triangularCode1\")");
     expect(actions).not.toContain("formData.get(\"triangularCode2\")");
@@ -1731,6 +1759,37 @@ describe("navigo app MVP rules", () => {
     expect(state.rotationAssignments).toHaveLength(0);
     expect(state.armAssignments).toHaveLength(0);
     expect(state.confirmations).toHaveLength(1);
+    expect(state.referenceCodes.map((code) => code.code)).toEqual(codesBefore);
+  });
+
+  it("updates manual Navigo rotation and leaves WhatsApp codes independent", async () => {
+    const state = createNavigoParticipantImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const studyParticipantId = seedApprovedFieldParticipantForNavigo(state);
+
+    const first = await repository.configureParticipantRotation({
+      actorUserId: "admin-1",
+      leftFragranceCode: "247",
+      rightFragranceCode: "583",
+      studyParticipantId
+    });
+    const codesBefore = state.referenceCodes.map((code) => code.code);
+    const second = await repository.configureParticipantRotation({
+      actorUserId: "admin-1",
+      leftFragranceCode: "111",
+      rightFragranceCode: "222",
+      studyParticipantId
+    });
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    expect(state.rotationAssignments).toHaveLength(1);
+    expect(state.armAssignments).toHaveLength(2);
+    expect(
+      state.armAssignments
+        .sort((left, right) => left.applicationOrder - right.applicationOrder)
+        .map((assignment) => state.products.find((product) => product.id === assignment.studyProductId)?.internalCode)
+    ).toEqual(["111", "222"]);
     expect(state.referenceCodes.map((code) => code.code)).toEqual(codesBefore);
   });
 

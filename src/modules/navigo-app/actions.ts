@@ -27,6 +27,7 @@ import {
 import { isSupportedNavigoActivityCode, type NavigoActivityCode } from "./definition";
 import type { NavigoRotationImportActionState } from "./rotation-import-state";
 import type { NavigoRotationWorkbookImportActionState } from "./rotation-workbook-import-state";
+import type { NavigoManualRotationActionState } from "./manual-rotation-state";
 import {
   parseNavigoRotationWorkbook,
   type NavigoHutRotationWorkbookRowInput,
@@ -261,6 +262,36 @@ export async function configureNavigoRotationAction(studyId: string, studyPartic
       "Rotacion Navigo configurada correctamente. La rotacion triangular CTL se conserva desde ROTACIONES NAVIGO.xlsx.",
     participant: studyParticipantId
   });
+}
+
+export async function configureNavigoRotationInlineAction(
+  studyId: string,
+  studyParticipantId: string,
+  _previousState: NavigoManualRotationActionState,
+  formData: FormData
+): Promise<NavigoManualRotationActionState> {
+  const actor = await requireCapability("rotation:register");
+  const result = await createNavigoAppRepository().configureParticipantRotation({
+    actorUserId: actor.id,
+    leftFragranceCode: String(formData.get("leftFragranceCode") ?? ""),
+    rightFragranceCode: String(formData.get("rightFragranceCode") ?? ""),
+    studyParticipantId
+  });
+
+  if (!result.ok) {
+    return {
+      message: result.message,
+      status: "error"
+    };
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+
+  return {
+    message:
+      "Rotacion Navigo configurada correctamente. La rotacion triangular CTL se conserva desde ROTACIONES NAVIGO.xlsx.",
+    status: "success"
+  };
 }
 
 export async function configureNavigoStudyRotationAction(studyId: string, formData: FormData) {

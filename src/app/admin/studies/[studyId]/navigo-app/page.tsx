@@ -2,7 +2,6 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
-  configureNavigoRotationAction,
   configureNavigoStudyRotationAction,
   clearNavigoParticipantRotationAction,
   deleteNavigoParticipantAction,
@@ -45,6 +44,7 @@ import { ParticipantLinkPanel } from "./_components/ParticipantLinkPanel";
 import { NavigoRotationImportPanel } from "./_components/NavigoRotationImportPanel";
 import { NavigoRotationWorkbookImportPanel } from "./_components/NavigoRotationWorkbookImportPanel";
 import { NavigoParticipantOperationsPanel } from "./_components/NavigoParticipantOperationsPanel";
+import { NavigoManualRotationForm } from "./_components/NavigoManualRotationForm";
 
 export const dynamic = "force-dynamic";
 
@@ -688,61 +688,27 @@ function RotationPreparation({
         </p>
       ) : null}
 
-      <details className="mt-4 rounded-md border border-zinc-200 bg-white p-3">
-        <summary className="cursor-pointer text-sm font-semibold text-teal-700">
-          {participant.rotation.ready ? "Actualizar rotacion" : "Configurar rotacion"}
-        </summary>
-        <p className="mt-2 text-xs leading-5 text-zinc-600">
-          Usa esta correccion puntual solo si necesitas ajustar un participante. El flujo recomendado es importar la rotacion masiva por folio.
-        </p>
-        <form action={configureNavigoRotationAction.bind(null, studyId, participant.id)} className="mt-4 grid gap-4 md:grid-cols-2">
-          <label className={labelClass}>
-            Codigo primera fragancia / brazo izquierdo
-            <input
-              className={inputClass}
-              defaultValue={participant.rotation.leftCode ?? ""}
-              name="leftFragranceCode"
-              required
-            />
-            <span className="text-xs font-normal leading-5 text-zinc-500">
-              Este codigo se usara para identificar la fragancia aplicada en el antebrazo izquierdo.
-            </span>
+      <NavigoManualRotationForm
+        initialLeftFragranceCode={participant.rotation.leftCode ?? ""}
+        initialRightFragranceCode={participant.rotation.rightCode ?? ""}
+        participantRotationReady={participant.rotation.ready}
+        studyId={studyId}
+        studyParticipantId={participant.id}
+      />
+      {participant.rotation.ready ? (
+        <form action={clearNavigoParticipantRotationAction.bind(null, studyId, participant.id)} className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+          <p className="text-xs leading-5 text-amber-900">
+            Limpia solo la rotacion provisional del participante. Conserva folio, codigos de WhatsApp, evidencias y respuestas.
+          </p>
+          <label className={`${labelClass} mt-3`}>
+            Confirmacion
+            <input className={inputClass} name="confirmation" placeholder="LIMPIAR ROTACION" />
           </label>
-          <label className={labelClass}>
-            Codigo segunda fragancia / brazo derecho
-            <input
-              className={inputClass}
-              defaultValue={participant.rotation.rightCode ?? ""}
-              name="rightFragranceCode"
-              required
-            />
-            <span className="text-xs font-normal leading-5 text-zinc-500">
-              Este codigo se usara para identificar la fragancia aplicada en el antebrazo derecho.
-            </span>
-          </label>
-          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900 md:col-span-2">
-            La rotacion triangular CTL requiere PR1-PR6 y VERI_1/VERI_2. Para conservar trazabilidad, se actualiza desde
-            ROTACIONES NAVIGO.xlsx; este ajuste manual solo guarda la primera y segunda fragancia de Navigo.
-          </div>
-          <div className="flex items-end md:col-span-2">
-            <SubmitButton pendingLabel="Guardando rotacion...">Guardar rotacion</SubmitButton>
+          <div className="mt-3">
+            <SubmitButton pendingLabel="Limpiando rotacion...">Limpiar rotacion provisional</SubmitButton>
           </div>
         </form>
-        {participant.rotation.ready ? (
-          <form action={clearNavigoParticipantRotationAction.bind(null, studyId, participant.id)} className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
-            <p className="text-xs leading-5 text-amber-900">
-              Limpia solo la rotacion provisional del participante. Conserva folio, codigos de WhatsApp, evidencias y respuestas.
-            </p>
-            <label className={`${labelClass} mt-3`}>
-              Confirmacion
-              <input className={inputClass} name="confirmation" placeholder="LIMPIAR ROTACION" />
-            </label>
-            <div className="mt-3">
-              <SubmitButton pendingLabel="Limpiando rotacion...">Limpiar rotacion provisional</SubmitButton>
-            </div>
-          </form>
-        ) : null}
-      </details>
+      ) : null}
     </section>
   );
 }
