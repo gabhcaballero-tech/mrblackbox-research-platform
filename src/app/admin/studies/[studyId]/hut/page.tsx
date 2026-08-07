@@ -13,6 +13,7 @@ import {
   resetHutCallEvaluationAction,
   resetHutReferenceSelfieAction,
   resetHutVideoSubmissionAction,
+  revokeHutPhaseCodeAction,
   sendHutRegistrationWhatsAppAction,
   setHutTestModeAction,
   setHutVisualOverrideAction,
@@ -28,6 +29,7 @@ import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { resolveRequestOrigin } from "@/shared/utils/request-origin";
 import { HutParticipantImportPanel } from "./_components/HutParticipantImportPanel";
+import { HutPhaseCodeControls } from "./_components/HutPhaseCodeControls";
 import { HutRegistrationSlotImportPanel } from "./_components/HutRegistrationSlotImportPanel";
 import { HutReferenceSelfieUpload } from "./_components/HutReferenceSelfieUpload";
 import { HutWhatsAppManualBlock } from "./_components/HutWhatsAppManualBlock";
@@ -435,6 +437,8 @@ function HutParticipantCard({
           />
 
           <IdentityReviewCard participant={participant} studyId={studyId} studyTimeZone={studyTimeZone} />
+
+          <HutPhaseCodesCard participant={participant} studyId={studyId} studyTimeZone={studyTimeZone} />
         </div>
 
         <div className="space-y-4">
@@ -604,6 +608,60 @@ function HutParticipantCard({
   );
 }
 
+function HutPhaseCodesCard({
+  participant,
+  studyId,
+  studyTimeZone
+}: {
+  participant: HutAdminParticipant;
+  studyId: string;
+  studyTimeZone: string;
+}) {
+  return (
+    <section className="rounded-md border border-zinc-200 bg-white p-4">
+      <div>
+        <h4 className="text-sm font-semibold text-zinc-950">Códigos por fase HUT</h4>
+        <p className="mt-1 text-xs leading-5 text-zinc-600">
+          Cada código controla el acceso de la fase correspondiente: colocación, regreso 1 y regreso 2.
+        </p>
+      </div>
+      <div className="mt-3 space-y-3">
+        {participant.phaseCodes.map((phaseCode) => (
+          <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3" key={phaseCode.phase}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-zinc-950">{phaseCode.label}</p>
+                <p className="mt-1 text-xs text-zinc-600">{`Slot ${phaseCode.slot} · Estado: ${hutPhaseCodeStatusLabel(phaseCode.status)}`}</p>
+              </div>
+              <StatusBadge status={hutPhaseCodeStatusBadge(phaseCode.status)}>{hutPhaseCodeStatusLabel(phaseCode.status)}</StatusBadge>
+            </div>
+            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+              <Field label="Última actualización" value={phaseCode.updatedAt ? formatDateTime(phaseCode.updatedAt, studyTimeZone) : "Sin registro"} />
+              <Field label="Enviado" value={phaseCode.sentAt ? formatDateTime(phaseCode.sentAt, studyTimeZone) : "Sin envío"} />
+              <Field label="Validado" value={phaseCode.validatedAt ? formatDateTime(phaseCode.validatedAt, studyTimeZone) : "Sin validación"} />
+              <Field label="Usado" value={phaseCode.usedAt ? formatDateTime(phaseCode.usedAt, studyTimeZone) : "Sin uso"} />
+              <Field label="Expira" value={phaseCode.expiresAt ? formatDateTime(phaseCode.expiresAt, studyTimeZone) : "Sin expiración"} />
+            </div>
+            <div className="mt-3 space-y-2">
+              <HutPhaseCodeControls
+                disabled={phaseCode.status === "MISSING"}
+                participantId={participant.id}
+                phase={phaseCode.phase}
+                studyId={studyId}
+              />
+              <form action={revokeHutPhaseCodeAction.bind(null, studyId, participant.id, phaseCode.phase)}>
+                <SubmitButton disabled={phaseCode.status === "MISSING" || phaseCode.status === "REVOKED"} pendingLabel="Revocando código...">
+                  Revocar código
+                </SubmitButton>
+              </form>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function whatsappAutomationLabel(status: "ERROR" | "NO_ENVIADO" | "ENVIADO"): string {
   switch (status) {
     case "ENVIADO":
@@ -613,6 +671,30 @@ function whatsappAutomationLabel(status: "ERROR" | "NO_ENVIADO" | "ENVIADO"): st
     default:
       return "No enviado";
   }
+}
+
+function hutPhaseCodeStatusLabel(status: HutAdminParticipant["phaseCodes"][number]["status"]): string {
+  const labels: Record<HutAdminParticipant["phaseCodes"][number]["status"], string> = {
+    EXPIRED: "Expirado",
+    GENERATED: "Generado",
+    MISSING: "Faltante",
+    REVOKED: "Revocado",
+    SENT: "Enviado",
+    USED: "Usado",
+    VALIDATED: "Validado"
+  };
+
+  return labels[status];
+}
+
+function hutPhaseCodeStatusBadge(status: HutAdminParticipant["phaseCodes"][number]["status"]): "blocked" | "planned" | "ready" {
+  if (status === "USED" || status === "VALIDATED") {
+    return "ready";
+  }
+  if (status === "EXPIRED" || status === "MISSING" || status === "REVOKED") {
+    return "blocked";
+  }
+  return "planned";
 }
 
 function buildHutRegistrationWhatsAppMessage(participant: HutAdminParticipant): string {

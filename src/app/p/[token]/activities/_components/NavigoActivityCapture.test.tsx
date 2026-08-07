@@ -417,6 +417,17 @@ describe("NavigoActivityCapture", () => {
     expect(screen.getAllByText(/Extremadamente fuerte/i)).toHaveLength(2);
   });
 
+  it("shows APP v3 comparative instructions and rotation codes by fragrance and arm", () => {
+    renderCapture({ selfieCount: 1, selfieReviewStatus: "APPROVED" });
+
+    expect(screen.getByText("Verifica el orden de las claves según la rotación asignada.")).toBeInTheDocument();
+    expect(screen.getByText("Identifica en qué brazo se colocó cada clave antes de responder.")).toBeInTheDocument();
+    expect(screen.getByText("Por favor huele ambos antebrazos y responde las siguientes preguntas.")).toBeInTheDocument();
+    expect(screen.getByText("Rotación asignada")).toBeInTheDocument();
+    expect(screen.getByText(/Primera fragancia:/)).toHaveTextContent("Primera fragancia: CODIGO-A · brazo izquierdo");
+    expect(screen.getByText(/Segunda fragancia:/)).toHaveTextContent("Segunda fragancia: CODIGO-B · brazo derecho");
+  });
+
   it("rejects an automatic NO_MATCH result and keeps AP1 to AP7 hidden", async () => {
     vi.mocked(verifyNavigoFaceIdentity).mockResolvedValueOnce({
       evaluatedAt: "2026-06-26T12:00:00.000Z",

@@ -35,6 +35,7 @@ vi.mock("@/modules/hut/actions", () => {
     markHutMissedDayAction: action,
     reactivateHutParticipantAction: action,
     reviewHutVisualVerificationAction: action,
+    revokeHutPhaseCodeAction: action,
     resetHutCallEvaluationAction: action,
     resetHutReferenceSelfieAction: action,
     resetHutVideoSubmissionAction: action,
@@ -117,6 +118,10 @@ vi.mock("./_components/HutReferenceSelfieUpload", () => ({
   )
 }));
 
+vi.mock("./_components/HutPhaseCodeControls", () => ({
+  HutPhaseCodeControls: ({ phase }: { phase: string }) => <div data-testid={`hut-phase-code-controls-${phase}`}>Controles codigo {phase}</div>
+}));
+
 describe("HutAdminPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -160,6 +165,11 @@ describe("HutAdminPage", () => {
     expect(screen.getAllByText("Selfie de registro: Faltante").length).toBeGreaterThan(0);
     expect(screen.getByText("Guarda la selfie de registro para habilitar el inicio del HUT.")).toBeInTheDocument();
     expect(screen.getByText("Identidad diaria: Pendiente")).toBeInTheDocument();
+    expect(screen.getByText("Códigos por fase HUT")).toBeInTheDocument();
+    expect(screen.getByText("Colocación")).toBeInTheDocument();
+    expect(screen.getByText("Regreso 1")).toBeInTheDocument();
+    expect(screen.getByText("Regreso 2")).toBeInTheDocument();
+    expect(screen.getByTestId("hut-phase-code-controls-COLOCACION")).toBeInTheDocument();
     expect(screen.getByText("Ver revisión de identidad")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Activar modo prueba" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tomar selfie de registro" })).toBeEnabled();
@@ -359,6 +369,17 @@ type TestParticipant = {
   link: string;
   name: string;
   phone: string | null;
+  phaseCodes: Array<{
+    expiresAt: Date | null;
+    label: string;
+    phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2";
+    sentAt: Date | null;
+    slot: number;
+    status: "EXPIRED" | "GENERATED" | "MISSING" | "REVOKED" | "SENT" | "USED" | "VALIDATED";
+    updatedAt: Date | null;
+    usedAt: Date | null;
+    validatedAt: Date | null;
+  }>;
   recruiter: string | null;
   referenceSelfie: {
     capturedAt: Date;
@@ -484,6 +505,41 @@ function baseParticipant() {
     },
     link: "https://example.com/hut/p/token-1",
     name: "Participante HUT",
+    phaseCodes: [
+      {
+        expiresAt: null,
+        label: "Colocación",
+        phase: "COLOCACION" as const,
+        sentAt: null,
+        slot: 1,
+        status: "GENERATED" as const,
+        updatedAt: new Date("2026-07-01T12:00:00.000Z"),
+        usedAt: null,
+        validatedAt: null
+      },
+      {
+        expiresAt: null,
+        label: "Regreso 1",
+        phase: "REGRESO_1" as const,
+        sentAt: null,
+        slot: 2,
+        status: "SENT" as const,
+        updatedAt: new Date("2026-07-01T12:00:00.000Z"),
+        usedAt: null,
+        validatedAt: null
+      },
+      {
+        expiresAt: null,
+        label: "Regreso 2",
+        phase: "REGRESO_2" as const,
+        sentAt: null,
+        slot: 3,
+        status: "MISSING" as const,
+        updatedAt: null,
+        usedAt: null,
+        validatedAt: null
+      }
+    ],
     phone: null,
     recruiter: null,
     referenceSelfie: {

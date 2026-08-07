@@ -71,18 +71,6 @@ export function normalizeCtlText(value: unknown): string {
     .toLocaleUpperCase("es-MX");
 }
 
-export function doReferenceCodesMatch(
-  expectedCodes: Array<{ code: string; slot: number }>,
-  submittedCodes: string[]
-): boolean {
-  const expected = [...expectedCodes]
-    .sort((left, right) => left.slot - right.slot)
-    .map((code) => normalizeCtlCode(code.code));
-  const submitted = submittedCodes.map(normalizeCtlCode);
-
-  return expected.length === 3 && expected.every((code, index) => code === submitted[index]);
-}
-
 export function parseCtlAnswers(
   input: CtlAnswerInput,
   definition: CtlDefinition = getCtlDefinition()

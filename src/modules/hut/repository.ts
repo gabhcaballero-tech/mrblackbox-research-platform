@@ -44,10 +44,39 @@ import {
 } from "@/modules/navigo-app/face-verification-contract";
 import { createOneuiWhatsAppRepository, sendHutRegistrationWhatsApp, type OneuiWhatsAppRepository } from "@/modules/oneui-whatsapp";
 import { whatsappAutomationStatusFromMessage, type WhatsAppAutomationStatus } from "@/modules/oneui-whatsapp/templates";
+import {
+  decryptHutPhaseCode,
+  encryptHutPhaseCode,
+  generateHutPhaseCode,
+  hashHutPhaseCode,
+  hutPhaseForSlot,
+  hutSlotForPhase,
+  resolveHutPhaseCodeSecret,
+  type HutPhase,
+  type HutPhaseCodeStatus
+} from "./phase-codes";
 
 export type HutActionResult<T = void> =
   | { ok: true; data: T; message?: string }
   | { ok: false; message: string };
+
+export type HutPhaseCodeSummary = {
+  created: number;
+  existing: number;
+  inconsistencies: string[];
+};
+
+export type HutPhaseCodeAdmin = {
+  expiresAt: Date | null;
+  label: string;
+  phase: HutPhase;
+  sentAt: Date | null;
+  slot: number;
+  status: HutPhaseCodeStatus | "MISSING";
+  updatedAt: Date | null;
+  usedAt: Date | null;
+  validatedAt: Date | null;
+};
 
 export type HutStudySummary = {
   code: string;
@@ -79,6 +108,7 @@ export type HutAdminParticipant = {
   name: string;
   phone: string | null;
   recruiter: string | null;
+  phaseCodes: HutPhaseCodeAdmin[];
   reminderPending: boolean;
   referenceSelfie: {
     capturedAt: Date;
@@ -192,6 +222,12 @@ export type HutPortalView = {
   block2: HutBlockSummary | null;
   message: string;
   name: string;
+  phaseGate: {
+    label: string;
+    phase: HutPhase;
+    required: boolean;
+    status: HutPhaseCodeStatus;
+  } | null;
   participantId: string;
   status: HutParticipantStatus;
   studyName: string;
@@ -383,6 +419,34 @@ export type HutRepository = {
     startDate: Date;
     studyId: string;
   }) => Promise<HutActionResult<{ participantId: string }>>;
+  ensureHutPhaseCodesForParticipant: (input: {
+    now?: Date;
+    participantId: string;
+    secret?: string;
+    studyId: string;
+  }) => Promise<HutActionResult<HutPhaseCodeSummary>>;
+  recoverPhaseCode: (input: {
+    participantId: string;
+    phase: HutPhase;
+    secret?: string;
+    studyId: string;
+  }) => Promise<HutActionResult<{ code: string; phase: HutPhase }>>;
+  regeneratePhaseCode: (input: {
+    participantId: string;
+    phase: HutPhase;
+    secret?: string;
+    studyId: string;
+  }) => Promise<HutActionResult<{ code: string; phase: HutPhase }>>;
+  revokePhaseCode: (input: {
+    participantId: string;
+    phase: HutPhase;
+    studyId: string;
+  }) => Promise<HutActionResult<{ participantId: string; phase: HutPhase }>>;
+  validatePhaseCode: (input: {
+    code: string;
+    phase: HutPhase;
+    token: string;
+  }) => Promise<HutActionResult<{ phase: HutPhase }>>;
 };
 
 type PrismaModel = {
@@ -403,10 +467,12 @@ type HutPrismaClient = PrismaClientLike & {
   hutCallEvaluation: PrismaModel;
   hutDailyCheck: PrismaModel;
   hutParticipant: PrismaModel;
+  hutParticipantPhaseCode: PrismaModel;
   hutReferenceSelfie: PrismaModel;
   hutRegistrationSlot: PrismaModel;
   hutVideoSubmission: PrismaModel;
   hutVisualVerification: PrismaModel;
+  participantConfirmation: PrismaModel;
   study: PrismaModel;
 };
 
@@ -422,6 +488,7 @@ type HutParticipantRecord = {
   id: string;
   name: string;
   phone: string | null;
+  phaseCodes?: HutPhaseCodeRecord[];
   recruiter: string | null;
   startDate: Date | null;
   status: HutParticipantStatus;
@@ -475,6 +542,34 @@ type HutCallRecord = {
   evaluatorName: string | null;
   notes: string | null;
   status: HutCallEvaluationStatus;
+};
+
+type HutPhaseCodeRecord = {
+  codeHash: string;
+  createdAt?: Date | null;
+  encryptedCode: string;
+  expiresAt?: Date | null;
+  id: string;
+  participantId: string;
+  phase: HutPhase;
+  sentAt?: Date | null;
+  slot: number;
+  status: HutPhaseCodeStatus;
+  updatedAt?: Date | null;
+  usedAt?: Date | null;
+  validatedAt?: Date | null;
+};
+
+type HutReferenceCodeRecord = {
+  code: string;
+  slot: number;
+};
+
+type HutParticipantConfirmationCodeSourceRecord = {
+  folio: string;
+  id: string;
+  referenceCodes: HutReferenceCodeRecord[];
+  studyId: string;
 };
 
 type HutDailyCheckRecord = {
@@ -558,6 +653,24 @@ const participantSelect = {
   id: true,
   name: true,
   phone: true,
+  phaseCodes: {
+    orderBy: { slot: "asc" },
+    select: {
+      codeHash: true,
+      createdAt: true,
+      encryptedCode: true,
+      expiresAt: true,
+      id: true,
+      participantId: true,
+      phase: true,
+      sentAt: true,
+      slot: true,
+      status: true,
+      updatedAt: true,
+      usedAt: true,
+      validatedAt: true
+    }
+  },
   recruiter: true,
   referenceSelfie: {
     select: {
@@ -1230,6 +1343,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         await tx.hutCallEvaluation.deleteMany?.({ where: { participantId: participant.id } });
         await tx.hutReferenceSelfie.deleteMany?.({ where: { participantId: participant.id } });
         await tx.hutBlock.deleteMany?.({ where: { participantId: participant.id } });
+        await tx.hutParticipantPhaseCode.deleteMany?.({ where: { participantId: participant.id } });
         await tx.hutParticipant.delete?.({ where: { id: participant.id } });
 
         return {
@@ -1606,6 +1720,11 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         return { message: "No hay videos disponibles para subir en este momento.", ok: false };
       }
 
+      const phaseBlock = pendingHutPhaseMessage(participant);
+      if (phaseBlock) {
+        return { message: phaseBlock, ok: false };
+      }
+
       const availability = currentAvailability(participant, block, new Date());
       if (availability.reason !== "AVAILABLE_FOR_VIDEO") {
         return { message: videoUnavailableMessage(availability.reason), ok: false };
@@ -1911,6 +2030,11 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         return { message: "No hay actividad HUT disponible.", ok: false };
       }
 
+      const phaseBlock = pendingHutPhaseMessage(participant);
+      if (phaseBlock) {
+        return { message: phaseBlock, ok: false };
+      }
+
       const availability = currentAvailability(participant, block, new Date());
       if (availability.reason !== "AVAILABLE_FOR_SELFIE") {
         return { message: videoUnavailableMessage(availability.reason), ok: false };
@@ -1957,6 +2081,11 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         const block = activeBlock(participant);
         if (!block) {
           return { message: "No hay actividad HUT disponible.", ok: false };
+        }
+
+        const phaseBlock = pendingHutPhaseMessage(participant);
+        if (phaseBlock) {
+          return { message: phaseBlock, ok: false };
         }
 
         const availability = currentAvailability(participant, block, now);
@@ -2131,6 +2260,15 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           return { message: "No hay videos disponibles para confirmar.", ok: false };
         }
 
+        const phaseForVideo = expectedHutPhaseForParticipant(participant);
+        const phaseCodeForVideo = phaseForVideo
+          ? participant.phaseCodes?.find((code) => code.phase === phaseForVideo) ?? null
+          : null;
+        const phaseBlock = pendingHutPhaseMessage(participant);
+        if (phaseBlock) {
+          return { message: phaseBlock, ok: false };
+        }
+
         const availability = currentAvailability(participant, block, now);
         if (availability.reason !== "AVAILABLE_FOR_VIDEO") {
           return { message: videoUnavailableMessage(availability.reason), ok: false };
@@ -2216,6 +2354,15 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           },
           where: { id: participant.id }
         });
+        if (phaseCodeForVideo?.status === "VALIDATED") {
+          await tx.hutParticipantPhaseCode.update?.({
+            data: {
+              status: "USED",
+              usedAt: now
+            },
+            where: { id: phaseCodeForVideo.id }
+          });
+        }
 
         return {
           data: {
@@ -2226,6 +2373,316 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
             decision.blockStatus === "CALL_PENDING"
               ? "Video recibido. Tu etapa de videos esta completa."
               : "Video recibido correctamente.",
+          ok: true
+        };
+      });
+    },
+
+    async ensureHutPhaseCodesForParticipant(input) {
+      const prisma = await getPrisma();
+      const now = input.now ?? new Date();
+      const secret = input.secret ?? resolveHutPhaseCodeSecret();
+
+      if (!secret) {
+        return { message: "No fue posible preparar codigos HUT seguros.", ok: false };
+      }
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipant(tx, input.participantId);
+
+        if (!participant || participant.studyId !== input.studyId) {
+          return { message: "No encontramos el participante HUT.", ok: false };
+        }
+
+        if (!participant.folio) {
+          return { message: "El participante HUT no tiene folio para sincronizar codigos.", ok: false };
+        }
+
+        const existingCodes = (await tx.hutParticipantPhaseCode.findMany?.({
+          select: {
+            codeHash: true,
+            encryptedCode: true,
+            id: true,
+            participantId: true,
+            phase: true,
+            slot: true,
+            status: true
+          },
+          where: { participantId: participant.id }
+        })) as HutPhaseCodeRecord[];
+        const inconsistencies = phaseCodeInconsistencies(existingCodes);
+        const existingByPhase = new Map(existingCodes.map((code) => [code.phase, code]));
+        const missingPhases = ([1, 2, 3] as const)
+          .map((slot) => ({ phase: hutPhaseForSlot(slot), slot }))
+          .filter((item): item is { phase: HutPhase; slot: 1 | 2 | 3 } => Boolean(item.phase))
+          .filter((item) => !existingByPhase.has(item.phase));
+
+        if (inconsistencies.length > 0) {
+          return {
+            message: `No se sincronizaron codigos HUT: ${inconsistencies.join(" ")}`,
+            ok: false
+          };
+        }
+
+        if (missingPhases.length === 0) {
+          return {
+            data: {
+              created: 0,
+              existing: existingCodes.length,
+              inconsistencies: []
+            },
+            message: "Codigos HUT de fase ya estaban sincronizados.",
+            ok: true
+          };
+        }
+
+        const confirmation = (await tx.participantConfirmation.findFirst?.({
+          select: {
+            folio: true,
+            id: true,
+            referenceCodes: {
+              orderBy: { slot: "asc" },
+              select: {
+                code: true,
+                slot: true
+              }
+            },
+            studyId: true
+          },
+          where: {
+            folio: participant.folio,
+            studyId: input.studyId
+          }
+        })) as HutParticipantConfirmationCodeSourceRecord | null;
+
+        if (!confirmation) {
+          return { message: "No encontramos codigos de referencia para este folio.", ok: false };
+        }
+
+        const sourceBySlot = new Map(confirmation.referenceCodes.map((code) => [code.slot, code]));
+        const missingSourceSlots = missingPhases
+          .filter((item) => !sourceBySlot.get(item.slot)?.code)
+          .map((item) => item.slot);
+
+        if (missingSourceSlots.length > 0) {
+          return {
+            message: `Faltan codigos de referencia para slots: ${missingSourceSlots.join(", ")}.`,
+            ok: false
+          };
+        }
+
+        let created = 0;
+        for (const missing of missingPhases) {
+          const source = sourceBySlot.get(missing.slot);
+
+          if (!source) {
+            continue;
+          }
+
+          await tx.hutParticipantPhaseCode.create?.({
+            data: {
+              codeHash: hashHutPhaseCode(source.code, secret),
+              encryptedCode: encryptHutPhaseCode(source.code, secret),
+              encryptionVersion: 1,
+              participantId: participant.id,
+              phase: missing.phase,
+              slot: missing.slot,
+              status: "GENERATED",
+              validatedAt: null,
+              usedAt: null,
+              sentAt: null,
+              expiresAt: null,
+              createdAt: now
+            }
+          });
+          created += 1;
+        }
+
+        return {
+          data: {
+            created,
+            existing: existingCodes.length,
+            inconsistencies: []
+          },
+          message: "Codigos HUT de fase sincronizados correctamente.",
+          ok: true
+        };
+      });
+    },
+
+    async recoverPhaseCode(input) {
+      const prisma = await getPrisma();
+      const secret = input.secret ?? resolveHutPhaseCodeSecret();
+
+      if (!secret) {
+        return { message: "No fue posible recuperar el codigo HUT.", ok: false };
+      }
+
+      const participant = await findParticipant(prisma, input.participantId);
+      if (!participant || participant.studyId !== input.studyId) {
+        return { message: "No encontramos el participante HUT.", ok: false };
+      }
+
+      const phaseCode = participant.phaseCodes?.find((code) => code.phase === input.phase) ?? null;
+      if (!phaseCode) {
+        return { message: "No encontramos el codigo de esta fase HUT.", ok: false };
+      }
+      if (phaseCode.status === "REVOKED" || phaseCode.status === "EXPIRED") {
+        return { message: "Este codigo HUT ya no esta vigente.", ok: false };
+      }
+
+      try {
+        return {
+          data: {
+            code: decryptHutPhaseCode(phaseCode.encryptedCode, secret),
+            phase: input.phase
+          },
+          ok: true
+        };
+      } catch {
+        return { message: "No fue posible descifrar el codigo HUT.", ok: false };
+      }
+    },
+
+    async regeneratePhaseCode(input) {
+      const prisma = await getPrisma();
+      const secret = input.secret ?? resolveHutPhaseCodeSecret();
+
+      if (!secret) {
+        return { message: "No fue posible regenerar el codigo HUT.", ok: false };
+      }
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipant(tx, input.participantId);
+        if (!participant || participant.studyId !== input.studyId) {
+          return { message: "No encontramos el participante HUT.", ok: false };
+        }
+
+        const slot = hutSlotForPhase(input.phase);
+        const nextCode = await generateUniqueHutPhaseCode(tx, secret);
+        const data = {
+          codeHash: hashHutPhaseCode(nextCode, secret),
+          encryptedCode: encryptHutPhaseCode(nextCode, secret),
+          encryptionVersion: 1,
+          expiresAt: null,
+          sentAt: null,
+          status: "GENERATED" as const,
+          usedAt: null,
+          validatedAt: null
+        };
+        const existing = participant.phaseCodes?.find((code) => code.phase === input.phase) ?? null;
+
+        if (existing) {
+          await tx.hutParticipantPhaseCode.update?.({
+            data,
+            where: { id: existing.id }
+          });
+        } else {
+          await tx.hutParticipantPhaseCode.create?.({
+            data: {
+              ...data,
+              participantId: participant.id,
+              phase: input.phase,
+              slot
+            }
+          });
+        }
+
+        return {
+          data: {
+            code: nextCode,
+            phase: input.phase
+          },
+          message: "Codigo HUT regenerado correctamente. Muestralo ahora; no se guardara en texto plano.",
+          ok: true
+        };
+      });
+    },
+
+    async revokePhaseCode(input) {
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipant(tx, input.participantId);
+        if (!participant || participant.studyId !== input.studyId) {
+          return { message: "No encontramos el participante HUT.", ok: false };
+        }
+
+        const phaseCode = participant.phaseCodes?.find((code) => code.phase === input.phase) ?? null;
+        if (!phaseCode) {
+          return { message: "No encontramos el codigo de esta fase HUT.", ok: false };
+        }
+
+        await tx.hutParticipantPhaseCode.update?.({
+          data: {
+            status: "REVOKED"
+          },
+          where: { id: phaseCode.id }
+        });
+
+        return {
+          data: {
+            participantId: participant.id,
+            phase: input.phase
+          },
+          message: "Codigo HUT revocado correctamente.",
+          ok: true
+        };
+      });
+    },
+
+    async validatePhaseCode(input) {
+      const prisma = await getPrisma();
+      const secret = resolveHutPhaseCodeSecret();
+
+      if (!secret) {
+        return { message: "No fue posible validar el codigo HUT.", ok: false };
+      }
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipantByToken(tx, input.token);
+
+        if (!participant) {
+          return { message: "Este enlace HUT no es valido.", ok: false };
+        }
+
+        const expectedPhase = expectedHutPhaseForParticipant(participant);
+        if (expectedPhase !== input.phase) {
+          return { message: "Este codigo no corresponde a la fase actual.", ok: false };
+        }
+
+        const phaseCode = participant.phaseCodes?.find((code) => code.phase === input.phase) ?? null;
+        if (!phaseCode) {
+          return { message: "No encontramos el codigo de esta fase HUT.", ok: false };
+        }
+
+        if (phaseCode.status === "USED" || phaseCode.status === "VALIDATED") {
+          return {
+            data: { phase: input.phase },
+            message: "Codigo HUT ya validado para esta fase.",
+            ok: true
+          };
+        }
+        if (phaseCode.status === "EXPIRED" || phaseCode.status === "REVOKED") {
+          return { message: "Este codigo HUT ya no esta vigente.", ok: false };
+        }
+
+        if (phaseCode.codeHash !== hashHutPhaseCode(input.code, secret)) {
+          return { message: "El codigo HUT no es correcto.", ok: false };
+        }
+
+        const now = new Date();
+        await tx.hutParticipantPhaseCode.update?.({
+          data: {
+            status: "VALIDATED",
+            validatedAt: now
+          },
+          where: { id: phaseCode.id }
+        });
+
+        return {
+          data: { phase: input.phase },
+          message: "Codigo HUT validado correctamente.",
           ok: true
         };
       });
@@ -2407,6 +2864,22 @@ async function releaseParticipantRegistrationSlot(tx: HutPrismaClient, participa
   });
 }
 
+async function generateUniqueHutPhaseCode(prisma: HutPrismaClient, secret: string): Promise<string> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const code = generateHutPhaseCode();
+    const existing = await prisma.hutParticipantPhaseCode.findFirst?.({
+      select: { id: true },
+      where: { codeHash: hashHutPhaseCode(code, secret) }
+    });
+
+    if (!existing) {
+      return code;
+    }
+  }
+
+  throw new Error("No fue posible generar un codigo HUT unico.");
+}
+
 async function toAdminParticipant(
   participant: HutParticipantRecord,
   requestOrigin: string,
@@ -2454,6 +2927,7 @@ async function toAdminParticipant(
     identityReview,
     link: participantLink(requestOrigin, participant.token),
     name: participant.name,
+    phaseCodes: toAdminPhaseCodes(participant),
     phone: participant.phone,
     recruiter: participant.recruiter,
     reminderPending: Boolean(participant.dailyChecks?.some((check) => check.status === "REMINDER_PENDING")),
@@ -2483,6 +2957,25 @@ async function toAdminParticipant(
     visualOverrideEnabled: participant.visualOverrideEnabled,
     whatsappRegistration
   };
+}
+
+function toAdminPhaseCodes(participant: HutParticipantRecord): HutPhaseCodeAdmin[] {
+  return ([1, 2, 3] as const).map((slot) => {
+    const phase = hutPhaseForSlot(slot);
+    const code = phase ? participant.phaseCodes?.find((item) => item.phase === phase) ?? null : null;
+
+    return {
+      expiresAt: code?.expiresAt ?? null,
+      label: phase ? hutPhaseLabel(phase) : `Fase ${slot}`,
+      phase: phase ?? "COLOCACION",
+      sentAt: code?.sentAt ?? null,
+      slot,
+      status: code?.status ?? "MISSING",
+      updatedAt: code?.updatedAt ?? code?.createdAt ?? null,
+      usedAt: code?.usedAt ?? null,
+      validatedAt: code?.validatedAt ?? null
+    };
+  });
 }
 
 async function sendHutRegistrationWhatsAppForParticipant({
@@ -2582,6 +3075,7 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
   const block = activeBlock(participant);
   const block1 = blockByNumber(participant, 1);
   const block2 = blockByNumber(participant, 2);
+  const phaseGate = currentHutPhaseGate(participant);
   const availability = block
     ? currentAvailability(participant, block, new Date())
     : { nextAvailableAt: null, reason: "BLOCK_NOT_ACTIVE" };
@@ -2600,6 +3094,7 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
       message:
         "Gracias por tu participacion. Por las reglas del estudio, no es posible continuar con esta etapa. El equipo podra contactarte si requiere informacion adicional.",
       name: participant.name,
+      phaseGate,
       participantId: participant.id,
       status: participant.status,
       studyName: participant.study.name,
@@ -2608,7 +3103,7 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
     };
   }
 
-  const availableUpload = block && availability.reason === "AVAILABLE_FOR_VIDEO"
+  const availableUpload = block && availability.reason === "AVAILABLE_FOR_VIDEO" && !phaseGate?.required
     ? {
         blockNumber: block.blockNumber,
         sequenceNumber: nextHutVideoSequence(block) ?? block.requiredVideos
@@ -2627,12 +3122,64 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
     block2: block2 ? toBasicBlockSummary(block2) : null,
     message: hutPortalMessage(participant),
     name: participant.name,
+    phaseGate,
     participantId: participant.id,
     status: participant.status,
     studyName: participant.study.name,
     testMode: participant.testMode,
     token: participant.token
   };
+}
+
+function currentHutPhaseGate(participant: HutParticipantRecord): HutPortalView["phaseGate"] {
+  const phase = expectedHutPhaseForParticipant(participant);
+  const phaseCode = phase ? participant.phaseCodes?.find((code) => code.phase === phase) ?? null : null;
+
+  if (!phase || !phaseCode) {
+    return null;
+  }
+
+  return {
+    label: hutPhaseLabel(phase),
+    phase,
+    required: phaseCode.status !== "USED" && phaseCode.status !== "VALIDATED",
+    status: phaseCode.status
+  };
+}
+
+function expectedHutPhaseForParticipant(participant: HutParticipantRecord): HutPhase | null {
+  if (participant.status === "BLOCK_1_IN_PROGRESS") {
+    return "COLOCACION";
+  }
+  if (participant.status === "BLOCK_1_CALL_PENDING") {
+    return "REGRESO_1";
+  }
+  if (participant.status === "BLOCK_2_IN_PROGRESS") {
+    const regreso1 = participant.phaseCodes?.find((code) => code.phase === "REGRESO_1");
+    return regreso1?.status === "USED" ? null : "REGRESO_1";
+  }
+  if (participant.status === "BLOCK_2_CALL_PENDING") {
+    return "REGRESO_2";
+  }
+
+  return null;
+}
+
+function hutPhaseLabel(phase: HutPhase): string {
+  const labels: Record<HutPhase, string> = {
+    COLOCACION: "Colocacion",
+    REGRESO_1: "Regreso 1 / Evaluacion 1",
+    REGRESO_2: "Regreso 2 / Evaluacion 2"
+  };
+  return labels[phase];
+}
+
+function pendingHutPhaseMessage(participant: HutParticipantRecord): string | null {
+  const phaseGate = currentHutPhaseGate(participant);
+
+  return phaseGate?.required
+    ? `Captura el codigo de ${phaseGate.label} antes de continuar.`
+    : null;
 }
 
 function hutPortalMessage(participant: HutParticipantRecord): string {
@@ -2871,6 +3418,34 @@ function hutVisualStatusFromReview(reviewStatus: "APPROVED" | "PENDING" | "REJEC
   }
 
   return "UNCERTAIN" as const;
+}
+
+function phaseCodeInconsistencies(codes: HutPhaseCodeRecord[]): string[] {
+  const messages: string[] = [];
+  const seenPhases = new Set<HutPhase>();
+  const seenSlots = new Set<number>();
+
+  for (const code of codes) {
+    const expectedPhase = hutPhaseForSlot(code.slot);
+
+    if (!expectedPhase) {
+      messages.push(`Slot ${code.slot} no corresponde a una fase HUT.`);
+    } else if (code.phase !== expectedPhase) {
+      messages.push(`Slot ${code.slot} esta asociado a ${code.phase}, pero corresponde a ${expectedPhase}.`);
+    }
+
+    if (seenPhases.has(code.phase)) {
+      messages.push(`La fase ${code.phase} esta duplicada.`);
+    }
+    seenPhases.add(code.phase);
+
+    if (seenSlots.has(code.slot)) {
+      messages.push(`El slot ${code.slot} esta duplicado.`);
+    }
+    seenSlots.add(code.slot);
+  }
+
+  return messages;
 }
 
 function videoUnavailableMessage(reason: string) {

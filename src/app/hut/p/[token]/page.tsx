@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createHutRepository, type HutPortalView } from "@/modules/hut";
+import { validateHutPhaseCodeAction } from "@/modules/hut/actions";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { HutVideoUploadForm } from "./HutVideoUploadForm";
 
@@ -9,10 +10,15 @@ type HutParticipantPageProps = {
   params: Promise<{
     token: string;
   }>;
+  searchParams?: Promise<{
+    hutError?: string;
+    hutMessage?: string;
+  }>;
 };
 
-export default async function HutParticipantPage({ params }: HutParticipantPageProps) {
+export default async function HutParticipantPage({ params, searchParams }: HutParticipantPageProps) {
   const { token } = await params;
+  const query = await searchParams;
   const result = await createHutRepository().getPortalView(token);
 
   if (!result.ok) {
@@ -49,9 +55,24 @@ export default async function HutParticipantPage({ params }: HutParticipantPageP
           <ProgressSummary view={view} />
         </section>
 
+        {query?.hutMessage ? (
+          <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            {query.hutMessage}
+          </p>
+        ) : null}
+        {query?.hutError ? (
+          <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+            {query.hutError}
+          </p>
+        ) : null}
+
         {view.status === "COMPLETED" ? <CompletionMessage /> : null}
 
-        {view.status !== "COMPLETED" && view.availability.reason === "AVAILABLE_FOR_SELFIE" ? (
+        {view.status !== "COMPLETED" && view.phaseGate?.required ? (
+          <HutPhaseCodeForm token={view.token} view={view} />
+        ) : null}
+
+        {view.status !== "COMPLETED" && !view.phaseGate?.required && view.availability.reason === "AVAILABLE_FOR_SELFIE" ? (
           <HutVideoUploadForm
             blockNumber={view.availability.blockNumber ?? view.availableUpload?.blockNumber ?? 1}
             mode="selfie"
@@ -60,7 +81,7 @@ export default async function HutParticipantPage({ params }: HutParticipantPageP
           />
         ) : null}
 
-        {view.status !== "COMPLETED" && view.availableUpload ? (
+        {view.status !== "COMPLETED" && !view.phaseGate?.required && view.availableUpload ? (
           <HutVideoUploadForm
             blockNumber={view.availableUpload.blockNumber}
             mode="video"
@@ -69,7 +90,7 @@ export default async function HutParticipantPage({ params }: HutParticipantPageP
           />
         ) : null}
 
-        {view.status !== "COMPLETED" && !view.availableUpload && view.availability.reason !== "AVAILABLE_FOR_SELFIE" ? (
+        {view.status !== "COMPLETED" && !view.phaseGate?.required && !view.availableUpload && view.availability.reason !== "AVAILABLE_FOR_SELFIE" ? (
           <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-zinc-950">Actividad no disponible</h2>
             <p className="mt-2 text-sm leading-6 text-zinc-600">{availabilityMessage(view.availability.reason, view.availability.nextAvailableAt)}</p>
@@ -77,6 +98,37 @@ export default async function HutParticipantPage({ params }: HutParticipantPageP
         ) : null}
       </main>
     </div>
+  );
+}
+
+function HutPhaseCodeForm({ token, view }: { token: string; view: HutPortalView }) {
+  if (!view.phaseGate) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
+      <p className="text-sm font-semibold uppercase tracking-wide text-amber-700">Codigo requerido</p>
+      <h2 className="mt-2 text-xl font-semibold text-amber-950">{view.phaseGate.label}</h2>
+      <p className="mt-2 text-sm leading-6 text-amber-900">
+        Captura el codigo de esta fase para continuar con la actividad HUT.
+      </p>
+      <form action={validateHutPhaseCodeAction.bind(null, token, view.phaseGate.phase)} className="mt-4 space-y-3">
+        <label className="flex flex-col gap-2 text-sm font-semibold text-amber-950">
+          Codigo
+          <input
+            autoComplete="one-time-code"
+            className="min-h-12 rounded-md border border-amber-300 bg-white px-4 py-3 text-lg font-semibold uppercase tracking-wide text-zinc-950 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+            inputMode="text"
+            name="phaseCode"
+            required
+          />
+        </label>
+        <button className="min-h-12 rounded-md bg-amber-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-800" type="submit">
+          Validar codigo
+        </button>
+      </form>
+    </section>
   );
 }
 

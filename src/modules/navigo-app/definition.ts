@@ -35,6 +35,35 @@ export type NavigoScheduleSeed = {
   windowStartsMinutes: number;
 };
 
+export const NAVIGO_COMPARATIVE_INSTRUCTIONS = [
+  "Verifica el orden de las claves según la rotación asignada.",
+  "Identifica en qué brazo se colocó cada clave antes de responder.",
+  "Por favor huele ambos antebrazos y responde las siguientes preguntas."
+] as const;
+
+const NAVIGO_NUMERIC_COMPARATIVE_QUESTIONS = new Set([
+  "AP1_PREFERENCIA_GENERAL",
+  "AP2_PREFERENCIA_INTENSIDAD",
+  "AP7_MAYOR_DURACION"
+]);
+
+const NAVIGO_COMPARATIVE_OPTION_NUMBERS: Record<string, number> = {
+  AMBAS: 3,
+  NINGUNA: 4,
+  PRIMERA: 1,
+  PRIMERA_IZQUIERDA: 1,
+  SEGUNDA: 2,
+  SEGUNDA_DERECHA: 2
+};
+
+export function navigoComparativeNumericEquivalent(questionId: string, value: string | number): number | null {
+  if (!NAVIGO_NUMERIC_COMPARATIVE_QUESTIONS.has(questionId) || typeof value !== "string") {
+    return null;
+  }
+
+  return NAVIGO_COMPARATIVE_OPTION_NUMBERS[value] ?? null;
+}
+
 export function createNavigoMeasurementDefinition(): NavigoMeasurementDefinition {
   return {
     purpose: "MEASUREMENT",
@@ -109,6 +138,7 @@ export function hashNavigoMeasurementDefinition(definition: NavigoMeasurementDef
 
 export function createNavigoScheduleSeeds(questionnaireVersionId: string): NavigoScheduleSeed[] {
   return [
+    // APP v3 documents AP1-AP7 for 3, 4.5, 6 and 8 hours; keeping T0_15_MIN active needs client confirmation.
     {
       code: "T0_15_MIN",
       name: "Evaluacion T0 - 15 minutos",

@@ -20,6 +20,7 @@ import {
   createNavigoScheduleSeeds,
   isInitialNavigoEvaluation,
   isSupportedNavigoActivityCode,
+  navigoComparativeNumericEquivalent,
   resolveNavigoTimeZone,
   resolveNavigoVisualVerificationMode,
   type NavigoActivityCode,
@@ -3413,7 +3414,10 @@ function createReadableNavigoResponses(
 
 function readableNavigoAnswerLabel(question: ReturnType<typeof createNavigoMeasurementDefinition>["questions"][number], value: string | number): string {
   if (question.type === "single_choice") {
-    return question.options.find((option) => option.value === value)?.label ?? String(value);
+    const label = question.options.find((option) => option.value === value)?.label ?? String(value);
+    const numericEquivalent = navigoComparativeNumericEquivalent(question.id, value);
+
+    return numericEquivalent ? `${numericEquivalent} - ${label}` : label;
   }
 
   if (question.type === "scale") {

@@ -70,7 +70,7 @@ export default async function CtlPage({ params, searchParams }: CtlPageProps) {
           <h2 className="text-lg font-semibold text-zinc-950">Herramienta de soporte: iniciar CTL por folio</h2>
           <p className="mt-1 text-sm leading-6 text-zinc-600">
             Uso opcional para supervision. En operacion normal, el encuestador IKA inicia CTL desde el listado publico de folios disponibles.
-            Los codigos fisicos y triangulares se registran dentro del cuestionario CTL.
+            Los codigos de acceso por fase pertenecen al flujo HUT y no bloquean el inicio CTL.
           </p>
           <form action={startCtlSessionAction.bind(null, studyId)} className="mt-5 grid gap-4 md:grid-cols-[minmax(0,240px)_auto]">
             <label className={labelClass}>

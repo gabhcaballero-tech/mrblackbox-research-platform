@@ -15,8 +15,10 @@ import {
   hashToken,
   NAVIGO_ACTIVITY_CODES,
   NAVIGO_APP_DEFAULT_TIME_ZONE,
+  NAVIGO_COMPARATIVE_INSTRUCTIONS,
   isInitialNavigoEvaluation,
   navigoActivityLabel,
+  navigoComparativeNumericEquivalent,
   nowInStudyTimezoneForDateTimeLocal,
   normalizeNavigoParticipantName,
   normalizeNavigoPhone,
@@ -97,6 +99,27 @@ describe("navigo app definition", () => {
     ]);
     expect(serializedQuestions).not.toContain("Homme");
     expect(serializedQuestions).not.toContain("realName");
+  });
+
+  it("keeps APP v3 comparative instructions and numeric equivalence without changing semantic values", () => {
+    const definition = createNavigoMeasurementDefinition();
+    const definitionSource = readWorkspaceFile("src", "modules", "navigo-app", "definition.ts");
+
+    expect(NAVIGO_COMPARATIVE_INSTRUCTIONS).toEqual([
+      "Verifica el orden de las claves según la rotación asignada.",
+      "Identifica en qué brazo se colocó cada clave antes de responder.",
+      "Por favor huele ambos antebrazos y responde las siguientes preguntas."
+    ]);
+    expect(navigoComparativeNumericEquivalent("AP1_PREFERENCIA_GENERAL", "PRIMERA_IZQUIERDA")).toBe(1);
+    expect(navigoComparativeNumericEquivalent("AP2_PREFERENCIA_INTENSIDAD", "SEGUNDA")).toBe(2);
+    expect(navigoComparativeNumericEquivalent("AP7_MAYOR_DURACION", "AMBAS")).toBe(3);
+    expect(navigoComparativeNumericEquivalent("AP7_MAYOR_DURACION", "NINGUNA")).toBe(4);
+    const ap2 = definition.questions.find((question) => question.id === "AP2_PREFERENCIA_INTENSIDAD");
+    if (!ap2 || ap2.type !== "single_choice") {
+      throw new Error("AP2 should be single choice");
+    }
+    expect(ap2.options.map((option) => option.value)).toContain("PRIMERA");
+    expect(definitionSource).toContain("keeping T0_15_MIN active needs client confirmation");
   });
 
   it("creates T0 15 min, T3, T4.5, T6 and T8 schedules with expected windows", () => {
@@ -691,7 +714,8 @@ describe("navigo app MVP rules", () => {
     expect(capture).toContain("IdentityConfirmation");
     expect(capture).toContain("IdentityIncidentState");
     expect(capture).toContain("confirmNavigoT0IdentityAction");
-    expect(capture).toContain("Recuerda oler ambos antebrazos antes de responder.");
+    expect(capture).toContain("NAVIGO_COMPARATIVE_INSTRUCTIONS");
+    expect(capture).toContain("Rotación asignada");
     expect(capture).toContain("Toma y guarda la selfie antes de enviar las respuestas.");
   });
 
@@ -747,6 +771,7 @@ describe("navigo app MVP rules", () => {
     expect(adminPage).not.toContain("storageBucket");
     expect(repository).toContain("createSignedReadUrl");
     expect(repository).toContain("readableResponses");
+    expect(repository).toContain("navigoComparativeNumericEquivalent");
     expect(repository).toContain("reviewActivityIdentity");
     expect(repository).toContain("evidence.internalNote");
     expect(actions).toContain("reviewNavigoActivityIdentityAction");

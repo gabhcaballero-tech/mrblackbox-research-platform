@@ -190,6 +190,21 @@ enum HutRegistrationSlotStatus {
   CANCELLED
 }
 
+enum HutPhase {
+  COLOCACION
+  REGRESO_1
+  REGRESO_2
+}
+
+enum HutPhaseCodeStatus {
+  GENERATED
+  SENT
+  VALIDATED
+  USED
+  EXPIRED
+  REVOKED
+}
+
 enum QuestionnairePurpose {
   SCREENER
   MEASUREMENT
@@ -704,6 +719,7 @@ model HutParticipant {
   visualOverrideBy    InternalUser?           @relation("HutVisualOverrideBy", fields: [visualOverrideByUserId], references: [id])
   referenceSelfie     HutReferenceSelfie?
   registrationSlot    HutRegistrationSlot?    @relation("HutRegistrationSlotParticipant")
+  phaseCodes          HutParticipantPhaseCode[]
   blocks              HutBlock[]
   videoSubmissions    HutVideoSubmission[]
   dailyChecks         HutDailyCheck[]
@@ -737,6 +753,31 @@ model HutRegistrationSlot {
   @@index([studyId, status])
   @@index([participantId])
   @@map("hut_registration_slots")
+}
+
+model HutParticipantPhaseCode {
+  id                String             @id @default(uuid()) @db.Uuid
+  participantId     String             @db.Uuid
+  phase             HutPhase
+  slot              Int
+  codeHash          String             @unique
+  encryptedCode     String
+  encryptionVersion Int                @default(1)
+  status            HutPhaseCodeStatus @default(GENERATED)
+  sentAt            DateTime?
+  validatedAt       DateTime?
+  usedAt            DateTime?
+  expiresAt         DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  participant HutParticipant @relation(fields: [participantId], references: [id])
+
+  @@unique([participantId, phase])
+  @@unique([participantId, slot])
+  @@index([participantId, status])
+  @@index([phase, status])
+  @@map("hut_participant_phase_codes")
 }
 
 model HutReferenceSelfie {

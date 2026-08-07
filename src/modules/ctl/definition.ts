@@ -188,34 +188,6 @@ const aromaAttributeRows = [
   { code: "ALCOHOL", label: "Alcohol" }
 ];
 
-const sampleCodeQuestions: CtlQuestionDefinition[] = [
-  {
-    code: "CODIGO_FISICO_1",
-    instructions: [
-      {
-        text: "Registra el codigo fisico observado en campo. Estos codigos no son requisito para tomar el folio.",
-        title: "INSTRUCCION",
-        type: "BEFORE_QUESTION"
-      }
-    ],
-    label: "Codigo fisico 1",
-    required: true,
-    type: "SHORT_TEXT"
-  },
-  {
-    code: "CODIGO_FISICO_2",
-    label: "Codigo fisico 2",
-    required: true,
-    type: "SHORT_TEXT"
-  },
-  {
-    code: "CODIGO_FISICO_3",
-    label: "Codigo fisico 3",
-    required: true,
-    type: "SHORT_TEXT"
-  }
-];
-
 const generalDataQuestions: CtlQuestionDefinition[] = [
   {
     code: "DG_NOMBRE",
@@ -399,18 +371,6 @@ function makeFragranceQuestions(suffix: "A" | "B", labelSuffix: string): CtlQues
 
 export const CTL_DEFINITION: CtlDefinition = {
   sections: [
-    {
-      id: "CODIGOS_FISICOS",
-      instructions: [
-        {
-          text: "Captura los codigos fisicos de las muestras antes de iniciar la entrevista. Si el participante ya fue tomado por el encuestador, estos codigos no bloquean la sesion CTL.",
-          title: "INSTRUCCION",
-          type: "SECTION"
-        }
-      ],
-      questions: sampleCodeQuestions,
-      title: "CODIGOS FISICOS DE MUESTRAS"
-    },
     {
       id: "DATOS_GENERALES",
       instructions: [

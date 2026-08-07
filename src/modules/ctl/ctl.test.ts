@@ -3,7 +3,6 @@ import { getCtlApplicableQuestions, getCtlDefinition, getCtlQuestions, type CtlD
 import { createCtlRepository } from "./repository";
 import {
   ctlFormDataToAnswerInput,
-  doReferenceCodesMatch,
   isCtlTerminatingAnswer,
   parseCtlAnswers,
   parseCtlQuestionAnswer,
@@ -21,7 +20,6 @@ describe("ctl module", () => {
 
     expect(definition.version).toBe(2);
     expect(definition.sections.map((section) => section.id)).toEqual([
-      "CODIGOS_FISICOS",
       "DATOS_GENERALES",
       "FILTROS",
       "TRIANGULAR_1",
@@ -30,11 +28,10 @@ describe("ctl module", () => {
       "FRAGRANCIA_2",
       "DEMOGRAFICOS"
     ]);
-    expect(questions).toHaveLength(53);
+    expect(questions).toHaveLength(50);
     expect(definition.sections.every((section) => Array.isArray(section.questions))).toBe(true);
     expect(questions.map((question) => question.code)).toEqual(expect.arrayContaining([
       "F0",
-      "CODIGO_FISICO_1",
       "F1",
       "F11",
       "F11A",
@@ -82,19 +79,6 @@ describe("ctl module", () => {
 
     expect(applicableCodes).not.toContain("F11A");
     expect(parsed.ok).toBe(true);
-  });
-
-  it("validates participant reference codes in slot order", () => {
-    expect(
-      doReferenceCodesMatch(
-        [
-          { code: "A7K4", slot: 1 },
-          { code: "M3P9", slot: 2 },
-          { code: "T8R2", slot: 3 }
-        ],
-        ["a7k4", "m3p9", "t8r2"]
-      )
-    ).toBe(true);
   });
 
   it("starts a CTL session without requiring participant reference codes", async () => {
@@ -1042,9 +1026,6 @@ const matrixDefinition: CtlDefinition = {
 
 function createValidCtlAnswerInput(): CtlAnswerInput {
   return {
-    CODIGO_FISICO_1: "247",
-    CODIGO_FISICO_2: "583",
-    CODIGO_FISICO_3: "742",
     F0: "1",
     F1: "1",
     F2: "2",

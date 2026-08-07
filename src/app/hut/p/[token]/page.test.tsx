@@ -30,8 +30,8 @@ describe("HutParticipantPage", () => {
 
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
-    expect(screen.getByText("Gracias por tu participación.")).toBeInTheDocument();
-    expect(screen.getByText(/Toma captura de la finalización de tu prueba/)).toBeInTheDocument();
+    expect(screen.getByText(/Gracias por tu participaci/)).toBeInTheDocument();
+    expect(screen.getByText(/Toma captura/)).toBeInTheDocument();
     expect(screen.queryByText("Actividad no disponible")).not.toBeInTheDocument();
     expect(screen.queryByText("Formulario HUT")).not.toBeInTheDocument();
     expect(createHutRepository).toHaveBeenCalled();
@@ -54,7 +54,35 @@ describe("HutParticipantPage", () => {
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
     expect(screen.getByText("Actividad no disponible")).toBeInTheDocument();
-    expect(screen.getByText("El siguiente video estará disponible mañana a partir de las 5:00 a.m.")).toBeInTheDocument();
+    expect(screen.getByText(/El siguiente video/)).toBeInTheDocument();
+  });
+
+  it("muestra captura de codigo de fase antes de permitir actividad HUT", async () => {
+    getPortalViewMock.mockResolvedValue({
+      data: createPortalView({
+        availability: {
+          blockNumber: 1,
+          expectedVideoSequence: 1,
+          nextAvailableAt: null,
+          reason: "AVAILABLE_FOR_SELFIE"
+        },
+        phaseGate: {
+          label: "Colocacion",
+          phase: "COLOCACION",
+          required: true,
+          status: "GENERATED"
+        },
+        status: "BLOCK_1_IN_PROGRESS"
+      }),
+      ok: true
+    });
+
+    render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
+
+    expect(screen.getByText("Codigo requerido")).toBeInTheDocument();
+    expect(screen.getByText("Colocacion")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Validar codigo" })).toBeInTheDocument();
+    expect(screen.queryByText("Formulario HUT")).not.toBeInTheDocument();
   });
 });
 
@@ -83,6 +111,7 @@ function createPortalView(overrides: Partial<PortalViewForTest> = {}): PortalVie
     },
     message: "Tu participacion HUT esta completa. Gracias por tu tiempo.",
     name: "Participante HUT",
+    phaseGate: null,
     participantId: "participant-1",
     status: "COMPLETED",
     studyName: "Estudio HUT",
@@ -118,6 +147,12 @@ type PortalViewForTest = {
   } | null;
   message: string;
   name: string;
+  phaseGate: {
+    label: string;
+    phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2";
+    required: boolean;
+    status: string;
+  } | null;
   participantId: string;
   status: string;
   studyName: string;

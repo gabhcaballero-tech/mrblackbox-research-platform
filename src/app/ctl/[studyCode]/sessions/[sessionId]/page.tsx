@@ -65,13 +65,6 @@ export default async function CtlPublicCapturePage({ params, searchParams }: Ctl
               label="Segunda muestra"
               value={session.participant.rotation.secondSampleKey ?? "Rotacion pendiente"}
             />
-            <Detail
-              label="Codigos"
-              value={
-                session.participant.referenceCodes.map((code) => `${code.slot}: ${code.code}`).join(" / ") ||
-                "Sin codigos"
-              }
-            />
             <Detail label="Estado CTL" value={ctlStatusLabel(session.status)} />
           </dl>
         </section>

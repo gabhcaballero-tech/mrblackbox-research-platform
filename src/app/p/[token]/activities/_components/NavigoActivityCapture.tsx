@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
-import { NAVIGO_T0_IDENTITY_QUESTION_ID } from "@/modules/navigo-app/definition";
+import { NAVIGO_COMPARATIVE_INSTRUCTIONS, NAVIGO_T0_IDENTITY_QUESTION_ID } from "@/modules/navigo-app/definition";
 import {
   confirmNavigoT0IdentityAction,
   confirmNavigoActivitySelfieUploadAction,
@@ -471,14 +471,19 @@ export function NavigoActivityCapture({
       {showQuestions ? (
       <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-zinc-950">Preguntas AP1 a AP7</h2>
-        <p className="mt-2 text-sm leading-6 text-zinc-600">
-          Recuerda oler ambos antebrazos antes de responder.
-        </p>
-        <div className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
-          <p>Primera fragancia = brazo izquierdo</p>
-          <p>Segunda fragancia = brazo derecho</p>
-          <p className="mt-1 font-mono">Brazo izquierdo: {fragranceCodes.left}</p>
-          <p className="font-mono">Brazo derecho: {fragranceCodes.right}</p>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-zinc-600">
+          {NAVIGO_COMPARATIVE_INSTRUCTIONS.map((instruction) => (
+            <li key={instruction}>{instruction}</li>
+          ))}
+        </ul>
+        <div className="mt-3 rounded-md border border-teal-200 bg-teal-50 px-3 py-3 text-sm text-teal-950">
+          <p className="font-semibold">Rotación asignada</p>
+          <p className="mt-2">
+            Primera fragancia: <span className="font-mono font-semibold">{fragranceCodes.left}</span> · brazo izquierdo
+          </p>
+          <p>
+            Segunda fragancia: <span className="font-mono font-semibold">{fragranceCodes.right}</span> · brazo derecho
+          </p>
         </div>
         {evaluationError ? (
           <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{evaluationError}</p>

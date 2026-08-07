@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createHutRepository, type HutActionResult } from "./repository";
+import type { HutPhase } from "./phase-codes";
 import type { HutSelfieUploadMetadata, HutSignedSelfieUpload, HutSignedVideoUpload, HutVideoUploadMetadata } from "./storage";
 import { requireCapability } from "@/shared/auth/session";
 import type { NavigoFaceVerificationClientResult } from "@/modules/navigo-app/face-verification-contract";
@@ -218,6 +219,70 @@ export async function setHutTestModeAction(studyId: string, participantId: strin
   redirectWithHutMessage(studyId, result, participantId);
 }
 
+export async function recoverHutPhaseCodeAction(
+  studyId: string,
+  participantId: string,
+  phase: HutPhase
+): Promise<{ code?: string; message: string; ok: boolean }> {
+  await requireCapability("screening:review");
+  const result = await createHutRepository().recoverPhaseCode({
+    participantId,
+    phase,
+    studyId
+  });
+
+  if (!result.ok) {
+    return {
+      message: result.message,
+      ok: false
+    };
+  }
+
+  return {
+    code: result.data.code,
+    message: "Codigo recuperado. Compartelo solo con el participante correspondiente.",
+    ok: true
+  };
+}
+
+export async function regenerateHutPhaseCodeAction(
+  studyId: string,
+  participantId: string,
+  phase: HutPhase
+): Promise<{ code?: string; message: string; ok: boolean }> {
+  await requireCapability("screening:review");
+  const result = await createHutRepository().regeneratePhaseCode({
+    participantId,
+    phase,
+    studyId
+  });
+
+  if (!result.ok) {
+    return {
+      message: result.message,
+      ok: false
+    };
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/hut`);
+  return {
+    code: result.data.code,
+    message: result.message ?? "Codigo HUT regenerado correctamente.",
+    ok: true
+  };
+}
+
+export async function revokeHutPhaseCodeAction(studyId: string, participantId: string, phase: HutPhase) {
+  await requireCapability("screening:review");
+  const result = await createHutRepository().revokePhaseCode({
+    participantId,
+    phase,
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
 export async function reviewHutVisualVerificationAction(
   studyId: string,
   participantId: string,
@@ -279,6 +344,24 @@ export async function confirmHutReferenceSelfieUploadAction(
   revalidatePath(`/admin/studies/${studyId}/hut`);
 
   return result;
+}
+
+export async function validateHutPhaseCodeAction(token: string, phase: HutPhase, formData: FormData) {
+  const result = await createHutRepository().validatePhaseCode({
+    code: String(formData.get("phaseCode") ?? ""),
+    phase,
+    token
+  });
+  const params = new URLSearchParams();
+
+  if (result.ok) {
+    params.set("hutMessage", result.message ?? "Codigo HUT validado correctamente.");
+  } else {
+    params.set("hutError", result.message);
+  }
+
+  revalidatePath(`/hut/p/${encodeURIComponent(token)}`);
+  redirect(`/hut/p/${encodeURIComponent(token)}?${params.toString()}`);
 }
 
 export async function requestHutRegistrationSelfieUploadAction(
