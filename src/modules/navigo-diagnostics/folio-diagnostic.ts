@@ -73,7 +73,7 @@ type StudySnapshot = {
 type RotationArmSnapshot = {
   applicationOrder: number;
   participantVisibleLabel: string | null;
-  studyArm: { name: string | null } | null;
+  studyArm: { label: string | null } | null;
   studyProduct: { internalCode: string | null } | null;
 };
 
@@ -673,7 +673,7 @@ function armLabel(arm: RotationArmSnapshot | null): string {
     return "Falta";
   }
 
-  return arm.studyArm?.name ?? arm.participantVisibleLabel ?? `Orden ${arm.applicationOrder}`;
+  return arm.studyArm?.label ?? arm.participantVisibleLabel ?? `Orden ${arm.applicationOrder}`;
 }
 
 function armLabelOrNull(arm: RotationArmSnapshot | null): string | null {
@@ -792,7 +792,7 @@ const confirmationDiagnosticSelect = {
             select: {
               applicationOrder: true,
               participantVisibleLabel: true,
-              studyArm: { select: { name: true } },
+              studyArm: { select: { label: true } },
               studyProduct: { select: { internalCode: true } }
             }
           },

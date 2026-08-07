@@ -203,6 +203,17 @@ describe("navigo folio diagnostic", () => {
     expect(pageSource).toContain('const canViewTechnicalDetail = actor.role === "ADMIN"');
     expect(pageSource).toContain("const includeTechnicalDetail = canViewTechnicalDetail && query.detalleTecnico === \"1\"");
   });
+
+  it("loads StudyArm labels with the current Prisma field", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src", "modules", "navigo-diagnostics", "folio-diagnostic.ts"),
+      "utf8"
+    );
+
+    expect(source).toContain("studyArm: { select: { label: true } }");
+    expect(source).not.toContain("studyArm: { select: { name: true } }");
+    expect(source).not.toContain("studyArm?.name");
+  });
 });
 
 function blockStatus(report: ReturnType<typeof buildFolioDiagnosticReport>, title: string) {
@@ -276,13 +287,13 @@ function completeSnapshot(overrides: Partial<FolioDiagnosticSnapshot> = {}): Fol
             {
               applicationOrder: 1,
               participantVisibleLabel: "Brazo izquierdo",
-              studyArm: { name: "Brazo izquierdo" },
+              studyArm: { label: "Brazo izquierdo" },
               studyProduct: { internalCode: "247" }
             },
             {
               applicationOrder: 2,
               participantVisibleLabel: "Brazo derecho",
-              studyArm: { name: "Brazo derecho" },
+              studyArm: { label: "Brazo derecho" },
               studyProduct: { internalCode: "583" }
             }
           ],
