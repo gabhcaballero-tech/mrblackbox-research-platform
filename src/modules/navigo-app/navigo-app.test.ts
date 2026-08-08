@@ -978,6 +978,100 @@ describe("navigo app MVP rules", () => {
     expect(state.reminderLogs).toHaveLength(1);
   });
 
+  it("permite reintento manual cuando el recordatorio previo fue cancelado", async () => {
+    const state = createNavigoParticipantImportState();
+    const whatsApp = createFakeNavigoWhatsAppRepository();
+    const repository = createNavigoAppRepository(state.prisma as never, whatsApp.repository);
+    seedDueNavigoReminderActivity(state, "T3_HORAS", new Date("2026-08-08T09:00:00.000Z"));
+    state.reminderLogs.push({
+      channel: "INTERNAL_FOLLOWUP",
+      id: "reminder-cancelled",
+      metadataJson: {
+        activityCode: "T3_HORAS",
+        reminderType: "NAVIGO_WHATSAPP_EVALUATION_REMINDER",
+        status: "FAILED"
+      },
+      participantActivityId: "activity-T3_HORAS",
+      scheduledFor: new Date("2026-08-08T09:00:00.000Z"),
+      sentAt: null,
+      status: "CANCELLED"
+    });
+    vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "phone-number-id");
+    const fetcher = vi.fn(async () => ({
+      json: async () => ({ messages: [{ id: "wamid-retry-cancelled", message_status: "accepted" }] }),
+      ok: true,
+      status: 200
+    }));
+    vi.stubGlobal("fetch", fetcher);
+
+    const result = await repository.sendEvaluationReminderNow({
+      actorUserId: "admin-1",
+      now: new Date("2026-08-08T09:05:00.000Z"),
+      participantActivityId: "activity-T3_HORAS",
+      requestOrigin: "https://example.test",
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(state.reminderLogs).toHaveLength(2);
+    expect(state.reminderLogs[1]).toMatchObject({
+      status: "COMPLETED"
+    });
+    expect(state.reminderLogs[1]?.metadataJson).toMatchObject({
+      adminUserId: "admin-1",
+      reminderType: "NAVIGO_WHATSAPP_EVALUATION_REMINDER",
+      source: "MANUAL_ADMIN",
+      status: "SENT"
+    });
+  });
+
+  it("permite reintento manual cuando existe intento fallido historico sin source", async () => {
+    const state = createNavigoParticipantImportState();
+    const whatsApp = createFakeNavigoWhatsAppRepository();
+    const repository = createNavigoAppRepository(state.prisma as never, whatsApp.repository);
+    seedDueNavigoReminderActivity(state, "T3_HORAS", new Date("2026-08-08T09:00:00.000Z"));
+    state.reminderLogs.push({
+      channel: "INTERNAL_FOLLOWUP",
+      id: "reminder-failed-legacy",
+      metadataJson: {
+        activityCode: "T3_HORAS",
+        reminderType: "NAVIGO_WHATSAPP_EVALUATION_REMINDER",
+        status: "FAILED"
+      },
+      participantActivityId: "activity-T3_HORAS",
+      scheduledFor: new Date("2026-08-08T09:00:00.000Z"),
+      sentAt: null,
+      status: "FAILED"
+    });
+    vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "phone-number-id");
+    const fetcher = vi.fn(async () => ({
+      json: async () => ({ messages: [{ id: "wamid-retry-failed", message_status: "accepted" }] }),
+      ok: true,
+      status: 200
+    }));
+    vi.stubGlobal("fetch", fetcher);
+
+    const result = await repository.sendEvaluationReminderNow({
+      actorUserId: "admin-1",
+      now: new Date("2026-08-08T09:05:00.000Z"),
+      participantActivityId: "activity-T3_HORAS",
+      requestOrigin: "https://example.test",
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(state.reminderLogs).toHaveLength(2);
+    expect(state.reminderLogs[1]?.metadataJson).toMatchObject({
+      reminderType: "NAVIGO_WHATSAPP_EVALUATION_REMINDER",
+      source: "MANUAL_ADMIN",
+      status: "SENT"
+    });
+  });
+
   it("envia solo la siguiente evaluacion pendiente cuando T3, T4.5 y T6 estan disponibles", async () => {
     const state = createNavigoParticipantImportState();
     const whatsApp = createFakeNavigoWhatsAppRepository();

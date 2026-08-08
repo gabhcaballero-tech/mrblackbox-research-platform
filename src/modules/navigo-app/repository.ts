@@ -4305,7 +4305,9 @@ async function sendNavigoEvaluationReminderForActivity({
   const activityCode = String(activity.activitySchedule.code) as NavigoActivityCode;
   const participant = activity.studyParticipant;
   const folio = participant.participantConfirmation?.folio ?? null;
-  const existingReminder = activity.reminders.some((log) => isNavigoEvaluationReminderLog(log.metadataJson, activityCode));
+  const existingReminder = activity.reminders.some((log) =>
+    log.status === "COMPLETED" && isNavigoEvaluationReminderLog(log.metadataJson, activityCode)
+  );
 
   if (existingReminder) {
     return {
