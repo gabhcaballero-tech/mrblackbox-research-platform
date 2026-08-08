@@ -231,15 +231,24 @@ export async function sendOneuiWhatsAppTemplate(input: {
     });
   }
 
+  const templatePayload: {
+    components?: OneuiWhatsAppTemplateComponent[];
+    language: { code: string };
+    name: string;
+  } = {
+    language: {
+      code: input.language
+    },
+    name: input.templateName
+  };
+
+  if (templateComponents.length > 0) {
+    templatePayload.components = templateComponents;
+  }
+
   const requestPayload = {
     messaging_product: "whatsapp",
-    template: {
-      components: templateComponents,
-      language: {
-        code: input.language
-      },
-      name: input.templateName
-    },
+    template: templatePayload,
     to: toPhone,
     type: "template"
   };

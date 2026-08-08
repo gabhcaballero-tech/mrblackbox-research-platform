@@ -409,7 +409,7 @@ describe("ONEUI WhatsApp template sending", () => {
     });
   });
 
-  it("arma payload de recordatorio Navigo con boton de enlace personal", async () => {
+  it("arma payload de recordatorio Navigo como plantilla simple sin parametros", async () => {
     const repository = createFakeRepository();
     const fetcher = viFetch({
       contacts: [{ wa_id: "5215512345678" }],
@@ -429,19 +429,10 @@ describe("ONEUI WhatsApp template sending", () => {
 
     expect(result.ok).toBe(true);
     expect(JSON.parse(fetcher.calls[0]?.init.body ?? "{}").template).toMatchObject({
-      components: [
-        {
-          index: "0",
-          parameters: [
-            { text: "https://example.test/p/token/activities", type: "text" }
-          ],
-          sub_type: "url",
-          type: "button"
-        }
-      ],
       language: { code: "es_MX" },
       name: "navigo_recordatorio_evaluacion"
     });
+    expect(JSON.parse(fetcher.calls[0]?.init.body ?? "{}").template).not.toHaveProperty("components");
     expect(repository.messages[0]).toMatchObject({
       bodyText: "Tu siguiente evaluacion ya se encuentra disponible.\n\nTe invitamos a realizarla ahora.",
       messageType: "template",

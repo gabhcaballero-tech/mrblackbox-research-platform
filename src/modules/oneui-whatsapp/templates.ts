@@ -238,7 +238,7 @@ export async function sendNavigoEvaluationReminderWhatsApp(input: {
 
   return sender({
     bodyText: buildNavigoEvaluationReminderWhatsAppBody(),
-    buttonUrl: input.evaluationUrl,
+    buttonUrl: null,
     env,
     language: env.WHATSAPP_NAVIGO_REMINDER_LANGUAGE ?? "es_MX",
     linkedParticipantId: input.participantId,

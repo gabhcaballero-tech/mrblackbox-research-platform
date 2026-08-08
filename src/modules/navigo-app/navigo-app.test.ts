@@ -941,16 +941,9 @@ describe("navigo app MVP rules", () => {
       status: "accepted"
     });
     expect((whatsApp.messages[0]?.rawPayload as { request?: { template?: unknown } }).request?.template).toMatchObject({
-      components: [
-        {
-          index: "0",
-          parameters: [{ text: "https://example.test/p/token-reminder/activities", type: "text" }],
-          sub_type: "url",
-          type: "button"
-        }
-      ],
       name: "navigo_recordatorio_evaluacion"
     });
+    expect((whatsApp.messages[0]?.rawPayload as { request?: { template?: unknown } }).request?.template).not.toHaveProperty("components");
   });
 
   it("no duplica recordatorios WhatsApp Navigo ya auditados", async () => {
