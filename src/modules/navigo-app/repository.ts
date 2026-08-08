@@ -64,6 +64,7 @@ import {
 } from "@/modules/hut/service";
 import {
   encryptHutPhaseCode,
+  generateHutPhaseCode,
   hashHutPhaseCode,
   hutPhaseForSlot,
   resolveHutPhaseCodeSecret,
@@ -255,6 +256,8 @@ export type NavigoHutRotationWorkbookPreviewRow = NavigoHutRotationWorkbookRowIn
   existingHutParticipant: boolean;
   existingHutSlot: boolean;
   hasHutProgress: boolean;
+  hutOrigin: "CLT_HUT" | "HUT_DIRECTO";
+  linkedNavigoFolio: string | null;
   linkedStudyParticipantId: string | null;
   rowNumber: number;
   updatable: boolean;
@@ -4109,7 +4112,15 @@ async function buildHutRotationWorkbookPreview({
   rows: NavigoHutRotationWorkbookPreviewRow[];
   summary: NavigoRotationWorkbookPreview["summary"]["hut"];
 }> {
-  const confirmations = await findConfirmationsByFolio({ prisma, rows, studyId });
+  const rowsWithNavigoFolio = rows.map((row) => ({
+    ...row,
+    linkedNavigoFolio: hutFolioToNavigoFolio(row.folio)
+  }));
+  const confirmations = await findConfirmationsByFolio({
+    prisma,
+    rows: rowsWithNavigoFolio.map((row) => ({ folio: row.linkedNavigoFolio ?? row.folio })),
+    studyId
+  });
   const hutParticipants = await findHutParticipantsByFolio({ folios: rows.map((row) => row.folio), prisma, studyId });
   const hutSlots = await findHutRegistrationSlotsByFolio({ folios: rows.map((row) => row.folio), prisma, studyId });
   const phaseCodeSecretReady = rows.length === 0 || Boolean(resolveHutPhaseCodeSecret());
@@ -4126,19 +4137,19 @@ async function buildHutRotationWorkbookPreview({
     seenFolios.add(row.folio);
   }
 
-  const previewRows = rows.map((row, index): NavigoHutRotationWorkbookPreviewRow => {
+  const previewRows = rowsWithNavigoFolio.map((row, index): NavigoHutRotationWorkbookPreviewRow => {
     const errors: string[] = [];
-    const confirmation = row.folio ? confirmations.get(row.folio) : null;
+    const confirmationFolio = row.linkedNavigoFolio ?? row.folio;
+    const confirmation = confirmationFolio ? confirmations.get(confirmationFolio) : null;
     const hutParticipant = row.folio ? hutParticipants.get(row.folio) ?? null : null;
     const hutSlot = row.folio ? hutSlots.get(row.folio) ?? null : null;
     const hasHutProgress = hutParticipant ? hutParticipantHasProgress(hutParticipant) : false;
+    const hutOrigin = confirmation ? "CLT_HUT" : "HUT_DIRECTO";
 
     if (!row.folio) {
       errors.push("folio HUT vacio");
     } else if (duplicateFolios.has(row.folio)) {
       errors.push("folio HUT duplicado dentro del archivo");
-    } else if (!confirmation) {
-      errors.push("folio HUT sin ParticipantConfirmation");
     }
     if (!row.hutEva1) {
       errors.push("EVA1 HUT vacia");
@@ -4150,7 +4161,7 @@ async function buildHutRotationWorkbookPreview({
       errors.push("falta configuracion segura para codigos HUT");
     }
     if (confirmation && participantStatus(confirmation.studyParticipant) !== "APPROVED") {
-      errors.push("participante no confirmado para HUT");
+      errors.push(`participante ${confirmationFolio} no confirmado para HUT`);
     }
     if (hutParticipant?.studyParticipantId && confirmation && hutParticipant.studyParticipantId !== confirmation.studyParticipant.id) {
       errors.push("participante HUT vinculado a otro StudyParticipant");
@@ -4168,6 +4179,8 @@ async function buildHutRotationWorkbookPreview({
       existingHutParticipant: Boolean(hutParticipant),
       existingHutSlot: Boolean(hutSlot),
       hasHutProgress,
+      hutOrigin,
+      linkedNavigoFolio: row.linkedNavigoFolio,
       linkedStudyParticipantId: hutParticipant?.studyParticipantId ?? confirmation?.studyParticipant.id ?? null,
       rowNumber: index + 2,
       updatable: errors.length === 0
@@ -4179,8 +4192,8 @@ async function buildHutRotationWorkbookPreview({
     summary: {
       existingParticipants: previewRows.filter((row) => row.existingHutParticipant).length,
       existingSlots: previewRows.filter((row) => row.existingHutSlot).length,
-      foundFolios: previewRows.filter((row) => row.folio && confirmations.has(row.folio)).length,
-      missingFolios: previewRows.filter((row) => row.errors.includes("folio HUT sin ParticipantConfirmation")).length,
+      foundFolios: previewRows.filter((row) => row.hutOrigin === "CLT_HUT").length,
+      missingFolios: previewRows.filter((row) => row.hutOrigin === "HUT_DIRECTO").length,
       rowsWithError: previewRows.filter((row) => row.errors.length > 0).length,
       totalRows: previewRows.length,
       updatable: previewRows.filter((row) => row.updatable).length,
@@ -4213,21 +4226,23 @@ async function applyHutRotationWorkbookRows({
     });
   }
 
-  const confirmations = await findConfirmationsByFolio({ prisma, rows, studyId });
+  const rowsWithNavigoFolio = rows.map((row) => ({
+    ...row,
+    linkedNavigoFolio: hutFolioToNavigoFolio(row.folio)
+  }));
+  const confirmations = await findConfirmationsByFolio({
+    prisma,
+    rows: rowsWithNavigoFolio.map((row) => ({ folio: row.linkedNavigoFolio ?? row.folio })),
+    studyId
+  });
   for (const row of rows) {
-    const confirmation = confirmations.get(row.folio);
-    if (!confirmation) {
-      throw new NavigoRotationApplyError({
-        folio: row.folio,
-        message: `No se encontro confirmacion para el folio HUT ${row.folio}.`,
-        step: "hut-confirmation"
-      });
-    }
+    const linkedNavigoFolio = hutFolioToNavigoFolio(row.folio);
+    const confirmation = confirmations.get(linkedNavigoFolio ?? row.folio) ?? null;
 
     const participant = await upsertHutParticipantFromWorkbookRow({
       prisma,
       row,
-      studyParticipant: confirmation.studyParticipant,
+      studyParticipant: confirmation?.studyParticipant ?? null,
       studyId
     });
 
@@ -4241,7 +4256,7 @@ async function applyHutRotationWorkbookRows({
     await ensureHutPhaseCodesForWorkbookParticipant({
       participant,
       prisma,
-      referenceCodes: confirmation.studyParticipant.participantConfirmation?.referenceCodes ?? []
+      referenceCodes: confirmation?.studyParticipant.participantConfirmation?.referenceCodes ?? []
     });
   }
 }
@@ -4255,9 +4270,9 @@ async function upsertHutParticipantFromWorkbookRow({
   prisma: NavigoTransactionClient;
   row: NavigoHutRotationWorkbookRowInput;
   studyId: string;
-  studyParticipant: ParticipantRecord;
+  studyParticipant: ParticipantRecord | null;
 }): Promise<HutParticipantWorkbookRecord> {
-  const existingByStudyParticipant = prisma.hutParticipant?.findFirst
+  const existingByStudyParticipant = studyParticipant && prisma.hutParticipant?.findFirst
     ? ((await prisma.hutParticipant.findFirst({
         select: hutParticipantWorkbookSelect,
         where: {
@@ -4281,10 +4296,12 @@ async function upsertHutParticipantFromWorkbookRow({
     const hasProgress = hutParticipantHasProgress(existing);
     const rotationDiffers = hutRotationDiffers(existing, row);
     const data: Record<string, unknown> = {
-      origin: "CLT_HUT",
-      protocolVersion: "APPLICATION_PHOTO",
-      studyParticipantId: existing.studyParticipantId ?? studyParticipant.id
+      origin: studyParticipant ? "CLT_HUT" : "HUT_DIRECTO",
+      protocolVersion: "APPLICATION_PHOTO"
     };
+    if (studyParticipant) {
+      data.studyParticipantId = existing.studyParticipantId ?? studyParticipant.id;
+    }
 
     if (!hasProgress || !rotationDiffers) {
       data.firstFragranceLeftArm = row.hutEva1;
@@ -4315,19 +4332,19 @@ async function upsertHutParticipantFromWorkbookRow({
     data: {
       currentBlockNumber: 1,
       currentVideoSequence: 1,
-      email: studyParticipant.participantProfile.email,
+      email: studyParticipant?.participantProfile.email ?? null,
       firstFragranceLeftArm: row.hutEva1,
       folio: row.folio,
-      name: studyParticipant.participantProfile.name,
-      origin: "CLT_HUT",
-      phone: studyParticipant.participantProfile.phone,
+      name: studyParticipant?.participantProfile.name ?? row.folio,
+      origin: studyParticipant ? "CLT_HUT" : "HUT_DIRECTO",
+      phone: studyParticipant?.participantProfile.phone ?? null,
       protocolVersion: "APPLICATION_PHOTO",
       recruiter: null,
       secondFragranceRightArm: row.hutEva2,
       startDate: null,
       status: "NOT_STARTED",
       studyId,
-      studyParticipantId: studyParticipant.id,
+      studyParticipantId: studyParticipant?.id ?? null,
       token: createHutParticipantToken()
     },
     select: hutParticipantWorkbookSelect
@@ -4413,19 +4430,12 @@ async function ensureHutPhaseCodesForWorkbookParticipant({
       continue;
     }
 
-    const source = referenceBySlot.get(slot);
-    if (!source?.code) {
-      throw new NavigoRotationApplyError({
-        folio: participant.folio ?? undefined,
-        message: `Falta codigo de referencia ${slot} para sincronizar HUT.`,
-        step: "hut-phase-code"
-      });
-    }
+    const code = referenceBySlot.get(slot)?.code ?? generateHutPhaseCode();
 
     await prisma.hutParticipantPhaseCode?.create?.({
       data: {
-        codeHash: hashHutPhaseCode(source.code, secret),
-        encryptedCode: encryptHutPhaseCode(source.code, secret),
+        codeHash: hashHutPhaseCode(code, secret),
+        encryptedCode: encryptHutPhaseCode(code, secret),
         encryptionVersion: 1,
         participantId: participant.id,
         phase,
@@ -4448,6 +4458,15 @@ function hutParticipantHasProgress(participant: HutParticipantWorkbookRecord): b
 
 function hutRotationDiffers(participant: HutParticipantWorkbookRecord, row: NavigoHutRotationWorkbookRowInput): boolean {
   return participant.firstFragranceLeftArm !== row.hutEva1 || participant.secondFragranceRightArm !== row.hutEva2;
+}
+
+function hutFolioToNavigoFolio(folio: string): string | null {
+  const match = normalizeNavigoFolio(folio).match(/^HUT-(\d+)$/);
+  if (!match?.[1]) {
+    return null;
+  }
+
+  return `NAV-${match[1].padStart(3, "0")}`;
 }
 
 function validateTriangularRotationRow(row: NavigoTriangularRotationLike): string[] {

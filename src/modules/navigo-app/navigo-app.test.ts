@@ -931,7 +931,7 @@ describe("navigo app MVP rules", () => {
     ]);
     expect(parsed.ok ? parsed.hutRows : []).toEqual([
       {
-        folio: "NAV-001",
+        folio: "HUT-001",
         hutEva1: "901",
         hutEva2: "902"
       }
@@ -1983,7 +1983,9 @@ describe("navigo app MVP rules", () => {
     expect(state.hutParticipants).toMatchObject([
       {
         firstFragranceLeftArm: "901",
-        folio: "NAV-001",
+        folio: "HUT-001",
+        origin: "CLT_HUT",
+        protocolVersion: "APPLICATION_PHOTO",
         secondFragranceRightArm: "902",
         status: "NOT_STARTED",
         studyParticipantId: state.participant.id
@@ -1992,7 +1994,7 @@ describe("navigo app MVP rules", () => {
     expect(state.hutRegistrationSlots).toMatchObject([
       {
         firstFragranceLeftArm: "901",
-        folio: "NAV-001",
+        folio: "HUT-001",
         secondFragranceRightArm: "902",
         status: "REGISTERED"
       }
@@ -2040,6 +2042,103 @@ describe("navigo app MVP rules", () => {
     expect(applied?.ok).toBe(true);
     expect(state.hutParticipants).toHaveLength(1);
     expect(state.hutRegistrationSlots).toHaveLength(1);
+    expect(state.hutParticipantPhaseCodes).toHaveLength(3);
+  });
+
+  it("links HUT folios to the equivalent NAV participant when present", async () => {
+    vi.stubEnv("HUT_PHASE_CODE_SECRET", "hut-phase-secret-for-tests");
+    const state = createNavigoRotationImportState({ participantFolio: "NAV-003" });
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const parsed = parseNavigoRotationWorkbook({
+      bytes: createMinimalRotationWorkbook({ cltFolio: "3", hutFolio: "HUT-003" }),
+      filename: "ROTACIONES NAVIGO.xlsx"
+    });
+
+    expect(parsed.ok).toBe(true);
+
+    const preview = parsed.ok
+      ? await repository.previewRotationWorkbookImport({
+          hutRows: parsed.hutRows,
+          rows: parsed.rows,
+          studyId: state.study.id
+        })
+      : null;
+
+    expect(preview?.ok ? preview.data.hutRows[0] : null).toMatchObject({
+      folio: "HUT-003",
+      hutOrigin: "CLT_HUT",
+      linkedNavigoFolio: "NAV-003",
+      linkedStudyParticipantId: state.participant.id
+    });
+
+    const applied = parsed.ok
+      ? await repository.applyRotationWorkbookImport({
+          actorUserId: "admin-1",
+          filename: "ROTACIONES NAVIGO.xlsx",
+          hutRows: parsed.hutRows,
+          rows: parsed.rows,
+          studyId: state.study.id
+        })
+      : null;
+
+    expect(applied?.ok).toBe(true);
+    expect(state.hutParticipants).toMatchObject([
+      {
+        folio: "HUT-003",
+        origin: "CLT_HUT",
+        protocolVersion: "APPLICATION_PHOTO",
+        studyParticipantId: state.participant.id
+      }
+    ]);
+  });
+
+  it("prepares direct HUT participants when the equivalent NAV participant does not exist", async () => {
+    vi.stubEnv("HUT_PHASE_CODE_SECRET", "hut-phase-secret-for-tests");
+    const state = createNavigoRotationImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const parsed = parseNavigoRotationWorkbook({
+      bytes: createMinimalRotationWorkbook({ hutFolio: "HUT-157" }),
+      filename: "ROTACIONES NAVIGO.xlsx"
+    });
+
+    expect(parsed.ok).toBe(true);
+
+    const preview = parsed.ok
+      ? await repository.previewRotationWorkbookImport({
+          hutRows: parsed.hutRows,
+          rows: parsed.rows,
+          studyId: state.study.id
+        })
+      : null;
+
+    expect(preview?.ok ? preview.data.hutRows[0] : null).toMatchObject({
+      errors: [],
+      folio: "HUT-157",
+      hutOrigin: "HUT_DIRECTO",
+      linkedNavigoFolio: "NAV-157",
+      linkedStudyParticipantId: null
+    });
+
+    const applied = parsed.ok
+      ? await repository.applyRotationWorkbookImport({
+          actorUserId: "admin-1",
+          filename: "ROTACIONES NAVIGO.xlsx",
+          hutRows: parsed.hutRows,
+          rows: parsed.rows,
+          studyId: state.study.id
+        })
+      : null;
+
+    expect(applied?.ok).toBe(true);
+    expect(state.hutParticipants).toMatchObject([
+      {
+        folio: "HUT-157",
+        name: "HUT-157",
+        origin: "HUT_DIRECTO",
+        protocolVersion: "APPLICATION_PHOTO",
+        studyParticipantId: null
+      }
+    ]);
     expect(state.hutParticipantPhaseCodes).toHaveLength(3);
   });
 
@@ -4329,10 +4428,12 @@ function createNavigoParticipantImportState(
 
 function createNavigoRotationImportState({
   failProductUpsert = false,
-  hutAccessAnswer = NAVIGO_HUT_ACCESS_YES_VALUE
+  hutAccessAnswer = NAVIGO_HUT_ACCESS_YES_VALUE,
+  participantFolio = "NAV-001"
 }: {
   failProductUpsert?: boolean;
   hutAccessAnswer?: string;
+  participantFolio?: string;
 } = {}) {
   const study = {
     code: NAVIGO_STUDY_CODE,
@@ -4359,7 +4460,7 @@ function createNavigoRotationImportState({
     id: "study-participant-1",
     participantConfirmation: {
       id: "confirmation-1",
-      folio: "NAV-001",
+      folio: participantFolio,
       referenceCodes: [
         { code: "CODE-1", slot: 1 },
         { code: "CODE-2", slot: 2 },
@@ -4455,8 +4556,10 @@ function createNavigoRotationImportState({
     folio: string | null;
     id: string;
     name: string;
+    origin: "CLT_HUT" | "HUT_DIRECTO";
     phone: string | null;
     phaseCodes: Array<{ id: string; phase: string; slot: number; status: string }>;
+    protocolVersion: "APPLICATION_PHOTO" | "LEGACY_VIDEO";
     secondFragranceRightArm: string | null;
     status: string;
     studyId: string;
@@ -4874,7 +4977,19 @@ function readWorkspaceFile(...segments: string[]) {
   return readFileSync(join(process.cwd(), ...segments), "utf8");
 }
 
-function createMinimalRotationWorkbook(): Buffer {
+function createMinimalRotationWorkbook({
+  cltFolio = "1",
+  hutFolio = "1"
+}: {
+  cltFolio?: string;
+  hutFolio?: string;
+} = {}): Buffer {
+  const cltFolioCell = /^\d+$/.test(cltFolio)
+    ? `<c r="A3"><v>${cltFolio}</v></c>`
+    : `<c r="A3" t="inlineStr"><is><t>${cltFolio}</t></is></c>`;
+  const hutFolioCell = /^\d+$/.test(hutFolio)
+    ? `<c r="A2"><v>${hutFolio}</v></c>`
+    : `<c r="A2" t="inlineStr"><is><t>${hutFolio}</t></is></c>`;
   const files = new Map([
     [
       "xl/workbook.xml",
@@ -4918,7 +5033,7 @@ function createMinimalRotationWorkbook(): Buffer {
         ].join(""),
         [
           '<row r="3">',
-          '<c r="A3"><v>1</v></c>',
+          cltFolioCell,
           '<c r="B3" t="inlineStr"><is><t>K-247</t></is></c>',
           '<c r="C3" t="inlineStr"><is><t>0-472</t></is></c>',
           '<c r="D3" t="inlineStr"><is><t>H-358</t></is></c>',
@@ -4949,7 +5064,7 @@ function createMinimalRotationWorkbook(): Buffer {
         ].join(""),
         [
           '<row r="2">',
-          '<c r="A2"><v>1</v></c>',
+          hutFolioCell,
           '<c r="B2"><v>901</v></c>',
           '<c r="C2"><v>902</v></c>',
           "</row>"

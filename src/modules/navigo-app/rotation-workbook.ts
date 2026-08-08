@@ -4,6 +4,7 @@ import { normalizeNavigoFolio, normalizeNavigoRotationCode, type NavigoRotationI
 const CLT_WORKBOOK_SHEET_NAME = "CLT";
 const HUT_WORKBOOK_SHEET_NAME = "HUT";
 const DEFAULT_FOLIO_PREFIX = "NAV";
+const HUT_FOLIO_PREFIX = "HUT";
 
 type WorkbookCellMap = Map<string, string>;
 
@@ -182,7 +183,7 @@ function parseHutWorkbookRows(
     }
 
     rows.push({
-      folio: normalizeWorkbookFolio(rawFolio),
+      folio: normalizeHutWorkbookFolio(rawFolio),
       hutEva1: normalizeNavigoRotationCode(rawEva1),
       hutEva2: normalizeNavigoRotationCode(rawEva2)
     });
@@ -415,6 +416,15 @@ function normalizeWorkbookFolio(value: string): string {
   const normalized = normalizeNavigoFolio(value);
   if (/^\d+$/.test(normalized)) {
     return `${DEFAULT_FOLIO_PREFIX}-${normalized.padStart(3, "0")}`;
+  }
+
+  return normalized;
+}
+
+function normalizeHutWorkbookFolio(value: string): string {
+  const normalized = normalizeNavigoFolio(value);
+  if (/^\d+$/.test(normalized)) {
+    return `${HUT_FOLIO_PREFIX}-${normalized.padStart(3, "0")}`;
   }
 
   return normalized;
