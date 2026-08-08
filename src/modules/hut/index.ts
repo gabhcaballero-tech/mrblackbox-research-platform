@@ -49,6 +49,8 @@ export type {
   HutQuestionnaireAttemptSummary,
   HutQuestionnaireProgressSummary,
   HutQuestionnaireState,
+  HutReservedNavReconciliationPreview,
+  HutReservedNavReconciliationRow,
   HutRegistrationSlotAdmin,
   HutPortalView
 } from "./repository";

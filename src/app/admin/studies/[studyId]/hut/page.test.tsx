@@ -34,6 +34,7 @@ vi.mock("@/modules/hut/actions", () => {
     deleteHutParticipantAction: action,
     markHutMissedDayAction: action,
     reactivateHutParticipantAction: action,
+    reconcileReservedHutNavParticipantsAction: action,
     reviewHutVisualVerificationAction: action,
     revokeHutPhaseCodeAction: action,
     resetHutCallEvaluationAction: action,
@@ -127,6 +128,54 @@ describe("HutAdminPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     requireCapabilityMock.mockResolvedValue({ id: "user-1", role: "ADMIN" });
+  });
+
+  it("muestra preview de reconciliacion HUT con NAV cuando hay folios aplicables", async () => {
+    getAdminDashboardMock.mockResolvedValue(
+      createDashboard({
+        reservedNavReconciliation: {
+          rows: [
+            {
+              canApply: true,
+              currentName: "HUT-121",
+              currentOrigin: "HUT_DIRECTO",
+              eva1: "247",
+              eva2: "583",
+              existingPhotoCount: 1,
+              existingPhaseCount: 3,
+              hutFolio: "HUT-121",
+              hutParticipantId: "hut-participant-121",
+              navEmail: "nav121@example.test",
+              navFolio: "NAV-121",
+              navName: "Participante NAV 121",
+              navPhone: "+525512312121",
+              navStudyParticipantId: "study-participant-121",
+              nextOrigin: "CLT_HUT",
+              reason: "Listo para reconciliar.",
+              registrationSlotId: "slot-121",
+              studyParticipantId: null
+            }
+          ],
+          summary: {
+            alreadyLinked: 0,
+            applicable: 1,
+            blocked: 0,
+            missingNav: 0,
+            missingSlot: 0,
+            total: 1
+          }
+        }
+      })
+    );
+
+    render(await HutAdminPage({ params: Promise.resolve({ studyId: "study-hut" }), searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole("heading", { name: "Reconciliar HUT con NAV" })).toBeInTheDocument();
+    expect(screen.getAllByText("HUT-121").length).toBeGreaterThan(0);
+    expect(screen.getByText("NAV-121")).toBeInTheDocument();
+    expect(screen.getByText("Participante NAV 121")).toBeInTheDocument();
+    expect(screen.getByText("Listo para reconciliar.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reconciliar HUT con NAV" })).toBeEnabled();
   });
 
   it("muestra resumen compacto, identidad colapsada y selfie habilitada cuando falta la selfie base", async () => {
@@ -587,6 +636,36 @@ type TestParticipant = {
 
 type TestDashboard = {
   participants: TestParticipant[];
+  reservedNavReconciliation: {
+    rows: Array<{
+      canApply: boolean;
+      currentName: string | null;
+      currentOrigin: "CLT_HUT" | "HUT_DIRECTO";
+      eva1: string | null;
+      eva2: string | null;
+      existingPhotoCount: number;
+      existingPhaseCount: number;
+      hutFolio: string;
+      hutParticipantId: string;
+      navEmail: string | null;
+      navFolio: string;
+      navName: string | null;
+      navPhone: string | null;
+      navStudyParticipantId: string | null;
+      nextOrigin: "CLT_HUT";
+      reason: string;
+      registrationSlotId: string | null;
+      studyParticipantId: string | null;
+    }>;
+    summary: {
+      alreadyLinked: number;
+      applicable: number;
+      blocked: number;
+      missingNav: number;
+      missingSlot: number;
+      total: number;
+    };
+  };
   registrationSlots: [];
   study: {
     code: string;
@@ -600,6 +679,17 @@ type TestDashboard = {
 function createDashboard(overrides?: Partial<TestDashboard>): TestDashboard {
   return {
     participants: [createParticipant()],
+    reservedNavReconciliation: {
+      rows: [],
+      summary: {
+        alreadyLinked: 0,
+        applicable: 0,
+        blocked: 0,
+        missingNav: 0,
+        missingSlot: 0,
+        total: 0
+      }
+    },
     registrationSlots: [],
     study: {
       code: "HUT-TEST",

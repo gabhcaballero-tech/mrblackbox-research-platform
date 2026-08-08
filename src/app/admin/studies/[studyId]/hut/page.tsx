@@ -9,6 +9,7 @@ import {
   deleteHutParticipantAction,
   markHutMissedDayAction,
   reactivateHutParticipantAction,
+  reconcileReservedHutNavParticipantsAction,
   reviewHutVisualVerificationAction,
   resetHutCallEvaluationAction,
   resetHutReferenceSelfieAction,
@@ -20,7 +21,12 @@ import {
   startHutBlockAction,
   syncHutParticipantProfileFromNavAction
 } from "@/modules/hut/actions";
-import { createHutRepository, type HutAdminParticipant, type HutRegistrationSlotAdmin } from "@/modules/hut";
+import {
+  createHutRepository,
+  type HutAdminParticipant,
+  type HutRegistrationSlotAdmin,
+  type HutReservedNavReconciliationPreview
+} from "@/modules/hut";
 import { normalizeWhatsAppRecipient } from "@/modules/oneui-whatsapp";
 import { SubmitButton } from "@/app/admin/_components/SubmitButton";
 import { requireCapability } from "@/shared/auth/session";
@@ -117,6 +123,8 @@ export default async function HutAdminPage({ params, searchParams }: HutAdminPag
         </div>
       </section>
 
+      <HutReservedNavReconciliationPanel preview={dashboard.reservedNavReconciliation} studyId={studyId} />
+
       <section className="mt-8 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
         <div className="border-b border-zinc-200 px-4 py-3">
           <h2 className="text-lg font-semibold text-zinc-950">Participantes HUT</h2>
@@ -147,6 +155,84 @@ export default async function HutAdminPage({ params, searchParams }: HutAdminPag
         )}
       </section>
     </AppShell>
+  );
+}
+
+function HutReservedNavReconciliationPanel({
+  preview,
+  studyId
+}: {
+  preview: HutReservedNavReconciliationPreview;
+  studyId: string;
+}) {
+  if (preview.summary.total === 0) {
+    return null;
+  }
+
+  return (
+    <section className="mt-8 rounded-lg border border-sky-200 bg-sky-50 p-5 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-sky-950">Reconciliar HUT con NAV</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-sky-900">
+            Herramienta segura para HUT-001 a HUT-156 que nacieron como HUT directo y ahora ya tienen NAV equivalente. El preview no cambia datos.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+            <span className="rounded-full bg-white px-2.5 py-1 text-sky-900">Total: {preview.summary.total}</span>
+            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-900">Aplicables: {preview.summary.applicable}</span>
+            <span className="rounded-full bg-white px-2.5 py-1 text-sky-900">Ya vinculados: {preview.summary.alreadyLinked}</span>
+            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-900">Pendiente NAV: {preview.summary.missingNav}</span>
+          </div>
+        </div>
+        <form action={reconcileReservedHutNavParticipantsAction.bind(null, studyId)} className="min-w-72 rounded-md border border-sky-200 bg-white p-3">
+          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            Confirmacion
+            <input className={inputClass} name="confirmation" placeholder="RECONCILIAR HUT" />
+          </label>
+          <div className="mt-3">
+            <SubmitButton disabled={preview.summary.applicable === 0} pendingLabel="Reconciliando...">
+              Reconciliar HUT con NAV
+            </SubmitButton>
+          </div>
+        </form>
+      </div>
+      <div className="mt-4 overflow-x-auto rounded-md border border-sky-100 bg-white">
+        <table className="min-w-full divide-y divide-zinc-200 text-left text-xs">
+          <thead className="bg-zinc-50 uppercase tracking-wide text-zinc-500">
+            <tr>
+              <th className="px-3 py-2">HUT</th>
+              <th className="px-3 py-2">NAV equivalente</th>
+              <th className="px-3 py-2">Origen actual</th>
+              <th className="px-3 py-2">Origen nuevo</th>
+              <th className="px-3 py-2">Nombre actual</th>
+              <th className="px-3 py-2">Nombre NAV</th>
+              <th className="px-3 py-2">EVA1/EVA2</th>
+              <th className="px-3 py-2">Fases</th>
+              <th className="px-3 py-2">Fotos</th>
+              <th className="px-3 py-2">Resultado</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-100">
+            {preview.rows.map((row) => (
+              <tr key={row.hutParticipantId}>
+                <td className="whitespace-nowrap px-3 py-2 font-semibold text-zinc-950">{row.hutFolio}</td>
+                <td className="whitespace-nowrap px-3 py-2">{row.navFolio}</td>
+                <td className="whitespace-nowrap px-3 py-2">{row.currentOrigin}</td>
+                <td className="whitespace-nowrap px-3 py-2">{row.nextOrigin}</td>
+                <td className="px-3 py-2">{row.currentName ?? "-"}</td>
+                <td className="px-3 py-2">{row.navName ?? "-"}</td>
+                <td className="whitespace-nowrap px-3 py-2">{row.eva1 ?? "-"} / {row.eva2 ?? "-"}</td>
+                <td className="whitespace-nowrap px-3 py-2">{row.existingPhaseCount}</td>
+                <td className="whitespace-nowrap px-3 py-2">{row.existingPhotoCount}</td>
+                <td className={row.canApply ? "px-3 py-2 font-semibold text-emerald-700" : "px-3 py-2 text-zinc-600"}>
+                  {row.reason}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

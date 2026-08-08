@@ -287,8 +287,42 @@ export type HutIdentityReviewSummary = {
 
 export type HutAdminDashboard = {
   participants: HutAdminParticipant[];
+  reservedNavReconciliation: HutReservedNavReconciliationPreview;
   registrationSlots: HutRegistrationSlotAdmin[];
   study: HutStudySummary;
+};
+
+export type HutReservedNavReconciliationRow = {
+  canApply: boolean;
+  currentName: string | null;
+  currentOrigin: "CLT_HUT" | "HUT_DIRECTO";
+  eva1: string | null;
+  eva2: string | null;
+  existingPhotoCount: number;
+  existingPhaseCount: number;
+  hutFolio: string;
+  hutParticipantId: string;
+  navEmail: string | null;
+  navFolio: string;
+  navName: string | null;
+  navPhone: string | null;
+  navStudyParticipantId: string | null;
+  nextOrigin: "CLT_HUT";
+  reason: string;
+  registrationSlotId: string | null;
+  studyParticipantId: string | null;
+};
+
+export type HutReservedNavReconciliationPreview = {
+  rows: HutReservedNavReconciliationRow[];
+  summary: {
+    alreadyLinked: number;
+    applicable: number;
+    blocked: number;
+    missingNav: number;
+    missingSlot: number;
+    total: number;
+  };
 };
 
 export type HutRegistrationView = {
@@ -429,6 +463,16 @@ export type HutRepository = {
     participantId: string;
     phone: string | null;
   }>>;
+  previewReservedHutNavReconciliation: (input: {
+    studyId: string;
+  }) => Promise<HutActionResult<HutReservedNavReconciliationPreview>>;
+  reconcileReservedHutNavParticipants: (input: {
+    confirmation: string;
+    studyId: string;
+  }) => Promise<HutActionResult<{ skipped: number; updated: number }>>;
+  reconcileReservedHutParticipantForStudyParticipant: (input: {
+    studyParticipantId: string;
+  }) => Promise<HutActionResult<{ hutFolio: string | null; participantId: string | null; updated: boolean }>>;
   resetReferenceSelfie: (input: {
     confirmation: string;
     participantId: string;
@@ -793,6 +837,20 @@ type HutParticipantConfirmationCodeSourceRecord = {
   studyId: string;
 };
 
+type HutNavReconciliationConfirmationRecord = {
+  folio: string;
+  id: string;
+  studyId: string;
+  studyParticipant: {
+    id: string;
+    participantProfile: {
+      email: string | null;
+      name: string;
+      phone: string | null;
+    };
+  };
+};
+
 type HutDailyCheckRecord = {
   blockId: string;
   blockDayNumber: number;
@@ -1003,9 +1061,12 @@ const participantSelect = {
   },
   registrationSlot: {
     select: {
+      firstFragranceLeftArm: true,
       folio: true,
       id: true,
+      participantId: true,
       registrationToken: true,
+      secondFragranceRightArm: true,
       status: true
     }
   },
@@ -1456,11 +1517,13 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         select: registrationSlotSelect,
         where: { studyId: input.studyId }
       })) as HutRegistrationSlotRecord[];
+      const reservedNavReconciliation = await buildReservedHutNavReconciliationPreview(prisma, input.studyId);
 
       return {
         participants: await Promise.all(
         participants.map((participant) => toAdminParticipant(participant, input.requestOrigin, input.storage, getWhatsAppRepository()))
         ),
+        reservedNavReconciliation,
         registrationSlots: registrationSlots.map((slot) => toAdminRegistrationSlot(slot, input.requestOrigin)),
         study
       };
@@ -2032,6 +2095,110 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
             phone: profileData.phone
           },
           message: "Datos HUT sincronizados desde el participante NAV vinculado.",
+          ok: true
+        };
+      });
+    },
+
+    async previewReservedHutNavReconciliation(input) {
+      const prisma = await getPrisma();
+      const preview = await buildReservedHutNavReconciliationPreview(prisma, input.studyId);
+
+      return {
+        data: preview,
+        ok: true
+      };
+    },
+
+    async reconcileReservedHutNavParticipants(input) {
+      if (normalizeHutText(input.confirmation) !== "RECONCILIAR HUT") {
+        return { message: "Escribe RECONCILIAR HUT para aplicar la reconciliacion.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const preview = await buildReservedHutNavReconciliationPreview(tx, input.studyId);
+        const rows = preview.rows.filter((row) => row.canApply);
+
+        for (const row of rows) {
+          await tx.hutParticipant.update?.({
+            data: {
+              email: row.navEmail,
+              name: row.navName ?? row.currentName ?? row.hutFolio,
+              origin: row.nextOrigin,
+              phone: row.navPhone,
+              studyParticipantId: row.navStudyParticipantId
+            },
+            where: { id: row.hutParticipantId }
+          });
+        }
+
+        return {
+          data: {
+            skipped: preview.rows.length - rows.length,
+            updated: rows.length
+          },
+          message: `Reconciliacion HUT completada. Actualizados: ${rows.length}. Omitidos: ${preview.rows.length - rows.length}.`,
+          ok: true
+        };
+      });
+    },
+
+    async reconcileReservedHutParticipantForStudyParticipant(input) {
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const confirmation = (await tx.participantConfirmation.findFirst?.({
+          select: {
+            folio: true,
+            studyId: true
+          },
+          where: { studyParticipantId: input.studyParticipantId }
+        })) as { folio: string; studyId: string } | null;
+
+        if (!confirmation) {
+          return {
+            data: { hutFolio: null, participantId: null, updated: false },
+            message: "El participante NAV aun no tiene folio confirmado.",
+            ok: true
+          };
+        }
+
+        const hutFolio = navFolioToReservedHutFolio(confirmation.folio);
+        if (!hutFolio) {
+          return {
+            data: { hutFolio: null, participantId: null, updated: false },
+            message: "El folio NAV no corresponde al rango HUT reservado.",
+            ok: true
+          };
+        }
+
+        const preview = await buildReservedHutNavReconciliationPreview(tx, confirmation.studyId, [hutFolio]);
+        const row = preview.rows.find((item) => item.hutFolio === hutFolio) ?? null;
+
+        if (!row || !row.canApply) {
+          return {
+            data: { hutFolio, participantId: row?.hutParticipantId ?? null, updated: false },
+            message: row?.reason ?? "No hay HUT reservado para reconciliar.",
+            ok: true
+          };
+        }
+
+        await tx.hutParticipant.update?.({
+          data: {
+            email: row.navEmail,
+            name: row.navName ?? row.currentName ?? row.hutFolio,
+            origin: row.nextOrigin,
+            phone: row.navPhone,
+            studyParticipantId: row.navStudyParticipantId
+          },
+          where: { id: row.hutParticipantId }
+        });
+
+        return {
+          data: { hutFolio, participantId: row.hutParticipantId, updated: true },
+          message: "HUT reservado reconciliado con participante NAV.",
           ok: true
         };
       });
@@ -4535,6 +4702,241 @@ function isLegacyVideoProtocol(participant: Pick<HutParticipantRecord, "protocol
 
 function participantOrigin(participant: Pick<HutParticipantRecord, "origin" | "studyId"> & { studyParticipantId?: string | null }): "CLT_HUT" | "HUT_DIRECTO" {
   return participant.origin ?? (participant.studyParticipantId ? "CLT_HUT" : "HUT_DIRECTO");
+}
+
+const RESERVED_HUT_NAV_MIN_NUMBER = 1;
+const RESERVED_HUT_NAV_MAX_NUMBER = 156;
+
+function hutFolioToReservedNavFolio(folio: string | null | undefined): string | null {
+  const match = normalizeHutText(folio).match(/^HUT-(\d{3})$/);
+  if (!match) {
+    return null;
+  }
+
+  const folioNumber = Number(match[1]);
+  if (folioNumber < RESERVED_HUT_NAV_MIN_NUMBER || folioNumber > RESERVED_HUT_NAV_MAX_NUMBER) {
+    return null;
+  }
+
+  return `NAV-${match[1]}`;
+}
+
+function navFolioToReservedHutFolio(folio: string | null | undefined): string | null {
+  const match = normalizeHutText(folio).match(/^NAV-(\d{3})$/);
+  if (!match) {
+    return null;
+  }
+
+  const folioNumber = Number(match[1]);
+  if (folioNumber < RESERVED_HUT_NAV_MIN_NUMBER || folioNumber > RESERVED_HUT_NAV_MAX_NUMBER) {
+    return null;
+  }
+
+  return `HUT-${match[1]}`;
+}
+
+async function buildReservedHutNavReconciliationPreview(
+  prisma: HutPrismaClient,
+  studyId: string,
+  hutFolios?: string[]
+): Promise<HutReservedNavReconciliationPreview> {
+  const normalizedHutFolios = hutFolios?.map((folio) => normalizeHutText(folio)).filter(Boolean) ?? null;
+  const participants = (await prisma.hutParticipant.findMany?.({
+    orderBy: [{ folio: "asc" }],
+    select: participantSelect,
+    where: {
+      qaParticipantRun: { is: null },
+      ...(normalizedHutFolios ? { folio: { in: normalizedHutFolios } } : {}),
+      studyId
+    }
+  })) as HutParticipantRecord[];
+  const reservedParticipants = participants.filter((participant) => hutFolioToReservedNavFolio(participant.folio));
+  const navFolios = reservedParticipants
+    .map((participant) => hutFolioToReservedNavFolio(participant.folio))
+    .filter((folio): folio is string => Boolean(folio));
+  const confirmations = await findHutNavReconciliationConfirmations(prisma, studyId, navFolios);
+  const slots = await findHutRegistrationSlotsForReconciliation(
+    prisma,
+    studyId,
+    reservedParticipants.map((participant) => normalizeHutText(participant.folio))
+  );
+  const studyParticipantUsage = new Map<string, string[]>();
+
+  for (const participant of participants) {
+    if (!participant.studyParticipantId) {
+      continue;
+    }
+    const participantIds = studyParticipantUsage.get(participant.studyParticipantId) ?? [];
+    participantIds.push(participant.id);
+    studyParticipantUsage.set(participant.studyParticipantId, participantIds);
+  }
+
+  const rows = reservedParticipants.map((participant): HutReservedNavReconciliationRow => {
+    const hutFolio = normalizeHutText(participant.folio);
+    const navFolio = hutFolioToReservedNavFolio(participant.folio) ?? "";
+    const confirmation = confirmations.get(navFolio) ?? null;
+    const navStudyParticipantId = confirmation?.studyParticipant.id ?? null;
+    const slot = participant.registrationSlot ?? slots.get(hutFolio) ?? null;
+    const currentOrigin = participantOrigin(participant);
+    const hasDifferentLinkedStudyParticipant = Boolean(
+      participant.studyParticipantId && navStudyParticipantId && participant.studyParticipantId !== navStudyParticipantId
+    );
+    const linkedParticipantsForNav = navStudyParticipantId ? studyParticipantUsage.get(navStudyParticipantId) ?? [] : [];
+    const hasOtherHutParticipantForNav = linkedParticipantsForNav.some((participantId) => participantId !== participant.id);
+    const hasSlotParticipantConflict = Boolean(slot?.participantId && slot.participantId !== participant.id);
+    const alreadyLinked = currentOrigin === "CLT_HUT" && participant.studyParticipantId === navStudyParticipantId && Boolean(navStudyParticipantId);
+    const missingNav = !confirmation;
+    const missingSlot = !slot;
+    const canApply =
+      !alreadyLinked &&
+      !missingNav &&
+      !missingSlot &&
+      !hasDifferentLinkedStudyParticipant &&
+      !hasOtherHutParticipantForNav &&
+      !hasSlotParticipantConflict;
+    const reason = reconciliationReason({
+      alreadyLinked,
+      canApply,
+      hasDifferentLinkedStudyParticipant,
+      hasOtherHutParticipantForNav,
+      hasSlotParticipantConflict,
+      missingNav,
+      missingSlot
+    });
+
+    return {
+      canApply,
+      currentName: participant.name ?? null,
+      currentOrigin,
+      eva1: participant.firstFragranceLeftArm ?? slot?.firstFragranceLeftArm ?? null,
+      eva2: participant.secondFragranceRightArm ?? slot?.secondFragranceRightArm ?? null,
+      existingPhotoCount: (participant.applicationEvidence?.length ?? 0) + (participant.applicationPhotoEntries?.length ?? 0),
+      existingPhaseCount: participant.phaseCodes?.length ?? 0,
+      hutFolio,
+      hutParticipantId: participant.id,
+      navEmail: confirmation?.studyParticipant.participantProfile.email ?? null,
+      navFolio,
+      navName: confirmation?.studyParticipant.participantProfile.name ?? null,
+      navPhone: confirmation?.studyParticipant.participantProfile.phone ?? null,
+      navStudyParticipantId,
+      nextOrigin: "CLT_HUT",
+      reason,
+      registrationSlotId: slot?.id ?? null,
+      studyParticipantId: participant.studyParticipantId ?? null
+    };
+  });
+
+  return {
+    rows,
+    summary: {
+      alreadyLinked: rows.filter((row) => row.reason === "Ya vinculado correctamente.").length,
+      applicable: rows.filter((row) => row.canApply).length,
+      blocked: rows.filter((row) => !row.canApply).length,
+      missingNav: rows.filter((row) => row.reason === "Pendiente NAV equivalente.").length,
+      missingSlot: rows.filter((row) => row.reason === "Falta HutRegistrationSlot.").length,
+      total: rows.length
+    }
+  };
+}
+
+async function findHutNavReconciliationConfirmations(
+  prisma: HutPrismaClient,
+  studyId: string,
+  folios: string[]
+): Promise<Map<string, HutNavReconciliationConfirmationRecord>> {
+  const uniqueFolios = [...new Set(folios.filter(Boolean))];
+  if (uniqueFolios.length === 0) {
+    return new Map();
+  }
+
+  const confirmations = (await prisma.participantConfirmation.findMany?.({
+    select: {
+      folio: true,
+      id: true,
+      studyId: true,
+      studyParticipant: {
+        select: {
+          id: true,
+          participantProfile: {
+            select: {
+              email: true,
+              name: true,
+              phone: true
+            }
+          }
+        }
+      }
+    },
+    where: {
+      folio: { in: uniqueFolios },
+      studyId
+    }
+  })) as HutNavReconciliationConfirmationRecord[];
+
+  return new Map(confirmations.map((confirmation) => [confirmation.folio, confirmation]));
+}
+
+async function findHutRegistrationSlotsForReconciliation(
+  prisma: HutPrismaClient,
+  studyId: string,
+  folios: string[]
+): Promise<Map<string, HutRegistrationSlotRecord>> {
+  const uniqueFolios = [...new Set(folios.filter(Boolean))];
+  if (uniqueFolios.length === 0) {
+    return new Map();
+  }
+
+  const slots = (await prisma.hutRegistrationSlot.findMany?.({
+    select: registrationSlotSelect,
+    where: {
+      folio: { in: uniqueFolios },
+      studyId
+    }
+  })) as HutRegistrationSlotRecord[];
+
+  return new Map(slots.map((slot) => [slot.folio, slot]));
+}
+
+function reconciliationReason({
+  alreadyLinked,
+  canApply,
+  hasDifferentLinkedStudyParticipant,
+  hasOtherHutParticipantForNav,
+  hasSlotParticipantConflict,
+  missingNav,
+  missingSlot
+}: {
+  alreadyLinked: boolean;
+  canApply: boolean;
+  hasDifferentLinkedStudyParticipant: boolean;
+  hasOtherHutParticipantForNav: boolean;
+  hasSlotParticipantConflict: boolean;
+  missingNav: boolean;
+  missingSlot: boolean;
+}): string {
+  if (canApply) {
+    return "Listo para reconciliar.";
+  }
+  if (alreadyLinked) {
+    return "Ya vinculado correctamente.";
+  }
+  if (missingNav) {
+    return "Pendiente NAV equivalente.";
+  }
+  if (missingSlot) {
+    return "Falta HutRegistrationSlot.";
+  }
+  if (hasDifferentLinkedStudyParticipant) {
+    return "Conflicto: HUT vinculado a otro StudyParticipant.";
+  }
+  if (hasOtherHutParticipantForNav) {
+    return "Conflicto: otro HUT ya usa el StudyParticipant NAV.";
+  }
+  if (hasSlotParticipantConflict) {
+    return "Conflicto: el slot HUT pertenece a otro participante.";
+  }
+
+  return "No aplicable.";
 }
 
 function linkedNavProfileData(

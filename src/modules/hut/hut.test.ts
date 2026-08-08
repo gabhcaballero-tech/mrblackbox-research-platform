@@ -159,6 +159,186 @@ describe("HUT module foundation", () => {
     expect(participant.phaseCodes).toHaveLength(1);
   });
 
+  it("reconciles a reserved HUT folio with its NAV equivalent without losing phases or evidence", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const slot = await repository.createRegistrationSlot({
+      firstFragranceLeftArm: "247",
+      folio: "HUT-121",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const created = await repository.createParticipant({
+      name: "HUT-121",
+      requestOrigin: "https://example.com",
+      slotId: slot.ok ? slot.data.slotId : "",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0];
+    const confirmation = confirmationWithCodes("NAV-121");
+    confirmation.studyParticipant.participantProfile = {
+      email: "nav121@example.test",
+      name: "Participante NAV 121",
+      phone: "+525512312121"
+    };
+    prisma.state.confirmations.push(confirmation);
+
+    expect(created.ok).toBe(true);
+    expect(participant).toBeDefined();
+    if (!participant) {
+      throw new Error("missing test participant");
+    }
+
+    participant.phaseCodes.push({
+      codeHash: "hash-1",
+      encryptedCode: "encrypted-1",
+      id: "phase-1",
+      participantId: participant.id,
+      phase: "COLOCACION",
+      slot: 1,
+      status: "GENERATED"
+    });
+    participant.applicationEvidence.push({
+      capturedAt: new Date("2026-08-08T12:00:00.000Z"),
+      extension: "jpg",
+      id: "evidence-1",
+      mimeType: "image/jpeg",
+      originalFilename: "foto.jpg",
+      participantId: participant.id,
+      phase: "COLOCACION",
+      privateStorageKey: "hut/evidence.jpg",
+      productCode: "247",
+      sizeBytes: 1024,
+      storageBucket: "participant-evidence"
+    });
+    participant.applicationPhotoEntries.push({
+      capturedAt: new Date("2026-08-08T12:00:00.000Z"),
+      capturedLocalDate: "2026-08-08",
+      capturedLocalTimezone: "America/Mexico_City",
+      id: "photo-1",
+      participantId: participant.id,
+      privateStorageKey: "hut/photo.jpg",
+      productCode: "247",
+      useDayNumber: 1
+    });
+
+    const preview = await repository.previewReservedHutNavReconciliation({ studyId: "study-hut" });
+    expect(preview.ok ? preview.data.rows[0] : null).toMatchObject({
+      canApply: true,
+      existingPhaseCount: 1,
+      existingPhotoCount: 2,
+      hutFolio: "HUT-121",
+      navFolio: "NAV-121",
+      navName: "Participante NAV 121"
+    });
+
+    const result = await repository.reconcileReservedHutNavParticipants({
+      confirmation: "RECONCILIAR HUT",
+      studyId: "study-hut"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(participant).toMatchObject({
+      email: "nav121@example.test",
+      firstFragranceLeftArm: "247",
+      folio: "HUT-121",
+      name: "Participante NAV 121",
+      origin: "CLT_HUT",
+      phone: "+525512312121",
+      secondFragranceRightArm: "583",
+      studyParticipantId: "study-participant-NAV-121"
+    });
+    expect(participant.phaseCodes).toHaveLength(1);
+    expect(participant.applicationEvidence).toHaveLength(1);
+    expect(participant.applicationPhotoEntries).toHaveLength(1);
+    expect(prisma.state.registrationSlots[0]).toMatchObject({
+      firstFragranceLeftArm: "247",
+      folio: "HUT-121",
+      participantId: participant.id,
+      secondFragranceRightArm: "583",
+      status: "REGISTERED"
+    });
+  });
+
+  it("does not reconcile a reserved HUT folio without NAV equivalent", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const slot = await repository.createRegistrationSlot({
+      firstFragranceLeftArm: "247",
+      folio: "HUT-123",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    await repository.createParticipant({
+      name: "HUT-123",
+      requestOrigin: "https://example.com",
+      slotId: slot.ok ? slot.data.slotId : "",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0];
+
+    const preview = await repository.previewReservedHutNavReconciliation({ studyId: "study-hut" });
+    expect(preview.ok ? preview.data.rows[0] : null).toMatchObject({
+      canApply: false,
+      hutFolio: "HUT-123",
+      navFolio: "NAV-123",
+      reason: "Pendiente NAV equivalente."
+    });
+
+    const result = await repository.reconcileReservedHutNavParticipants({
+      confirmation: "RECONCILIAR HUT",
+      studyId: "study-hut"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.updated : 0).toBe(0);
+    expect(participant).toMatchObject({
+      name: "HUT-123",
+      origin: "HUT_DIRECTO",
+      studyParticipantId: null
+    });
+  });
+
+  it("automatically reconciles a reserved HUT folio when the NAV participant appears", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const slot = await repository.createRegistrationSlot({
+      firstFragranceLeftArm: "247",
+      folio: "HUT-115",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    await repository.createParticipant({
+      name: "HUT-115",
+      requestOrigin: "https://example.com",
+      slotId: slot.ok ? slot.data.slotId : "",
+      studyId: "study-hut"
+    });
+    const confirmation = confirmationWithCodes("NAV-115");
+    prisma.state.confirmations.push(confirmation);
+
+    const result = await repository.reconcileReservedHutParticipantForStudyParticipant({
+      studyParticipantId: confirmation.studyParticipant.id
+    });
+
+    expect(result).toMatchObject({
+      data: {
+        hutFolio: "HUT-115",
+        participantId: prisma.state.participants[0]?.id,
+        updated: true
+      },
+      ok: true
+    });
+    expect(prisma.state.participants[0]).toMatchObject({
+      name: "Participante NAV-115",
+      origin: "CLT_HUT",
+      studyParticipantId: confirmation.studyParticipant.id
+    });
+  });
+
   it("defines an optional StudyParticipant link for HUT participants", () => {
     const schema = readWorkspaceFile("prisma", "schema.prisma");
     const migration = readWorkspaceFile(
@@ -2503,11 +2683,21 @@ function createFakeHutPrisma() {
       }
     },
     participantConfirmation: {
-      async findFirst(args: { where: { folio: string; studyId: string } }) {
+      async findFirst(args: { where: { folio?: string; studyId?: string; studyParticipantId?: string } }) {
         return (
           state.confirmations.find(
-            (confirmation) => confirmation.folio === args.where.folio && confirmation.studyId === args.where.studyId
+            (confirmation) =>
+              (!args.where.folio || confirmation.folio === args.where.folio) &&
+              (!args.where.studyId || confirmation.studyId === args.where.studyId) &&
+              (!args.where.studyParticipantId || confirmation.studyParticipant.id === args.where.studyParticipantId)
           ) ?? null
+        );
+      },
+      async findMany(args: { where: { folio?: { in: string[] }; studyId: string } }) {
+        return state.confirmations.filter(
+          (confirmation) =>
+            confirmation.studyId === args.where.studyId &&
+            (!args.where.folio?.in.length || args.where.folio.in.includes(confirmation.folio))
         );
       }
     },
@@ -2515,6 +2705,7 @@ function createFakeHutPrisma() {
       async create(args: { data: Partial<FakeParticipant> }) {
         const participant: FakeParticipant = {
           applicationEvidence: [],
+          applicationPhotoEntries: [],
           blocks: [],
           callEvaluations: [],
           currentBlockNumber: Number(args.data.currentBlockNumber ?? 1),
@@ -2538,7 +2729,7 @@ function createFakeHutPrisma() {
           study: state.study,
           studyId: String(args.data.studyId),
           studyParticipant: null,
-          studyParticipantId: null,
+          studyParticipantId: (args.data.studyParticipantId as string | null) ?? null,
           testMode: Boolean(args.data.testMode ?? false),
           token: String(args.data.token),
           visualOverrideEnabled: false,
@@ -2577,6 +2768,14 @@ function createFakeHutPrisma() {
         const participant = state.participants.find((item) => item.id === args.where.id);
         if (participant) {
           Object.assign(participant, args.data);
+          if (args.data.studyParticipantId) {
+            const confirmation = state.confirmations.find((item) => item.studyParticipant.id === args.data.studyParticipantId);
+            participant.studyParticipant = confirmation
+              ? {
+                  participantProfile: confirmation.studyParticipant.participantProfile
+                }
+              : participant.studyParticipant;
+          }
         }
         return participant;
       },
@@ -3050,6 +3249,7 @@ function createFakeHutPrisma() {
 
 type FakeParticipant = {
   applicationEvidence: FakeApplicationEvidence[];
+  applicationPhotoEntries: FakeApplicationPhotoEntry[];
   blocks: FakeBlock[];
   callEvaluations: FakeCall[];
   currentBlockNumber: number;
@@ -3167,6 +3367,15 @@ type FakeParticipantConfirmation = {
   id: string;
   referenceCodes: Array<{ code: string; slot: number }>;
   studyId: string;
+  studyParticipant: {
+    id: string;
+    participantConfirmation?: FakeParticipantConfirmation;
+    participantProfile: {
+      email: string | null;
+      name: string;
+      phone: string | null;
+    };
+  };
 };
 
 type FakeHutPhaseCode = {
@@ -3297,7 +3506,7 @@ function referenceSelfie(): FakeReferenceSelfie {
 }
 
 function confirmationWithCodes(folio: string): FakeParticipantConfirmation {
-  return {
+  const confirmation: FakeParticipantConfirmation = {
     folio,
     id: `confirmation-${folio}`,
     referenceCodes: [
@@ -3305,7 +3514,21 @@ function confirmationWithCodes(folio: string): FakeParticipantConfirmation {
       { code: "M3P9", slot: 2 },
       { code: "T8R2", slot: 3 }
     ],
-    studyId: "study-hut"
+    studyId: "study-hut",
+    studyParticipant: {
+      id: `study-participant-${folio}`,
+      participantProfile: {
+        email: `${folio.toLowerCase()}@example.com`,
+        name: `Participante ${folio}`,
+        phone: "+525500000000"
+      }
+    }
+  };
+
+  confirmation.studyParticipant.participantConfirmation = confirmation;
+
+  return {
+    ...confirmation
   };
 }
 

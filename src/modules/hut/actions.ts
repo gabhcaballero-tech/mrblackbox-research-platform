@@ -94,6 +94,16 @@ export async function syncHutParticipantProfileFromNavAction(studyId: string, pa
   redirectWithHutMessage(studyId, result, participantId);
 }
 
+export async function reconcileReservedHutNavParticipantsAction(studyId: string, formData: FormData) {
+  await requireCapability("screening:review");
+  const result = await createHutRepository().reconcileReservedHutNavParticipants({
+    confirmation: String(formData.get("confirmation") ?? ""),
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result);
+}
+
 export async function sendHutRegistrationWhatsAppAction(studyId: string, participantId: string, formData: FormData) {
   await requireCapability("screening:review");
   const result = await createHutRepository().sendRegistrationWhatsApp({
