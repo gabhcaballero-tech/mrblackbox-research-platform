@@ -43,7 +43,12 @@ export type {
   HutActionResult,
   HutAdminDashboard,
   HutAdminParticipant,
+  HutApplicationPhotoDailyAvailability,
+  HutApplicationPhotoEntrySummary,
   HutPhaseCodeSummary,
+  HutQuestionnaireAttemptSummary,
+  HutQuestionnaireProgressSummary,
+  HutQuestionnaireState,
   HutRegistrationSlotAdmin,
   HutPortalView
 } from "./repository";

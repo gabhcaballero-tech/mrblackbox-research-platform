@@ -249,6 +249,226 @@ describe("HUT module foundation", () => {
     });
   });
 
+  it("creates HUT v5 questionnaire attempts idempotently for application photo participants", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await repository.createParticipant({
+      firstFragranceLeftArm: "247",
+      folio: "NAV-HUT-V5-001",
+      name: "Participante HUT V5",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    expect(participant.ok).toBe(true);
+    const participantId = participant.ok ? participant.data.participantId : "";
+
+    const first = await repository.ensureQuestionnaireAttempt({ participantId, studyId: "study-hut" });
+    const second = await repository.ensureQuestionnaireAttempt({ participantId, studyId: "study-hut" });
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    expect(first.ok && second.ok ? first.data.id : null).toBe(second.ok ? second.data.id : null);
+    expect(prisma.state.questionnaireAttempts).toHaveLength(1);
+    expect(prisma.state.participants[0]?.blocks).toHaveLength(0);
+  });
+
+  it("tracks HUT v5 progress by questionnaire section", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await repository.createParticipant({
+      name: "Participante Progreso",
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    const participantId = participant.ok ? participant.data.participantId : "";
+
+    const started = await repository.ensureQuestionnaireSectionProgress({
+      participantId,
+      section: "PRIMERA_VISITA",
+      studyId: "study-hut"
+    });
+    const completed = await repository.completeQuestionnaireSection({
+      participantId,
+      section: "PRIMERA_VISITA",
+      studyId: "study-hut"
+    });
+
+    expect(started).toMatchObject({
+      data: {
+        section: "PRIMERA_VISITA",
+        status: "IN_PROGRESS"
+      },
+      ok: true
+    });
+    expect(completed).toMatchObject({
+      data: {
+        section: "PRIMERA_VISITA",
+        status: "COMPLETED"
+      },
+      ok: true
+    });
+    expect(prisma.state.questionnaireAttempts[0]?.visits).toHaveLength(1);
+  });
+
+  it("saves HUT v5 answers incrementally and updates instead of duplicating", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await repository.createParticipant({
+      name: "Participante Respuestas",
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    const participantId = participant.ok ? participant.data.participantId : "";
+
+    const first = await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_EVA1_GUSTO: "6" },
+      participantId,
+      questionCode: "HUT_EVA1_GUSTO",
+      studyId: "study-hut"
+    });
+    const second = await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_EVA1_GUSTO: "7" },
+      participantId,
+      questionCode: "HUT_EVA1_GUSTO",
+      studyId: "study-hut"
+    });
+    const matrix = await repository.saveQuestionnaireAnswer({
+      answerInput: {
+        HUT_EVA1_ATRIBUTOS: {
+          ADECUADO_PARA_MI: "3",
+          AGRADABLE: "5",
+          DURADERO: "4"
+        }
+      },
+      participantId,
+      questionCode: "HUT_EVA1_ATRIBUTOS",
+      studyId: "study-hut"
+    });
+
+    expect(first.ok).toBe(true);
+    expect(second).toMatchObject({
+      data: {
+        answerValue: 7,
+        questionCode: "HUT_EVA1_GUSTO"
+      },
+      ok: true
+    });
+    expect(matrix.ok).toBe(true);
+    expect(prisma.state.answers.filter((answer) => answer.questionCode === "HUT_EVA1_GUSTO")).toHaveLength(1);
+    expect(prisma.state.answers.find((answer) => answer.questionCode === "HUT_EVA1_GUSTO")?.answerJson).toBe(7);
+    expect(prisma.state.answers.find((answer) => answer.questionCode === "HUT_EVA1_ATRIBUTOS")?.answerJson).toEqual({
+      ADECUADO_PARA_MI: "3",
+      AGRADABLE: "5",
+      DURADERO: "4"
+    });
+  });
+
+  it("omits repeated HUT filter answers for CLT_HUT participants", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await repository.createParticipant({
+      name: "Participante CLT HUT",
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    const participantId = participant.ok ? participant.data.participantId : "";
+    prisma.state.participants[0]!.origin = "CLT_HUT";
+
+    const skipped = await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_F1_GENERO: "HOMBRE" },
+      participantId,
+      questionCode: "HUT_F1_GENERO",
+      studyId: "study-hut"
+    });
+    const state = await repository.getQuestionnaireState({
+      participantId,
+      studyId: "study-hut"
+    });
+
+    expect(skipped).toMatchObject({
+      message: "Esta pregunta HUT se omite para este participante.",
+      ok: false
+    });
+    expect(state.ok ? state.data.omittedQuestionCodes : []).toContain("HUT_F1_GENERO");
+    expect(state.ok ? state.data.applicableQuestionCodes : []).toContain("HUT_PARTICIPO_CLT");
+  });
+
+  it("blocks a second HUT v5 application photo on the same Mexico City day", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await repository.createParticipant({
+      name: "Participante Foto Diaria",
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    const participantId = participant.ok ? participant.data.participantId : "";
+    const now = new Date("2026-08-07T15:00:00.000Z");
+
+    const availabilityBefore = await repository.getApplicationPhotoDailyAvailability({
+      now,
+      participantId,
+      studyId: "study-hut"
+    });
+    const recorded = await repository.recordApplicationPhotoEntry({
+      extension: "jpg",
+      mimeType: "image/jpeg",
+      now,
+      participantId,
+      privateStorageKey: "hut/application-photo/photo-1.jpg",
+      productCode: "247",
+      sizeBytes: 1234,
+      storageBucket: "participant-evidence",
+      studyId: "study-hut",
+      useDayNumber: 1
+    });
+    const duplicate = await repository.recordApplicationPhotoEntry({
+      extension: "jpg",
+      mimeType: "image/jpeg",
+      now: new Date("2026-08-07T23:30:00.000Z"),
+      participantId,
+      privateStorageKey: "hut/application-photo/photo-2.jpg",
+      productCode: "247",
+      sizeBytes: 1234,
+      storageBucket: "participant-evidence",
+      studyId: "study-hut",
+      useDayNumber: 1
+    });
+    const availabilityAfter = await repository.getApplicationPhotoDailyAvailability({
+      now,
+      participantId,
+      studyId: "study-hut"
+    });
+
+    expect(availabilityBefore).toMatchObject({
+      data: {
+        available: true,
+        capturedLocalDate: "2026-08-07",
+        reason: "AVAILABLE"
+      },
+      ok: true
+    });
+    expect(recorded).toMatchObject({
+      data: {
+        capturedLocalDate: "2026-08-07",
+        productCode: "247",
+        useDayNumber: 1
+      },
+      ok: true
+    });
+    expect(duplicate).toMatchObject({
+      message: "Ya existe una foto de aplicacion registrada para el dia de hoy.",
+      ok: false
+    });
+    expect(availabilityAfter).toMatchObject({
+      data: {
+        available: false,
+        reason: "PHOTO_ALREADY_CAPTURED_TODAY"
+      },
+      ok: true
+    });
+  });
+
   it("syncs HUT phase codes from participant reference codes without overwriting existing records", async () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
@@ -394,6 +614,7 @@ describe("HUT module foundation", () => {
       phase: "COLOCACION",
       token: participant.token
     });
+    await savePlacementQuestionnaireAnswers(repository, participant.id);
     const viewAfter = await repository.getPortalView(participant.token);
     const upload = await repository.requestApplicationPhotoUpload({
       metadata: selfieMetadata(),
@@ -2116,12 +2337,30 @@ async function uploadNextVideo(
   expect(confirmed.ok).toBe(true);
 }
 
+async function savePlacementQuestionnaireAnswers(repository: ReturnType<typeof createHutRepository>, participantId: string) {
+  const base = {
+    participantId,
+    studyId: "study-hut"
+  };
+
+  await repository.saveQuestionnaireAnswer({ ...base, answerInput: { HUT_DG_NOMBRE: "Participante HUT" }, questionCode: "HUT_DG_NOMBRE" });
+  await repository.saveQuestionnaireAnswer({ ...base, answerInput: { HUT_DG_FOLIO: "NAV-004" }, questionCode: "HUT_DG_FOLIO" });
+  await repository.saveQuestionnaireAnswer({ ...base, answerInput: { HUT_PARTICIPO_CLT: "NO" }, questionCode: "HUT_PARTICIPO_CLT" });
+  await repository.saveQuestionnaireAnswer({ ...base, answerInput: { HUT_F1_GENERO: "HOMBRE" }, questionCode: "HUT_F1_GENERO" });
+  await repository.saveQuestionnaireAnswer({ ...base, answerInput: { HUT_F2_EDAD: "35" }, questionCode: "HUT_F2_EDAD" });
+  await repository.saveQuestionnaireAnswer({ ...base, answerInput: { HUT_F3_USO_PERFUME: "MARCA A" }, questionCode: "HUT_F3_USO_PERFUME" });
+  await repository.saveQuestionnaireAnswer({ ...base, answerInput: { HUT_V1_CONFIRMACION_ENTREGA: "SI" }, questionCode: "HUT_V1_CONFIRMACION_ENTREGA" });
+}
+
 function createFakeHutPrisma() {
   const state = {
+    applicationPhotoEntries: [] as FakeApplicationPhotoEntry[],
+    answers: [] as FakeHutAnswer[],
     confirmations: [] as FakeParticipantConfirmation[],
     nextId: 1,
     phaseCodes: [] as FakeHutPhaseCode[],
     participants: [] as FakeParticipant[],
+    questionnaireAttempts: [] as FakeHutQuestionnaireAttempt[],
     registrationSlots: [] as FakeRegistrationSlot[],
     study: {
       code: "HUT-TEST",
@@ -2424,6 +2663,135 @@ function createFakeHutPrisma() {
         return { count };
       }
     },
+    hutQuestionnaireAttempt: {
+      async upsert(args: {
+        create: Partial<FakeHutQuestionnaireAttempt> & { participantId: string };
+        update: Partial<FakeHutQuestionnaireAttempt>;
+        where: { participantId?: string };
+      }) {
+        let attempt = state.questionnaireAttempts.find((item) => item.participantId === args.where.participantId);
+        if (attempt) {
+          Object.assign(attempt, args.update);
+          return attemptWithRelations(attempt, state);
+        }
+        attempt = {
+          answers: [],
+          completedAt: (args.create.completedAt as Date | null) ?? null,
+          id: `hut-questionnaire-attempt-${state.nextId++}`,
+          participantId: args.create.participantId,
+          startedAt: (args.create.startedAt as Date | null) ?? null,
+          status: (args.create.status as FakeHutQuestionnaireAttempt["status"]) ?? "PENDING",
+          terminatedAt: (args.create.terminatedAt as Date | null) ?? null,
+          terminationReason: (args.create.terminationReason as string | null) ?? null,
+          visits: []
+        };
+        state.questionnaireAttempts.push(attempt);
+        return attemptWithRelations(attempt, state);
+      },
+      async findUnique(args: { where: { id?: string; participantId?: string } }) {
+        const attempt =
+          state.questionnaireAttempts.find(
+            (item) => item.id === args.where.id || item.participantId === args.where.participantId
+          ) ?? null;
+        return attempt ? attemptWithRelations(attempt, state) : null;
+      },
+      async update(args: { data: Partial<FakeHutQuestionnaireAttempt>; where: { id: string } }) {
+        const attempt = state.questionnaireAttempts.find((item) => item.id === args.where.id);
+        if (attempt) {
+          Object.assign(attempt, args.data);
+        }
+        return attempt ? attemptWithRelations(attempt, state) : null;
+      }
+    },
+    hutVisitProgress: {
+      async upsert(args: {
+        create: Partial<FakeHutVisitProgress> & { attemptId: string; section: FakeHutVisitProgress["section"] };
+        update: Partial<FakeHutVisitProgress>;
+        where: { attemptId_section: { attemptId: string; section: FakeHutVisitProgress["section"] } };
+      }) {
+        let visit = state.questionnaireAttempts
+          .flatMap((attempt) => attempt.visits)
+          .find(
+            (item) =>
+              item.attemptId === args.where.attemptId_section.attemptId &&
+              item.section === args.where.attemptId_section.section
+          );
+        if (visit) {
+          Object.assign(visit, args.update);
+          return visit;
+        }
+        visit = {
+          attemptId: args.create.attemptId,
+          completedAt: (args.create.completedAt as Date | null) ?? null,
+          id: `hut-visit-progress-${state.nextId++}`,
+          section: args.create.section,
+          startedAt: (args.create.startedAt as Date | null) ?? null,
+          status: (args.create.status as FakeHutVisitProgress["status"]) ?? "PENDING"
+        };
+        const attempt = state.questionnaireAttempts.find((item) => item.id === visit?.attemptId);
+        attempt?.visits.push(visit);
+        return visit;
+      }
+    },
+    hutAnswer: {
+      async findMany(args: { where: { attemptId: string } }) {
+        return state.answers.filter((answer) => answer.attemptId === args.where.attemptId);
+      },
+      async upsert(args: {
+        create: Partial<FakeHutAnswer> & { answerJson: unknown; attemptId: string; questionCode: string };
+        update: Partial<FakeHutAnswer>;
+        where: { attemptId_questionCode: { attemptId: string; questionCode: string } };
+      }) {
+        let answer = state.answers.find(
+          (item) =>
+            item.attemptId === args.where.attemptId_questionCode.attemptId &&
+            item.questionCode === args.where.attemptId_questionCode.questionCode
+        );
+        if (answer) {
+          Object.assign(answer, args.update);
+          return answer;
+        }
+        answer = {
+          answerJson: args.create.answerJson,
+          attemptId: args.create.attemptId,
+          id: `hut-answer-${state.nextId++}`,
+          questionCode: args.create.questionCode,
+          visitProgressId: (args.create.visitProgressId as string | null) ?? null
+        };
+        state.answers.push(answer);
+        const attempt = state.questionnaireAttempts.find((item) => item.id === answer?.attemptId);
+        attempt?.answers.push(answer);
+        return answer;
+      }
+    },
+    hutApplicationPhotoEntry: {
+      async count(args: { where: { participantId: string } }) {
+        return state.applicationPhotoEntries.filter((entry) => entry.participantId === args.where.participantId).length;
+      },
+      async create(args: { data: Partial<FakeApplicationPhotoEntry> & { participantId: string } }) {
+        const entry: FakeApplicationPhotoEntry = {
+          capturedAt: (args.data.capturedAt as Date) ?? new Date(),
+          capturedLocalDate: String(args.data.capturedLocalDate),
+          capturedLocalTimezone: String(args.data.capturedLocalTimezone ?? "America/Mexico_City"),
+          id: `hut-application-photo-entry-${state.nextId++}`,
+          participantId: args.data.participantId,
+          privateStorageKey: String(args.data.privateStorageKey),
+          productCode: (args.data.productCode as string | null) ?? null,
+          useDayNumber: Number(args.data.useDayNumber)
+        };
+        state.applicationPhotoEntries.push(entry);
+        return entry;
+      },
+      async findFirst(args: { where: { capturedLocalDate?: string; participantId: string } }) {
+        return (
+          state.applicationPhotoEntries.find(
+            (entry) =>
+              entry.participantId === args.where.participantId &&
+              (!args.where.capturedLocalDate || entry.capturedLocalDate === args.where.capturedLocalDate)
+          ) ?? null
+        );
+      }
+    },
     hutCallEvaluation: {
       async create(args: { data: Partial<FakeCall> & { participantId: string } }) {
         const participant = state.participants.find((item) => item.id === args.data.participantId);
@@ -2610,6 +2978,53 @@ type FakeParticipant = {
   visualOverrideReason: string | null;
   visualVerifications: FakeVisualVerification[];
   videoSubmissions: Array<FakeVideo & { id?: string }>;
+};
+
+type FakeHutQuestionnaireAttempt = {
+  answers: FakeHutAnswer[];
+  completedAt: Date | null;
+  id: string;
+  participantId: string;
+  startedAt: Date | null;
+  status: "COMPLETED" | "IN_PROGRESS" | "PENDING" | "TERMINATED";
+  terminatedAt: Date | null;
+  terminationReason: string | null;
+  visits: FakeHutVisitProgress[];
+};
+
+type FakeHutVisitProgress = {
+  attemptId: string;
+  completedAt: Date | null;
+  id: string;
+  section:
+    | "COMPARATIVA"
+    | "DATOS_GENERALES"
+    | "EVALUACION_PRIMER_PERFUME"
+    | "EVALUACION_SEGUNDO_PERFUME"
+    | "FILTROS"
+    | "PRIMERA_VISITA"
+    | "SEGUNDA_VISITA";
+  startedAt: Date | null;
+  status: "COMPLETED" | "IN_PROGRESS" | "PENDING";
+};
+
+type FakeHutAnswer = {
+  answerJson: unknown;
+  attemptId: string;
+  id: string;
+  questionCode: string;
+  visitProgressId: string | null;
+};
+
+type FakeApplicationPhotoEntry = {
+  capturedAt: Date;
+  capturedLocalDate: string;
+  capturedLocalTimezone: string;
+  id: string;
+  participantId: string;
+  privateStorageKey: string;
+  productCode: string | null;
+  useDayNumber: number;
 };
 
 type FakeApplicationEvidence = {
@@ -2886,5 +3301,16 @@ function slotWithParticipant(slot: FakeRegistrationSlot, participants: FakeParti
             token: participant.token
           }
         : null
+  };
+}
+
+function attemptWithRelations(
+  attempt: FakeHutQuestionnaireAttempt,
+  state: ReturnType<typeof createFakeHutPrisma>["prisma"]["state"]
+) {
+  return {
+    ...attempt,
+    answers: state.answers.filter((answer) => answer.attemptId === attempt.id),
+    visits: attempt.visits
   };
 }

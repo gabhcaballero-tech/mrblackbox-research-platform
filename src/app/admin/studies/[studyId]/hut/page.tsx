@@ -315,6 +315,7 @@ function HutParticipantCard({
   const hutWhatsAppManualMessage = buildHutRegistrationWhatsAppMessage(participant);
   const protocolVersion = participant.protocolVersion ?? "LEGACY_VIDEO";
   const origin = participant.origin ?? "HUT_DIRECTO";
+  const isApplicationPhoto = protocolVersion === "APPLICATION_PHOTO";
   const whatsappRequiresSelfie = protocolVersion === "LEGACY_VIDEO" && participant.referenceSelfie.status === "MISSING";
   const hutWhatsAppUrl = buildHutWhatsAppUrl({
     message: hutWhatsAppManualMessage,
@@ -338,10 +339,16 @@ function HutParticipantCard({
         <div className="flex flex-wrap gap-2">
           <SummaryBadge label="Estado general" tone="slate" value={hutParticipantStatusLabel(participant.status)} />
           <SummaryBadge label="Origen HUT" tone={origin === "CLT_HUT" ? "sky" : "slate"} value={origin === "CLT_HUT" ? "CLT + HUT" : "HUT directo"} />
-          <SummaryBadge label="Protocolo" tone={protocolVersion === "APPLICATION_PHOTO" ? "emerald" : "slate"} value={protocolVersion === "APPLICATION_PHOTO" ? "Fotos de aplicacion" : "Legacy videos"} />
-          <SummaryBadge label="Bloque actual" tone="slate" value={`Bloque ${participant.currentBlockNumber}`} />
-          <SummaryBadge label="Video esperado" tone="slate" value={`Video ${participant.currentVideoSequence}`} />
-          <SummaryBadge label="Siguiente disponibilidad" tone="slate" value={nextAvailability} />
+          <SummaryBadge label="Protocolo" tone={isApplicationPhoto ? "emerald" : "slate"} value={isApplicationPhoto ? "Fotos de aplicacion" : "Legacy videos"} />
+          {isApplicationPhoto ? (
+            <SummaryBadge label="Fase actual" tone="emerald" value={applicationPhotoCurrentPhaseLabel(participant)} />
+          ) : (
+            <>
+              <SummaryBadge label="Bloque actual" tone="slate" value={`Bloque ${participant.currentBlockNumber}`} />
+              <SummaryBadge label="Video esperado" tone="slate" value={`Video ${participant.currentVideoSequence}`} />
+              <SummaryBadge label="Siguiente disponibilidad" tone="slate" value={nextAvailability} />
+            </>
+          )}
           {protocolVersion === "LEGACY_VIDEO" ? (
             <>
               <SummaryBadge label="Selfie de registro" tone={participant.referenceSelfie.status === "COMPLETE" ? "emerald" : "amber"} value={summarySelfieLabel} />
@@ -358,7 +365,7 @@ function HutParticipantCard({
             Guarda la selfie de registro para habilitar el inicio del HUT.
           </p>
         ) : null}
-        {participant.usedToleranceInCurrentBlock ? (
+        {protocolVersion === "LEGACY_VIDEO" && participant.usedToleranceInCurrentBlock ? (
           <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
             Ya usó su día de tolerancia del bloque actual.
           </p>
@@ -452,12 +459,13 @@ function HutParticipantCard({
               <IdentityReviewCard participant={participant} studyId={studyId} studyTimeZone={studyTimeZone} />
             </>
           ) : (
-            <ApplicationEvidenceCard participant={participant} studyTimeZone={studyTimeZone} />
+            <ApplicationPhotoProtocolCard participant={participant} studyTimeZone={studyTimeZone} />
           )}
 
           <HutPhaseCodesCard participant={participant} studyId={studyId} studyTimeZone={studyTimeZone} />
         </div>
 
+        {protocolVersion === "LEGACY_VIDEO" ? (
         <div className="space-y-4">
           <section className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
             <div className="flex items-start justify-between gap-3">
@@ -482,6 +490,9 @@ function HutParticipantCard({
             </div>
           </section>
         </div>
+        ) : (
+          <ApplicationPhotoQuestionnaireCard participant={participant} studyTimeZone={studyTimeZone} />
+        )}
 
         <div className="space-y-4">
           <section className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
@@ -508,6 +519,8 @@ function HutParticipantCard({
               </form>
             </details>
 
+            {protocolVersion === "LEGACY_VIDEO" ? (
+            <>
             <section className="mt-4 rounded-md border border-zinc-200 bg-white p-3">
               <h5 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Operación</h5>
               <div className="mt-3 space-y-3">
@@ -567,8 +580,11 @@ function HutParticipantCard({
                 </SubmitButton>
               </form>
             </section>
+            </>
+            ) : null}
           </section>
 
+          {protocolVersion === "LEGACY_VIDEO" ? (
           <details className="rounded-md border border-amber-200 bg-amber-50 p-4">
             <summary className="cursor-pointer text-sm font-semibold text-amber-950">Override manual</summary>
             <p className="mt-2 text-xs leading-5 text-amber-900">
@@ -590,12 +606,17 @@ function HutParticipantCard({
               <SubmitButton pendingLabel="Guardando override...">Guardar override visual</SubmitButton>
             </form>
           </details>
+          ) : null}
 
           <details className="rounded-md border border-rose-200 bg-rose-50 p-4" data-testid={`hut-danger-zone-${participant.id}`}>
             <summary className="cursor-pointer text-sm font-semibold text-rose-950">Zona peligrosa</summary>
             <p className="mt-2 text-xs leading-5 text-rose-900">
-              Eliminar este participante borrará sus bloques, videos, selfies, verificaciones, evaluaciones y avance HUT. Esta acción no se puede deshacer.
+              {protocolVersion === "LEGACY_VIDEO"
+                ? "Eliminar este participante borrara sus bloques, videos, selfies, verificaciones, evaluaciones y avance HUT. Esta accion no se puede deshacer."
+                : "Eliminar este participante borrara su avance HUT, codigos, cuestionario y fotos de aplicacion. Esta accion no se puede deshacer."}
             </p>
+            {protocolVersion === "LEGACY_VIDEO" ? (
+            <>
             <form action={resetHutReferenceSelfieAction.bind(null, studyId, participant.id)} className="mt-3 space-y-2">
               <input className={inputClass} name="confirmation" placeholder="ELIMINAR SELFIE DE REGISTRO" required />
               <SubmitButton pendingLabel="Eliminando selfie...">Eliminar selfie de registro</SubmitButton>
@@ -614,6 +635,8 @@ function HutParticipantCard({
               <input className={inputClass} name="confirmation" placeholder="RESTABLECER EVALUACIÓN 2" required />
               <SubmitButton pendingLabel="Restableciendo evaluación...">Restablecer evaluación 2</SubmitButton>
             </form>
+            </>
+            ) : null}
             <form action={deleteHutParticipantAction.bind(null, studyId, participant.id)} className="mt-4 space-y-2">
               <input className={inputClass} name="confirmation" placeholder="ELIMINAR PARTICIPANTE HUT" required />
               <SubmitButton pendingLabel="Eliminando participante...">Eliminar participante HUT</SubmitButton>
@@ -679,7 +702,7 @@ function HutPhaseCodesCard({
   );
 }
 
-function ApplicationEvidenceCard({
+function ApplicationPhotoProtocolCard({
   participant,
   studyTimeZone
 }: {
@@ -687,14 +710,22 @@ function ApplicationEvidenceCard({
   studyTimeZone: string;
 }) {
   const applicationEvidence = participant.applicationEvidence ?? [];
+  const phaseLabel = applicationPhotoCurrentPhaseLabel(participant);
 
   return (
     <section className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
       <div>
-        <h4 className="text-sm font-semibold text-emerald-950">Fotos de aplicacion HUT</h4>
+        <h4 className="text-sm font-semibold text-emerald-950">HUT v5 · Fotos de aplicacion</h4>
         <p className="mt-1 text-xs leading-5 text-emerald-900">
-          Protocolo nuevo: no solicita selfie, validacion facial, video diario ni bloques legacy. Las fotos se registran por fase.
+          Protocolo nuevo: no solicita selfie, validacion facial, video diario ni bloques legacy. Las fotos se registran como evidencia de aplicacion.
         </p>
+      </div>
+      <div className="mt-3 grid gap-2 text-sm">
+        <Field label="Origen" value={participant.origin === "CLT_HUT" ? "CLT + HUT" : "HUT directo"} />
+        <Field label="Protocolo" value="APPLICATION_PHOTO" />
+        <Field label="Fase actual" value={phaseLabel} />
+        <Field label="EVA1 / primera fragancia" value={participant.firstFragranceLeftArm ?? "No asignada"} />
+        <Field label="EVA2 / segunda fragancia" value={participant.secondFragranceRightArm ?? "No asignada"} />
       </div>
       <div className="mt-3 space-y-3">
         {(["COLOCACION", "REGRESO_1", "REGRESO_2"] as const).map((phase) => {
@@ -724,11 +755,131 @@ function ApplicationEvidenceCard({
   );
 }
 
+function ApplicationPhotoQuestionnaireCard({
+  participant,
+  studyTimeZone
+}: {
+  participant: HutAdminParticipant;
+  studyTimeZone: string;
+}) {
+  const questionnaire = participant.questionnaire;
+  const answersBySection = groupHutQuestionnaireAnswersBySection(questionnaire?.answers ?? []);
+
+  return (
+    <div className="space-y-4">
+      <section className="rounded-md border border-emerald-200 bg-white p-4">
+        <h4 className="text-sm font-semibold text-zinc-950">Cuestionario HUT v5</h4>
+        {questionnaire ? (
+          <>
+            <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+              <Field label="Estado" value={hutQuestionnaireStatusLabel(questionnaire.attempt.status)} />
+              <Field label="Progreso requerido" value={`${questionnaire.answeredRequired}/${questionnaire.totalRequired}`} />
+              <Field
+                label="Inicio"
+                value={questionnaire.attempt.startedAt ? formatDateTime(questionnaire.attempt.startedAt, studyTimeZone) : "Sin inicio"}
+              />
+              <Field
+                label="Termino"
+                value={questionnaire.attempt.completedAt ? formatDateTime(questionnaire.attempt.completedAt, studyTimeZone) : "Sin termino"}
+              />
+            </div>
+            <div className="mt-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Progreso por visita/seccion</p>
+              {questionnaire.visits.length > 0 ? (
+                questionnaire.visits.map((visit) => (
+                  <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3" key={visit.section}>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-zinc-950">{hutQuestionnaireSectionLabel(visit.section)}</p>
+                      <StatusBadge status={visit.status === "COMPLETED" ? "ready" : visit.status === "IN_PROGRESS" ? "planned" : "blocked"}>
+                        {hutVisitStatusLabel(visit.status)}
+                      </StatusBadge>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">Sin secciones iniciadas.</p>
+              )}
+            </div>
+          </>
+        ) : (
+          <p className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
+            Sin cuestionario HUT v5 iniciado.
+          </p>
+        )}
+      </section>
+
+      <section className="rounded-md border border-zinc-200 bg-white p-4">
+        <h4 className="text-sm font-semibold text-zinc-950">Respuestas por visita/seccion</h4>
+        {answersBySection.length > 0 ? (
+          <div className="mt-3 space-y-3">
+            {answersBySection.map((section) => (
+              <details className="rounded-md border border-zinc-200 bg-zinc-50 p-3" key={section.sectionLabel} open>
+                <summary className="cursor-pointer text-sm font-semibold text-zinc-950">{section.sectionLabel}</summary>
+                <div className="mt-3 space-y-2">
+                  {section.answers.map((answer) => (
+                    <div className="rounded-md border border-zinc-200 bg-white p-3" key={answer.questionCode}>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{answer.questionCode}</p>
+                      <p className="mt-1 text-sm font-medium text-zinc-950">{answer.label}</p>
+                      <p className="mt-1 break-words text-sm text-zinc-700">{formatHutAnswerValue(answer.answerValue)}</p>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">Sin respuestas registradas.</p>
+        )}
+      </section>
+
+      <section className="rounded-md border border-zinc-200 bg-white p-4">
+        <h4 className="text-sm font-semibold text-zinc-950">Fotos diarias de aplicacion</h4>
+        {participant.applicationPhotoEntries.length > 0 ? (
+          <div className="mt-3 space-y-3">
+            {participant.applicationPhotoEntries.map((entry) => (
+              <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3" key={`${entry.capturedLocalDate}-${entry.useDayNumber}`}>
+                <div className="grid gap-2 text-sm md:grid-cols-2">
+                  <Field label="Dia de uso" value={String(entry.useDayNumber)} />
+                  <Field label="Producto" value={entry.productCode ?? "No capturado"} />
+                  <Field label="Fecha local" value={entry.capturedLocalDate} />
+                  <Field label="Capturada" value={formatDateTime(entry.capturedAt, studyTimeZone)} />
+                </div>
+                {entry.signedUrl ? (
+                  <a className="mt-3 inline-flex text-sm font-semibold text-teal-700 hover:text-teal-800" href={entry.signedUrl} rel="noreferrer" target="_blank">
+                    Ver foto diaria
+                  </a>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">Sin fotos diarias registradas.</p>
+        )}
+      </section>
+    </div>
+  );
+}
+
 function productCodeForAdminPhase(participant: HutAdminParticipant, phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2") {
   if (phase === "COLOCACION") {
     return participant.firstFragranceLeftArm;
   }
   return participant.secondFragranceRightArm;
+}
+
+function applicationPhotoCurrentPhaseLabel(participant: HutAdminParticipant): string {
+  const currentPhase = applicationPhotoCurrentPhase(participant);
+  return currentPhase === "COMPLETED" ? "Completado" : hutPhaseLabel(currentPhase);
+}
+
+function applicationPhotoCurrentPhase(participant: HutAdminParticipant): "COLOCACION" | "COMPLETED" | "REGRESO_1" | "REGRESO_2" {
+  for (const phase of ["COLOCACION", "REGRESO_1", "REGRESO_2"] as const) {
+    const code = participant.phaseCodes.find((item) => item.phase === phase);
+    if (!code || (code.status !== "USED" && code.status !== "VALIDATED")) {
+      return phase;
+    }
+  }
+  return "COMPLETED";
 }
 
 function hutPhaseLabel(phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2") {
@@ -738,6 +889,70 @@ function hutPhaseLabel(phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2") {
     REGRESO_2: "Regreso 2 / evaluacion 2"
   } as const;
   return labels[phase];
+}
+
+function hutQuestionnaireSectionLabel(section: NonNullable<HutAdminParticipant["questionnaire"]>["visits"][number]["section"]): string {
+  const labels: Record<NonNullable<HutAdminParticipant["questionnaire"]>["visits"][number]["section"], string> = {
+    COMPARATIVA: "Comparativa",
+    DATOS_GENERALES: "Datos generales",
+    EVALUACION_PRIMER_PERFUME: "Evaluacion primer perfume",
+    EVALUACION_SEGUNDO_PERFUME: "Evaluacion segundo perfume",
+    FILTROS: "Filtros",
+    PRIMERA_VISITA: "Primera visita",
+    SEGUNDA_VISITA: "Segunda visita"
+  };
+
+  return labels[section];
+}
+
+function hutQuestionnaireStatusLabel(status: NonNullable<HutAdminParticipant["questionnaire"]>["attempt"]["status"]): string {
+  const labels: Record<NonNullable<HutAdminParticipant["questionnaire"]>["attempt"]["status"], string> = {
+    COMPLETED: "Completado",
+    IN_PROGRESS: "En progreso",
+    PENDING: "Pendiente",
+    TERMINATED: "Terminado"
+  };
+
+  return labels[status];
+}
+
+function hutVisitStatusLabel(status: NonNullable<HutAdminParticipant["questionnaire"]>["visits"][number]["status"]): string {
+  const labels: Record<NonNullable<HutAdminParticipant["questionnaire"]>["visits"][number]["status"], string> = {
+    COMPLETED: "Completada",
+    IN_PROGRESS: "En progreso",
+    PENDING: "Pendiente"
+  };
+
+  return labels[status];
+}
+
+function groupHutQuestionnaireAnswersBySection(answers: NonNullable<HutAdminParticipant["questionnaire"]>["answers"]) {
+  const groups = new Map<string, { answers: typeof answers; sectionLabel: string }>();
+  for (const answer of answers) {
+    const sectionLabel = answer.section ? hutQuestionnaireSectionLabel(answer.section) : "Sin seccion";
+    const existing = groups.get(sectionLabel);
+    if (existing) {
+      existing.answers.push(answer);
+      continue;
+    }
+    groups.set(sectionLabel, { answers: [answer], sectionLabel });
+  }
+
+  return Array.from(groups.values());
+}
+
+function formatHutAnswerValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") {
+    return "Sin respuesta";
+  }
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "Respuesta no disponible";
+  }
 }
 
 function whatsappAutomationLabel(status: "ERROR" | "NO_ENVIADO" | "ENVIADO"): string {

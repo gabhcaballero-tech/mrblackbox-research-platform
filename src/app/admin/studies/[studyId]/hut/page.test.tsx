@@ -318,12 +318,59 @@ describe("HutAdminPage", () => {
                 signedUrl: "https://storage.example/application-photo.jpg"
               }
             ],
+            applicationPhotoEntries: [
+              {
+                capturedAt: new Date("2026-07-02T13:00:00.000Z"),
+                capturedLocalDate: "2026-07-02",
+                capturedLocalTimezone: "America/Mexico_City",
+                productCode: "901",
+                signedUrl: "https://storage.example/daily-application-photo.jpg",
+                useDayNumber: 1
+              }
+            ],
             block1: null,
             block2: null,
             call1: null,
             call2: null,
             origin: "CLT_HUT",
             protocolVersion: "APPLICATION_PHOTO",
+            questionnaire: {
+              answeredRequired: 2,
+              answers: [
+                {
+                  answerValue: "SI",
+                  label: "¿Participó anteriormente en CLT?",
+                  questionCode: "HUT_PARTICIPO_CLT",
+                  section: "DATOS_GENERALES"
+                },
+                {
+                  answerValue: { LIMPIA: "5" },
+                  label: "Atributos del perfume",
+                  questionCode: "HUT_P8_ATRIBUTOS_EVA1",
+                  section: "EVALUACION_PRIMER_PERFUME"
+                }
+              ],
+              attempt: {
+                completedAt: null,
+                id: "hut-questionnaire-attempt-1",
+                participantId: "participant-1",
+                startedAt: new Date("2026-07-02T12:30:00.000Z"),
+                status: "IN_PROGRESS",
+                terminatedAt: null,
+                terminationReason: null
+              },
+              omittedQuestionCodes: [],
+              totalRequired: 10,
+              visits: [
+                {
+                  attemptId: "hut-questionnaire-attempt-1",
+                  completedAt: null,
+                  section: "DATOS_GENERALES",
+                  startedAt: new Date("2026-07-02T12:30:00.000Z"),
+                  status: "IN_PROGRESS"
+                }
+              ]
+            },
             referenceSelfie: {
               capturedAt: new Date(0),
               signedUrl: null,
@@ -336,12 +383,19 @@ describe("HutAdminPage", () => {
 
     render(await HutAdminPage({ params: Promise.resolve({ studyId: "study-hut" }), searchParams: Promise.resolve({}) }));
 
-    expect(screen.getByText("Fotos de aplicacion HUT")).toBeInTheDocument();
+    expect(screen.getByText("HUT v5 · Fotos de aplicacion")).toBeInTheDocument();
+    expect(screen.getByText("Cuestionario HUT v5")).toBeInTheDocument();
+    expect(screen.getByText("Respuestas por visita/seccion")).toBeInTheDocument();
+    expect(screen.getByText("Fotos diarias de aplicacion")).toBeInTheDocument();
+    expect(screen.getByText("HUT_PARTICIPO_CLT")).toBeInTheDocument();
+    expect(screen.getByText("HUT_P8_ATRIBUTOS_EVA1")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ver foto diaria" })).toHaveAttribute("href", "https://storage.example/daily-application-photo.jpg");
     expect(screen.getByRole("button", { name: "Enviar WhatsApp" })).toBeEnabled();
     expect(screen.queryByText("WhatsApp pendiente: se enviarÃ¡ despuÃ©s de guardar la selfie de registro.")).not.toBeInTheDocument();
     expect(screen.getByText(/C.digos por fase HUT/)).toBeInTheDocument();
     expect(screen.getByTestId("hut-phase-code-controls-COLOCACION")).toBeInTheDocument();
     expect(screen.queryByText("Selfie de registro: Faltante")).not.toBeInTheDocument();
+    expect(screen.queryByText("Bloques y videos")).not.toBeInTheDocument();
   });
 });
 
@@ -351,6 +405,14 @@ type TestParticipant = {
     phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2";
     productCode: string | null;
     signedUrl: string | null;
+  }>;
+  applicationPhotoEntries: Array<{
+    capturedAt: Date;
+    capturedLocalDate: string;
+    capturedLocalTimezone: string;
+    productCode: string | null;
+    signedUrl: string | null;
+    useDayNumber: number;
   }>;
   availability: {
     nextAvailableAt: Date | null;
@@ -428,6 +490,48 @@ type TestParticipant = {
   }>;
   recruiter: string | null;
   protocolVersion: "APPLICATION_PHOTO" | "LEGACY_VIDEO";
+  questionnaire: {
+    answeredRequired: number;
+    answers: Array<{
+      answerValue: unknown;
+      label: string;
+      questionCode: string;
+      section:
+        | "COMPARATIVA"
+        | "DATOS_GENERALES"
+        | "EVALUACION_PRIMER_PERFUME"
+        | "EVALUACION_SEGUNDO_PERFUME"
+        | "FILTROS"
+        | "PRIMERA_VISITA"
+        | "SEGUNDA_VISITA"
+        | null;
+    }>;
+    attempt: {
+      completedAt: Date | null;
+      id: string;
+      participantId: string;
+      startedAt: Date | null;
+      status: "COMPLETED" | "IN_PROGRESS" | "PENDING" | "TERMINATED";
+      terminatedAt: Date | null;
+      terminationReason: string | null;
+    };
+    omittedQuestionCodes: string[];
+    totalRequired: number;
+    visits: Array<{
+      attemptId: string;
+      completedAt: Date | null;
+      section:
+        | "COMPARATIVA"
+        | "DATOS_GENERALES"
+        | "EVALUACION_PRIMER_PERFUME"
+        | "EVALUACION_SEGUNDO_PERFUME"
+        | "FILTROS"
+        | "PRIMERA_VISITA"
+        | "SEGUNDA_VISITA";
+      startedAt: Date | null;
+      status: "COMPLETED" | "IN_PROGRESS" | "PENDING";
+    }>;
+  } | null;
   referenceSelfie: {
     capturedAt: Date;
     signedUrl: string | null;
@@ -490,6 +594,7 @@ function createDashboard(overrides?: Partial<TestDashboard>): TestDashboard {
 function baseParticipant() {
   return {
     applicationEvidence: [],
+    applicationPhotoEntries: [],
     availability: {
       nextAvailableAt: null,
       reason: "BLOCK_NOT_ACTIVE"
@@ -591,6 +696,7 @@ function baseParticipant() {
     ],
     phone: null,
     protocolVersion: "LEGACY_VIDEO" as const,
+    questionnaire: null,
     recruiter: null,
     referenceSelfie: {
       capturedAt: new Date(0),

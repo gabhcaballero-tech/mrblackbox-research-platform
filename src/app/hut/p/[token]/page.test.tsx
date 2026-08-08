@@ -1,16 +1,20 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import HutParticipantPage from "./page";
 import { createHutRepository } from "@/modules/hut";
 
 const getPortalViewMock = vi.fn();
+const getQuestionnaireStateByTokenMock = vi.fn();
+const getApplicationPhotoDailyAvailabilityByTokenMock = vi.fn();
 
 vi.mock("@/modules/hut", async () => {
   const actual = await vi.importActual<typeof import("@/modules/hut")>("@/modules/hut");
   return {
     ...actual,
     createHutRepository: vi.fn(() => ({
-      getPortalView: getPortalViewMock
+      getApplicationPhotoDailyAvailabilityByToken: getApplicationPhotoDailyAvailabilityByTokenMock,
+      getPortalView: getPortalViewMock,
+      getQuestionnaireStateByToken: getQuestionnaireStateByTokenMock
     }))
   };
 });
@@ -26,6 +30,18 @@ vi.mock("./HutApplicationPhotoUploadForm", () => ({
 }));
 
 describe("HutParticipantPage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getQuestionnaireStateByTokenMock.mockResolvedValue({
+      data: createQuestionnaireState(),
+      ok: true
+    });
+    getApplicationPhotoDailyAvailabilityByTokenMock.mockResolvedValue({
+      data: createPhotoAvailability(),
+      ok: true
+    });
+  });
+
   it("muestra mensaje final cuando la participacion HUT esta completa", async () => {
     getPortalViewMock.mockResolvedValue({
       data: createPortalView({
@@ -112,6 +128,20 @@ describe("HutParticipantPage", () => {
       }),
       ok: true
     });
+    getQuestionnaireStateByTokenMock.mockResolvedValue({
+      data: createQuestionnaireState({
+        answers: {
+          HUT_DG_FOLIO: "NAV-001",
+          HUT_DG_NOMBRE: "PARTICIPANTE HUT",
+          HUT_F1_GENERO: "HOMBRE",
+          HUT_F2_EDAD: "35",
+          HUT_F3_USO_PERFUME: "MARCA A",
+          HUT_PARTICIPO_CLT: "NO",
+          HUT_V1_CONFIRMACION_ENTREGA: "SI"
+        }
+      }),
+      ok: true
+    });
 
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
@@ -120,6 +150,130 @@ describe("HutParticipantPage", () => {
     expect(screen.queryByRole("button", { name: "Validar codigo" })).not.toBeInTheDocument();
     expect(screen.queryByText("Formulario HUT")).not.toBeInTheDocument();
     expect(screen.queryByText(/selfie/i)).not.toBeInTheDocument();
+  });
+
+  it("muestra pregunta pendiente de HUT_DIRECTO antes de la foto", async () => {
+    getPortalViewMock.mockResolvedValue({
+      data: createPortalView({
+        availableApplicationPhoto: {
+          phase: "COLOCACION",
+          productCode: "247"
+        },
+        availability: {
+          nextAvailableAt: null,
+          reason: "AVAILABLE_FOR_APPLICATION_PHOTO"
+        },
+        protocolVersion: "APPLICATION_PHOTO",
+        status: "BLOCK_1_IN_PROGRESS"
+      }),
+      ok: true
+    });
+    getQuestionnaireStateByTokenMock.mockResolvedValue({
+      data: createQuestionnaireState({
+        answers: {
+          HUT_DG_FOLIO: "NAV-001",
+          HUT_DG_NOMBRE: "PARTICIPANTE HUT",
+          HUT_PARTICIPO_CLT: "NO"
+        }
+      }),
+      ok: true
+    });
+
+    render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
+
+    expect(screen.getByText("Genero")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Guardar y continuar" })).toBeInTheDocument();
+    expect(screen.queryByText(/Foto de aplicacion COLOCACION/)).not.toBeInTheDocument();
+  });
+
+  it("omite filtros repetidos para CLT_HUT y continua con primera visita", async () => {
+    getPortalViewMock.mockResolvedValue({
+      data: createPortalView({
+        availableApplicationPhoto: {
+          phase: "COLOCACION",
+          productCode: "247"
+        },
+        availability: {
+          nextAvailableAt: null,
+          reason: "AVAILABLE_FOR_APPLICATION_PHOTO"
+        },
+        origin: "CLT_HUT",
+        protocolVersion: "APPLICATION_PHOTO",
+        status: "BLOCK_1_IN_PROGRESS"
+      }),
+      ok: true
+    });
+    getQuestionnaireStateByTokenMock.mockResolvedValue({
+      data: createQuestionnaireState({
+        answers: {
+          HUT_DG_FOLIO: "NAV-001",
+          HUT_DG_NOMBRE: "PARTICIPANTE HUT",
+          HUT_PARTICIPO_CLT: "SI"
+        },
+        applicableQuestionCodes: [
+          "HUT_DG_NOMBRE",
+          "HUT_DG_FOLIO",
+          "HUT_DG_FECHA",
+          "HUT_PARTICIPO_CLT",
+          "HUT_V1_CONFIRMACION_ENTREGA",
+          "HUT_V1_OBSERVACIONES"
+        ],
+        omittedQuestionCodes: ["HUT_F1_GENERO", "HUT_F2_EDAD", "HUT_F3_USO_PERFUME"],
+        participantOrigin: "CLT_HUT"
+      }),
+      ok: true
+    });
+
+    render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
+
+    expect(screen.getByText("Confirmar entrega del primer perfume")).toBeInTheDocument();
+    expect(screen.queryByText("Genero")).not.toBeInTheDocument();
+  });
+
+  it("bloquea foto diaria cuando ya existe captura del dia", async () => {
+    getPortalViewMock.mockResolvedValue({
+      data: createPortalView({
+        availableApplicationPhoto: {
+          phase: "COLOCACION",
+          productCode: "247"
+        },
+        availability: {
+          nextAvailableAt: null,
+          reason: "AVAILABLE_FOR_APPLICATION_PHOTO"
+        },
+        protocolVersion: "APPLICATION_PHOTO",
+        status: "BLOCK_1_IN_PROGRESS"
+      }),
+      ok: true
+    });
+    getQuestionnaireStateByTokenMock.mockResolvedValue({
+      data: createQuestionnaireState({
+        answers: {
+          HUT_DG_FOLIO: "NAV-001",
+          HUT_DG_NOMBRE: "PARTICIPANTE HUT",
+          HUT_F1_GENERO: "HOMBRE",
+          HUT_F2_EDAD: "35",
+          HUT_F3_USO_PERFUME: "MARCA A",
+          HUT_PARTICIPO_CLT: "NO",
+          HUT_V1_CONFIRMACION_ENTREGA: "SI"
+        }
+      }),
+      ok: true
+    });
+    getApplicationPhotoDailyAvailabilityByTokenMock.mockResolvedValue({
+      data: createPhotoAvailability({
+        available: false,
+        nextAvailableLocalDate: "2026-08-08",
+        reason: "PHOTO_ALREADY_CAPTURED_TODAY"
+      }),
+      ok: true
+    });
+
+    render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
+
+    expect(screen.getByText("Foto diaria ya registrada")).toBeInTheDocument();
+    expect(screen.getByText(/2026-08-08/)).toBeInTheDocument();
+    expect(screen.queryByText(/Foto de aplicacion COLOCACION/)).not.toBeInTheDocument();
   });
 });
 
@@ -203,4 +357,72 @@ type PortalViewForTest = {
   studyName: string;
   testMode: boolean;
   token: string;
+};
+
+function createQuestionnaireState(overrides: Partial<QuestionnaireStateForTest> = {}): QuestionnaireStateForTest {
+  return {
+    answers: {},
+    applicableQuestionCodes: [
+      "HUT_DG_NOMBRE",
+      "HUT_DG_FOLIO",
+      "HUT_DG_FECHA",
+      "HUT_PARTICIPO_CLT",
+      "HUT_F1_GENERO",
+      "HUT_F2_EDAD",
+      "HUT_F3_USO_PERFUME",
+      "HUT_V1_CONFIRMACION_ENTREGA",
+      "HUT_V1_OBSERVACIONES"
+    ],
+    attempt: {
+      completedAt: null,
+      id: "hut-attempt-1",
+      participantId: "participant-1",
+      startedAt: new Date("2026-08-07T15:00:00.000Z"),
+      status: "IN_PROGRESS",
+      terminatedAt: null,
+      terminationReason: null
+    },
+    omittedQuestionCodes: [],
+    participantOrigin: "HUT_DIRECTO",
+    visits: [],
+    ...overrides
+  };
+}
+
+function createPhotoAvailability(
+  overrides: Partial<PhotoAvailabilityForTest> = {}
+): PhotoAvailabilityForTest {
+  return {
+    available: true,
+    capturedLocalDate: "2026-08-07",
+    existingEntry: null,
+    nextAvailableLocalDate: null,
+    reason: "AVAILABLE",
+    ...overrides
+  };
+}
+
+type QuestionnaireStateForTest = {
+  answers: Record<string, unknown>;
+  applicableQuestionCodes: string[];
+  attempt: {
+    completedAt: Date | null;
+    id: string;
+    participantId: string;
+    startedAt: Date | null;
+    status: string;
+    terminatedAt: Date | null;
+    terminationReason: string | null;
+  };
+  omittedQuestionCodes: string[];
+  participantOrigin: "CLT_HUT" | "HUT_DIRECTO";
+  visits: [];
+};
+
+type PhotoAvailabilityForTest = {
+  available: boolean;
+  capturedLocalDate: string;
+  existingEntry: null;
+  nextAvailableLocalDate: string | null;
+  reason: "AVAILABLE" | "LEGACY_PROTOCOL" | "PHOTO_ALREADY_CAPTURED_TODAY";
 };

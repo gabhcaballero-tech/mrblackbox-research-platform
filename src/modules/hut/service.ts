@@ -160,6 +160,15 @@ export function normalizeHutFolio(value: unknown): string {
   return normalizeHutText(value).replace(/\s+/g, "-");
 }
 
+export function hutLocalDateKey(date: Date, timeZoneIana = "America/Mexico_City"): string {
+  const parts = getTimeZoneDateParts(date, timeZoneIana);
+  return [
+    String(parts.year).padStart(4, "0"),
+    String(parts.month).padStart(2, "0"),
+    String(parts.day).padStart(2, "0")
+  ].join("-");
+}
+
 export type HutAnswerInput = Record<
   string,
   FormDataEntryValue | Record<string, FormDataEntryValue | null | undefined> | null | undefined

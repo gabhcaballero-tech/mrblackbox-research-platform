@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createHutRepository, type HutActionResult } from "./repository";
+import { createHutRepository, hutFormDataToAnswerInput, type HutActionResult } from "./";
 import type { HutPhase } from "./phase-codes";
 import type {
   HutApplicationPhotoUploadMetadata,
@@ -363,6 +363,24 @@ export async function validateHutPhaseCodeAction(token: string, phase: HutPhase,
 
   if (result.ok) {
     params.set("hutMessage", result.message ?? "Codigo HUT validado correctamente.");
+  } else {
+    params.set("hutError", result.message);
+  }
+
+  revalidatePath(`/hut/p/${encodeURIComponent(token)}`);
+  redirect(`/hut/p/${encodeURIComponent(token)}?${params.toString()}`);
+}
+
+export async function saveHutQuestionnaireAnswerAction(token: string, questionCode: string, formData: FormData) {
+  const result = await createHutRepository().saveQuestionnaireAnswerByToken({
+    answerInput: hutFormDataToAnswerInput(formData),
+    questionCode,
+    token
+  });
+  const params = new URLSearchParams();
+
+  if (result.ok) {
+    params.set("hutMessage", "Respuesta guardada correctamente.");
   } else {
     params.set("hutError", result.message);
   }
