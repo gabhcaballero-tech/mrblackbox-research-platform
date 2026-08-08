@@ -63,8 +63,6 @@ import {
   isNavigoHutAccessEnabled
 } from "@/modules/screener/study-overrides";
 import {
-  HUT_MAX_MISSED_DAYS_PER_BLOCK,
-  HUT_REQUIRED_VIDEOS_PER_BLOCK,
   createHutRegistrationToken,
   createHutParticipantToken
 } from "@/modules/hut/service";
@@ -4287,6 +4285,8 @@ async function upsertHutParticipantFromWorkbookRow({
     const hasProgress = hutParticipantHasProgress(existing);
     const rotationDiffers = hutRotationDiffers(existing, row);
     const data: Record<string, unknown> = {
+      origin: "CLT_HUT",
+      protocolVersion: "APPLICATION_PHOTO",
       studyParticipantId: existing.studyParticipantId ?? studyParticipant.id
     };
 
@@ -4323,7 +4323,9 @@ async function upsertHutParticipantFromWorkbookRow({
       firstFragranceLeftArm: row.hutEva1,
       folio: row.folio,
       name: studyParticipant.participantProfile.name,
+      origin: "CLT_HUT",
       phone: studyParticipant.participantProfile.phone,
+      protocolVersion: "APPLICATION_PHOTO",
       recruiter: null,
       secondFragranceRightArm: row.hutEva2,
       startDate: null,
@@ -4334,8 +4336,6 @@ async function upsertHutParticipantFromWorkbookRow({
     },
     select: hutParticipantWorkbookSelect
   })) as HutParticipantWorkbookRecord;
-
-  await createHutWorkbookParticipantFoundation(prisma, created.id);
 
   return created;
 }
@@ -4438,42 +4438,6 @@ async function ensureHutPhaseCodesForWorkbookParticipant({
       }
     });
   }
-}
-
-async function createHutWorkbookParticipantFoundation(prisma: NavigoTransactionClient, participantId: string) {
-  await prisma.hutBlock?.create?.({
-    data: {
-      blockNumber: 1,
-      maxMissedDaysAllowed: HUT_MAX_MISSED_DAYS_PER_BLOCK,
-      participantId,
-      requiredVideos: HUT_REQUIRED_VIDEOS_PER_BLOCK,
-      startDate: null,
-      status: "NOT_STARTED"
-    }
-  });
-  await prisma.hutBlock?.create?.({
-    data: {
-      blockNumber: 2,
-      maxMissedDaysAllowed: HUT_MAX_MISSED_DAYS_PER_BLOCK,
-      participantId,
-      requiredVideos: HUT_REQUIRED_VIDEOS_PER_BLOCK,
-      status: "NOT_STARTED"
-    }
-  });
-  await prisma.hutCallEvaluation?.create?.({
-    data: {
-      blockNumber: 1,
-      participantId,
-      status: "PENDING"
-    }
-  });
-  await prisma.hutCallEvaluation?.create?.({
-    data: {
-      blockNumber: 2,
-      participantId,
-      status: "PENDING"
-    }
-  });
 }
 
 function hutParticipantHasProgress(participant: HutParticipantWorkbookRecord): boolean {

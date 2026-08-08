@@ -4,7 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createHutRepository, type HutActionResult } from "./repository";
 import type { HutPhase } from "./phase-codes";
-import type { HutSelfieUploadMetadata, HutSignedSelfieUpload, HutSignedVideoUpload, HutVideoUploadMetadata } from "./storage";
+import type {
+  HutApplicationPhotoUploadMetadata,
+  HutSelfieUploadMetadata,
+  HutSignedApplicationPhotoUpload,
+  HutSignedSelfieUpload,
+  HutSignedVideoUpload,
+  HutVideoUploadMetadata
+} from "./storage";
 import { requireCapability } from "@/shared/auth/session";
 import type { NavigoFaceVerificationClientResult } from "@/modules/navigo-app/face-verification-contract";
 
@@ -413,6 +420,33 @@ export async function requestHutDailySelfieUploadAction(
     metadata,
     token
   });
+}
+
+export async function requestHutApplicationPhotoUploadAction(
+  token: string,
+  metadata: HutApplicationPhotoUploadMetadata
+): Promise<HutActionResult<HutSignedApplicationPhotoUpload & { phase: HutPhase; productCode: string | null }>> {
+  return createHutRepository().requestApplicationPhotoUpload({
+    metadata,
+    token
+  });
+}
+
+export async function confirmHutApplicationPhotoUploadAction(
+  token: string,
+  metadata: HutApplicationPhotoUploadMetadata & {
+    privateStorageKey: string;
+    storageBucket: string;
+  }
+): Promise<HutActionResult<{ phase: HutPhase }>> {
+  const result = await createHutRepository().confirmApplicationPhotoUpload({
+    metadata,
+    token
+  });
+
+  revalidatePath(`/hut/p/${encodeURIComponent(token)}`);
+
+  return result;
 }
 
 export async function confirmHutDailySelfieUploadAction(

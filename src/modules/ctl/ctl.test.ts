@@ -1124,6 +1124,7 @@ describe("ctl module", () => {
       studyId: state.study.id
     });
     const parsed = parseCtlAnswers(createValidCtlAnswerInput());
+    await validateAllCtlPhases(repository, started.ok ? started.sessionId : "");
 
     await repository.saveAnswers({
       actor: interviewer,
@@ -1138,6 +1139,61 @@ describe("ctl module", () => {
     });
     expect(state.navigoActivities).toEqual([]);
     expect(state.accessTokens).toHaveLength(1);
+  });
+
+  it("blocks CTL completion until operational phases are validated", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const started = await repository.startSession({
+      actor: interviewer,
+      folio: "NAV-001",
+      studyId: state.study.id
+    });
+    const parsed = parseCtlAnswers(createValidCtlAnswerInput());
+
+    const result = await repository.saveAnswers({
+      actor: interviewer,
+      answers: parsed.ok ? parsed.answers : [],
+      complete: true,
+      sessionId: started.ok ? started.sessionId : ""
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.message).toContain("Valida la fase Colocacion");
+    expect(state.sessions[0]?.status).toBe("PENDING");
+    expect(state.accessTokens).toHaveLength(0);
+  });
+
+  it("validates CTL phases using participant reference code slots", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const started = await repository.startSession({
+      actor: interviewer,
+      folio: "NAV-001",
+      studyId: state.study.id
+    });
+
+    const invalid = await repository.validatePhaseCode({
+      actor: interviewer,
+      code: "codigo-equivocado",
+      phase: "EVALUACION_1",
+      sessionId: started.ok ? started.sessionId : ""
+    });
+    const valid = await repository.validatePhaseCode({
+      actor: interviewer,
+      code: "M3P9",
+      phase: "EVALUACION_1",
+      sessionId: started.ok ? started.sessionId : ""
+    });
+
+    expect(invalid.ok).toBe(false);
+    expect(invalid.ok ? "" : invalid.message).toBe("El codigo de fase CTL no es correcto.");
+    expect(valid.ok).toBe(true);
+    expect(state.phaseProgress.find((phase) => phase.phase === "EVALUACION_1")).toMatchObject({
+      referenceCodeSlot: 2,
+      status: "COMPLETED",
+      validatedBy: interviewer.id
+    });
   });
 
   it("resets a CTL session by deleting answers and preserving the session", async () => {
@@ -1172,6 +1228,27 @@ describe("ctl module", () => {
     expect(session?.answers).toEqual({});
   });
 });
+
+async function validateAllCtlPhases(repository: ReturnType<typeof createCtlRepository>, sessionId: string) {
+  await repository.validatePhaseCode({
+    actor: interviewer,
+    code: "A7K4",
+    phase: "COLOCACION",
+    sessionId
+  });
+  await repository.validatePhaseCode({
+    actor: interviewer,
+    code: "M3P9",
+    phase: "EVALUACION_1",
+    sessionId
+  });
+  await repository.validatePhaseCode({
+    actor: interviewer,
+    code: "T8R2",
+    phase: "EVALUACION_2",
+    sessionId
+  });
+}
 
 const scaleDefinition: CtlDefinition = {
   sections: [
@@ -1435,6 +1512,19 @@ function createCtlState() {
     updatedAt: Date;
   }> = [];
   const answers: Array<{ answerValue: unknown; ctlSessionId: string; questionCode: string }> = [];
+  const phaseProgress: Array<{
+    arm: string | null;
+    completedAt: Date | null;
+    ctlSessionId: string;
+    phase: "COLOCACION" | "EVALUACION_1" | "EVALUACION_2";
+    productCode: string | null;
+    referenceCodeSlot: number;
+    rotationSnapshot: unknown;
+    startedAt: Date | null;
+    status: "PENDING" | "IN_PROGRESS" | "VALIDATED" | "COMPLETED";
+    validatedAt: Date | null;
+    validatedBy: string | null;
+  }> = [];
   const armAssignments = [{ id: "arm-1" }, { id: "arm-2" }];
   const activitySchedules = [
     {
@@ -1476,6 +1566,7 @@ function createCtlState() {
       answers: answers.filter((answer) => answer.ctlSessionId === session.id),
       ctlInterviewerCode,
       interviewer: user,
+      phaseProgress: phaseProgress.filter((phase) => phase.ctlSessionId === session.id),
       studyParticipant: {
         ...participant,
         participantConfirmation: confirmation
@@ -1572,6 +1663,44 @@ function createCtlState() {
         if (!code) throw new Error("interviewer code not found");
         Object.assign(code, args.data, { updatedAt: new Date() });
         return toInterviewerCodeRecord(code);
+      }
+    },
+    ctlPhaseProgress: {
+      async create(args: { data: (typeof phaseProgress)[number] }) {
+        const record = {
+          ...args.data,
+          completedAt: args.data.completedAt ?? null,
+          startedAt: args.data.startedAt ?? null,
+          validatedAt: args.data.validatedAt ?? null,
+          validatedBy: args.data.validatedBy ?? null
+        };
+        phaseProgress.push(record);
+        return record;
+      },
+      async deleteMany(args: { where: { ctlSessionId: string } }) {
+        for (let index = phaseProgress.length - 1; index >= 0; index -= 1) {
+          if (phaseProgress[index]?.ctlSessionId === args.where.ctlSessionId) {
+            phaseProgress.splice(index, 1);
+          }
+        }
+        return { count: 0 };
+      },
+      async upsert(args: {
+        create: (typeof phaseProgress)[number];
+        update: Partial<(typeof phaseProgress)[number]>;
+        where: { ctlSessionId_phase: { ctlSessionId: string; phase: "COLOCACION" | "EVALUACION_1" | "EVALUACION_2" } };
+      }) {
+        const target = phaseProgress.find(
+          (phase) =>
+            phase.ctlSessionId === args.where.ctlSessionId_phase.ctlSessionId &&
+            phase.phase === args.where.ctlSessionId_phase.phase
+        );
+        if (target) {
+          Object.assign(target, args.update);
+          return target;
+        }
+        phaseProgress.push(args.create);
+        return args.create;
       }
     },
     ctlSession: {
@@ -1771,6 +1900,7 @@ function createCtlState() {
     armAssignments,
     confirmations,
     ctlInterviewerCodes,
+    phaseProgress,
     navigoActivities,
     participant,
     prisma,

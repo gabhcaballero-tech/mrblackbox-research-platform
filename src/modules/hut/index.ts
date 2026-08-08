@@ -3,17 +3,39 @@ export {
   applyHutMissedDay,
   applyHutVideoSubmission,
   getHutCurrentAvailability,
+  hutFormDataToAnswerInput,
   hutBlockDayAvailableAt,
   nextHutVideoSequence,
   normalizeHutText,
+  parseHutQuestionnaireAnswers,
+  parseHutQuestionAnswer,
   parseHutParticipantImportText,
   parseHutRegistrationSlotImportText
 } from "./service";
+export {
+  getHutApplicableQuestions,
+  getHutQuestions,
+  getHutQuestionsBySection,
+  getHutV5Definition,
+  HUT_V5_DEFINITION
+} from "./definition";
 export type {
+  HutAnswerDraft,
+  HutAnswerInput,
   HutBlockStatus,
   HutCallEvaluationStatus,
   HutParticipantStatus
 } from "./service";
+export type {
+  HutDefinition,
+  HutDefinitionContext,
+  HutMatrixQuestionDefinition,
+  HutParticipantOrigin,
+  HutQuestionDefinition,
+  HutQuestionnaireSectionId,
+  HutQuestionType,
+  HutSectionDefinition
+} from "./definition";
 export {
   createHutRepository
 } from "./repository";

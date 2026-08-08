@@ -8,23 +8,28 @@ import {
 } from "./CtlMobileCapture";
 import {
   finishPublicCtlSessionAction,
-  savePublicCtlQuestionAnswerAction
+  savePublicCtlQuestionAnswerAction,
+  validatePublicCtlPhaseCodeAction
 } from "@/modules/ctl/public-actions";
 
 vi.mock("@/modules/ctl/public-actions", () => ({
   finishPublicCtlSessionAction: vi.fn(),
-  savePublicCtlQuestionAnswerAction: vi.fn()
+  savePublicCtlQuestionAnswerAction: vi.fn(),
+  validatePublicCtlPhaseCodeAction: vi.fn()
 }));
 
 const saveQuestionMock = vi.mocked(savePublicCtlQuestionAnswerAction);
 const finishMock = vi.mocked(finishPublicCtlSessionAction);
+const validatePhaseMock = vi.mocked(validatePublicCtlPhaseCodeAction);
 
 describe("CtlMobileCapture", () => {
   beforeEach(() => {
     saveQuestionMock.mockReset();
     finishMock.mockReset();
+    validatePhaseMock.mockReset();
     saveQuestionMock.mockResolvedValue({ ok: true });
     finishMock.mockResolvedValue({ ok: true, redirectTo: "" });
+    validatePhaseMock.mockResolvedValue({ ok: true });
   });
 
   it("starts on the first required pending question after reload", () => {
@@ -153,14 +158,61 @@ describe("CtlMobileCapture", () => {
     expect(saveQuestionMock.mock.calls[0]?.[2]).toBe("P1");
     expect((saveQuestionMock.mock.calls[0]?.[3] as FormData).get("P1")).toBe("PR2");
   });
+
+  it("requires the operational phase code before showing fragrance evaluation questions", async () => {
+    renderMobileCapture({
+      definition: phaseDefinition,
+      phaseProgress: [
+        {
+          arm: "IZQUIERDO",
+          phase: "COLOCACION",
+          productCode: "247",
+          referenceCodeSlot: 1,
+          status: "IN_PROGRESS",
+          validatedAt: null
+        },
+        {
+          arm: "DERECHO",
+          phase: "EVALUACION_1",
+          productCode: "583",
+          referenceCodeSlot: 2,
+          status: "PENDING",
+          validatedAt: null
+        },
+        {
+          arm: null,
+          phase: "EVALUACION_2",
+          productCode: "583",
+          referenceCodeSlot: 3,
+          status: "PENDING",
+          validatedAt: null
+        }
+      ]
+    });
+
+    expect(screen.getByText("Fase operativa")).toBeInTheDocument();
+    expect(screen.getByText("Colocacion - Entrega 1")).toBeInTheDocument();
+    expect(screen.getByText("247")).toBeInTheDocument();
+    expect(screen.queryByText("Gusto primera fragancia")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Codigo de fase"), { target: { value: "A7K4" } });
+    fireEvent.click(screen.getByRole("button", { name: "Validar codigo" }));
+
+    await waitFor(() => expect(validatePhaseMock).toHaveBeenCalledTimes(1));
+    expect(validatePhaseMock.mock.calls[0]?.[2]).toBe("COLOCACION");
+    expect((validatePhaseMock.mock.calls[0]?.[3] as FormData).get("phaseCode")).toBe("A7K4");
+    expect(await screen.findByText("Gusto primera fragancia")).toBeInTheDocument();
+  });
 });
 
 function renderMobileCapture({
   answers = {},
-  definition = mobileDefinition
+  definition = mobileDefinition,
+  phaseProgress = []
 }: {
   answers?: Record<string, unknown>;
   definition?: CtlDefinition;
+  phaseProgress?: React.ComponentProps<typeof CtlMobileCapture>["phaseProgress"];
 } = {}) {
   render(
     <CtlMobileCapture
@@ -187,6 +239,7 @@ function renderMobileCapture({
       readOnly={false}
       sessionId="session-1"
       studyCode="FMASCULINA-NAVIGO-2026"
+      phaseProgress={phaseProgress}
     />
   );
 }
@@ -274,6 +327,26 @@ const triangularDefinition: CtlDefinition = {
         }
       ],
       title: "Triangular"
+    }
+  ],
+  version: 2
+};
+
+const phaseDefinition: CtlDefinition = {
+  sections: [
+    {
+      id: "FRAGRANCIA_1",
+      questions: [
+        {
+          code: "P5A_GUSTO_M1",
+          label: "Gusto primera fragancia",
+          max: 7,
+          min: 1,
+          required: true,
+          type: "SCALE"
+        }
+      ],
+      title: "Evaluacion primera fragancia"
     }
   ],
   version: 2

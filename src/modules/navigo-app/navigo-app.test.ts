@@ -2002,6 +2002,8 @@ describe("navigo app MVP rules", () => {
       { phase: "REGRESO_1", slot: 2, status: "GENERATED" },
       { phase: "REGRESO_2", slot: 3, status: "GENERATED" }
     ]);
+    expect(state.hutParticipants[0]?.blocks).toHaveLength(0);
+    expect(state.hutParticipants[0]?.callEvaluations).toHaveLength(0);
   });
 
   it("does not synchronize HUT rows when screening marks the participant as Navigo only", async () => {
@@ -2091,7 +2093,7 @@ describe("navigo app MVP rules", () => {
     expect(blocked.ok ? 0 : blocked.data?.summary.rowsWithError).toBe(1);
   });
 
-  it("blocks Navigo before CTL and releases link, T0 and rotation after CTL completion", async () => {
+  it("blocks Navigo before CTL and creates only T3, T4.5 and T6 after initial application", async () => {
     const state = createNavigoParticipantImportState();
     const repository = createNavigoAppRepository(state.prisma as never);
     await repository.configureStudyRotation({
@@ -2145,6 +2147,30 @@ describe("navigo app MVP rules", () => {
     expect(state.activities).toHaveLength(0);
     expect(state.rotationAssignments).toMatchObject([{ rotationCode: "ROTACION_1" }]);
     expect(state.armAssignments).toHaveLength(2);
+
+    const application = await repository.registerInitialApplication({
+      now: new Date("2026-06-26T16:00:00.000Z"),
+      token: state.accessTokens[0]?.id ?? ""
+    });
+
+    expect(application.ok).toBe(true);
+    expect(state.activities).toHaveLength(3);
+    const createdActivities = state.activities
+      .map((activity) => ({
+        code: state.schedules.find((schedule) => schedule.id === activity.activityScheduleId)?.code,
+        scheduledAt: activity.scheduledAt
+      }))
+      .sort((left, right) => left.scheduledAt.getTime() - right.scheduledAt.getTime());
+    expect(createdActivities.map((activity) => activity.scheduledAt.toISOString())).toEqual([
+      "2026-06-26T19:00:00.000Z",
+      "2026-06-26T20:30:00.000Z",
+      "2026-06-26T22:00:00.000Z"
+    ]);
+    expect(createdActivities.map((activity) => activity.code)).toEqual(["T3_HORAS", "T4_5_HORAS", "T6_HORAS"]);
+    expect(state.activities.some((activity) => {
+      const code = String(state.schedules.find((schedule) => schedule.id === activity.activityScheduleId)?.code ?? "");
+      return code === "T0_15_MIN" || code === "T8_HORAS";
+    })).toBe(false);
   });
 
   it("keeps CTL release rotation fixed and assigns independent rotations to two participants", async () => {
@@ -3777,6 +3803,29 @@ function createNavigoParticipantImportState(
       },
       async deleteMany(args: { where: { studyParticipantId: string } }) {
         return deleteWhere(accessTokens, (token) => token.studyParticipantId === args.where.studyParticipantId);
+      },
+      async findFirst(args: { where: { status: string; tokenHash: string } }) {
+        const token = accessTokens.find(
+          (candidate) => candidate.status === args.where.status && candidate.tokenHash === args.where.tokenHash
+        );
+        if (!token) {
+          return null;
+        }
+        const participant = buildParticipantRecord(token.studyParticipantId);
+        return participant
+          ? {
+              ...token,
+              studyParticipant: participant
+            }
+          : null;
+      },
+      async update(args: { data: Partial<(typeof accessTokens)[number]>; where: { id: string } }) {
+        const target = accessTokens.find((token) => token.id === args.where.id);
+        if (!target) {
+          throw new Error("token not found");
+        }
+        Object.assign(target, args.data);
+        return target;
       },
       async updateMany(args: { data: Partial<(typeof accessTokens)[number]>; where: { status: string; studyParticipantId: string } }) {
         let count = 0;

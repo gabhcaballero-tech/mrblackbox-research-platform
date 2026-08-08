@@ -18,7 +18,8 @@ import {
   normalizeCtlCode,
   parseCtlAnswers,
   parseCtlQuestionAnswer,
-  type CtlAnswerInput
+  type CtlAnswerInput,
+  type CtlOperationalPhase
 } from "./service";
 
 export async function loginPublicCtlInterviewerAction(studyCode: string, formData: FormData) {
@@ -121,6 +122,43 @@ export async function savePublicCtlAnswersAction(studyCode: string, sessionId: s
   redirect(
     `/ctl/${encodeURIComponent(studyCode)}/sessions/${encodeURIComponent(sessionId)}?ctlMessage=${encodeURIComponent("Avance CTL guardado.")}`
   );
+}
+
+export async function validatePublicCtlPhaseCodeAction(
+  studyCode: string,
+  sessionId: string,
+  phase: CtlOperationalPhase,
+  formData: FormData
+) {
+  const actor = await getPublicCtlInterviewerActor({ studyCode });
+
+  if (!actor) {
+    return {
+      message: "Ingresa tu codigo de encuestador para continuar.",
+      ok: false
+    };
+  }
+
+  const result = await createCtlRepository().validatePhaseCode({
+    actor,
+    code: String(formData.get("phaseCode") ?? ""),
+    phase,
+    sessionId
+  });
+
+  if (!result.ok) {
+    return {
+      message: result.message,
+      ok: false
+    };
+  }
+
+  revalidatePath(`/ctl/${studyCode}`);
+  revalidatePath(`/ctl/${studyCode}/sessions/${sessionId}`);
+
+  return {
+    ok: true
+  };
 }
 
 export async function savePublicCtlQuestionAnswerAction(

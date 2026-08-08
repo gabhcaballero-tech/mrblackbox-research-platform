@@ -8,6 +8,7 @@ import {
 export const HUT_VIDEO_BUCKET = PARTICIPANT_EVIDENCE_BUCKET;
 export const HUT_MAX_VIDEO_BYTES = 250 * 1024 * 1024;
 export const HUT_MAX_SELFIE_BYTES = 8 * 1024 * 1024;
+export const HUT_MAX_APPLICATION_PHOTO_BYTES = 12 * 1024 * 1024;
 
 export type HutVideoUploadMetadata = {
   originalFilename: string;
@@ -41,6 +42,15 @@ export type HutSignedSelfieUpload = {
   storageBucket: string;
   token: string;
   metadata: HutValidatedSelfieUploadMetadata;
+};
+
+export type HutApplicationPhotoUploadMetadata = HutSelfieUploadMetadata;
+export type HutValidatedApplicationPhotoUploadMetadata = HutValidatedSelfieUploadMetadata;
+export type HutSignedApplicationPhotoUpload = {
+  privateStorageKey: string;
+  storageBucket: string;
+  token: string;
+  metadata: HutValidatedApplicationPhotoUploadMetadata;
 };
 
 export type HutStorageClient = EvidenceStorageClient;
@@ -141,6 +151,16 @@ export function validateHutSelfieUploadMetadata(metadata: HutSelfieUploadMetadat
   };
 }
 
+export function validateHutApplicationPhotoUploadMetadata(metadata: HutApplicationPhotoUploadMetadata): HutValidatedApplicationPhotoUploadMetadata {
+  const validated = validateHutSelfieUploadMetadata(metadata);
+
+  if (metadata.sizeBytes > HUT_MAX_APPLICATION_PHOTO_BYTES) {
+    throw new Error("La foto excede el tamano maximo permitido.");
+  }
+
+  return validated;
+}
+
 export async function createHutSignedReferenceSelfieUpload({
   metadata,
   participantId,
@@ -212,6 +232,44 @@ export async function createHutSignedDailySelfieUpload({
   return createSignedHutSelfie({ metadata: validated, privateStorageKey, storage });
 }
 
+export async function createHutSignedApplicationPhotoUpload({
+  metadata,
+  participantId,
+  phase,
+  storage = createSupabaseEvidenceStorageClient(),
+  studyId
+}: {
+  metadata: HutApplicationPhotoUploadMetadata;
+  participantId: string;
+  phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2";
+  storage?: HutStorageClient;
+  studyId: string;
+}): Promise<HutSignedApplicationPhotoUpload> {
+  const validated = validateHutApplicationPhotoUploadMetadata(metadata);
+  const privateStorageKey = buildHutApplicationPhotoStorageKey({
+    extension: validated.extension,
+    participantId,
+    phase,
+    studyId
+  });
+  const signed = await storage.createSignedUploadUrl({
+    bucket: HUT_VIDEO_BUCKET,
+    contentType: validated.mimeType,
+    privateStorageKey
+  });
+
+  if (!signed.token) {
+    throw new Error("No fue posible preparar la carga de la foto.");
+  }
+
+  return {
+    metadata: validated,
+    privateStorageKey,
+    storageBucket: HUT_VIDEO_BUCKET,
+    token: signed.token
+  };
+}
+
 export function assertHutVideoStorageKey({
   participantId,
   privateStorageKey,
@@ -241,6 +299,22 @@ export function assertHutSelfieStorageKey({
 
   if (!privateStorageKey.startsWith(expectedPrefix)) {
     throw new Error("No fue posible validar la selfie cargada.");
+  }
+}
+
+export function assertHutApplicationPhotoStorageKey({
+  participantId,
+  privateStorageKey,
+  studyId
+}: {
+  participantId: string;
+  privateStorageKey: string;
+  studyId: string;
+}) {
+  const expectedPrefix = ["studies", studyId, "hut-participants", participantId, "application-photos", ""].join("/");
+
+  if (!privateStorageKey.startsWith(expectedPrefix)) {
+    throw new Error("No fue posible validar la foto de aplicacion.");
   }
 }
 
@@ -338,6 +412,30 @@ function buildHutSelfieStorageKey({
     "hut-participants",
     participantId,
     ...folder,
+    `${randomUUID()}.${safeExtension}`
+  ].join("/");
+}
+
+function buildHutApplicationPhotoStorageKey({
+  extension,
+  participantId,
+  phase,
+  studyId
+}: {
+  extension: string;
+  participantId: string;
+  phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2";
+  studyId: string;
+}) {
+  const safeExtension = extension.toLowerCase() === "jpeg" ? "jpg" : extension.toLowerCase();
+
+  return [
+    "studies",
+    studyId,
+    "hut-participants",
+    participantId,
+    "application-photos",
+    phase.toLowerCase(),
     `${randomUUID()}.${safeExtension}`
   ].join("/");
 }

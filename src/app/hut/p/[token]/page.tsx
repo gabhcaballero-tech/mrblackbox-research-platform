@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createHutRepository, type HutPortalView } from "@/modules/hut";
 import { validateHutPhaseCodeAction } from "@/modules/hut/actions";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { HutApplicationPhotoUploadForm } from "./HutApplicationPhotoUploadForm";
 import { HutVideoUploadForm } from "./HutVideoUploadForm";
 
 export const dynamic = "force-dynamic";
@@ -72,7 +73,15 @@ export default async function HutParticipantPage({ params, searchParams }: HutPa
           <HutPhaseCodeForm token={view.token} view={view} />
         ) : null}
 
-        {view.status !== "COMPLETED" && !view.phaseGate?.required && view.availability.reason === "AVAILABLE_FOR_SELFIE" ? (
+        {view.status !== "COMPLETED" && !view.phaseGate?.required && view.availableApplicationPhoto ? (
+          <HutApplicationPhotoUploadForm
+            phase={view.availableApplicationPhoto.phase}
+            productCode={view.availableApplicationPhoto.productCode}
+            token={view.token}
+          />
+        ) : null}
+
+        {view.protocolVersion === "LEGACY_VIDEO" && view.status !== "COMPLETED" && !view.phaseGate?.required && view.availability.reason === "AVAILABLE_FOR_SELFIE" ? (
           <HutVideoUploadForm
             blockNumber={view.availability.blockNumber ?? view.availableUpload?.blockNumber ?? 1}
             mode="selfie"
@@ -81,7 +90,7 @@ export default async function HutParticipantPage({ params, searchParams }: HutPa
           />
         ) : null}
 
-        {view.status !== "COMPLETED" && !view.phaseGate?.required && view.availableUpload ? (
+        {view.protocolVersion === "LEGACY_VIDEO" && view.status !== "COMPLETED" && !view.phaseGate?.required && view.availableUpload ? (
           <HutVideoUploadForm
             blockNumber={view.availableUpload.blockNumber}
             mode="video"
@@ -90,7 +99,7 @@ export default async function HutParticipantPage({ params, searchParams }: HutPa
           />
         ) : null}
 
-        {view.status !== "COMPLETED" && !view.phaseGate?.required && !view.availableUpload && view.availability.reason !== "AVAILABLE_FOR_SELFIE" ? (
+        {view.status !== "COMPLETED" && !view.phaseGate?.required && !view.availableApplicationPhoto && !view.availableUpload && view.availability.reason !== "AVAILABLE_FOR_SELFIE" ? (
           <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-zinc-950">Actividad no disponible</h2>
             <p className="mt-2 text-sm leading-6 text-zinc-600">{availabilityMessage(view.availability.reason, view.availability.nextAvailableAt)}</p>
@@ -145,12 +154,38 @@ function CompletionMessage() {
 }
 
 function ProgressSummary({ view }: { view: HutPortalView }) {
+  if (view.protocolVersion === "APPLICATION_PHOTO") {
+    return (
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        {(["COLOCACION", "REGRESO_1", "REGRESO_2"] as const).map((phase) => {
+          const evidence = view.applicationEvidence.find((item) => item.phase === phase);
+          return (
+            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={phase}>
+              <p className="font-semibold text-zinc-950">{phaseLabel(phase)}</p>
+              <p className="mt-1 text-zinc-600">{evidence ? "Foto registrada" : "Pendiente"}</p>
+              {evidence?.productCode ? <p className="text-zinc-600">Producto: {evidence.productCode}</p> : null}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div className="mt-5 grid gap-3 sm:grid-cols-2">
       <BlockSummary label="Bloque 1" missed={view.block1?.missedDaysCount ?? 0} videos={view.block1?.submittedVideosCount ?? 0} />
       <BlockSummary label="Bloque 2" missed={view.block2?.missedDaysCount ?? 0} videos={view.block2?.submittedVideosCount ?? 0} />
     </div>
   );
+}
+
+function phaseLabel(phase: string): string {
+  const labels: Record<string, string> = {
+    COLOCACION: "Colocacion",
+    REGRESO_1: "Regreso 1",
+    REGRESO_2: "Regreso 2"
+  };
+  return labels[phase] ?? phase;
 }
 
 function BlockSummary({ label, missed, videos }: { label: string; missed: number; videos: number }) {
@@ -185,6 +220,12 @@ function availabilityMessage(reason: string, nextAvailableAt: Date | null) {
   }
   if (reason === "MISSING_REFERENCE_SELFIE") {
     return "Tu registro aún no está completo. Contacta al encuestador.";
+  }
+  if (reason === "WAITING_FOR_PHASE_CODE") {
+    return "Captura el codigo de la fase para registrar la foto de aplicacion.";
+  }
+  if (reason === "COMPLETE") {
+    return "Tu participacion HUT esta completa.";
   }
   if (reason === "VISUAL_VERIFICATION_FAILED" || reason === "VISUAL_VERIFICATION_PENDING") {
     return "No pudimos confirmar tu identidad. Contacta al supervisor antes de continuar.";

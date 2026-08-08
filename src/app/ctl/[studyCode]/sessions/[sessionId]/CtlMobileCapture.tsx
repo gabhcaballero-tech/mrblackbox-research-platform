@@ -11,8 +11,10 @@ import {
 } from "@/modules/ctl/definition";
 import {
   finishPublicCtlSessionAction,
-  savePublicCtlQuestionAnswerAction
+  savePublicCtlQuestionAnswerAction,
+  validatePublicCtlPhaseCodeAction
 } from "@/modules/ctl/public-actions";
+import type { CtlOperationalPhase, CtlPhaseProgressStatus } from "@/modules/ctl/service";
 
 type FlatQuestion = {
   index: number;
@@ -32,11 +34,21 @@ type CtlMobileCaptureProps = {
     secondSampleKey?: string | null;
     triangularRotation?: CtlTriangularRotationDisplay | null;
   };
+  phaseProgress?: CtlPhaseProgressDisplay[];
   readOnly: boolean;
   sessionId: string;
   startedAtLabel?: string | null;
   studyCode: string;
   todayLabel?: string;
+};
+
+type CtlPhaseProgressDisplay = {
+  arm: string | null;
+  phase: CtlOperationalPhase;
+  productCode: string | null;
+  referenceCodeSlot: 1 | 2 | 3;
+  status: CtlPhaseProgressStatus;
+  validatedAt: Date | string | null;
 };
 
 type CtlTriangularRotationDisplay = {
@@ -68,6 +80,7 @@ export function CtlMobileCapture({
   completedAtLabel,
   definition,
   participant,
+  phaseProgress = [],
   readOnly,
   sessionId,
   startedAtLabel,
@@ -82,6 +95,8 @@ export function CtlMobileCapture({
     [answers, completedAtLabel, participant, startedAtLabel, todayLabel]
   );
   const [localAnswers, setLocalAnswers] = useState<Record<string, unknown>>(initialAnswers);
+  const [localPhaseProgress, setLocalPhaseProgress] = useState<CtlPhaseProgressDisplay[]>(phaseProgress);
+  const [phaseCode, setPhaseCode] = useState("");
   const questions = useMemo(() => flattenCtlQuestions(definition, localAnswers), [definition, localAnswers]);
   const [currentIndex, setCurrentIndex] = useState(() => getInitialCtlQuestionIndex(definition, initialAnswers));
   const [isReviewing, setIsReviewing] = useState(readOnly);
@@ -96,6 +111,9 @@ export function CtlMobileCapture({
   const completedCount = questions.filter(({ question }) => isCtlQuestionAnswered(question, localAnswers[question.code])).length;
   const progressPercent = questions.length > 0 ? Math.round((completedCount / questions.length) * 100) : 0;
   const pendingQuestionCodes = getPendingCtlQuestionCodes(definition, localAnswers);
+  const requiredPhase = !isReviewing && current ? requiredCtlPhaseForQuestion(current.sectionTitle, current.question.code) : null;
+  const phaseGate = requiredPhase ? localPhaseProgress.find((phase) => phase.phase === requiredPhase) ?? null : null;
+  const isPhaseBlocked = Boolean(phaseGate && phaseGate.status !== "COMPLETED" && !readOnly);
   const canGoBack = !isPending && (isReviewing || currentIndex > 0);
 
   function setAnswer(questionCode: string, answer: unknown) {
@@ -184,6 +202,13 @@ export function CtlMobileCapture({
       return;
     }
 
+    const incompletePhase = firstIncompletePhase(localPhaseProgress);
+    if (incompletePhase) {
+      setMessage(null);
+      setError(`Valida la fase ${ctlPhaseLabel(incompletePhase.phase)} antes de finalizar CTL.`);
+      return;
+    }
+
     setError(null);
     setMessage("Finalizando CTL...");
     startTransition(async () => {
@@ -211,6 +236,47 @@ export function CtlMobileCapture({
       if (result.redirectTo) {
         window.location.assign(result.redirectTo);
       }
+    });
+  }
+
+  function validatePhase() {
+    if (!phaseGate || readOnly || isPending) {
+      return;
+    }
+
+    if (!phaseCode.trim()) {
+      setError("Captura el codigo de fase para continuar.");
+      return;
+    }
+
+    setError(null);
+    setMessage("Validando codigo de fase...");
+    const formData = new FormData();
+    formData.set("phaseCode", phaseCode);
+
+    startTransition(async () => {
+      const result = await validatePublicCtlPhaseCodeAction(
+        studyCode,
+        sessionId,
+        phaseGate.phase,
+        formData
+      ) as ActionResult;
+
+      if (!result.ok) {
+        setMessage(null);
+        setError(result.message);
+        return;
+      }
+
+      setLocalPhaseProgress((currentPhases) =>
+        currentPhases.map((phase) =>
+          phase.phase === phaseGate.phase
+            ? { ...phase, status: "COMPLETED", validatedAt: new Date().toISOString() }
+            : phase
+        )
+      );
+      setPhaseCode("");
+      setMessage("Fase validada correctamente.");
     });
   }
 
@@ -263,6 +329,14 @@ export function CtlMobileCapture({
           pendingCount={pendingQuestionCodes.length}
           pendingQuestionCodes={pendingQuestionCodes}
         />
+      ) : isPhaseBlocked && phaseGate ? (
+        <PhaseGatePanel
+          disabled={isPending}
+          onChange={setPhaseCode}
+          onSubmit={validatePhase}
+          phase={phaseGate}
+          value={phaseCode}
+        />
       ) : current ? (
         <QuestionStep
           answer={localAnswers[current.question.code]}
@@ -293,6 +367,15 @@ export function CtlMobileCapture({
           >
             {isPending ? "Finalizando CTL..." : "Finalizar CTL"}
           </button>
+        ) : isPhaseBlocked ? (
+          <button
+            className={primaryButtonClass}
+            disabled={readOnly || isPending}
+            onClick={validatePhase}
+            type="button"
+          >
+            {isPending ? "Validando..." : "Validar fase"}
+          </button>
         ) : (
           <button
             className={primaryButtonClass}
@@ -305,6 +388,62 @@ export function CtlMobileCapture({
         )}
       </div>
     </section>
+  );
+}
+
+function PhaseGatePanel({
+  disabled,
+  onChange,
+  onSubmit,
+  phase,
+  value
+}: {
+  disabled: boolean;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  phase: CtlPhaseProgressDisplay;
+  value: string;
+}) {
+  return (
+    <article className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-5">
+      <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Fase operativa</p>
+      <h3 className="mt-2 text-xl font-bold text-amber-950">{ctlPhaseLabel(phase.phase)}</h3>
+      <p className="mt-2 text-sm leading-6 text-amber-900">
+        Captura el codigo {phase.referenceCodeSlot} para continuar con esta fase de la entrevista.
+      </p>
+      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+        <PhaseDetail label="Producto" value={phase.productCode ?? "No asignado"} />
+        <PhaseDetail label="Brazo" value={phase.arm ?? "No aplica"} />
+      </dl>
+      <label className="mt-5 block text-sm font-semibold text-amber-950">
+        Codigo de fase
+        <input
+          autoComplete="off"
+          className="mt-2 min-h-12 w-full rounded-xl border border-amber-300 bg-white px-4 py-3 text-lg font-bold tracking-widest text-zinc-950"
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={`Codigo ${phase.referenceCodeSlot}`}
+          value={value}
+        />
+      </label>
+      <button
+        className={`${primaryButtonClass} mt-4`}
+        disabled={disabled}
+        onClick={onSubmit}
+        type="button"
+      >
+        {disabled ? "Validando..." : "Validar codigo"}
+      </button>
+    </article>
+  );
+}
+
+function PhaseDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-amber-200 bg-white p-3">
+      <dt className="text-xs font-medium text-amber-700">{label}</dt>
+      <dd className="mt-1 font-semibold text-zinc-950">{value}</dd>
+    </div>
   );
 }
 
@@ -782,6 +921,40 @@ function buildAutomaticCtlAnswers({
     DG_HORA_TERMINO: completedAtLabel ?? "",
     DG_NOMBRE: participant.name
   };
+}
+
+function requiredCtlPhaseForQuestion(sectionTitle: string, questionCode: string): CtlOperationalPhase | null {
+  if (questionCode.startsWith("P5A") || questionCode.startsWith("P6A") || questionCode.startsWith("P7A") || questionCode.startsWith("P8A") || questionCode.startsWith("P9A") || questionCode.startsWith("P10A") || questionCode.startsWith("P11A") || questionCode.startsWith("P12A") || questionCode.startsWith("P13A")) {
+    return "COLOCACION";
+  }
+  if (questionCode.startsWith("P5B") || questionCode.startsWith("P6B") || questionCode.startsWith("P7B") || questionCode.startsWith("P8B") || questionCode.startsWith("P9B") || questionCode.startsWith("P10B") || questionCode.startsWith("P11B") || questionCode.startsWith("P12B") || questionCode.startsWith("P13B")) {
+    return "EVALUACION_1";
+  }
+  if (sectionTitle.includes("COMPARATIVA") || sectionTitle.includes("DEMOGRAF")) {
+    return "EVALUACION_2";
+  }
+
+  return null;
+}
+
+function firstIncompletePhase(phases: CtlPhaseProgressDisplay[]): CtlPhaseProgressDisplay | null {
+  if (phases.length === 0) {
+    return null;
+  }
+
+  return phases
+    .slice()
+    .sort((left, right) => left.referenceCodeSlot - right.referenceCodeSlot)
+    .find((phase) => phase.status !== "COMPLETED") ?? null;
+}
+
+function ctlPhaseLabel(phase: CtlOperationalPhase): string {
+  const labels: Record<CtlOperationalPhase, string> = {
+    COLOCACION: "Colocacion - Entrega 1",
+    EVALUACION_1: "Evaluacion 1 - Entrega 2",
+    EVALUACION_2: "Evaluacion 2"
+  };
+  return labels[phase];
 }
 
 function resolveQuestionLabel(

@@ -23,14 +23,18 @@ import {
   type HutParticipantStatus
 } from "./service";
 import {
+  assertHutApplicationPhotoStorageKey,
   assertHutSelfieStorageKey,
   assertHutRegistrationSelfieStorageKey,
   assertHutVideoStorageKey,
+  createHutSignedApplicationPhotoUpload,
   createHutSignedDailySelfieUpload,
   createHutSignedRegistrationSelfieUpload,
   createHutSignedReferenceSelfieUpload,
   createHutSignedVideoUpload,
   HUT_VIDEO_BUCKET,
+  type HutApplicationPhotoUploadMetadata,
+  type HutSignedApplicationPhotoUpload,
   type HutSelfieUploadMetadata,
   type HutSignedSelfieUpload,
   type HutSignedVideoUpload,
@@ -87,6 +91,7 @@ export type HutStudySummary = {
 };
 
 export type HutAdminParticipant = {
+  applicationEvidence: HutApplicationEvidenceAdmin[];
   availability: {
     blockNumber?: number;
     expectedVideoSequence?: number;
@@ -107,8 +112,10 @@ export type HutAdminParticipant = {
   link: string;
   name: string;
   phone: string | null;
+  origin: "CLT_HUT" | "HUT_DIRECTO";
   recruiter: string | null;
   phaseCodes: HutPhaseCodeAdmin[];
+  protocolVersion: "APPLICATION_PHOTO" | "LEGACY_VIDEO";
   reminderPending: boolean;
   referenceSelfie: {
     capturedAt: Date;
@@ -161,6 +168,13 @@ export type HutCallSummary = {
   status: HutCallEvaluationStatus;
 };
 
+export type HutApplicationEvidenceAdmin = {
+  capturedAt: Date;
+  phase: HutPhase;
+  productCode: string | null;
+  signedUrl: string | null;
+};
+
 export type HutVideoSummary = {
   sequenceNumber: number;
   signedUrl: string | null;
@@ -208,6 +222,15 @@ export type HutRegistrationView = {
 };
 
 export type HutPortalView = {
+  applicationEvidence: Array<{
+    capturedAt: Date;
+    phase: HutPhase;
+    productCode: string | null;
+  }>;
+  availableApplicationPhoto: {
+    phase: HutPhase;
+    productCode: string | null;
+  } | null;
   availableUpload: {
     blockNumber: number;
     sequenceNumber: number;
@@ -226,9 +249,11 @@ export type HutPortalView = {
     label: string;
     phase: HutPhase;
     required: boolean;
-    status: HutPhaseCodeStatus;
+    status: HutPhaseCodeStatus | "MISSING";
   } | null;
   participantId: string;
+  origin: "CLT_HUT" | "HUT_DIRECTO";
+  protocolVersion: "APPLICATION_PHOTO" | "LEGACY_VIDEO";
   status: HutParticipantStatus;
   studyName: string;
   testMode: boolean;
@@ -255,6 +280,7 @@ export type HutRepository = {
     slotId?: string | null;
     startDate?: Date | null;
     studyId: string;
+    protocolVersion?: "APPLICATION_PHOTO" | "LEGACY_VIDEO";
   }) => Promise<HutActionResult<{ link: string; participantId: string }>>;
   createRegistrationSlot: (input: {
     firstFragranceLeftArm: string;
@@ -378,6 +404,11 @@ export type HutRepository = {
     storage?: HutStorageClient;
     token: string;
   }) => Promise<HutActionResult<HutSignedSelfieUpload & { referenceSelfieSignedUrl: string }>>;
+  requestApplicationPhotoUpload: (input: {
+    metadata: HutApplicationPhotoUploadMetadata;
+    storage?: HutStorageClient;
+    token: string;
+  }) => Promise<HutActionResult<HutSignedApplicationPhotoUpload & { phase: HutPhase; productCode: string | null }>>;
   confirmDailySelfieUpload: (input: {
     faceVerification?: NavigoFaceVerificationClientResult | null;
     metadata: HutSelfieUploadMetadata & {
@@ -386,6 +417,13 @@ export type HutRepository = {
     };
     token: string;
   }) => Promise<HutActionResult<{ status: "MATCHED" | "NOT_MATCHED" | "UNCERTAIN" | "PENDING_REVIEW" }>>;
+  confirmApplicationPhotoUpload: (input: {
+    metadata: HutApplicationPhotoUploadMetadata & {
+      privateStorageKey: string;
+      storageBucket: string;
+    };
+    token: string;
+  }) => Promise<HutActionResult<{ phase: HutPhase }>>;
   setVisualOverride: (input: {
     actorUserId: string;
     enabled: boolean;
@@ -466,6 +504,7 @@ type HutPrismaClient = PrismaClientLike & {
   hutBlock: PrismaModel;
   hutCallEvaluation: PrismaModel;
   hutDailyCheck: PrismaModel;
+  hutApplicationEvidence: PrismaModel;
   hutParticipant: PrismaModel;
   hutParticipantPhaseCode: PrismaModel;
   hutReferenceSelfie: PrismaModel;
@@ -477,6 +516,7 @@ type HutPrismaClient = PrismaClientLike & {
 };
 
 type HutParticipantRecord = {
+  applicationEvidence?: HutApplicationEvidenceRecord[];
   blocks: HutBlockRecord[];
   callEvaluations: HutCallRecord[];
   currentBlockNumber: number;
@@ -488,12 +528,15 @@ type HutParticipantRecord = {
   id: string;
   name: string;
   phone: string | null;
+  origin?: "CLT_HUT" | "HUT_DIRECTO";
   phaseCodes?: HutPhaseCodeRecord[];
+  protocolVersion?: "APPLICATION_PHOTO" | "LEGACY_VIDEO";
   recruiter: string | null;
   startDate: Date | null;
   status: HutParticipantStatus;
   study: HutStudySummary;
   studyId: string;
+  studyParticipantId?: string | null;
   testMode: boolean;
   token: string;
   referenceSelfie: HutReferenceSelfieRecord | null;
@@ -542,6 +585,15 @@ type HutCallRecord = {
   evaluatorName: string | null;
   notes: string | null;
   status: HutCallEvaluationStatus;
+};
+
+type HutApplicationEvidenceRecord = {
+  capturedAt: Date;
+  id: string;
+  phase: HutPhase;
+  privateStorageKey: string;
+  productCode: string | null;
+  storageBucket: string;
 };
 
 type HutPhaseCodeRecord = {
@@ -612,6 +664,17 @@ const studySelect = {
 } as const;
 
 const participantSelect = {
+  applicationEvidence: {
+    orderBy: { capturedAt: "asc" },
+    select: {
+      capturedAt: true,
+      id: true,
+      phase: true,
+      privateStorageKey: true,
+      productCode: true,
+      storageBucket: true
+    }
+  },
   blocks: {
     orderBy: { blockNumber: "asc" },
     select: {
@@ -652,6 +715,7 @@ const participantSelect = {
   folio: true,
   id: true,
   name: true,
+  origin: true,
   phone: true,
   phaseCodes: {
     orderBy: { slot: "asc" },
@@ -672,6 +736,7 @@ const participantSelect = {
     }
   },
   recruiter: true,
+  protocolVersion: true,
   referenceSelfie: {
     select: {
       capturedAt: true,
@@ -692,6 +757,7 @@ const participantSelect = {
   status: true,
   study: { select: studySelect },
   studyId: true,
+  studyParticipantId: true,
   testMode: true,
   token: true,
   visualOverrideEnabled: true,
@@ -865,6 +931,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
         const token = createHutParticipantToken();
         const startsNow = Boolean(input.startDate);
+        const protocolVersion = input.protocolVersion ?? "APPLICATION_PHOTO";
         const participant = (await tx.hutParticipant.create?.({
           data: {
             currentBlockNumber: 1,
@@ -873,7 +940,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
             firstFragranceLeftArm: rotation?.firstFragranceLeftArm ?? null,
             folio: rotation?.folio ?? null,
             name,
+            origin: "HUT_DIRECTO",
             phone,
+            protocolVersion,
             recruiter,
             secondFragranceRightArm: rotation?.secondFragranceRightArm ?? null,
             startDate: input.startDate ?? null,
@@ -883,11 +952,13 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           }
         })) as { id: string };
 
-        await createHutParticipantFoundation(tx, {
-          participantId: participant.id,
-          startDate: input.startDate ?? null,
-          startsNow
-        });
+        if (protocolVersion === "LEGACY_VIDEO") {
+          await createHutParticipantFoundation(tx, {
+            participantId: participant.id,
+            startDate: input.startDate ?? null,
+            startsNow
+          });
+        }
 
         if (slot) {
           await tx.hutRegistrationSlot.update?.({
@@ -1340,6 +1411,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         await tx.hutVisualVerification.deleteMany?.({ where: { participantId: participant.id } });
         await tx.hutVideoSubmission.deleteMany?.({ where: { participantId: participant.id } });
         await tx.hutDailyCheck.deleteMany?.({ where: { participantId: participant.id } });
+        await tx.hutApplicationEvidence?.deleteMany?.({ where: { participantId: participant.id } });
         await tx.hutCallEvaluation.deleteMany?.({ where: { participantId: participant.id } });
         await tx.hutReferenceSelfie.deleteMany?.({ where: { participantId: participant.id } });
         await tx.hutBlock.deleteMany?.({ where: { participantId: participant.id } });
@@ -1956,7 +2028,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
             firstFragranceLeftArm: slot.firstFragranceLeftArm,
             folio: slot.folio,
             name,
+            origin: "HUT_DIRECTO",
             phone,
+            protocolVersion: "LEGACY_VIDEO",
             recruiter,
             secondFragranceRightArm: slot.secondFragranceRightArm,
             startDate: now,
@@ -2065,6 +2139,125 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       } catch (error) {
         return { message: error instanceof Error ? error.message : "No fue posible preparar la selfie diaria.", ok: false };
       }
+    },
+
+    async requestApplicationPhotoUpload(input) {
+      const prisma = await getPrisma();
+      const participant = await findParticipantByToken(prisma, input.token);
+
+      if (!participant) {
+        return { message: "Este enlace HUT no es valido.", ok: false };
+      }
+      if (!isApplicationPhotoProtocol(participant)) {
+        return { message: "Este participante conserva el flujo HUT historico.", ok: false };
+      }
+
+      const phase = expectedApplicationPhotoPhase(participant);
+      if (!phase) {
+        return { message: "No hay foto de aplicacion pendiente.", ok: false };
+      }
+
+      const phaseBlock = pendingHutPhaseMessage(participant);
+      if (phaseBlock) {
+        return { message: phaseBlock, ok: false };
+      }
+
+      try {
+        const signed = await createHutSignedApplicationPhotoUpload({
+          metadata: input.metadata,
+          participantId: participant.id,
+          phase,
+          storage: input.storage,
+          studyId: participant.studyId
+        });
+        return {
+          data: {
+            ...signed,
+            phase,
+            productCode: hutProductCodeForPhase(participant, phase)
+          },
+          ok: true
+        };
+      } catch (error) {
+        return { message: error instanceof Error ? error.message : "No fue posible preparar la foto de aplicacion.", ok: false };
+      }
+    },
+
+    async confirmApplicationPhotoUpload(input) {
+      const prisma = await getPrisma();
+      const now = new Date();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipantByToken(tx, input.token);
+
+        if (!participant) {
+          return { message: "Este enlace HUT no es valido.", ok: false };
+        }
+        if (!isApplicationPhotoProtocol(participant)) {
+          return { message: "Este participante conserva el flujo HUT historico.", ok: false };
+        }
+
+        const phase = expectedApplicationPhotoPhase(participant);
+        if (!phase) {
+          return { message: "No hay foto de aplicacion pendiente.", ok: false };
+        }
+
+        const phaseBlock = pendingHutPhaseMessage(participant);
+        if (phaseBlock) {
+          return { message: phaseBlock, ok: false };
+        }
+
+        if (input.metadata.storageBucket !== HUT_VIDEO_BUCKET) {
+          return { message: "No fue posible validar la foto de aplicacion.", ok: false };
+        }
+
+        try {
+          assertHutApplicationPhotoStorageKey({
+            participantId: participant.id,
+            privateStorageKey: input.metadata.privateStorageKey,
+            studyId: participant.studyId
+          });
+        } catch (error) {
+          return { message: error instanceof Error ? error.message : "No fue posible validar la foto de aplicacion.", ok: false };
+        }
+
+        await tx.hutApplicationEvidence.create?.({
+          data: {
+            capturedAt: now,
+            extension: extensionFromFilename(input.metadata.originalFilename),
+            mimeType: input.metadata.mimeType,
+            originalFilename: input.metadata.originalFilename,
+            participantId: participant.id,
+            phase,
+            privateStorageKey: input.metadata.privateStorageKey,
+            productCode: hutProductCodeForPhase(participant, phase),
+            sizeBytes: input.metadata.sizeBytes,
+            storageBucket: input.metadata.storageBucket
+          }
+        });
+
+        const phaseCode = participant.phaseCodes?.find((code) => code.phase === phase) ?? null;
+        if (phaseCode?.status === "VALIDATED") {
+          await tx.hutParticipantPhaseCode.update?.({
+            data: {
+              status: "USED",
+              usedAt: now
+            },
+            where: { id: phaseCode.id }
+          });
+        }
+
+        await tx.hutParticipant.update?.({
+          data: nextApplicationPhotoParticipantState(phase),
+          where: { id: participant.id }
+        });
+
+        return {
+          data: { phase },
+          message: phase === "REGRESO_2" ? "Foto registrada. Tu participacion HUT esta completa." : "Foto registrada correctamente.",
+          ok: true
+        };
+      });
     },
 
     async confirmDailySelfieUpload(input) {
@@ -2645,7 +2838,6 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         if (!participant) {
           return { message: "Este enlace HUT no es valido.", ok: false };
         }
-
         const expectedPhase = expectedHutPhaseForParticipant(participant);
         if (expectedPhase !== input.phase) {
           return { message: "Este codigo no corresponde a la fase actual.", ok: false };
@@ -2898,6 +3090,14 @@ async function toAdminParticipant(
     ? await signedStorageUrl(participant.referenceSelfie.privateStorageKey, participant.referenceSelfie.storageBucket, storage)
     : null;
   const identityReview = await buildIdentityReviewSummary(participant, referenceSignedUrl, storage);
+  const applicationEvidence = await Promise.all(
+    (participant.applicationEvidence ?? []).map(async (evidence) => ({
+      capturedAt: evidence.capturedAt,
+      phase: evidence.phase,
+      productCode: evidence.productCode,
+      signedUrl: await signedStorageUrl(evidence.privateStorageKey, evidence.storageBucket, storage)
+    }))
+  );
   const repository = whatsappRepository ?? createOneuiWhatsAppRepository();
   const whatsappRegistration = whatsappAutomationStatusFromMessage(
     await repository.findLatestOutboundTemplateMessage({
@@ -2908,6 +3108,7 @@ async function toAdminParticipant(
   );
 
   return {
+    applicationEvidence,
     availability: {
       blockNumber: "blockNumber" in availability ? availability.blockNumber : undefined,
       expectedVideoSequence: "expectedVideoSequence" in availability ? availability.expectedVideoSequence : undefined,
@@ -2927,8 +3128,10 @@ async function toAdminParticipant(
     identityReview,
     link: participantLink(requestOrigin, participant.token),
     name: participant.name,
+    origin: participantOrigin(participant),
     phaseCodes: toAdminPhaseCodes(participant),
     phone: participant.phone,
+    protocolVersion: participant.protocolVersion ?? "LEGACY_VIDEO",
     recruiter: participant.recruiter,
     reminderPending: Boolean(participant.dailyChecks?.some((check) => check.status === "REMINDER_PENDING")),
     referenceSelfie: participant.referenceSelfie
@@ -2998,7 +3201,7 @@ async function sendHutRegistrationWhatsAppForParticipant({
   if (!participant) {
     return { message: "No encontramos el participante HUT.", ok: false };
   }
-  if (!participant.referenceSelfie) {
+  if (isLegacyVideoProtocol(participant) && !participant.referenceSelfie) {
     return { message: "Guarda la selfie de registro para habilitar el inicio del HUT.", ok: false };
   }
 
@@ -3072,6 +3275,10 @@ function toAdminRegistrationSlot(slot: HutRegistrationSlotRecord, requestOrigin:
 }
 
 function toPortalView(participant: HutParticipantRecord): HutPortalView {
+  if (isApplicationPhotoProtocol(participant)) {
+    return toApplicationPhotoPortalView(participant);
+  }
+
   const block = activeBlock(participant);
   const block1 = blockByNumber(participant, 1);
   const block2 = blockByNumber(participant, 2);
@@ -3082,6 +3289,8 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
 
   if (participant.status === "DISQUALIFIED") {
     return {
+      applicationEvidence: applicationEvidenceSummary(participant),
+      availableApplicationPhoto: null,
       availableUpload: null,
       availability: {
         blockNumber: "blockNumber" in availability ? availability.blockNumber : undefined,
@@ -3094,8 +3303,10 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
       message:
         "Gracias por tu participacion. Por las reglas del estudio, no es posible continuar con esta etapa. El equipo podra contactarte si requiere informacion adicional.",
       name: participant.name,
+      origin: participantOrigin(participant),
       phaseGate,
       participantId: participant.id,
+      protocolVersion: "LEGACY_VIDEO",
       status: participant.status,
       studyName: participant.study.name,
       testMode: participant.testMode,
@@ -3111,6 +3322,8 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
     : null;
 
   return {
+    applicationEvidence: applicationEvidenceSummary(participant),
+    availableApplicationPhoto: null,
     availableUpload,
     availability: {
       blockNumber: "blockNumber" in availability ? availability.blockNumber : undefined,
@@ -3122,8 +3335,44 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
     block2: block2 ? toBasicBlockSummary(block2) : null,
     message: hutPortalMessage(participant),
     name: participant.name,
+    origin: participantOrigin(participant),
     phaseGate,
     participantId: participant.id,
+    protocolVersion: "LEGACY_VIDEO",
+    status: participant.status,
+    studyName: participant.study.name,
+    testMode: participant.testMode,
+    token: participant.token
+  };
+}
+
+function toApplicationPhotoPortalView(participant: HutParticipantRecord): HutPortalView {
+  const phaseGate = currentHutPhaseGate(participant);
+  const nextPhase = expectedApplicationPhotoPhase(participant);
+  const evidence = applicationEvidenceSummary(participant);
+  const availableApplicationPhoto = nextPhase && !phaseGate?.required
+    ? {
+        phase: nextPhase,
+        productCode: hutProductCodeForPhase(participant, nextPhase)
+      }
+    : null;
+
+  return {
+    applicationEvidence: evidence,
+    availableApplicationPhoto,
+    availableUpload: null,
+    availability: {
+      nextAvailableAt: null,
+      reason: availableApplicationPhoto ? "AVAILABLE_FOR_APPLICATION_PHOTO" : nextPhase ? "WAITING_FOR_PHASE_CODE" : "COMPLETE"
+    },
+    block1: null,
+    block2: null,
+    message: applicationPhotoPortalMessage(participant),
+    name: participant.name,
+    origin: participantOrigin(participant),
+    phaseGate,
+    participantId: participant.id,
+    protocolVersion: "APPLICATION_PHOTO",
     status: participant.status,
     studyName: participant.study.name,
     testMode: participant.testMode,
@@ -3132,22 +3381,30 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
 }
 
 function currentHutPhaseGate(participant: HutParticipantRecord): HutPortalView["phaseGate"] {
-  const phase = expectedHutPhaseForParticipant(participant);
+  if (!isApplicationPhotoProtocol(participant)) {
+    return null;
+  }
+
+  const phase = expectedApplicationPhotoPhase(participant);
   const phaseCode = phase ? participant.phaseCodes?.find((code) => code.phase === phase) ?? null : null;
 
-  if (!phase || !phaseCode) {
+  if (!phase) {
     return null;
   }
 
   return {
     label: hutPhaseLabel(phase),
     phase,
-    required: phaseCode.status !== "USED" && phaseCode.status !== "VALIDATED",
-    status: phaseCode.status
+    required: !phaseCode || (phaseCode.status !== "USED" && phaseCode.status !== "VALIDATED"),
+    status: phaseCode?.status ?? "MISSING"
   };
 }
 
 function expectedHutPhaseForParticipant(participant: HutParticipantRecord): HutPhase | null {
+  if (isApplicationPhotoProtocol(participant)) {
+    return expectedApplicationPhotoPhase(participant);
+  }
+
   if (participant.status === "BLOCK_1_IN_PROGRESS") {
     return "COLOCACION";
   }
@@ -3165,10 +3422,90 @@ function expectedHutPhaseForParticipant(participant: HutParticipantRecord): HutP
   return null;
 }
 
+function expectedApplicationPhotoPhase(participant: HutParticipantRecord): HutPhase | null {
+  const captured = new Set((participant.applicationEvidence ?? []).map((evidence) => evidence.phase));
+
+  if (!captured.has("COLOCACION")) {
+    return "COLOCACION";
+  }
+  if (!captured.has("REGRESO_1")) {
+    return "REGRESO_1";
+  }
+  if (!captured.has("REGRESO_2")) {
+    return "REGRESO_2";
+  }
+
+  return null;
+}
+
+function hutProductCodeForPhase(participant: HutParticipantRecord, phase: HutPhase): string | null {
+  if (phase === "COLOCACION") {
+    return participant.firstFragranceLeftArm;
+  }
+
+  return participant.secondFragranceRightArm;
+}
+
+function nextApplicationPhotoParticipantState(phase: HutPhase): Partial<Pick<HutParticipantRecord, "currentBlockNumber" | "currentVideoSequence" | "status">> {
+  if (phase === "COLOCACION") {
+    return {
+      currentBlockNumber: 1,
+      currentVideoSequence: 1,
+      status: "BLOCK_1_CALL_PENDING"
+    };
+  }
+  if (phase === "REGRESO_1") {
+    return {
+      currentBlockNumber: 2,
+      currentVideoSequence: 1,
+      status: "BLOCK_2_CALL_PENDING"
+    };
+  }
+
+  return {
+    currentBlockNumber: 2,
+    currentVideoSequence: 1,
+    status: "COMPLETED"
+  };
+}
+
+function isApplicationPhotoProtocol(participant: Pick<HutParticipantRecord, "protocolVersion">): boolean {
+  return participant.protocolVersion === "APPLICATION_PHOTO";
+}
+
+function isLegacyVideoProtocol(participant: Pick<HutParticipantRecord, "protocolVersion">): boolean {
+  return participant.protocolVersion === "LEGACY_VIDEO";
+}
+
+function participantOrigin(participant: Pick<HutParticipantRecord, "origin" | "studyId"> & { studyParticipantId?: string | null }): "CLT_HUT" | "HUT_DIRECTO" {
+  return participant.origin ?? (participant.studyParticipantId ? "CLT_HUT" : "HUT_DIRECTO");
+}
+
+function applicationEvidenceSummary(participant: HutParticipantRecord): HutPortalView["applicationEvidence"] {
+  return (participant.applicationEvidence ?? []).map((evidence) => ({
+    capturedAt: evidence.capturedAt,
+    phase: evidence.phase,
+    productCode: evidence.productCode
+  }));
+}
+
+function applicationPhotoPortalMessage(participant: HutParticipantRecord): string {
+  if (participant.status === "COMPLETED") {
+    return "Tu participacion HUT esta completa. Gracias por tu tiempo.";
+  }
+
+  const phase = expectedApplicationPhotoPhase(participant);
+  if (!phase) {
+    return "No hay fotos HUT pendientes.";
+  }
+
+  return `Tienes pendiente registrar la foto de aplicacion de ${hutPhaseLabel(phase)}.`;
+}
+
 function hutPhaseLabel(phase: HutPhase): string {
   const labels: Record<HutPhase, string> = {
-    COLOCACION: "Colocacion",
-    REGRESO_1: "Regreso 1 / Evaluacion 1",
+    COLOCACION: "Colocacion / Entrega 1",
+    REGRESO_1: "Regreso 1 / Evaluacion 1 / Entrega 2",
     REGRESO_2: "Regreso 2 / Evaluacion 2"
   };
   return labels[phase];

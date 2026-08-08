@@ -7,11 +7,16 @@ import {
   buildHutTsv,
   createHutRepository,
   decryptHutPhaseCode,
+  getHutApplicableQuestions,
   hashHutPhaseCode,
+  getHutV5Definition,
   getHutCurrentAvailability,
+  hutFormDataToAnswerInput,
   hutBlockDayAvailableAt,
   nextHutVideoSequence,
   parseHutParticipantImportText,
+  parseHutQuestionnaireAnswers,
+  parseHutQuestionAnswer,
   parseHutRegistrationSlotImportText
 } from ".";
 import type { OneuiWhatsAppMessageRecord, OneuiWhatsAppRepository } from "@/modules/oneui-whatsapp";
@@ -64,6 +69,7 @@ describe("HUT module foundation", () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     const result = await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Uno",
       phone: "5512345678",
       recruiter: "Reclutadora",
@@ -78,6 +84,24 @@ describe("HUT module foundation", () => {
     expect(prisma.state.participants[0]?.blocks).toHaveLength(2);
   });
 
+  it("creates new HUT participants with the application photo protocol by default", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const result = await repository.createParticipant({
+      name: "Participante Nuevo Protocolo",
+      phone: "5512345678",
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(prisma.state.participants[0]).toMatchObject({
+      origin: "HUT_DIRECTO",
+      protocolVersion: "APPLICATION_PHOTO"
+    });
+    expect(prisma.state.participants[0]?.blocks).toHaveLength(0);
+  });
+
   it("defines an optional StudyParticipant link for HUT participants", () => {
     const schema = readWorkspaceFile("prisma", "schema.prisma");
     const migration = readWorkspaceFile(
@@ -87,17 +111,149 @@ describe("HUT module foundation", () => {
       "migration.sql"
     );
 
-    expect(schema).toContain("studyParticipantId      String?");
-    expect(schema).toContain("studyParticipant    StudyParticipant?");
-    expect(schema).toContain("hutParticipant                   HutParticipant?");
+    expect(schema).toMatch(/studyParticipantId\s+String\?/);
+    expect(schema).toMatch(/studyParticipant\s+StudyParticipant\?/);
+    expect(schema).toMatch(/hutParticipant\s+HutParticipant\?/);
     expect(migration).toContain('ADD COLUMN "studyParticipantId" UUID');
     expect(migration).toContain('FOREIGN KEY ("studyParticipantId") REFERENCES "study_participants"("id")');
+  });
+
+  it("defines the HUT v5 questionnaire foundation without changing legacy video tables", () => {
+    const schema = readWorkspaceFile("prisma", "schema.prisma");
+    const migration = readWorkspaceFile(
+      "prisma",
+      "migrations",
+      "20260808000000_add_hut_v5_questionnaire_foundation",
+      "migration.sql"
+    );
+
+    expect(schema).toContain("enum HutQuestionnaireAttemptStatus");
+    expect(schema).toContain("model HutQuestionnaireAttempt");
+    expect(schema).toContain("model HutVisitProgress");
+    expect(schema).toContain("model HutAnswer");
+    expect(schema).toContain("model HutApplicationPhotoEntry");
+    expect(schema).toContain("questionnaireAttempt    HutQuestionnaireAttempt?");
+    expect(schema).toContain("applicationPhotoEntries HutApplicationPhotoEntry[]");
+    expect(schema).toContain('@@unique([participantId, capturedLocalDate])');
+    expect(schema).toContain("model HutBlock");
+    expect(schema).toContain("model HutVideoSubmission");
+    expect(migration).toContain('CREATE TABLE "hut_questionnaire_attempts"');
+    expect(migration).toContain('CREATE TABLE "hut_visit_progress"');
+    expect(migration).toContain('CREATE TABLE "hut_answers"');
+    expect(migration).toContain('CREATE TABLE "hut_application_photo_entries"');
+    expect(migration).not.toContain('DROP TABLE "hut_blocks"');
+    expect(migration).not.toContain('DROP TABLE "hut_video_submissions"');
+  });
+
+  it("defines the HUT v5 application photo questionnaire sections separately from operational phases", () => {
+    const definition = getHutV5Definition();
+
+    expect(definition).toMatchObject({
+      protocolVersion: "APPLICATION_PHOTO",
+      version: 5
+    });
+    expect(definition.sections.map((section) => section.id)).toEqual([
+      "DATOS_GENERALES",
+      "FILTROS",
+      "PRIMERA_VISITA",
+      "EVALUACION_PRIMER_PERFUME",
+      "SEGUNDA_VISITA",
+      "EVALUACION_SEGUNDO_PERFUME",
+      "COMPARATIVA"
+    ]);
+    expect(definition.sections.map((section) => section.id)).not.toContain("COLOCACION");
+    expect(definition.sections.map((section) => section.id)).not.toContain("REGRESO_1");
+    expect(definition.sections.map((section) => section.id)).not.toContain("REGRESO_2");
+    expect(definition.sections.flatMap((section) => section.questions).map((question) => question.code)).toContain(
+      "HUT_PARTICIPO_CLT"
+    );
+  });
+
+  it("uses the CLT participation answer to omit repeated HUT filters", () => {
+    const cltParticipantQuestions = getHutApplicableQuestions({
+      answers: { HUT_PARTICIPO_CLT: "SI" },
+      context: { participantOrigin: "CLT_HUT" }
+    });
+    const directParticipantQuestions = getHutApplicableQuestions({
+      answers: { HUT_PARTICIPO_CLT: "NO" },
+      context: { participantOrigin: "HUT_DIRECTO" }
+    });
+
+    expect(cltParticipantQuestions.map((question) => question.code)).not.toContain("HUT_F1_GENERO");
+    expect(cltParticipantQuestions.map((question) => question.code)).not.toContain("HUT_F2_EDAD");
+    expect(directParticipantQuestions.map((question) => question.code)).toContain("HUT_F1_GENERO");
+    expect(directParticipantQuestions.map((question) => question.code)).toContain("HUT_F2_EDAD");
+  });
+
+  it("defaults HUT filter visibility from participant origin when the operational answer is not present yet", () => {
+    const cltParticipantQuestions = getHutApplicableQuestions({ context: { participantOrigin: "CLT_HUT" } });
+    const directParticipantQuestions = getHutApplicableQuestions({ context: { participantOrigin: "HUT_DIRECTO" } });
+
+    expect(cltParticipantQuestions.map((question) => question.code)).not.toContain("HUT_F3_USO_PERFUME");
+    expect(directParticipantQuestions.map((question) => question.code)).toContain("HUT_F3_USO_PERFUME");
+  });
+
+  it("validates HUT v5 select, scale and matrix answers", () => {
+    const formData = new FormData();
+    formData.set("HUT_PARTICIPO_CLT", "NO");
+    formData.set("HUT_DG_NOMBRE", "Participante Uno");
+    formData.set("HUT_DG_FOLIO", "NAV-001");
+    formData.set("HUT_F1_GENERO", "HOMBRE");
+    formData.set("HUT_F2_EDAD", "35");
+    formData.set("HUT_F3_USO_PERFUME", "Marca A");
+    formData.set("HUT_V1_CONFIRMACION_ENTREGA", "SI");
+    formData.set("HUT_EVA1_GUSTO", "7");
+    formData.set("HUT_EVA1_ATRIBUTOS.AGRADABLE", "5");
+    formData.set("HUT_EVA1_ATRIBUTOS.DURADERO", "4");
+    formData.set("HUT_EVA1_ATRIBUTOS.ADECUADO_PARA_MI", "3");
+    formData.set("HUT_V2_CONFIRMACION_ENTREGA", "SI");
+    formData.set("HUT_EVA2_GUSTO", "6");
+    formData.set("HUT_EVA2_ATRIBUTOS.AGRADABLE", "5");
+    formData.set("HUT_EVA2_ATRIBUTOS.DURADERO", "4");
+    formData.set("HUT_EVA2_ATRIBUTOS.ADECUADO_PARA_MI", "3");
+    formData.set("HUT_COMP_PREFERENCIA", "EVA1");
+    formData.set("HUT_COMP_RAZONES", "Le gusto mas");
+
+    const result = parseHutQuestionnaireAnswers(
+      hutFormDataToAnswerInput(formData),
+      getHutV5Definition(),
+      { participantOrigin: "HUT_DIRECTO" }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.answers.find((answer) => answer.questionCode === "HUT_EVA1_GUSTO")?.answerValue : null).toBe(7);
+    expect(result.ok ? result.answers.find((answer) => answer.questionCode === "HUT_EVA1_ATRIBUTOS")?.answerValue : null)
+      .toEqual({
+        ADECUADO_PARA_MI: "3",
+        AGRADABLE: "5",
+        DURADERO: "4"
+      });
+  });
+
+  it("rejects invalid HUT v5 values without using legacy video state", () => {
+    const invalidScale = parseHutQuestionAnswer("HUT_EVA1_GUSTO", { HUT_EVA1_GUSTO: "8" });
+    const missingMatrixRow = parseHutQuestionAnswer("HUT_EVA1_ATRIBUTOS", {
+      HUT_EVA1_ATRIBUTOS: {
+        AGRADABLE: "5",
+        DURADERO: "4"
+      }
+    });
+
+    expect(invalidScale).toMatchObject({
+      message: "Selecciona un valor entre 1 y 7.",
+      ok: false
+    });
+    expect(missingMatrixRow).toMatchObject({
+      missingQuestionCodes: ["HUT_EVA1_ATRIBUTOS.ADECUADO_PARA_MI"],
+      ok: false
+    });
   });
 
   it("syncs HUT phase codes from participant reference codes without overwriting existing records", async () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       folio: "NAV-001",
       firstFragranceLeftArm: "247",
       name: "Participante Codigos",
@@ -136,6 +292,7 @@ describe("HUT module foundation", () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       folio: "NAV-002",
       firstFragranceLeftArm: "247",
       name: "Participante Incompleta",
@@ -169,6 +326,7 @@ describe("HUT module foundation", () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       folio: "NAV-003",
       firstFragranceLeftArm: "247",
       name: "Participante Inconsistente",
@@ -198,7 +356,7 @@ describe("HUT module foundation", () => {
     expect(result.ok ? "" : result.message).toContain("Slot 1 esta asociado a REGRESO_2");
   });
 
-  it("requires and validates the current HUT phase code before portal uploads", async () => {
+  it("requires and validates the current HUT phase code before application photo uploads", async () => {
     vi.stubEnv("HUT_PHASE_CODE_SECRET", "hut-phase-secret-for-tests");
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
@@ -213,7 +371,6 @@ describe("HUT module foundation", () => {
     });
     prisma.state.confirmations.push(confirmationWithCodes("NAV-004"));
     const participant = prisma.state.participants[0]!;
-    participant.referenceSelfie = referenceSelfie();
 
     await repository.ensureHutPhaseCodesForParticipant({
       participantId: participant.id,
@@ -222,7 +379,7 @@ describe("HUT module foundation", () => {
     });
 
     const viewBefore = await repository.getPortalView(participant.token);
-    const blockedUpload = await repository.requestDailySelfieUpload({
+    const blockedUpload = await repository.requestApplicationPhotoUpload({
       metadata: selfieMetadata(),
       storage,
       token: participant.token
@@ -238,29 +395,16 @@ describe("HUT module foundation", () => {
       token: participant.token
     });
     const viewAfter = await repository.getPortalView(participant.token);
-    participant.visualVerifications.unshift({
-      attemptSelfieKey: "daily-1-1.jpg",
-      attemptStorageBucket: "participant-evidence",
-      blockNumber: 1,
-      id: "verification-phase-code",
-      overrideReason: null,
-      reviewedAt: null,
-      reviewedByUserId: null,
-      sequenceNumber: 1,
-      similarityScore: 0.82,
-      status: "MATCHED",
-      verificationDate: new Date("2026-07-01T12:00:00.000Z")
-    });
-    const video = await repository.requestVideoUpload({
-      metadata: videoMetadata(),
+    const upload = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
       storage,
       token: participant.token
     });
-    await repository.confirmVideoUpload({
+    await repository.confirmApplicationPhotoUpload({
       metadata: {
-        ...videoMetadata(),
-        privateStorageKey: video.ok ? video.data.privateStorageKey : "",
-        storageBucket: video.ok ? video.data.storageBucket : ""
+        ...selfieMetadata(),
+        privateStorageKey: upload.ok ? upload.data.privateStorageKey : "",
+        storageBucket: upload.ok ? upload.data.storageBucket : ""
       },
       token: participant.token
     });
@@ -271,7 +415,7 @@ describe("HUT module foundation", () => {
       status: "GENERATED"
     });
     expect(blockedUpload).toMatchObject({
-      message: "Captura el codigo de Colocacion antes de continuar.",
+      message: "Captura el codigo de Colocacion / Entrega 1 antes de continuar.",
       ok: false
     });
     expect(invalid).toMatchObject({
@@ -287,9 +431,11 @@ describe("HUT module foundation", () => {
       required: false,
       status: "VALIDATED"
     });
+    expect(upload.ok).toBe(true);
     expect(prisma.state.phaseCodes.find((code) => code.phase === "COLOCACION")).toMatchObject({
       status: "USED"
     });
+    expect(prisma.state.participants[0]?.applicationEvidence).toHaveLength(1);
   });
 
   it("lets admin recover, revoke and regenerate HUT phase codes without storing plain text", async () => {
@@ -297,6 +443,7 @@ describe("HUT module foundation", () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       folio: "NAV-004",
       firstFragranceLeftArm: "247",
       name: "Participante Admin Codigos",
@@ -346,6 +493,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Selfie",
       requestOrigin: "https://example.com",
       studyId: "study-hut"
@@ -380,6 +528,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Con Fecha",
       requestOrigin: "https://example.com",
       startDate: new Date("2026-07-01T00:00:00.000Z"),
@@ -403,6 +552,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Con Evidencia",
       requestOrigin: "https://example.com",
       studyId: "study-hut"
@@ -442,6 +592,7 @@ describe("HUT module foundation", () => {
     const repository = createHutRepository(prisma as never, whatsapp);
 
     const created = await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       firstFragranceLeftArm: "Fragancia A",
       folio: "HUT-010",
       name: "Participante Manual",
@@ -455,11 +606,41 @@ describe("HUT module foundation", () => {
     expect(whatsapp.createOutboundMessage).not.toHaveBeenCalled();
   });
 
+  it("does not block application photo WhatsApp because registration selfie is missing", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const whatsapp = createFakeWhatsAppRepository();
+    const repository = createHutRepository(prisma as never, whatsapp);
+    const created = await repository.createParticipant({
+      protocolVersion: "APPLICATION_PHOTO",
+      firstFragranceLeftArm: "Fragancia A",
+      folio: "HUT-010-A",
+      name: "Participante Fotos",
+      phone: "5512345678",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "Fragancia B",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+
+    const sent = await repository.sendRegistrationWhatsApp({
+      participantId: participant.id,
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+
+    expect(created.ok).toBe(true);
+    expect(participant.referenceSelfie).toBeNull();
+    expect(sent.ok ? "" : sent.message).not.toBe("Guarda la selfie de registro para habilitar el inicio del HUT.");
+    expect(sent.ok ? "" : sent.message).toBe("Faltan variables de entorno para enviar por WhatsApp.");
+    expect(whatsapp.createOutboundMessage).toHaveBeenCalled();
+  });
+
   it("sends HUT WhatsApp after saving the admin registration selfie and does not duplicate a sent message", async () => {
     const { prisma, storage } = createFakeHutPrisma();
     const whatsapp = createFakeWhatsAppRepository();
     const repository = createHutRepository(prisma as never, whatsapp);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       firstFragranceLeftArm: "Fragancia A",
       folio: "HUT-011",
       name: "Participante WhatsApp",
@@ -514,6 +695,7 @@ describe("HUT module foundation", () => {
     const whatsapp = createFakeWhatsAppRepository();
     const repository = createHutRepository(prisma as never, whatsapp);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       firstFragranceLeftArm: "Fragancia A",
       folio: "HUT-012",
       name: "Participante Error WhatsApp",
@@ -684,6 +866,7 @@ describe("HUT module foundation", () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Admin",
       requestOrigin: "https://example.com",
       studyId: "study-hut"
@@ -727,6 +910,7 @@ describe("HUT module foundation", () => {
     });
     const slot = prisma.state.registrationSlots[0]!;
     const created = await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Con Slot",
       requestOrigin: "https://example.com",
       slotId: slot.id,
@@ -803,6 +987,7 @@ describe("HUT module foundation", () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       firstFragranceLeftArm: "Fragancia A",
       folio: "HUT-012",
       name: "Uno",
@@ -811,6 +996,7 @@ describe("HUT module foundation", () => {
       studyId: "study-hut"
     });
     const duplicate = await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       firstFragranceLeftArm: "Fragancia C",
       folio: "HUT-012",
       name: "Dos",
@@ -901,6 +1087,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Sin Selfie",
       requestOrigin: "https://example.com",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
@@ -1047,6 +1234,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Matched",
       requestOrigin: "https://example.com",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
@@ -1078,6 +1266,7 @@ describe("HUT module foundation", () => {
       const { prisma, storage } = createFakeHutPrisma();
       const repository = createHutRepository(prisma as never);
       await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
         name: "Participante Diario",
         requestOrigin: "https://example.com",
         startDate: new Date("2026-07-09T14:00:00.000Z"),
@@ -1140,6 +1329,7 @@ describe("HUT module foundation", () => {
       const { prisma, storage } = createFakeHutPrisma();
       const repository = createHutRepository(prisma as never);
       await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
         name: "Participante Test Mode",
         requestOrigin: "https://example.com",
         startDate: new Date("2026-07-09T14:00:00.000Z"),
@@ -1172,6 +1362,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Prueba",
       requestOrigin: "https://example.com",
       startDate: new Date("2026-07-01T06:00:00.000Z"),
@@ -1197,6 +1388,7 @@ describe("HUT module foundation", () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Modo",
       requestOrigin: "https://example.com",
       studyId: "study-hut"
@@ -1222,6 +1414,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Fallo",
       requestOrigin: "https://example.com",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
@@ -1250,6 +1443,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     const created = await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Uno",
       requestOrigin: "https://example.com",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
@@ -1273,6 +1467,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Video",
       requestOrigin: "https://example.com",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
@@ -1302,6 +1497,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Identidad",
       requestOrigin: "https://example.com",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
@@ -1341,6 +1537,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Manual",
       requestOrigin: "https://example.com",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
@@ -1384,6 +1581,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Rechazo",
       requestOrigin: "https://example.com",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
@@ -1427,6 +1625,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Selfie",
       requestOrigin: "https://example.com",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
@@ -1452,6 +1651,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Reset",
       requestOrigin: "https://example.com",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
@@ -1480,6 +1680,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Evaluado",
       requestOrigin: "https://example.com",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
@@ -1518,6 +1719,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       firstFragranceLeftArm: "Fragancia A",
       folio: "HUT-RESET-1",
       name: "Participante Bloque 2",
@@ -1580,6 +1782,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Reset Bloque 2",
       requestOrigin: "https://example.com",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
@@ -1627,6 +1830,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Dos",
       requestOrigin: "https://example.com",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
@@ -1648,6 +1852,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Tres",
       requestOrigin: "https://example.com",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
@@ -1670,6 +1875,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Cuatro",
       requestOrigin: "https://example.com",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
@@ -1700,6 +1906,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Cinco",
       requestOrigin: "https://example.com",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
@@ -1730,6 +1937,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       name: "Participante Evaluaciones",
       requestOrigin: "https://example.com",
       startDate: new Date("2020-01-01T00:00:00.000Z"),
@@ -1784,6 +1992,7 @@ describe("HUT module foundation", () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
+      protocolVersion: "LEGACY_VIDEO",
       email: "participante@example.com",
       name: "Participante con Ñ",
       phone: "5512345678",
@@ -1955,6 +2164,7 @@ function createFakeHutPrisma() {
     hutParticipant: {
       async create(args: { data: Partial<FakeParticipant> }) {
         const participant: FakeParticipant = {
+          applicationEvidence: [],
           blocks: [],
           callEvaluations: [],
           currentBlockNumber: Number(args.data.currentBlockNumber ?? 1),
@@ -1965,8 +2175,10 @@ function createFakeHutPrisma() {
           folio: (args.data.folio as string | null) ?? null,
           id: `participant-${state.nextId++}`,
           name: String(args.data.name),
+          origin: (args.data.origin as FakeParticipant["origin"]) ?? "HUT_DIRECTO",
           phaseCodes: [],
           phone: (args.data.phone as string | null) ?? null,
+          protocolVersion: (args.data.protocolVersion as FakeParticipant["protocolVersion"]) ?? "LEGACY_VIDEO",
           recruiter: (args.data.recruiter as string | null) ?? null,
           referenceSelfie: null,
           registrationSlot: null,
@@ -2184,6 +2396,34 @@ function createFakeHutPrisma() {
         return { count };
       }
     },
+    hutApplicationEvidence: {
+      async create(args: { data: Partial<FakeApplicationEvidence> & { participantId: string } }) {
+        const participant = state.participants.find((item) => item.id === args.data.participantId);
+        const evidence: FakeApplicationEvidence = {
+          capturedAt: (args.data.capturedAt as Date) ?? new Date(),
+          extension: String(args.data.extension ?? "jpg"),
+          id: `application-evidence-${state.nextId++}`,
+          mimeType: String(args.data.mimeType),
+          originalFilename: (args.data.originalFilename as string | null) ?? null,
+          participantId: String(args.data.participantId),
+          phase: args.data.phase as FakeApplicationEvidence["phase"],
+          privateStorageKey: String(args.data.privateStorageKey),
+          productCode: (args.data.productCode as string | null) ?? null,
+          sizeBytes: Number(args.data.sizeBytes ?? 0),
+          storageBucket: String(args.data.storageBucket)
+        };
+        participant?.applicationEvidence.push(evidence);
+        return evidence;
+      },
+      async deleteMany(args: { where: { participantId: string } }) {
+        const participant = state.participants.find((item) => item.id === args.where.participantId);
+        const count = participant?.applicationEvidence.length ?? 0;
+        if (participant) {
+          participant.applicationEvidence = [];
+        }
+        return { count };
+      }
+    },
     hutCallEvaluation: {
       async create(args: { data: Partial<FakeCall> & { participantId: string } }) {
         const participant = state.participants.find((item) => item.id === args.data.participantId);
@@ -2328,6 +2568,7 @@ function createFakeHutPrisma() {
 }
 
 type FakeParticipant = {
+  applicationEvidence: FakeApplicationEvidence[];
   blocks: FakeBlock[];
   callEvaluations: FakeCall[];
   currentBlockNumber: number;
@@ -2338,8 +2579,10 @@ type FakeParticipant = {
   folio: string | null;
   id: string;
   name: string;
+  origin: "CLT_HUT" | "HUT_DIRECTO";
   phaseCodes: FakeHutPhaseCode[];
   phone: string | null;
+  protocolVersion: "APPLICATION_PHOTO" | "LEGACY_VIDEO";
   recruiter: string | null;
   referenceSelfie: FakeReferenceSelfie | null;
   registrationSlot: FakeRegistrationSlot | null;
@@ -2367,6 +2610,20 @@ type FakeParticipant = {
   visualOverrideReason: string | null;
   visualVerifications: FakeVisualVerification[];
   videoSubmissions: Array<FakeVideo & { id?: string }>;
+};
+
+type FakeApplicationEvidence = {
+  capturedAt: Date;
+  extension: string;
+  id: string;
+  mimeType: string;
+  originalFilename: string | null;
+  participantId: string;
+  phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2";
+  privateStorageKey: string;
+  productCode: string | null;
+  sizeBytes: number;
+  storageBucket: string;
 };
 
 type FakeParticipantConfirmation = {

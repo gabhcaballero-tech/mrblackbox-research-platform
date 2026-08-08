@@ -108,6 +108,19 @@ enum CtlInterviewerCodeStatus {
   EXPIRED
 }
 
+enum CtlOperationalPhase {
+  COLOCACION
+  EVALUACION_1
+  EVALUACION_2
+}
+
+enum CtlPhaseProgressStatus {
+  PENDING
+  IN_PROGRESS
+  VALIDATED
+  COMPLETED
+}
+
 enum ApplicationTimeEventType {
   REGISTERED
   CORRECTED
@@ -143,6 +156,16 @@ enum HutParticipantStatus {
   BLOCK_2_CALL_PENDING
   COMPLETED
   DISQUALIFIED
+}
+
+enum HutParticipantOrigin {
+  HUT_DIRECTO
+  CLT_HUT
+}
+
+enum HutProtocolVersion {
+  LEGACY_VIDEO
+  APPLICATION_PHOTO
 }
 
 enum HutBlockStatus {
@@ -203,6 +226,29 @@ enum HutPhaseCodeStatus {
   USED
   EXPIRED
   REVOKED
+}
+
+enum HutQuestionnaireAttemptStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  TERMINATED
+}
+
+enum HutQuestionnaireSection {
+  DATOS_GENERALES
+  FILTROS
+  PRIMERA_VISITA
+  EVALUACION_PRIMER_PERFUME
+  SEGUNDA_VISITA
+  EVALUACION_SEGUNDO_PERFUME
+  COMPARATIVA
+}
+
+enum HutVisitProgressStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
 }
 
 enum QuestionnairePurpose {
@@ -706,6 +752,8 @@ model HutParticipant {
   recruiter               String?
   firstFragranceLeftArm   String?
   secondFragranceRightArm String?
+  origin                  HutParticipantOrigin @default(HUT_DIRECTO)
+  protocolVersion         HutProtocolVersion   @default(LEGACY_VIDEO)
   token                   String               @unique
   status                  HutParticipantStatus @default(NOT_STARTED)
   startDate               DateTime?
@@ -719,24 +767,136 @@ model HutParticipant {
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
 
-  study               Study                     @relation(fields: [studyId], references: [id])
-  studyParticipant    StudyParticipant?         @relation(fields: [studyParticipantId], references: [id])
-  visualOverrideBy    InternalUser?             @relation("HutVisualOverrideBy", fields: [visualOverrideByUserId], references: [id])
-  referenceSelfie     HutReferenceSelfie?
-  registrationSlot    HutRegistrationSlot?      @relation("HutRegistrationSlotParticipant")
-  phaseCodes          HutParticipantPhaseCode[]
-  blocks              HutBlock[]
-  videoSubmissions    HutVideoSubmission[]
-  dailyChecks         HutDailyCheck[]
-  callEvaluations     HutCallEvaluation[]
-  visualVerifications HutVisualVerification[]
+  study                   Study                      @relation(fields: [studyId], references: [id])
+  studyParticipant        StudyParticipant?          @relation(fields: [studyParticipantId], references: [id])
+  visualOverrideBy        InternalUser?              @relation("HutVisualOverrideBy", fields: [visualOverrideByUserId], references: [id])
+  referenceSelfie         HutReferenceSelfie?
+  registrationSlot        HutRegistrationSlot?       @relation("HutRegistrationSlotParticipant")
+  phaseCodes              HutParticipantPhaseCode[]
+  applicationEvidence     HutApplicationEvidence[]
+  questionnaireAttempt    HutQuestionnaireAttempt?
+  applicationPhotoEntries HutApplicationPhotoEntry[]
+  blocks                  HutBlock[]
+  videoSubmissions        HutVideoSubmission[]
+  dailyChecks             HutDailyCheck[]
+  callEvaluations         HutCallEvaluation[]
+  visualVerifications     HutVisualVerification[]
 
   @@unique([studyId, folio])
   @@index([studyId, status])
+  @@index([studyId, origin])
+  @@index([studyId, protocolVersion])
   @@index([studyParticipantId])
   @@index([token])
   @@index([visualOverrideByUserId])
   @@map("hut_participants")
+}
+
+model HutApplicationEvidence {
+  id                String   @id @default(uuid()) @db.Uuid
+  participantId     String   @db.Uuid
+  phase             HutPhase
+  productCode       String?
+  capturedAt        DateTime @default(now())
+  storageBucket     String
+  privateStorageKey String   @unique
+  originalFilename  String?
+  mimeType          String
+  extension         String
+  sizeBytes         Int
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  participant HutParticipant @relation(fields: [participantId], references: [id])
+
+  @@unique([participantId, phase])
+  @@index([participantId, capturedAt])
+  @@index([phase])
+  @@map("hut_application_evidence")
+}
+
+model HutQuestionnaireAttempt {
+  id                String                        @id @default(uuid()) @db.Uuid
+  participantId     String                        @unique @db.Uuid
+  status            HutQuestionnaireAttemptStatus @default(PENDING)
+  startedAt         DateTime?
+  completedAt       DateTime?
+  terminatedAt      DateTime?
+  terminationReason String?
+  createdAt         DateTime                      @default(now())
+  updatedAt         DateTime                      @updatedAt
+
+  participant HutParticipant     @relation(fields: [participantId], references: [id])
+  visits      HutVisitProgress[]
+  answers     HutAnswer[]
+
+  @@index([status])
+  @@index([participantId, status])
+  @@map("hut_questionnaire_attempts")
+}
+
+model HutVisitProgress {
+  id          String                  @id @default(uuid()) @db.Uuid
+  attemptId   String                  @db.Uuid
+  section     HutQuestionnaireSection
+  status      HutVisitProgressStatus  @default(PENDING)
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  attempt HutQuestionnaireAttempt @relation(fields: [attemptId], references: [id])
+  answers HutAnswer[]
+
+  @@unique([attemptId, section])
+  @@index([section, status])
+  @@map("hut_visit_progress")
+}
+
+model HutAnswer {
+  id              String   @id @default(uuid()) @db.Uuid
+  attemptId       String   @db.Uuid
+  visitProgressId String?  @db.Uuid
+  questionCode    String
+  answerJson      Json
+  answeredAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  attempt       HutQuestionnaireAttempt @relation(fields: [attemptId], references: [id])
+  visitProgress HutVisitProgress?       @relation(fields: [visitProgressId], references: [id])
+
+  @@unique([attemptId, questionCode])
+  @@index([visitProgressId])
+  @@index([questionCode])
+  @@map("hut_answers")
+}
+
+model HutApplicationPhotoEntry {
+  id                    String   @id @default(uuid()) @db.Uuid
+  participantId         String   @db.Uuid
+  productCode           String?
+  useDayNumber          Int
+  capturedLocalDate     String
+  capturedLocalTimezone String   @default("America/Mexico_City")
+  capturedAt            DateTime @default(now())
+  storageBucket         String
+  privateStorageKey     String   @unique
+  originalFilename      String?
+  mimeType              String
+  extension             String
+  sizeBytes             Int
+  notes                 String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  participant HutParticipant @relation(fields: [participantId], references: [id])
+
+  @@unique([participantId, capturedLocalDate])
+  @@index([participantId, productCode, useDayNumber])
+  @@index([capturedLocalDate])
+  @@map("hut_application_photo_entries")
 }
 
 model HutRegistrationSlot {
@@ -1138,6 +1298,7 @@ model CtlSession {
   interviewer        InternalUser?       @relation("CtlSessionInterviewer", fields: [interviewerId], references: [id], onDelete: Restrict)
   ctlInterviewerCode CtlInterviewerCode? @relation(fields: [ctlInterviewerCodeId], references: [id], onDelete: Restrict)
   answers            CtlAnswer[]
+  phaseProgress      CtlPhaseProgress[]
 
   @@index([studyId, status, createdAt])
   @@index([studyParticipantId, status])
@@ -1181,6 +1342,30 @@ model CtlAnswer {
   @@unique([ctlSessionId, questionCode])
   @@index([questionCode])
   @@map("ctl_answers")
+}
+
+model CtlPhaseProgress {
+  id                String                 @id @default(uuid()) @db.Uuid
+  ctlSessionId      String                 @db.Uuid
+  phase             CtlOperationalPhase
+  referenceCodeSlot Int
+  status            CtlPhaseProgressStatus @default(PENDING)
+  startedAt         DateTime?
+  validatedAt       DateTime?
+  completedAt       DateTime?
+  productCode       String?
+  arm               String?
+  rotationSnapshot  Json?
+  validatedBy       String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  ctlSession CtlSession @relation(fields: [ctlSessionId], references: [id])
+
+  @@unique([ctlSessionId, phase])
+  @@index([ctlSessionId, status])
+  @@index([phase, status])
+  @@map("ctl_phase_progress")
 }
 
 model CtlTriangularRotationAssignment {

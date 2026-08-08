@@ -1,4 +1,13 @@
 import { randomUUID } from "node:crypto";
+import {
+  getHutApplicableQuestions,
+  getHutQuestions,
+  getHutV5Definition,
+  type HutDefinition,
+  type HutDefinitionContext,
+  type HutMatrixQuestionDefinition,
+  type HutQuestionDefinition
+} from "./definition";
 
 export const HUT_REQUIRED_VIDEOS_PER_BLOCK = 3;
 export const HUT_MAX_MISSED_DAYS_PER_BLOCK = 1;
@@ -149,6 +158,279 @@ export function normalizeOptionalHutText(value: unknown): string | null {
 
 export function normalizeHutFolio(value: unknown): string {
   return normalizeHutText(value).replace(/\s+/g, "-");
+}
+
+export type HutAnswerInput = Record<
+  string,
+  FormDataEntryValue | Record<string, FormDataEntryValue | null | undefined> | null | undefined
+>;
+
+export type HutAnswerDraft = {
+  answerValue: unknown;
+  questionCode: string;
+};
+
+export function parseHutQuestionnaireAnswers(
+  input: HutAnswerInput,
+  definition: HutDefinition = getHutV5Definition(),
+  context: HutDefinitionContext = {}
+):
+  | {
+      answers: HutAnswerDraft[];
+      ok: true;
+    }
+  | {
+      message: string;
+      missingQuestionCodes: string[];
+      ok: false;
+    } {
+  const answers: HutAnswerDraft[] = [];
+  const missingQuestionCodes: string[] = [];
+
+  for (const question of getHutApplicableQuestions({ answers: input, context, definition })) {
+    const parsed = parseHutAnswerForQuestion(input, question);
+
+    if (!parsed.ok) {
+      return {
+        message: parsed.message,
+        missingQuestionCodes: parsed.missingQuestionCodes,
+        ok: false
+      };
+    }
+
+    if (question.required && parsed.empty) {
+      missingQuestionCodes.push(question.code);
+      continue;
+    }
+
+    if (parsed.empty) {
+      continue;
+    }
+
+    answers.push({
+      answerValue: parsed.answerValue,
+      questionCode: question.code
+    });
+  }
+
+  if (missingQuestionCodes.length > 0) {
+    return {
+      message: "Responde las preguntas obligatorias antes de continuar.",
+      missingQuestionCodes,
+      ok: false
+    };
+  }
+
+  return {
+    answers,
+    ok: true
+  };
+}
+
+export function parseHutQuestionAnswer(
+  questionCode: string,
+  input: HutAnswerInput,
+  definition: HutDefinition = getHutV5Definition()
+):
+  | {
+      answer: HutAnswerDraft | null;
+      empty: boolean;
+      ok: true;
+    }
+  | {
+      message: string;
+      missingQuestionCodes: string[];
+      ok: false;
+    } {
+  const question = getHutQuestions(definition).find((candidate) => candidate.code === questionCode);
+
+  if (!question) {
+    return {
+      message: "No encontramos la pregunta HUT.",
+      missingQuestionCodes: [questionCode],
+      ok: false
+    };
+  }
+
+  const parsed = parseHutAnswerForQuestion(input, question);
+
+  if (!parsed.ok) {
+    return parsed;
+  }
+
+  if (question.required && parsed.empty) {
+    return {
+      message: "Responde la pregunta obligatoria antes de continuar.",
+      missingQuestionCodes: [question.code],
+      ok: false
+    };
+  }
+
+  return {
+    answer: parsed.empty
+      ? null
+      : {
+          answerValue: parsed.answerValue,
+          questionCode: question.code
+        },
+    empty: parsed.empty,
+    ok: true
+  };
+}
+
+export function hutFormDataToAnswerInput(formData: FormData): HutAnswerInput {
+  const input: HutAnswerInput = {};
+
+  for (const [key, value] of formData.entries()) {
+    const separatorIndex = key.indexOf(".");
+
+    if (separatorIndex === -1) {
+      input[key] = value;
+      continue;
+    }
+
+    const questionCode = key.slice(0, separatorIndex);
+    const rowCode = key.slice(separatorIndex + 1);
+
+    if (!questionCode || !rowCode) {
+      continue;
+    }
+
+    const current = input[questionCode];
+    const nested = isHutMatrixValueRecord(current)
+      ? current as Record<string, FormDataEntryValue | null | undefined>
+      : {};
+
+    nested[rowCode] = value;
+    input[questionCode] = nested;
+  }
+
+  return input;
+}
+
+function parseHutAnswerForQuestion(input: HutAnswerInput, question: HutQuestionDefinition):
+  | {
+      answerValue: unknown;
+      empty: boolean;
+      ok: true;
+    }
+  | {
+      message: string;
+      missingQuestionCodes: string[];
+      ok: false;
+    } {
+  if (question.type === "MATRIX") {
+    return parseHutMatrixAnswer(input[question.code], question);
+  }
+
+  const rawValue = input[question.code];
+  const normalized = question.type === "SELECT" || question.type === "SCALE"
+    ? normalizeHutAnswerCode(rawValue)
+    : normalizeHutText(rawValue);
+
+  if (!normalized) {
+    return { answerValue: null, empty: true, ok: true };
+  }
+
+  if (question.type === "SELECT") {
+    const allowedValues = new Set(question.options.map((option) => normalizeHutAnswerCode(option.value)));
+
+    if (!allowedValues.has(normalized)) {
+      return {
+        message: "Selecciona una opcion valida.",
+        missingQuestionCodes: [question.code],
+        ok: false
+      };
+    }
+
+    return { answerValue: normalized, empty: false, ok: true };
+  }
+
+  if (question.type === "SCALE") {
+    const value = Number(normalized);
+
+    if (!Number.isInteger(value) || value < question.min || value > question.max) {
+      return {
+        message: `Selecciona un valor entre ${question.min} y ${question.max}.`,
+        missingQuestionCodes: [question.code],
+        ok: false
+      };
+    }
+
+    return { answerValue: value, empty: false, ok: true };
+  }
+
+  return { answerValue: normalized, empty: false, ok: true };
+}
+
+function parseHutMatrixAnswer(
+  rawValue: HutAnswerInput[string],
+  question: HutMatrixQuestionDefinition
+):
+  | {
+      answerValue: Record<string, string>;
+      empty: boolean;
+      ok: true;
+    }
+  | {
+      message: string;
+      missingQuestionCodes: string[];
+      ok: false;
+    } {
+  const rawRows = isHutMatrixValueRecord(rawValue)
+    ? rawValue as Record<string, FormDataEntryValue | null | undefined>
+    : {};
+  const allowedValues = new Set(question.columns.map((column) => normalizeHutAnswerCode(column.value)));
+  const answerValue: Record<string, string> = {};
+  const missingRows: string[] = [];
+
+  for (const row of question.rows) {
+    const normalized = normalizeHutAnswerCode(rawRows[row.code]);
+
+    if (!normalized) {
+      if (question.required) {
+        missingRows.push(row.code);
+      }
+      continue;
+    }
+
+    if (!allowedValues.has(normalized)) {
+      return {
+        message: "Selecciona una opcion valida.",
+        missingQuestionCodes: [`${question.code}.${row.code}`],
+        ok: false
+      };
+    }
+
+    answerValue[row.code] = normalized;
+  }
+
+  if (missingRows.length > 0) {
+    return {
+      message: "Responde las preguntas obligatorias antes de continuar.",
+      missingQuestionCodes: missingRows.map((rowCode) => `${question.code}.${rowCode}`),
+      ok: false
+    };
+  }
+
+  return {
+    answerValue,
+    empty: Object.keys(answerValue).length === 0,
+    ok: true
+  };
+}
+
+function normalizeHutAnswerCode(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFC")
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
+    .trim()
+    .replace(/\s+/g, "")
+    .toUpperCase();
+}
+
+function isHutMatrixValueRecord(value: unknown): value is Record<string, FormDataEntryValue | null | undefined> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 export function nextHutVideoSequence(block: Pick<HutBlockState, "requiredVideos" | "submittedVideosCount">): number | null {

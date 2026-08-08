@@ -30,6 +30,10 @@ export type CtlSessionStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCEL
 
 export type CtlInterviewerCodeStatus = "ACTIVE" | "DISABLED" | "EXPIRED";
 
+export type CtlOperationalPhase = "COLOCACION" | "EVALUACION_1" | "EVALUACION_2";
+
+export type CtlPhaseProgressStatus = "COMPLETED" | "IN_PROGRESS" | "PENDING" | "VALIDATED";
+
 export type CtlAnswerInput = Record<
   string,
   FormDataEntryValue | Record<string, FormDataEntryValue | null | undefined> | null | undefined

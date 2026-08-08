@@ -11,6 +11,8 @@ import {
   type CtlActor,
   type CtlAnswerDraft,
   type CtlInterviewerCodeStatus,
+  type CtlOperationalPhase,
+  type CtlPhaseProgressStatus,
   type CtlPublicInterviewerActor,
   type CtlSessionStatus
 } from "./service";
@@ -30,6 +32,7 @@ type CtlPrismaClient = PrismaClientLike & {
   $transaction: <T>(callback: (tx: CtlTransactionClient) => Promise<T>) => Promise<T>;
   ctlAnswer: Delegate;
   ctlInterviewerCode: Delegate;
+  ctlPhaseProgress: Delegate;
   ctlSession: Delegate;
   participantConfirmation: Delegate;
   study: Delegate;
@@ -55,6 +58,19 @@ export type CtlParticipantSummary = {
   triangularRotation: CtlTriangularRotationSnapshot | null;
 };
 
+export type CtlPhaseProgressView = {
+  arm: string | null;
+  completedAt: Date | null;
+  phase: CtlOperationalPhase;
+  productCode: string | null;
+  referenceCodeSlot: 1 | 2 | 3;
+  rotationSnapshot: unknown;
+  startedAt: Date | null;
+  status: CtlPhaseProgressStatus;
+  validatedAt: Date | null;
+  validatedBy: string | null;
+};
+
 export type CtlAvailableParticipantSummary = {
   ctlStatus: CtlSessionStatus | null;
   folio: string;
@@ -77,6 +93,7 @@ export type CtlSessionView = {
   id: string;
   interviewerName: string;
   participant: CtlParticipantSummary;
+  phaseProgress: CtlPhaseProgressView[];
   startedAt: Date | null;
   status: CtlSessionStatus;
 };
@@ -162,6 +179,7 @@ type SessionRecord = {
   startedAt: Date | null;
   status: CtlSessionStatus;
   studyId: string;
+  phaseProgress?: CtlPhaseProgressRecord[];
   triangularRotationSnapshot: unknown;
   studyParticipant: ParticipantRecord & {
     participantConfirmation: {
@@ -176,6 +194,19 @@ type SessionRecord = {
     } | null;
   };
   studyParticipantId: string;
+};
+
+type CtlPhaseProgressRecord = {
+  arm: string | null;
+  completedAt: Date | null;
+  phase: CtlOperationalPhase;
+  productCode: string | null;
+  referenceCodeSlot: number;
+  rotationSnapshot: unknown;
+  startedAt: Date | null;
+  status: CtlPhaseProgressStatus;
+  validatedAt: Date | null;
+  validatedBy: string | null;
 };
 
 export type CtlRepository = {
@@ -260,6 +291,12 @@ export type CtlRepository = {
     status: Extract<CtlInterviewerCodeStatus, "ACTIVE" | "DISABLED">;
     studyId: string;
   }) => Promise<{ ok: true } | { message: string; ok: false }>;
+  validatePhaseCode: (input: {
+    actor: CtlActor;
+    code: string;
+    phase: CtlOperationalPhase;
+    sessionId: string;
+  }) => Promise<{ ok: true; phase: CtlOperationalPhase } | { message: string; ok: false }>;
 };
 
 export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlRepository {
@@ -388,6 +425,11 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
 
           await upsertAutomaticCtlStartAnswers(tx, {
             participantName: confirmation.studyParticipant.participantProfile.name,
+            sessionId: created.id,
+            startedAt: now
+          });
+          await createCtlPhaseProgressFoundation(tx, {
+            confirmation,
             sessionId: created.id,
             startedAt: now
           });
@@ -807,6 +849,21 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
         await tx.ctlAnswer.deleteMany?.({
           where: { ctlSessionId: session.id }
         });
+        await tx.ctlPhaseProgress.deleteMany?.({
+          where: { ctlSessionId: session.id }
+        });
+        if (session.studyParticipant.participantConfirmation) {
+          await createCtlPhaseProgressFoundation(tx, {
+            confirmation: {
+              folio: session.studyParticipant.participantConfirmation.folio,
+              referenceCodes: session.studyParticipant.participantConfirmation.referenceCodes,
+              screeningAttempt: session.studyParticipant.participantConfirmation.screeningAttempt,
+              studyParticipant: session.studyParticipant
+            },
+            sessionId: session.id,
+            startedAt: new Date()
+          });
+        }
         await tx.ctlSession.update?.({
           data: {
             completedAt: null,
@@ -817,6 +874,83 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
         });
 
         return { ok: true, sessionId: session.id };
+      });
+    },
+
+    async validatePhaseCode(input) {
+      if (!canAccessCtl(input.actor)) {
+        return { message: "No tienes permiso para validar fases CTL.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const session = (await tx.ctlSession.findUnique?.({
+          select: sessionSelect,
+          where: { id: input.sessionId }
+        })) as SessionRecord | null;
+
+        if (!session || !canReadSession(input.actor, session)) {
+          return { message: "No encontramos la sesion CTL.", ok: false };
+        }
+
+        if (session.status === "COMPLETED" || session.status === "CANCELLED") {
+          return { message: "Esta sesion CTL ya no se puede editar.", ok: false };
+        }
+
+        const confirmation = session.studyParticipant.participantConfirmation;
+        if (!confirmation) {
+          return { message: "No encontramos los codigos del participante.", ok: false };
+        }
+
+        const referenceCodeSlot = ctlReferenceCodeSlotForPhase(input.phase);
+        const expectedCode = confirmation.referenceCodes.find((code) => code.slot === referenceCodeSlot);
+        if (!expectedCode) {
+          return { message: `Falta el codigo ${referenceCodeSlot} para validar esta fase.`, ok: false };
+        }
+
+        if (normalizeCtlCode(input.code) !== normalizeCtlCode(expectedCode.code)) {
+          return { message: "El codigo de fase CTL no es correcto.", ok: false };
+        }
+
+        const now = new Date();
+        const phaseData = ctlPhaseProgressData(input.phase, session);
+        await tx.ctlPhaseProgress.upsert?.({
+          create: {
+            ...phaseData,
+            ctlSessionId: session.id,
+            referenceCodeSlot,
+            status: "COMPLETED",
+            startedAt: now,
+            validatedAt: now,
+            completedAt: now,
+            validatedBy: ctlPhaseValidatedBy(input.actor)
+          },
+          update: {
+            ...phaseData,
+            status: "COMPLETED",
+            startedAt: now,
+            validatedAt: now,
+            completedAt: now,
+            validatedBy: ctlPhaseValidatedBy(input.actor)
+          },
+          where: {
+            ctlSessionId_phase: {
+              ctlSessionId: session.id,
+              phase: input.phase
+            }
+          }
+        });
+
+        await tx.ctlSession.update?.({
+          data: {
+            startedAt: session.startedAt ?? now,
+            status: "IN_PROGRESS"
+          },
+          where: { id: session.id }
+        });
+
+        return { ok: true, phase: input.phase };
       });
     },
 
@@ -847,6 +981,14 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
 
         const now = new Date();
         if (input.complete) {
+          const incompletePhase = firstIncompleteCtlOperationalPhase(session.phaseProgress ?? []);
+          if (incompletePhase) {
+            return {
+              message: `Valida la fase ${ctlOperationalPhaseLabel(incompletePhase.phase)} antes de completar CTL.`,
+              ok: false
+            };
+          }
+
           await upsertCtlAnswer(tx, session.id, {
             answerValue: formatCtlTime(now),
             questionCode: "DG_HORA_TERMINO"
@@ -957,6 +1099,11 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
 
       await upsertAutomaticCtlStartAnswers(prisma as CtlTransactionClient, {
         participantName: confirmation.studyParticipant.participantProfile.name,
+        sessionId: created.id,
+        startedAt: now
+      });
+      await createCtlPhaseProgressFoundation(prisma as CtlTransactionClient, {
+        confirmation,
         sessionId: created.id,
         startedAt: now
       });
@@ -1086,6 +1233,21 @@ const sessionSelect = {
   interviewer: { select: { id: true, name: true } },
   interviewerId: true,
   screeningAttemptId: true,
+  phaseProgress: {
+    orderBy: { referenceCodeSlot: "asc" },
+    select: {
+      arm: true,
+      completedAt: true,
+      phase: true,
+      productCode: true,
+      referenceCodeSlot: true,
+      rotationSnapshot: true,
+      startedAt: true,
+      status: true,
+      validatedAt: true,
+      validatedBy: true
+    }
+  },
   startedAt: true,
   status: true,
   studyId: true,
@@ -1151,6 +1313,28 @@ async function upsertAutomaticCtlStartAnswers(
   });
 }
 
+async function createCtlPhaseProgressFoundation(
+  tx: CtlTransactionClient,
+  input: {
+    confirmation: ConfirmationRecord;
+    sessionId: string;
+    startedAt: Date;
+  }
+): Promise<void> {
+  for (const phase of CTL_OPERATIONAL_PHASES) {
+    const data = ctlPhaseProgressDataFromConfirmation(phase, input.confirmation);
+    await tx.ctlPhaseProgress.create?.({
+      data: {
+        ...data,
+        ctlSessionId: input.sessionId,
+        referenceCodeSlot: ctlReferenceCodeSlotForPhase(phase),
+        startedAt: phase === "COLOCACION" ? input.startedAt : null,
+        status: phase === "COLOCACION" ? "IN_PROGRESS" : "PENDING"
+      }
+    });
+  }
+}
+
 async function upsertCtlAnswer(
   tx: CtlTransactionClient,
   sessionId: string,
@@ -1183,6 +1367,69 @@ function canReadSession(
   }
 
   return actor.role === "ADMIN" || actor.role === "SUPERVISOR" || session.interviewerId === actor.id;
+}
+
+const CTL_OPERATIONAL_PHASES: CtlOperationalPhase[] = ["COLOCACION", "EVALUACION_1", "EVALUACION_2"];
+
+function ctlReferenceCodeSlotForPhase(phase: CtlOperationalPhase): 1 | 2 | 3 {
+  const slots: Record<CtlOperationalPhase, 1 | 2 | 3> = {
+    COLOCACION: 1,
+    EVALUACION_1: 2,
+    EVALUACION_2: 3
+  };
+  return slots[phase];
+}
+
+function ctlOperationalPhaseLabel(phase: CtlOperationalPhase): string {
+  const labels: Record<CtlOperationalPhase, string> = {
+    COLOCACION: "Colocacion - Entrega 1",
+    EVALUACION_1: "Evaluacion 1 - Entrega 2",
+    EVALUACION_2: "Evaluacion 2"
+  };
+  return labels[phase];
+}
+
+function ctlPhaseValidatedBy(actor: CtlActor): string {
+  return isPublicCtlInterviewerActor(actor) ? actor.label : actor.id;
+}
+
+function firstIncompleteCtlOperationalPhase(phases: CtlPhaseProgressRecord[]): CtlPhaseProgressRecord | null {
+  if (phases.length === 0) {
+    return null;
+  }
+
+  return phases
+    .slice()
+    .sort((left, right) => left.referenceCodeSlot - right.referenceCodeSlot)
+    .find((phase) => phase.status !== "COMPLETED") ?? null;
+}
+
+function ctlPhaseProgressData(phase: CtlOperationalPhase, session: SessionRecord) {
+  return ctlPhaseProgressDataFromParticipant(phase, session.studyParticipant);
+}
+
+function ctlPhaseProgressDataFromConfirmation(phase: CtlOperationalPhase, confirmation: ConfirmationRecord) {
+  return ctlPhaseProgressDataFromParticipant(phase, confirmation.studyParticipant);
+}
+
+function ctlPhaseProgressDataFromParticipant(phase: CtlOperationalPhase, participant: ParticipantRecord) {
+  const arms = participant.rotationAssignment?.arms ?? [];
+  const firstSampleKey = arms.find((arm) => arm.applicationOrder === 1)?.studyProduct.internalCode ?? null;
+  const secondSampleKey = arms.find((arm) => arm.applicationOrder === 2)?.studyProduct.internalCode ?? null;
+  const triangularRotation = buildCtlTriangularRotationSnapshot(participant.ctlTriangularRotationAssignment ?? null);
+  const productCode = phase === "COLOCACION" ? firstSampleKey : secondSampleKey;
+  const arm = phase === "COLOCACION" ? "IZQUIERDO" : phase === "EVALUACION_1" ? "DERECHO" : null;
+
+  return {
+    arm,
+    phase,
+    productCode,
+    rotationSnapshot: {
+      firstSampleKey,
+      secondSampleKey,
+      triangularRotation
+    }
+  };
 }
 
 function buildCtlTriangularRotationSnapshot(
@@ -1333,9 +1580,28 @@ function toSessionView(session: SessionRecord): CtlSessionView {
           sessionId: session.id,
           triangularRotation
         },
+    phaseProgress: toPhaseProgressViews(session.phaseProgress ?? []),
     startedAt: session.startedAt,
     status: session.status
   };
+}
+
+function toPhaseProgressViews(phases: CtlPhaseProgressRecord[]): CtlPhaseProgressView[] {
+  return phases
+    .slice()
+    .sort((left, right) => left.referenceCodeSlot - right.referenceCodeSlot)
+    .map((phase) => ({
+      arm: phase.arm,
+      completedAt: phase.completedAt,
+      phase: phase.phase,
+      productCode: phase.productCode,
+      referenceCodeSlot: phase.referenceCodeSlot as 1 | 2 | 3,
+      rotationSnapshot: phase.rotationSnapshot,
+      startedAt: phase.startedAt,
+      status: phase.status,
+      validatedAt: phase.validatedAt,
+      validatedBy: phase.validatedBy
+    }));
 }
 
 function isInternalAdmin(actor: CtlActor): boolean {

@@ -313,6 +313,9 @@ function HutParticipantCard({
   const summarySelfieLabel = participant.referenceSelfie.status === "COMPLETE" ? "Completa" : "Faltante";
   const nextAvailability = formatAvailability(participant.availability.nextAvailableAt, studyTimeZone);
   const hutWhatsAppManualMessage = buildHutRegistrationWhatsAppMessage(participant);
+  const protocolVersion = participant.protocolVersion ?? "LEGACY_VIDEO";
+  const origin = participant.origin ?? "HUT_DIRECTO";
+  const whatsappRequiresSelfie = protocolVersion === "LEGACY_VIDEO" && participant.referenceSelfie.status === "MISSING";
   const hutWhatsAppUrl = buildHutWhatsAppUrl({
     message: hutWhatsAppManualMessage,
     phone: participant.phone
@@ -334,17 +337,23 @@ function HutParticipantCard({
         </div>
         <div className="flex flex-wrap gap-2">
           <SummaryBadge label="Estado general" tone="slate" value={hutParticipantStatusLabel(participant.status)} />
+          <SummaryBadge label="Origen HUT" tone={origin === "CLT_HUT" ? "sky" : "slate"} value={origin === "CLT_HUT" ? "CLT + HUT" : "HUT directo"} />
+          <SummaryBadge label="Protocolo" tone={protocolVersion === "APPLICATION_PHOTO" ? "emerald" : "slate"} value={protocolVersion === "APPLICATION_PHOTO" ? "Fotos de aplicacion" : "Legacy videos"} />
           <SummaryBadge label="Bloque actual" tone="slate" value={`Bloque ${participant.currentBlockNumber}`} />
           <SummaryBadge label="Video esperado" tone="slate" value={`Video ${participant.currentVideoSequence}`} />
           <SummaryBadge label="Siguiente disponibilidad" tone="slate" value={nextAvailability} />
-          <SummaryBadge label="Selfie de registro" tone={participant.referenceSelfie.status === "COMPLETE" ? "emerald" : "amber"} value={summarySelfieLabel} />
-          <SummaryBadge label="Identidad diaria" tone={identitySummaryTone(participant.identityReview.summaryLabel)} value={identitySummaryLabel(participant.identityReview.summaryLabel)} />
+          {protocolVersion === "LEGACY_VIDEO" ? (
+            <>
+              <SummaryBadge label="Selfie de registro" tone={participant.referenceSelfie.status === "COMPLETE" ? "emerald" : "amber"} value={summarySelfieLabel} />
+              <SummaryBadge label="Identidad diaria" tone={identitySummaryTone(participant.identityReview.summaryLabel)} value={identitySummaryLabel(participant.identityReview.summaryLabel)} />
+            </>
+          ) : null}
           <SummaryBadge label="Modo prueba" tone={participant.testMode ? "sky" : "slate"} value={participant.testMode ? "Activo" : "Inactivo"} />
         </div>
       </div>
 
       <div className="mt-3 space-y-2">
-        {participant.referenceSelfie.status === "MISSING" ? (
+        {protocolVersion === "LEGACY_VIDEO" && participant.referenceSelfie.status === "MISSING" ? (
           <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
             Guarda la selfie de registro para habilitar el inicio del HUT.
           </p>
@@ -367,6 +376,8 @@ function HutParticipantCard({
               <Field label="Folio" value={participant.folio ?? "No asignado"} />
               <Field label="Primera fragancia / brazo izquierdo" value={participant.firstFragranceLeftArm ?? "No asignada"} />
               <Field label="Segunda fragancia / brazo derecho" value={participant.secondFragranceRightArm ?? "No asignada"} />
+              <Field label="Origen HUT" value={origin === "CLT_HUT" ? "CLT + HUT" : "HUT directo"} />
+              <Field label="Protocolo HUT" value={protocolVersion === "APPLICATION_PHOTO" ? "Fotos de aplicacion" : "Legacy videos"} />
               <Field label="WhatsApp registro" value={whatsappAutomationLabel(participant.whatsappRegistration.status)} />
               <Field label="WhatsApp Meta ID" value={participant.whatsappRegistration.metaMessageId ?? "Sin ID"} />
               <Field
@@ -389,14 +400,14 @@ function HutParticipantCard({
                 <div>
                   <p className="text-sm font-semibold text-emerald-950">Confirmación por WhatsApp</p>
                   <p className="mt-1 text-xs leading-5 text-emerald-900">
-                    {participant.referenceSelfie.status === "MISSING"
+                    {whatsappRequiresSelfie
                       ? "WhatsApp pendiente: se enviará después de guardar la selfie de registro."
                       : `Envío automático: ${whatsappAutomationLabel(participant.whatsappRegistration.status)}. El enlace manual sigue disponible como respaldo.`}
                   </p>
                 </div>
                 <form action={sendHutRegistrationWhatsAppAction.bind(null, studyId, participant.id)}>
                   <input name="requestOrigin" type="hidden" value={requestOrigin} />
-                  <SubmitButton disabled={participant.referenceSelfie.status === "MISSING"} pendingLabel="Enviando WhatsApp...">
+                  <SubmitButton disabled={whatsappRequiresSelfie} pendingLabel="Enviando WhatsApp...">
                     {participant.whatsappRegistration.status === "NO_ENVIADO" ? "Enviar WhatsApp" : "Reenviar WhatsApp"}
                   </SubmitButton>
                 </form>
@@ -429,14 +440,20 @@ function HutParticipantCard({
             </section>
           </section>
 
-          <SelfieRegistrationCard
-            disabledReason={referenceSelfieDisabledReason}
-            participant={participant}
-            requestOrigin={requestOrigin}
-            studyId={studyId}
-          />
+          {protocolVersion === "LEGACY_VIDEO" ? (
+            <>
+              <SelfieRegistrationCard
+                disabledReason={referenceSelfieDisabledReason}
+                participant={participant}
+                requestOrigin={requestOrigin}
+                studyId={studyId}
+              />
 
-          <IdentityReviewCard participant={participant} studyId={studyId} studyTimeZone={studyTimeZone} />
+              <IdentityReviewCard participant={participant} studyId={studyId} studyTimeZone={studyTimeZone} />
+            </>
+          ) : (
+            <ApplicationEvidenceCard participant={participant} studyTimeZone={studyTimeZone} />
+          )}
 
           <HutPhaseCodesCard participant={participant} studyId={studyId} studyTimeZone={studyTimeZone} />
         </div>
@@ -622,7 +639,7 @@ function HutPhaseCodesCard({
       <div>
         <h4 className="text-sm font-semibold text-zinc-950">Códigos por fase HUT</h4>
         <p className="mt-1 text-xs leading-5 text-zinc-600">
-          Cada código controla el acceso de la fase correspondiente: colocación, regreso 1 y regreso 2.
+          Cada código controla el acceso de la fase correspondiente: colocación / entrega 1, evaluación 1 / entrega 2 y evaluación 2.
         </p>
       </div>
       <div className="mt-3 space-y-3">
@@ -660,6 +677,67 @@ function HutPhaseCodesCard({
       </div>
     </section>
   );
+}
+
+function ApplicationEvidenceCard({
+  participant,
+  studyTimeZone
+}: {
+  participant: HutAdminParticipant;
+  studyTimeZone: string;
+}) {
+  const applicationEvidence = participant.applicationEvidence ?? [];
+
+  return (
+    <section className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
+      <div>
+        <h4 className="text-sm font-semibold text-emerald-950">Fotos de aplicacion HUT</h4>
+        <p className="mt-1 text-xs leading-5 text-emerald-900">
+          Protocolo nuevo: no solicita selfie, validacion facial, video diario ni bloques legacy. Las fotos se registran por fase.
+        </p>
+      </div>
+      <div className="mt-3 space-y-3">
+        {(["COLOCACION", "REGRESO_1", "REGRESO_2"] as const).map((phase) => {
+          const evidence = applicationEvidence.find((item) => item.phase === phase);
+          return (
+            <div className="rounded-md border border-emerald-200 bg-white p-3" key={phase}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-zinc-950">{hutPhaseLabel(phase)}</p>
+                  <p className="mt-1 text-xs text-zinc-600">Producto: {evidence?.productCode ?? productCodeForAdminPhase(participant, phase) ?? "No asignado"}</p>
+                  <p className="mt-1 text-xs text-zinc-600">
+                    {evidence ? `Capturada: ${formatDateTime(evidence.capturedAt, studyTimeZone)}` : "Foto pendiente"}
+                  </p>
+                </div>
+                <StatusBadge status={evidence ? "ready" : "planned"}>{evidence ? "Registrada" : "Pendiente"}</StatusBadge>
+              </div>
+              {evidence?.signedUrl ? (
+                <a className="mt-3 inline-flex text-sm font-semibold text-teal-700 hover:text-teal-800" href={evidence.signedUrl} rel="noreferrer" target="_blank">
+                  Ver foto
+                </a>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function productCodeForAdminPhase(participant: HutAdminParticipant, phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2") {
+  if (phase === "COLOCACION") {
+    return participant.firstFragranceLeftArm;
+  }
+  return participant.secondFragranceRightArm;
+}
+
+function hutPhaseLabel(phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2") {
+  const labels = {
+    COLOCACION: "Colocacion / entrega 1",
+    REGRESO_1: "Regreso 1 / evaluacion 1",
+    REGRESO_2: "Regreso 2 / evaluacion 2"
+  } as const;
+  return labels[phase];
 }
 
 function whatsappAutomationLabel(status: "ERROR" | "NO_ENVIADO" | "ENVIADO"): string {

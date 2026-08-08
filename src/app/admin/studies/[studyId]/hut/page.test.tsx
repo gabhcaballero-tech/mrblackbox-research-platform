@@ -304,9 +304,54 @@ describe("HutAdminPage", () => {
     expect(screen.getAllByText("Pendiente").length).toBeGreaterThan(0);
     expect(screen.queryByText(/privateStorageKey/i)).not.toBeInTheDocument();
   });
+
+  it("muestra codigos HUT en APPLICATION_PHOTO sin requerir selfie ni video legacy", async () => {
+    getAdminDashboardMock.mockResolvedValue(
+      createDashboard({
+        participants: [
+          createParticipant({
+            applicationEvidence: [
+              {
+                capturedAt: new Date("2026-07-01T12:00:00.000Z"),
+                phase: "COLOCACION",
+                productCode: "901",
+                signedUrl: "https://storage.example/application-photo.jpg"
+              }
+            ],
+            block1: null,
+            block2: null,
+            call1: null,
+            call2: null,
+            origin: "CLT_HUT",
+            protocolVersion: "APPLICATION_PHOTO",
+            referenceSelfie: {
+              capturedAt: new Date(0),
+              signedUrl: null,
+              status: "MISSING"
+            }
+          })
+        ]
+      })
+    );
+
+    render(await HutAdminPage({ params: Promise.resolve({ studyId: "study-hut" }), searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByText("Fotos de aplicacion HUT")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enviar WhatsApp" })).toBeEnabled();
+    expect(screen.queryByText("WhatsApp pendiente: se enviarÃ¡ despuÃ©s de guardar la selfie de registro.")).not.toBeInTheDocument();
+    expect(screen.getByText(/C.digos por fase HUT/)).toBeInTheDocument();
+    expect(screen.getByTestId("hut-phase-code-controls-COLOCACION")).toBeInTheDocument();
+    expect(screen.queryByText("Selfie de registro: Faltante")).not.toBeInTheDocument();
+  });
 });
 
 type TestParticipant = {
+  applicationEvidence: Array<{
+    capturedAt: Date;
+    phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2";
+    productCode: string | null;
+    signedUrl: string | null;
+  }>;
   availability: {
     nextAvailableAt: Date | null;
     reason: string;
@@ -368,6 +413,7 @@ type TestParticipant = {
   };
   link: string;
   name: string;
+  origin: "CLT_HUT" | "HUT_DIRECTO";
   phone: string | null;
   phaseCodes: Array<{
     expiresAt: Date | null;
@@ -381,6 +427,7 @@ type TestParticipant = {
     validatedAt: Date | null;
   }>;
   recruiter: string | null;
+  protocolVersion: "APPLICATION_PHOTO" | "LEGACY_VIDEO";
   referenceSelfie: {
     capturedAt: Date;
     signedUrl: string | null;
@@ -442,6 +489,7 @@ function createDashboard(overrides?: Partial<TestDashboard>): TestDashboard {
 
 function baseParticipant() {
   return {
+    applicationEvidence: [],
     availability: {
       nextAvailableAt: null,
       reason: "BLOCK_NOT_ACTIVE"
@@ -505,6 +553,7 @@ function baseParticipant() {
     },
     link: "https://example.com/hut/p/token-1",
     name: "Participante HUT",
+    origin: "HUT_DIRECTO" as const,
     phaseCodes: [
       {
         expiresAt: null,
@@ -541,6 +590,7 @@ function baseParticipant() {
       }
     ],
     phone: null,
+    protocolVersion: "LEGACY_VIDEO" as const,
     recruiter: null,
     referenceSelfie: {
       capturedAt: new Date(0),

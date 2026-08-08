@@ -122,6 +122,7 @@ export default async function CtlPublicCapturePage({ params, searchParams }: Ctl
                 }
               : null
           }}
+          phaseProgress={session.phaseProgress}
           readOnly={readOnly}
           sessionId={session.id}
           startedAtLabel={formatCtlTimestamp(session.startedAt)}
