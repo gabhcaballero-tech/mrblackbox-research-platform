@@ -19,6 +19,7 @@ export type CtlQuestionReference = {
 };
 
 export type CtlBaseQuestionDefinition = {
+  captureMode?: "AUTO" | "MANUAL";
   code: string;
   displayTemplate?: string;
   instructions?: CtlInstructionDefinition[];
@@ -71,6 +72,13 @@ export type CtlDefinition = {
 };
 
 export type CtlAnswerLookup = Record<string, unknown>;
+
+export const CTL_AGE_RANGE_OPTIONS = [
+  { label: "29 años o menos", value: "1" },
+  { label: "30 a 45 años", value: "2" },
+  { label: "46 a 55 años", value: "3" },
+  { label: "56 años o más", value: "4" }
+] as const;
 
 const sameDifferentOptions: CtlQuestionOption[] = [
   { label: "Es una fragancia diferente", value: "1" },
@@ -153,6 +161,98 @@ const nseClassificationOptions: CtlQuestionOption[] = [
   { label: "E (0 a 47 puntos)", value: "E" }
 ];
 
+export const CTL_NSE_SOURCE_QUESTION_CODES = [
+  "D1_ESCOLARIDAD_JEFE_HOGAR",
+  "D2_BANOS_COMPLETOS",
+  "D3_AUTOS",
+  "D4_INTERNET",
+  "D5_PERSONAS_TRABAJARON",
+  "D6_CUARTOS_DORMIR"
+] as const;
+
+export type CtlNseCalculation =
+  | {
+      classificationCode: string;
+      classificationNumber: number;
+      levelLabel: string;
+      ok: true;
+      totalPoints: number;
+    }
+  | {
+      missingQuestionCodes: string[];
+      ok: false;
+    };
+
+export function calculateCtlNse(
+  definition: CtlDefinition = getCtlDefinition(),
+  answers: CtlAnswerLookup = {}
+): CtlNseCalculation {
+  const questions = new Map(getCtlQuestions(definition).map((question) => [question.code, question]));
+  const missingQuestionCodes: string[] = [];
+  let totalPoints = 0;
+
+  for (const questionCode of CTL_NSE_SOURCE_QUESTION_CODES) {
+    const question = questions.get(questionCode);
+    const answerValue = normalizeDefinitionAnswer(answers[questionCode]);
+
+    if (!question || question.type !== "SELECT" || !answerValue) {
+      missingQuestionCodes.push(questionCode);
+      continue;
+    }
+
+    const option = question.options.find((candidate) => normalizeDefinitionAnswer(candidate.value) === answerValue);
+    const points = option ? extractNsePoints(option.label) : null;
+
+    if (points === null) {
+      missingQuestionCodes.push(questionCode);
+      continue;
+    }
+
+    totalPoints += points;
+  }
+
+  if (missingQuestionCodes.length > 0) {
+    return { missingQuestionCodes, ok: false };
+  }
+
+  const classification = classifyCtlNse(totalPoints);
+  return {
+    classificationCode: classification.code,
+    classificationNumber: classification.number,
+    levelLabel: classification.label,
+    ok: true,
+    totalPoints
+  };
+}
+
+function extractNsePoints(label: string): number | null {
+  const match = label.match(/\((\d+)\s+puntos?/i);
+  return match ? Number(match[1]) : null;
+}
+
+function classifyCtlNse(totalPoints: number): { code: string; label: string; number: number } {
+  if (totalPoints >= 202) {
+    return { code: "A_B", label: "A/B", number: 1 };
+  }
+  if (totalPoints >= 168) {
+    return { code: "C_PLUS", label: "C+", number: 2 };
+  }
+  if (totalPoints >= 141) {
+    return { code: "C_TIPICO", label: "C típico", number: 3 };
+  }
+  if (totalPoints >= 116) {
+    return { code: "C_MINUS", label: "C-", number: 4 };
+  }
+  if (totalPoints >= 95) {
+    return { code: "D_PLUS", label: "D+", number: 5 };
+  }
+  if (totalPoints >= 48) {
+    return { code: "D", label: "D", number: 6 };
+  }
+
+  return { code: "E", label: "E", number: 7 };
+}
+
 const agreementColumns = [
   { label: "Totalmente en desacuerdo", value: 1 },
   { label: "En desacuerdo", value: 2 },
@@ -207,6 +307,7 @@ const aromaAttributeRows = [
 
 const generalDataQuestions: CtlQuestionDefinition[] = [
   {
+    captureMode: "AUTO",
     code: "DG_NOMBRE",
     displayTemplate: "Nombre del participante: {{PARTICIPANT_NAME}}",
     label: "Nombre",
@@ -238,6 +339,7 @@ const generalDataQuestions: CtlQuestionDefinition[] = [
     type: "SHORT_TEXT"
   },
   {
+    captureMode: "AUTO",
     code: "DG_FECHA",
     displayTemplate: "Fecha de entrevista: {{TODAY}}",
     label: "Fecha",
@@ -245,6 +347,7 @@ const generalDataQuestions: CtlQuestionDefinition[] = [
     type: "SHORT_TEXT"
   },
   {
+    captureMode: "AUTO",
     code: "DG_HORA_INICIO",
     displayTemplate: "Hora inicio CTL: {{CTL_STARTED_AT}}",
     label: "Hora inicio",
@@ -252,6 +355,7 @@ const generalDataQuestions: CtlQuestionDefinition[] = [
     type: "SHORT_TEXT"
   },
   {
+    captureMode: "AUTO",
     code: "DG_HORA_TERMINO",
     displayTemplate: "Hora termino CTL: {{CTL_COMPLETED_AT}}",
     label: "Hora termino",
@@ -338,12 +442,14 @@ const demographicQuestions: CtlQuestionDefinition[] = [
     type: "SELECT"
   },
   {
+    captureMode: "AUTO",
     code: "D_TOTAL_PUNTOS_NSE",
     label: "TOTAL de puntos NSE",
     required: false,
     type: "SHORT_TEXT"
   },
   {
+    captureMode: "AUTO",
     code: "D_NSE_CLASIFICACION",
     label: "Registrar NSE de acuerdo al puntaje",
     options: nseClassificationOptions,
@@ -571,7 +677,7 @@ export const CTL_DEFINITION: CtlDefinition = {
           label: "F2. ¿Me podría decir cuál es su edad exacta?",
           instructions: [
             {
-              text: "Captura la edad exacta en años. El sistema derivara el rango operativo.",
+              text: "Captura la edad exacta en años. El sistema preseleccionara el rango operativo para confirmacion.",
               title: "EDAD EXACTA",
               type: "BEFORE_QUESTION"
             }
@@ -654,7 +760,7 @@ export const CTL_DEFINITION: CtlDefinition = {
         },
         {
           code: "F10",
-          label: "F10. ¿Cuándo fue la última vez que compró perfume de la marca (TRASPASAR MARCA DE P7)?",
+          label: "F10. ¿Cuándo fue la última vez que compró perfume de la marca Navigo?",
           required: true,
           type: "SHORT_TEXT"
         },
@@ -824,7 +930,7 @@ export const CTL_DEFINITION: CtlDefinition = {
       id: "DEMOGRAFICOS",
       instructions: [
         {
-          text: "Registra los datos necesarios para calcular NSE. El cálculo automático queda pendiente de confirmación operativa; por ahora captura total y clasificación cuando estén disponibles.",
+          text: "Registra los datos demográficos necesarios. El sistema calculará el NSE automáticamente al completar la sección.",
           title: "NOTA PARA ENCUESTADOR",
           type: "SECTION"
         }

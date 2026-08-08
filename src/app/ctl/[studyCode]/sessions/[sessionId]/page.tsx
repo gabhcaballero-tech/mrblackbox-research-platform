@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getPublicCtlInterviewerActor } from "@/shared/auth/ctl-public";
 import { createCtlRepository, ctlStatusLabel } from "@/modules/ctl/repository";
+import { formatCtlDate, formatCtlTime } from "@/modules/ctl/service";
 import { CtlMobileCapture } from "./CtlMobileCapture";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,8 @@ export default async function CtlPublicCapturePage({ params, searchParams }: Ctl
   }
 
   const readOnly = session.status === "COMPLETED" || session.status === "CANCELLED";
+  const completedAtLabel = formatCtlTimestamp(session.completedAt);
+  const startedAtLabel = formatCtlTimestamp(session.startedAt);
 
   return (
     <main className="min-h-screen bg-zinc-50 px-4 py-6 text-zinc-950 sm:py-8">
@@ -81,6 +84,8 @@ export default async function CtlPublicCapturePage({ params, searchParams }: Ctl
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
               <Detail label="Participante" value={session.participant.name} />
               <Detail label="Folio" value={session.participant.folio} />
+              <Detail label="Hora inicio" value={startedAtLabel ?? "Sin registro"} />
+              <Detail label="Hora termino" value={completedAtLabel ?? "Sin registro"} />
               <Detail label="Estado CTL" value={ctlStatusLabel(session.status)} />
             </dl>
             {session.participant.participantLinkToken ? (
@@ -100,7 +105,7 @@ export default async function CtlPublicCapturePage({ params, searchParams }: Ctl
 
         <CtlMobileCapture
           answers={session.answers}
-          completedAtLabel={formatCtlTimestamp(session.completedAt)}
+          completedAtLabel={completedAtLabel}
           definition={session.definition}
           participant={{
             firstSampleKey: session.participant.rotation.firstSampleKey,
@@ -125,9 +130,9 @@ export default async function CtlPublicCapturePage({ params, searchParams }: Ctl
           phaseProgress={session.phaseProgress}
           readOnly={readOnly}
           sessionId={session.id}
-          startedAtLabel={formatCtlTimestamp(session.startedAt)}
+          startedAtLabel={startedAtLabel}
           studyCode={studyCode}
-          todayLabel={new Date().toLocaleDateString("es-MX")}
+          todayLabel={formatCtlDate(new Date())}
         />
       </div>
     </main>
@@ -161,10 +166,5 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 function formatCtlTimestamp(value: Date | null): string | null {
-  return value
-    ? value.toLocaleTimeString("es-MX", {
-        hour: "2-digit",
-        minute: "2-digit"
-      })
-    : null;
+  return value ? formatCtlTime(value) : null;
 }

@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import {
+  CTL_AGE_RANGE_OPTIONS,
   getCtlApplicableQuestions,
   getCtlDefinition,
   getCtlQuestions,
@@ -49,6 +50,8 @@ export type CtlAgeAnswerValue = {
   rangeCode: "1" | "2" | "3" | "4";
   rangeLabel: string;
 };
+
+export const CTL_OPERATIONAL_TIME_ZONE = "America/Mexico_City";
 
 export type CtlTriangularRotationForAnswer = {
   triangular1: {
@@ -121,6 +124,24 @@ export function normalizeCtlText(value: unknown): string {
     .replace(/\s+/g, " ")
     .trim()
     .toLocaleUpperCase("es-MX");
+}
+
+export function formatCtlDate(value: Date, timeZoneIana = CTL_OPERATIONAL_TIME_ZONE): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: timeZoneIana,
+    year: "numeric"
+  }).format(value);
+}
+
+export function formatCtlTime(value: Date, timeZoneIana = CTL_OPERATIONAL_TIME_ZONE): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    hour: "2-digit",
+    hour12: true,
+    minute: "2-digit",
+    timeZone: timeZoneIana
+  }).format(value);
 }
 
 export function parseCtlAnswers(
@@ -415,13 +436,14 @@ function parseCtlAgeAnswer(
       missingQuestionCodes: string[];
       ok: false;
     } {
-  const normalized = normalizeCtlCode(isGenericRecord(rawValue) ? rawValue.exactAge : rawValue);
+  const isStructuredAge = isGenericRecord(rawValue);
+  const normalized = normalizeCtlCode(isStructuredAge ? rawValue.exactAge : rawValue);
 
   if (!normalized) {
     return { answerValue: null, empty: true, ok: true };
   }
 
-  if (isLegacyCtlAgeRangeCode(normalized)) {
+  if (!isStructuredAge && isLegacyCtlAgeRangeCode(normalized)) {
     return { answerValue: normalized, empty: false, ok: true };
   }
 
@@ -442,10 +464,20 @@ function parseCtlAgeAnswer(
     };
   }
 
+  const derivedRange = deriveCtlAgeRange(exactAge);
+  const selectedRangeCode = isStructuredAge ? normalizeCtlCode(rawValue.rangeCode) : "";
+  if (selectedRangeCode && selectedRangeCode !== derivedRange.rangeCode) {
+    return {
+      message: "El rango operativo no coincide con la edad capturada.",
+      missingQuestionCodes: [questionCode],
+      ok: false
+    };
+  }
+
   return {
     answerValue: {
       exactAge,
-      ...deriveCtlAgeRange(exactAge)
+      ...derivedRange
     },
     empty: false,
     ok: true
@@ -519,18 +551,18 @@ function isGenericRecord(value: unknown): value is Record<string, unknown> {
 
 function deriveCtlAgeRange(exactAge: number): Pick<CtlAgeAnswerValue, "rangeCode" | "rangeLabel"> {
   if (exactAge <= 29) {
-    return { rangeCode: "1", rangeLabel: "29 años o menos" };
+    return { rangeCode: "1", rangeLabel: CTL_AGE_RANGE_OPTIONS[0].label };
   }
 
   if (exactAge <= 45) {
-    return { rangeCode: "2", rangeLabel: "30 a 45 años" };
+    return { rangeCode: "2", rangeLabel: CTL_AGE_RANGE_OPTIONS[1].label };
   }
 
   if (exactAge <= 55) {
-    return { rangeCode: "3", rangeLabel: "46 a 55 años" };
+    return { rangeCode: "3", rangeLabel: CTL_AGE_RANGE_OPTIONS[2].label };
   }
 
-  return { rangeCode: "4", rangeLabel: "55 años o más" };
+  return { rangeCode: "4", rangeLabel: CTL_AGE_RANGE_OPTIONS[3].label };
 }
 
 function resolveCtlAgeRangeCode(answerValue: unknown): string | null {

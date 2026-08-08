@@ -1,10 +1,12 @@
 import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
 import { releaseNavigoParticipantForCtl } from "@/modules/navigo-app/repository";
-import { getCtlDefinition } from "./definition";
+import { calculateCtlNse, getCtlDefinition } from "./definition";
 import {
   canAccessCtl,
   ctlStatusLabel,
   buildPermanentCtlInterviewerCode,
+  formatCtlDate,
+  formatCtlTime,
   generateCtlInterviewerCode,
   hashCtlInterviewerCode,
   INITIAL_PERMANENT_CTL_INTERVIEWERS,
@@ -1081,14 +1083,26 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
 
         const now = new Date();
         if (input.complete) {
-          const incompletePhase = firstIncompleteCtlOperationalPhase(session.phaseProgress ?? []);
-          if (incompletePhase) {
+          const nseCalculation = calculateCtlNse(
+            getCtlDefinition(),
+            mergeCtlAnswerLookup(session.answers ?? [], input.answers)
+          );
+
+          if (!nseCalculation.ok) {
             return {
-              message: `Valida la fase ${ctlOperationalPhaseLabel(incompletePhase.phase)} antes de completar CTL.`,
+              message: `Faltan datos demograficos para calcular NSE: ${nseCalculation.missingQuestionCodes.join(", ")}.`,
               ok: false
             };
           }
 
+          await upsertCtlAnswer(tx, session.id, {
+            answerValue: String(nseCalculation.totalPoints),
+            questionCode: "D_TOTAL_PUNTOS_NSE"
+          });
+          await upsertCtlAnswer(tx, session.id, {
+            answerValue: nseCalculation.classificationCode,
+            questionCode: "D_NSE_CLASIFICACION"
+          });
           await upsertCtlAnswer(tx, session.id, {
             answerValue: formatCtlTime(now),
             questionCode: "DG_HORA_TERMINO"
@@ -1460,6 +1474,16 @@ async function upsertCtlAnswer(
   });
 }
 
+function mergeCtlAnswerLookup(
+  existingAnswers: Array<{ answerValue: unknown; questionCode: string }>,
+  nextAnswers: CtlAnswerDraft[]
+): Record<string, unknown> {
+  return {
+    ...Object.fromEntries(existingAnswers.map((answer) => [answer.questionCode, answer.answerValue])),
+    ...Object.fromEntries(nextAnswers.map((answer) => [answer.questionCode, answer.answerValue]))
+  };
+}
+
 function canReadSession(
   actor: CtlActor,
   session: Pick<SessionRecord, "ctlInterviewerCodeId" | "interviewerId" | "studyId">
@@ -1482,28 +1506,8 @@ function ctlReferenceCodeSlotForPhase(phase: CtlOperationalPhase): 1 | 2 | 3 {
   return slots[phase];
 }
 
-function ctlOperationalPhaseLabel(phase: CtlOperationalPhase): string {
-  const labels: Record<CtlOperationalPhase, string> = {
-    COLOCACION: "Colocacion - Entrega 1",
-    EVALUACION_1: "Evaluacion 1 - Entrega 2",
-    EVALUACION_2: "Evaluacion 2"
-  };
-  return labels[phase];
-}
-
 function ctlPhaseValidatedBy(actor: CtlActor): string {
   return isPublicCtlInterviewerActor(actor) ? actor.label : actor.id;
-}
-
-function firstIncompleteCtlOperationalPhase(phases: CtlPhaseProgressRecord[]): CtlPhaseProgressRecord | null {
-  if (phases.length === 0) {
-    return null;
-  }
-
-  return phases
-    .slice()
-    .sort((left, right) => left.referenceCodeSlot - right.referenceCodeSlot)
-    .find((phase) => phase.status !== "COMPLETED") ?? null;
 }
 
 function ctlPhaseProgressData(phase: CtlOperationalPhase, session: SessionRecord) {
@@ -1724,17 +1728,6 @@ function isUniqueConstraintError(error: unknown): boolean {
       "code" in error &&
       (error as { code?: string }).code === "P2002"
   );
-}
-
-function formatCtlDate(value: Date): string {
-  return value.toLocaleDateString("es-MX");
-}
-
-function formatCtlTime(value: Date): string {
-  return value.toLocaleTimeString("es-MX", {
-    hour: "2-digit",
-    minute: "2-digit"
-  });
 }
 
 function formatNse(input: { nseClass: string | null; nseScore: number | null }): string {

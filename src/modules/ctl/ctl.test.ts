@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { getCtlApplicableQuestions, getCtlDefinition, getCtlQuestions, type CtlDefinition } from "./definition";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  calculateCtlNse,
+  getCtlApplicableQuestions,
+  getCtlDefinition,
+  getCtlQuestions,
+  type CtlDefinition
+} from "./definition";
 import { createCtlRepository } from "./repository";
 import {
   buildCtlTriangularAnswerValue,
@@ -7,6 +13,7 @@ import {
   isCtlTerminatingAnswer,
   parseCtlAnswers,
   parseCtlQuestionAnswer,
+  formatCtlTime,
   type CtlAnswerInput
 } from "./service";
 
@@ -15,6 +22,10 @@ const otherInterviewer = { id: "interviewer-2", role: "INTERVIEWER" as const, st
 const admin = { id: "admin-1", role: "ADMIN" as const, status: "ACTIVE" as const };
 
 describe("ctl module", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("exposes the Navigo Homme CTL v7 definition with comparative and demographic sections", () => {
     const definition = getCtlDefinition();
     const questions = getCtlQuestions(definition);
@@ -61,6 +72,8 @@ describe("ctl module", () => {
       "D_TOTAL_PUNTOS_NSE",
       "D_NSE_CLASIFICACION"
     ]));
+    expect(questions.find((question) => question.code === "DG_HORA_INICIO")?.captureMode).toBe("AUTO");
+    expect(questions.find((question) => question.code === "DG_HORA_TERMINO")?.captureMode).toBe("AUTO");
     expect(questions.findIndex((question) => question.code === "DG_NOMBRE")).toBeLessThan(
       questions.findIndex((question) => question.code === "F0")
     );
@@ -127,9 +140,10 @@ describe("ctl module", () => {
     expect(p14?.instructions?.[0]?.text).toContain("CARÁTULA DE ROTACIÓN");
   });
 
-  it("defines real demographic NSE capture questions without automatic score calculation", () => {
+  it("defines real demographic NSE source questions and automatic result fields", () => {
     const questions = getCtlQuestions(getCtlDefinition());
     const d1 = questions.find((question) => question.code === "D1_ESCOLARIDAD_JEFE_HOGAR");
+    const total = questions.find((question) => question.code === "D_TOTAL_PUNTOS_NSE");
     const nse = questions.find((question) => question.code === "D_NSE_CLASIFICACION");
 
     expect(d1?.type).toBe("SELECT");
@@ -137,6 +151,8 @@ describe("ctl module", () => {
       throw new Error("D1 must be a SELECT question");
     }
     expect(d1.options).toHaveLength(10);
+    expect(total).toMatchObject({ captureMode: "AUTO", required: false, type: "SHORT_TEXT" });
+    expect(nse).toMatchObject({ captureMode: "AUTO", required: false, type: "SELECT" });
     expect(nse?.type).toBe("SELECT");
     if (!nse || nse.type !== "SELECT") {
       throw new Error("D_NSE_CLASIFICACION must be a SELECT question");
@@ -150,6 +166,39 @@ describe("ctl module", () => {
       "D",
       "E"
     ]);
+    const demographics = getCtlDefinition().sections.find((section) => section.id === "DEMOGRAFICOS");
+    expect(demographics?.instructions?.[0]?.text).not.toContain("pendiente");
+  });
+
+  it("calculates NSE score, letter level and numeric classification from demographic answers", () => {
+    const calculation = calculateCtlNse(getCtlDefinition(), createValidCtlAnswerInput());
+
+    expect(calculation).toEqual({
+      classificationCode: "C_PLUS",
+      classificationNumber: 2,
+      levelLabel: "C+",
+      ok: true,
+      totalPoints: 168
+    });
+  });
+
+  it("reports missing demographic answers before calculating NSE", () => {
+    const answers = createValidCtlAnswerInput();
+    delete answers.D6_CUARTOS_DORMIR;
+
+    const calculation = calculateCtlNse(getCtlDefinition(), answers);
+
+    expect(calculation).toEqual({
+      missingQuestionCodes: ["D6_CUARTOS_DORMIR"],
+      ok: false
+    });
+  });
+
+  it("renders F10 with the final Navigo brand text and no internal transfer placeholder", () => {
+    const f10 = getCtlQuestions(getCtlDefinition()).find((question) => question.code === "F10");
+
+    expect(f10?.label).toBe("F10. ¿Cuándo fue la última vez que compró perfume de la marca Navigo?");
+    expect(f10?.label).not.toContain("TRASPASAR MARCA");
   });
 
   it("uses numeric CTL yes/no matrix values with Si=1 and No=2", () => {
@@ -179,18 +228,47 @@ describe("ctl module", () => {
     expect(isCtlTerminatingAnswer("P1", "PR1")).toBe(false);
   });
 
-  it("captures F2 as exact age and derives the operational age range", () => {
-    const parsed = parseCtlQuestionAnswer("F2", { F2: "35" });
+  it("captures F2 as exact age and confirmed operational age range", () => {
+    const parsed = parseCtlQuestionAnswer("F2", { F2: { exactAge: "33", rangeCode: "2" } });
 
     expect(parsed.ok).toBe(true);
     expect(parsed.ok ? parsed.answer : null).toEqual({
       answerValue: {
-        exactAge: 35,
+        exactAge: 33,
         rangeCode: "2",
         rangeLabel: "30 a 45 años"
       },
       questionCode: "F2"
     });
+  });
+
+  it("derives F2 age range boundaries for 28, 33 and 60 years", () => {
+    const young = parseCtlQuestionAnswer("F2", { F2: { exactAge: "28", rangeCode: "1" } });
+    const adult = parseCtlQuestionAnswer("F2", { F2: { exactAge: "33", rangeCode: "2" } });
+    const older = parseCtlQuestionAnswer("F2", { F2: { exactAge: "60", rangeCode: "4" } });
+
+    expect(young.ok ? young.answer?.answerValue : null).toMatchObject({
+      exactAge: 28,
+      rangeCode: "1",
+      rangeLabel: "29 años o menos"
+    });
+    expect(adult.ok ? adult.answer?.answerValue : null).toMatchObject({
+      exactAge: 33,
+      rangeCode: "2",
+      rangeLabel: "30 a 45 años"
+    });
+    expect(older.ok ? older.answer?.answerValue : null).toMatchObject({
+      exactAge: 60,
+      rangeCode: "4",
+      rangeLabel: "56 años o más"
+    });
+  });
+
+  it("blocks F2 when the confirmed range does not match exact age", () => {
+    const parsed = parseCtlQuestionAnswer("F2", { F2: { exactAge: "33", rangeCode: "1" } });
+
+    expect(parsed.ok).toBe(false);
+    expect(parsed.ok ? "" : parsed.message).toBe("El rango operativo no coincide con la edad capturada.");
   });
 
   it("keeps historical F2 range answers compatible", () => {
@@ -233,6 +311,8 @@ describe("ctl module", () => {
   });
 
   it("saves automatic general data when an admin starts CTL", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-08T06:26:00.000Z"));
     const state = createCtlState();
     const repository = createCtlRepository(state.prisma as never);
 
@@ -246,8 +326,9 @@ describe("ctl module", () => {
     expect(state.sessions[0]?.startedAt).toBeInstanceOf(Date);
     expect(Object.fromEntries(state.answers.map((answer) => [answer.questionCode, answer.answerValue]))).toMatchObject({
       DG_NOMBRE: "ANA PEREZ",
-      DG_HORA_INICIO: expect.any(String)
+      DG_HORA_INICIO: formatCtlTime(new Date("2026-08-08T06:26:00.000Z"))
     });
+    expect(String(state.answers.find((answer) => answer.questionCode === "DG_HORA_INICIO")?.answerValue)).not.toContain("06:26");
   });
 
   it("creates a CTL session after validating participant codes", async () => {
@@ -1204,6 +1285,8 @@ describe("ctl module", () => {
   });
 
   it("releases Navigo when CTL is completed", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-08T06:00:00.000Z"));
     const state = createCtlState();
     const repository = createCtlRepository(state.prisma as never);
     const started = await repository.startSession({
@@ -1214,6 +1297,7 @@ describe("ctl module", () => {
     const parsed = parseCtlAnswers(createValidCtlAnswerInput());
     await validateAllCtlPhases(repository, started.ok ? started.sessionId : "");
 
+    vi.setSystemTime(new Date("2026-08-08T07:26:00.000Z"));
     await repository.saveAnswers({
       actor: interviewer,
       answers: parsed.ok ? parsed.answers : [],
@@ -1223,13 +1307,42 @@ describe("ctl module", () => {
 
     expect(state.sessions[0]?.status).toBe("COMPLETED");
     expect(Object.fromEntries(state.answers.map((answer) => [answer.questionCode, answer.answerValue]))).toMatchObject({
-      DG_HORA_TERMINO: expect.any(String)
+      DG_HORA_TERMINO: formatCtlTime(new Date("2026-08-08T07:26:00.000Z")),
+      D_NSE_CLASIFICACION: "C_PLUS",
+      D_TOTAL_PUNTOS_NSE: "168"
     });
+    expect(String(state.answers.find((answer) => answer.questionCode === "DG_HORA_TERMINO")?.answerValue)).not.toContain("07:26");
     expect(state.navigoActivities).toEqual([]);
     expect(state.accessTokens).toHaveLength(1);
   });
 
-  it("blocks CTL completion until operational phases are validated", async () => {
+  it("blocks CTL completion when demographic answers are missing for NSE calculation", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const started = await repository.startSession({
+      actor: interviewer,
+      folio: "NAV-001",
+      studyId: state.study.id
+    });
+    const parsed = parseCtlAnswers(createValidCtlAnswerInput());
+    const answersWithoutNseSource = parsed.ok
+      ? parsed.answers.filter((answer) => answer.questionCode !== "D6_CUARTOS_DORMIR")
+      : [];
+
+    const result = await repository.saveAnswers({
+      actor: interviewer,
+      answers: answersWithoutNseSource,
+      complete: true,
+      sessionId: started.ok ? started.sessionId : ""
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.message).toContain("D6_CUARTOS_DORMIR");
+    expect(state.sessions[0]?.status).toBe("PENDING");
+    expect(state.accessTokens).toHaveLength(0);
+  });
+
+  it("completes CTL without requiring operational phase code validation", async () => {
     const state = createCtlState();
     const repository = createCtlRepository(state.prisma as never);
     const started = await repository.startSession({
@@ -1246,10 +1359,9 @@ describe("ctl module", () => {
       sessionId: started.ok ? started.sessionId : ""
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.ok ? "" : result.message).toContain("Valida la fase Colocacion");
-    expect(state.sessions[0]?.status).toBe("PENDING");
-    expect(state.accessTokens).toHaveLength(0);
+    expect(result.ok).toBe(true);
+    expect(state.sessions[0]?.status).toBe("COMPLETED");
+    expect(state.accessTokens).toHaveLength(1);
   });
 
   it("validates CTL phases using participant reference code slots", async () => {
@@ -1452,9 +1564,7 @@ function createValidCtlAnswerInput(): CtlAnswerInput {
     D3_AUTOS: "1",
     D4_INTERNET: "1",
     D5_PERSONAS_TRABAJARON: "1",
-    D6_CUARTOS_DORMIR: "2",
-    D_TOTAL_PUNTOS_NSE: "152",
-    D_NSE_CLASIFICACION: "C_TIPICO"
+    D6_CUARTOS_DORMIR: "2"
   };
 }
 

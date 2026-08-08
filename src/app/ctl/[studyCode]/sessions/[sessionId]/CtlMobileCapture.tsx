@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
+  CTL_AGE_RANGE_OPTIONS,
+  calculateCtlNse,
   getCtlApplicableQuestions,
   type CtlDefinition,
   type CtlMatrixQuestionDefinition,
@@ -11,17 +13,20 @@ import {
 } from "@/modules/ctl/definition";
 import {
   finishPublicCtlSessionAction,
-  savePublicCtlQuestionAnswerAction,
-  validatePublicCtlPhaseCodeAction
+  savePublicCtlQuestionAnswerAction
 } from "@/modules/ctl/public-actions";
-import type { CtlAgeAnswerValue, CtlOperationalPhase, CtlPhaseProgressStatus } from "@/modules/ctl/service";
+import type { CtlAgeAnswerValue } from "@/modules/ctl/service";
 
 type FlatQuestion = {
   index: number;
   question: CtlQuestionDefinition;
+  sectionId: string;
   sectionInstructions?: Array<{ text: string; title?: string; type: string }>;
+  sectionInstructionTexts: string[];
   sectionTitle: string;
 };
+
+type CtlQuestionLookup = Map<string, CtlQuestionDefinition>;
 
 type CtlMobileCaptureProps = {
   answers: Record<string, unknown>;
@@ -34,21 +39,12 @@ type CtlMobileCaptureProps = {
     secondSampleKey?: string | null;
     triangularRotation?: CtlTriangularRotationDisplay | null;
   };
-  phaseProgress?: CtlPhaseProgressDisplay[];
   readOnly: boolean;
   sessionId: string;
+  phaseProgress?: Array<unknown>;
   startedAtLabel?: string | null;
   studyCode: string;
   todayLabel?: string;
-};
-
-type CtlPhaseProgressDisplay = {
-  arm: string | null;
-  phase: CtlOperationalPhase;
-  productCode: string | null;
-  referenceCodeSlot: 1 | 2 | 3;
-  status: CtlPhaseProgressStatus;
-  validatedAt: Date | string | null;
 };
 
 type CtlTriangularRotationDisplay = {
@@ -80,7 +76,6 @@ export function CtlMobileCapture({
   completedAtLabel,
   definition,
   participant,
-  phaseProgress = [],
   readOnly,
   sessionId,
   startedAtLabel,
@@ -95,15 +90,16 @@ export function CtlMobileCapture({
     [answers, completedAtLabel, participant, startedAtLabel, todayLabel]
   );
   const [localAnswers, setLocalAnswers] = useState<Record<string, unknown>>(initialAnswers);
-  const [localPhaseProgress, setLocalPhaseProgress] = useState<CtlPhaseProgressDisplay[]>(phaseProgress);
-  const [phaseCode, setPhaseCode] = useState("");
   const questions = useMemo(() => flattenCtlQuestions(definition, localAnswers), [definition, localAnswers]);
+  const questionLookup = useMemo(() => buildCtlQuestionLookup(definition), [definition]);
   const [currentIndex, setCurrentIndex] = useState(() => getInitialCtlQuestionIndex(definition, initialAnswers));
   const [isReviewing, setIsReviewing] = useState(readOnly);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [validationModal, setValidationModal] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const captureTopRef = useRef<HTMLElement | null>(null);
+  const hasMountedRef = useRef(false);
 
   const current = questions[currentIndex];
   const needsTriangularRotation = questions.some(({ question }) => isTriangularQuestionCode(question.code));
@@ -111,10 +107,18 @@ export function CtlMobileCapture({
   const completedCount = questions.filter(({ question }) => isCtlQuestionAnswered(question, localAnswers[question.code])).length;
   const progressPercent = questions.length > 0 ? Math.round((completedCount / questions.length) * 100) : 0;
   const pendingQuestionCodes = getPendingCtlQuestionCodes(definition, localAnswers);
-  const requiredPhase = !isReviewing && current ? requiredCtlPhaseForQuestion(current.sectionTitle, current.question.code) : null;
-  const phaseGate = requiredPhase ? localPhaseProgress.find((phase) => phase.phase === requiredPhase) ?? null : null;
-  const isPhaseBlocked = Boolean(phaseGate && phaseGate.status !== "COMPLETED" && !readOnly);
+  const nseCalculation = useMemo(() => calculateCtlNse(definition, localAnswers), [definition, localAnswers]);
+  const shouldShowNseResult = isReviewing || current?.sectionId === "DEMOGRAFICOS";
   const canGoBack = !isPending && (isReviewing || currentIndex > 0);
+
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+
+    captureTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [currentIndex, isReviewing]);
 
   function setAnswer(questionCode: string, answer: unknown) {
     setLocalAnswers((currentAnswers) => ({
@@ -202,13 +206,6 @@ export function CtlMobileCapture({
       return;
     }
 
-    const incompletePhase = firstIncompletePhase(localPhaseProgress);
-    if (incompletePhase) {
-      setMessage(null);
-      setError(`Valida la fase ${ctlPhaseLabel(incompletePhase.phase)} antes de finalizar CTL.`);
-      return;
-    }
-
     setError(null);
     setMessage("Finalizando CTL...");
     startTransition(async () => {
@@ -239,47 +236,6 @@ export function CtlMobileCapture({
     });
   }
 
-  function validatePhase() {
-    if (!phaseGate || readOnly || isPending) {
-      return;
-    }
-
-    if (!phaseCode.trim()) {
-      setError("Captura el codigo de fase para continuar.");
-      return;
-    }
-
-    setError(null);
-    setMessage("Validando codigo de fase...");
-    const formData = new FormData();
-    formData.set("phaseCode", phaseCode);
-
-    startTransition(async () => {
-      const result = await validatePublicCtlPhaseCodeAction(
-        studyCode,
-        sessionId,
-        phaseGate.phase,
-        formData
-      ) as ActionResult;
-
-      if (!result.ok) {
-        setMessage(null);
-        setError(result.message);
-        return;
-      }
-
-      setLocalPhaseProgress((currentPhases) =>
-        currentPhases.map((phase) =>
-          phase.phase === phaseGate.phase
-            ? { ...phase, status: "COMPLETED", validatedAt: new Date().toISOString() }
-            : phase
-        )
-      );
-      setPhaseCode("");
-      setMessage("Fase validada correctamente.");
-    });
-  }
-
   if (questions.length === 0) {
     return (
       <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
@@ -301,7 +257,7 @@ export function CtlMobileCapture({
   }
 
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6">
+    <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6" ref={captureTopRef}>
       <header className="space-y-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">CTL Navigo Homme</p>
@@ -319,6 +275,8 @@ export function CtlMobileCapture({
         </div>
       </header>
 
+      <AutomaticCtlDetails answers={localAnswers} completedAtLabel={completedAtLabel} />
+
       <StatusMessages error={error} message={message} />
       {validationModal ? (
         <ValidationModal message={validationModal} onClose={() => setValidationModal(null)} />
@@ -326,27 +284,24 @@ export function CtlMobileCapture({
 
       {isReviewing ? (
         <ReviewPanel
+          nseCalculation={nseCalculation}
           pendingCount={pendingQuestionCodes.length}
           pendingQuestionCodes={pendingQuestionCodes}
         />
-      ) : isPhaseBlocked && phaseGate ? (
-        <PhaseGatePanel
-          disabled={isPending}
-          onChange={setPhaseCode}
-          onSubmit={validatePhase}
-          phase={phaseGate}
-          value={phaseCode}
-        />
       ) : current ? (
-        <QuestionStep
-          answer={localAnswers[current.question.code]}
-          flatQuestion={current}
-          onAnswer={setAnswer}
-          participant={participant}
-          readOnly={readOnly}
-          sessionId={sessionId}
-          answers={localAnswers}
-        />
+        <>
+          <QuestionStep
+            answer={localAnswers[current.question.code]}
+            flatQuestion={current}
+            onAnswer={setAnswer}
+            participant={participant}
+            questionLookup={questionLookup}
+            readOnly={readOnly}
+            sessionId={sessionId}
+            answers={localAnswers}
+          />
+          {shouldShowNseResult ? <CtlNseResultPanel calculation={nseCalculation} /> : null}
+        </>
       ) : null}
 
       <div className="mt-8 grid gap-3 sm:grid-cols-2">
@@ -367,15 +322,6 @@ export function CtlMobileCapture({
           >
             {isPending ? "Finalizando CTL..." : "Finalizar CTL"}
           </button>
-        ) : isPhaseBlocked ? (
-          <button
-            className={primaryButtonClass}
-            disabled={readOnly || isPending}
-            onClick={validatePhase}
-            type="button"
-          >
-            {isPending ? "Validando..." : "Validar fase"}
-          </button>
         ) : (
           <button
             className={primaryButtonClass}
@@ -391,58 +337,32 @@ export function CtlMobileCapture({
   );
 }
 
-function PhaseGatePanel({
-  disabled,
-  onChange,
-  onSubmit,
-  phase,
-  value
+function AutomaticCtlDetails({
+  answers,
+  completedAtLabel
 }: {
-  disabled: boolean;
-  onChange: (value: string) => void;
-  onSubmit: () => void;
-  phase: CtlPhaseProgressDisplay;
-  value: string;
+  answers: Record<string, unknown>;
+  completedAtLabel?: string | null;
 }) {
   return (
-    <article className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-5">
-      <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Fase operativa</p>
-      <h3 className="mt-2 text-xl font-bold text-amber-950">{ctlPhaseLabel(phase.phase)}</h3>
-      <p className="mt-2 text-sm leading-6 text-amber-900">
-        Captura el codigo {phase.referenceCodeSlot} para continuar con esta fase de la entrevista.
-      </p>
-      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-        <PhaseDetail label="Producto" value={phase.productCode ?? "No asignado"} />
-        <PhaseDetail label="Brazo" value={phase.arm ?? "No aplica"} />
+    <div className="mt-5 rounded-xl border border-teal-100 bg-teal-50 p-4">
+      <p className="text-xs font-bold uppercase tracking-wide text-teal-700">Datos automaticos CTL</p>
+      <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+        <AutomaticDetail label="Fecha" value={String(answers.DG_FECHA ?? "Sin registro")} />
+        <AutomaticDetail label="Hora inicio" value={String(answers.DG_HORA_INICIO ?? "Sin registro")} />
+        {completedAtLabel ? (
+          <AutomaticDetail label="Hora termino" value={String(answers.DG_HORA_TERMINO ?? completedAtLabel)} />
+        ) : null}
       </dl>
-      <label className="mt-5 block text-sm font-semibold text-amber-950">
-        Codigo de fase
-        <input
-          autoComplete="off"
-          className="mt-2 min-h-12 w-full rounded-xl border border-amber-300 bg-white px-4 py-3 text-lg font-bold tracking-widest text-zinc-950"
-          disabled={disabled}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={`Codigo ${phase.referenceCodeSlot}`}
-          value={value}
-        />
-      </label>
-      <button
-        className={`${primaryButtonClass} mt-4`}
-        disabled={disabled}
-        onClick={onSubmit}
-        type="button"
-      >
-        {disabled ? "Validando..." : "Validar codigo"}
-      </button>
-    </article>
+    </div>
   );
 }
 
-function PhaseDetail({ label, value }: { label: string; value: string }) {
+function AutomaticDetail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-amber-200 bg-white p-3">
-      <dt className="text-xs font-medium text-amber-700">{label}</dt>
-      <dd className="mt-1 font-semibold text-zinc-950">{value}</dd>
+    <div>
+      <dt className="text-xs font-semibold text-teal-700">{label}</dt>
+      <dd className="mt-1 font-bold text-teal-950">{value}</dd>
     </div>
   );
 }
@@ -453,6 +373,7 @@ function QuestionStep({
   flatQuestion,
   onAnswer,
   participant,
+  questionLookup,
   readOnly,
   sessionId
 }: {
@@ -467,11 +388,15 @@ function QuestionStep({
     secondSampleKey?: string | null;
     triangularRotation?: CtlTriangularRotationDisplay | null;
   };
+  questionLookup: CtlQuestionLookup;
   readOnly: boolean;
   sessionId: string;
 }) {
   const { question, sectionInstructions, sectionTitle } = flatQuestion;
-  const displayLabel = resolveQuestionLabel(question, answers, participant);
+  const displayLabel = resolveQuestionLabel(question, answers, participant, questionLookup);
+  const questionInstructions = question.instructions?.filter(
+    (instruction) => !isSectionInstructionDuplicate(instruction.text, flatQuestion.sectionInstructionTexts)
+  );
 
   return (
     <article className="mt-6 space-y-5">
@@ -480,11 +405,16 @@ function QuestionStep({
         {sectionInstructions?.map((instruction, index) => (
           <InstructionBox instruction={instruction} key={`${instruction.type}-${index}`} />
         ))}
-        {question.instructions?.map((instruction, index) => (
+        {questionInstructions?.map((instruction, index) => (
           <InstructionBox instruction={instruction} key={`${question.code}-${instruction.type}-${index}`} />
         ))}
         {question.references?.length ? (
-          <ReferenceList answers={answers} participant={participant} references={question.references} />
+          <ReferenceList
+            answers={answers}
+            participant={participant}
+            questionLookup={questionLookup}
+            references={question.references}
+          />
         ) : null}
         <h3 className="mt-2 text-lg font-bold leading-7 text-zinc-950">
           {displayLabel}
@@ -492,7 +422,7 @@ function QuestionStep({
         </h3>
         <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">{question.code}</p>
       </div>
-      {renderMobileQuestionInput(question, answer, onAnswer, participant, readOnly, sessionId)}
+      {renderMobileQuestionInput(question, answer, onAnswer, participant, questionLookup, readOnly, sessionId)}
     </article>
   );
 }
@@ -508,9 +438,20 @@ function renderMobileQuestionInput(
     secondSampleKey?: string | null;
     triangularRotation?: CtlTriangularRotationDisplay | null;
   },
+  questionLookup: CtlQuestionLookup,
   readOnly: boolean,
   sessionId: string
 ) {
+  if (question.code === "F2") {
+    return (
+      <AgeRangeInput
+        answer={answer}
+        disabled={readOnly}
+        onChange={(value) => onAnswer(question.code, value)}
+      />
+    );
+  }
+
   if (question.type === "SELECT") {
     return (
       <OptionCards
@@ -519,7 +460,7 @@ function renderMobileQuestionInput(
         onSelect={(value) => onAnswer(question.code, value)}
         options={question.options.map((option) => ({
           ...option,
-          label: resolveTemplate(option.label, {}, participant)
+          label: resolveTemplate(option.label, {}, participant, questionLookup)
         }))}
       />
     );
@@ -564,6 +505,88 @@ function renderMobileQuestionInput(
       type={question.code === "F2" ? "number" : "text"}
       value={formatTextInputAnswer(question, answer)}
     />
+  );
+}
+
+function AgeRangeInput({
+  answer,
+  disabled,
+  onChange
+}: {
+  answer: unknown;
+  disabled: boolean;
+  onChange: (value: CtlAgeAnswerValue) => void;
+}) {
+  const exactAge = getCtlAgeExactInput(answer);
+  const derivedRange = deriveCtlAgeRangeOption(exactAge);
+  const selectedRangeCode = getCtlAgeRangeInput(answer) || derivedRange?.value || "";
+  const hasMismatch = Boolean(derivedRange && selectedRangeCode && selectedRangeCode !== derivedRange.value);
+
+  function updateExactAge(value: string) {
+    const nextDerived = deriveCtlAgeRangeOption(value);
+    onChange({
+      exactAge: Number(value),
+      rangeCode: (nextDerived?.value ?? selectedRangeCode ?? "") as CtlAgeAnswerValue["rangeCode"],
+      rangeLabel: nextDerived?.label ?? ctlAgeRangeLabel(selectedRangeCode)
+    });
+  }
+
+  function updateRange(rangeCode: string) {
+    onChange({
+      exactAge: Number(exactAge),
+      rangeCode: rangeCode as CtlAgeAnswerValue["rangeCode"],
+      rangeLabel: ctlAgeRangeLabel(rangeCode)
+    });
+  }
+
+  return (
+    <div className="space-y-5">
+      <label className="block text-sm font-semibold text-zinc-700">
+        Edad exacta
+        <input
+          className={textInputClass}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(event) => updateExactAge(event.target.value)}
+          pattern="[0-9]*"
+          type="number"
+          value={exactAge}
+        />
+      </label>
+
+      <div>
+        <p className="text-sm font-bold text-zinc-800">Rango operativo</p>
+        <p className="mt-1 text-sm text-zinc-600">
+          El rango se preselecciona con la edad exacta. Confirma que corresponde antes de continuar.
+        </p>
+        <div className="mt-3 grid gap-3">
+          {CTL_AGE_RANGE_OPTIONS.map((option) => {
+            const isSelected = selectedRangeCode === option.value;
+            const isDerived = derivedRange?.value === option.value;
+            return (
+              <button
+                aria-pressed={isSelected}
+                className={optionButtonClass(isSelected)}
+                disabled={disabled || !exactAge}
+                key={option.value}
+                onClick={() => updateRange(option.value)}
+                type="button"
+              >
+                <span className="text-left">
+                  {option.label}
+                  {isDerived ? <span className="ml-2 text-xs font-bold uppercase opacity-80">Sugerido</span> : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {hasMismatch ? (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+            El rango seleccionado no coincide con la edad capturada. Corrige el rango antes de continuar.
+          </p>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -619,11 +642,12 @@ function ScaleButtons({
     <div className="grid gap-3">
       {values.map((value) => {
         const isSelected = selected === String(value);
+        const label = formatScaleQuestionOptionLabel(question, value);
         return (
           <button
-            aria-label={`${value} ${question.labels?.[value] ?? `Valor ${value}`}`}
+            aria-label={label}
             aria-pressed={isSelected}
-            className={`flex min-h-16 items-center gap-4 rounded-xl border px-4 py-3 text-left transition ${
+            className={`flex min-h-16 items-center rounded-xl border px-4 py-3 text-left text-base font-semibold leading-6 transition ${
               isSelected
                 ? "border-teal-700 bg-teal-700 text-white"
                 : "border-zinc-300 bg-white text-zinc-950 hover:border-teal-600"
@@ -633,14 +657,7 @@ function ScaleButtons({
             onClick={() => onSelect(value)}
             type="button"
           >
-            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl font-bold ${
-              isSelected ? "bg-white text-teal-800" : "bg-zinc-100 text-zinc-950"
-            }`}>
-              {value}
-            </span>
-            <span className="text-base font-semibold leading-6">
-              {question.labels?.[value] ?? `Valor ${value}`}
-            </span>
+            {label}
           </button>
         );
       })}
@@ -663,24 +680,26 @@ function MatrixBlocks({
 }) {
   const matrixAnswer = isRecord(answer) ? toStringRecord(answer) : {};
   const rows = question.randomizeRows ? stableShuffle(question.rows, `${sessionId}:${question.code}`) : question.rows;
+  const isBinaryMatrix = isBinaryYesNoColumns(question.columns);
 
   return (
     <div className="space-y-4">
       {rows.map((row, index) => (
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4" key={row.code}>
-          {index > 0 && index % 5 === 0 ? (
+          {!isBinaryMatrix && index > 0 && index % 5 === 0 ? (
             <ScaleReminder columns={question.columns} />
           ) : null}
           <p className="text-base font-semibold text-zinc-950">{row.label}</p>
-          <div className="mt-3 grid grid-cols-5 gap-2">
+          <div className="mt-3 grid gap-2">
             {question.columns.map((column) => {
               const value = String(column.value);
               const isSelected = matrixAnswer[row.code] === value;
+              const label = isBinaryMatrix ? column.label : formatScaleOptionLabel(column.value, column.label);
               return (
                 <button
-                  aria-label={`${row.label}: ${column.label}`}
+                  aria-label={`${row.label}: ${label}`}
                   aria-pressed={isSelected}
-                  className={`min-h-12 rounded-lg border px-2 py-2 text-sm font-bold transition ${
+                  className={`min-h-12 rounded-lg border px-3 py-2 text-left text-sm font-bold transition ${
                     isSelected
                       ? "border-teal-700 bg-teal-700 text-white"
                       : "border-zinc-300 bg-white text-zinc-950 hover:border-teal-600"
@@ -690,17 +709,10 @@ function MatrixBlocks({
                   onClick={() => onChange({ ...matrixAnswer, [row.code]: value })}
                   type="button"
                 >
-                  {column.value}
+                  {label}
                 </button>
               );
             })}
-          </div>
-          <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-zinc-500">
-            {question.columns.map((column) => (
-              <span key={String(column.value)}>
-                <span className="font-semibold">{column.value}</span> {column.label}
-              </span>
-            ))}
           </div>
         </div>
       ))}
@@ -711,12 +723,60 @@ function MatrixBlocks({
 function ScaleReminder({ columns }: { columns: CtlMatrixQuestionDefinition["columns"] }) {
   return (
     <div className="mb-4 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-xs leading-5 text-teal-950">
-      <p className="font-bold">Recordatorio de escala</p>
+      <p className="font-bold">ENCUESTADOR: POR FAVOR HAGA EL RECORDATORIO DE ESCALA AL PANELISTA</p>
       <p className="mt-1">
-        {columns.map((column) => `${column.value} ${column.label}`).join(" · ")}
+        {columns.map((column) => formatScaleOptionLabel(column.value, column.label)).join(" · ")}
       </p>
     </div>
   );
+}
+
+function formatScaleOptionLabel(value: number | string, label: string): string {
+  return `${value} - ${label}`;
+}
+
+function formatScaleQuestionOptionLabel(question: CtlScaleQuestionDefinition, value: number): string {
+  const label = question.labels?.[value] ?? `Valor ${value}`;
+  return isBinaryYesNoScale(question) ? label : formatScaleOptionLabel(value, label);
+}
+
+function isBinaryYesNoScale(question: CtlScaleQuestionDefinition): boolean {
+  if (question.min !== 1 || question.max !== 2 || !question.labels) {
+    return false;
+  }
+
+  return isYesLabel(question.labels[1]) && isNoLabel(question.labels[2]);
+}
+
+function isBinaryYesNoColumns(columns: CtlMatrixQuestionDefinition["columns"]): boolean {
+  if (columns.length !== 2) {
+    return false;
+  }
+
+  const [first, second] = columns;
+  return (
+    String(first?.value) === "1" &&
+    String(second?.value) === "2" &&
+    isYesLabel(first?.label) &&
+    isNoLabel(second?.label)
+  );
+}
+
+function isYesLabel(label: string | undefined): boolean {
+  const normalized = normalizeOptionLabel(label);
+  return normalized === "si" || normalized.startsWith("s");
+}
+
+function isNoLabel(label: string | undefined): boolean {
+  return normalizeOptionLabel(label) === "no";
+}
+
+function normalizeOptionLabel(label: string | undefined): string {
+  return String(label ?? "")
+    .trim()
+    .toLocaleLowerCase("es-MX")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
 }
 
 function InstructionBox({
@@ -735,10 +795,12 @@ function InstructionBox({
 function ReferenceList({
   answers,
   participant,
+  questionLookup,
   references
 }: {
   answers: Record<string, unknown>;
   participant: { firstSampleKey?: string | null; folio: string; name: string; secondSampleKey?: string | null };
+  questionLookup: CtlQuestionLookup;
   references: Array<{ label: string; source: string }>;
 }) {
   return (
@@ -746,7 +808,13 @@ function ReferenceList({
       {references.map((reference) => (
         <p key={`${reference.source}-${reference.label}`}>
           <span className="font-bold">{reference.label}:</span>{" "}
-          {formatReferenceValue(resolveReferenceValue(reference.source, answers, participant))}
+          {formatContextValue(
+            reference.source,
+            resolveReferenceValue(reference.source, answers, participant),
+            answers,
+            participant,
+            questionLookup
+          )}
         </p>
       ))}
     </div>
@@ -773,9 +841,11 @@ function ValidationModal({ message, onClose }: { message: string; onClose: () =>
 }
 
 function ReviewPanel({
+  nseCalculation,
   pendingCount,
   pendingQuestionCodes
 }: {
+  nseCalculation: ReturnType<typeof calculateCtlNse>;
   pendingCount: number;
   pendingQuestionCodes: string[];
 }) {
@@ -791,6 +861,27 @@ function ReviewPanel({
         <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
           Todas las preguntas obligatorias estan completas. Puedes finalizar CTL.
         </p>
+      )}
+      <CtlNseResultPanel calculation={nseCalculation} />
+    </div>
+  );
+}
+
+function CtlNseResultPanel({ calculation }: { calculation: ReturnType<typeof calculateCtlNse> }) {
+  return (
+    <div className="mt-5 rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-950">
+      <h3 className="text-base font-bold">NSE calculado</h3>
+      {calculation.ok ? (
+        <dl className="mt-3 grid gap-3 sm:grid-cols-3">
+          <AutomaticDetail label="Total de puntos NSE" value={String(calculation.totalPoints)} />
+          <AutomaticDetail label="Nivel NSE (letra)" value={calculation.levelLabel} />
+          <AutomaticDetail label="Clasificacion NSE (numero)" value={String(calculation.classificationNumber)} />
+        </dl>
+      ) : (
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
+          <p className="font-semibold">Faltan datos demograficos para calcular NSE.</p>
+          <p className="mt-1">Pendientes: {calculation.missingQuestionCodes.join(", ")}</p>
+        </div>
       )}
     </div>
   );
@@ -816,15 +907,47 @@ function StatusMessages({ error, message }: { error: string | null; message: str
 export function flattenCtlQuestions(definition: CtlDefinition, answers: Record<string, unknown> = {}): FlatQuestion[] {
   const applicableCodes = new Set(getCtlApplicableQuestions(definition, answers).map((question) => question.code));
 
-  return definition.sections.flatMap((section) =>
-    section.questions
-      .filter((question) => applicableCodes.has(question.code))
+  return definition.sections.flatMap((section) => {
+    const sectionInstructions = ctlSectionInstructions(section.description, section.instructions);
+    const sectionInstructionTexts = (sectionInstructions ?? []).map((instruction) => normalizeInstructionText(instruction.text));
+
+    return section.questions
+      .filter((question) => applicableCodes.has(question.code) && question.captureMode !== "AUTO")
       .map((question, index) => ({
         index,
         question,
-        sectionInstructions: section.instructions,
+        sectionId: section.id,
+        sectionInstructions: index === 0 ? sectionInstructions : undefined,
+        sectionInstructionTexts,
         sectionTitle: section.title
-      }))
+      }));
+  });
+}
+
+function buildCtlQuestionLookup(definition: CtlDefinition): CtlQuestionLookup {
+  return new Map(definition.sections.flatMap((section) => section.questions.map((question) => [question.code, question])));
+}
+
+function ctlSectionInstructions(
+  description: string | undefined,
+  instructions: FlatQuestion["sectionInstructions"] | undefined
+): FlatQuestion["sectionInstructions"] | undefined {
+  const allInstructions = [
+    ...(description ? [{ text: description, title: "INSTRUCCION OPERATIVA", type: "SECTION" }] : []),
+    ...(instructions ?? [])
+  ];
+
+  return allInstructions.length > 0 ? allInstructions : undefined;
+}
+
+function normalizeInstructionText(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("es-MX");
+}
+
+function isSectionInstructionDuplicate(instructionText: string, sectionInstructionTexts: string[]): boolean {
+  const normalized = normalizeInstructionText(instructionText);
+  return sectionInstructionTexts.some((sectionText) =>
+    sectionText === normalized || sectionText.includes(normalized) || normalized.includes(sectionText)
   );
 }
 
@@ -867,11 +990,11 @@ function validateCtlQuestionForClient(
   answer: unknown
 ): { ok: true } | { message: string; ok: false } {
   if (isCtlQuestionAnswered(question, answer)) {
-    if (question.code === "F2" && !isValidCtlAgeInput(answer)) {
-      return {
-        message: "Captura la edad exacta con numeros.",
-        ok: false
-      };
+    if (question.code === "F2") {
+      const ageValidation = validateCtlAgeInput(answer);
+      if (!ageValidation.ok) {
+        return ageValidation;
+      }
     }
 
     return { ok: true };
@@ -900,11 +1023,29 @@ function buildAllAnswersFormData(definition: CtlDefinition, answers: Record<stri
     appendQuestionAnswer(formData, question, answers[question.code]);
   }
 
+  appendCalculatedCtlNseAnswers(formData, definition, answers);
+
   return formData;
+}
+
+function appendCalculatedCtlNseAnswers(formData: FormData, definition: CtlDefinition, answers: Record<string, unknown>): void {
+  const calculation = calculateCtlNse(definition, answers);
+  if (!calculation.ok) {
+    return;
+  }
+
+  formData.set("D_TOTAL_PUNTOS_NSE", String(calculation.totalPoints));
+  formData.set("D_NSE_CLASIFICACION", calculation.classificationCode);
 }
 
 function appendQuestionAnswer(formData: FormData, question: CtlQuestionDefinition, answer: unknown): void {
   if (question.code === "F2") {
+    if (isRecord(answer)) {
+      formData.set(`${question.code}.exactAge`, formatCtlAgeInputValue(answer));
+      formData.set(`${question.code}.rangeCode`, getCtlAgeRangeInput(answer));
+      return;
+    }
+
     formData.set(question.code, formatCtlAgeInputValue(answer));
     return;
   }
@@ -940,15 +1081,80 @@ function formatTextInputAnswer(question: CtlQuestionDefinition, answer: unknown)
 
 function formatCtlAgeInputValue(answer: unknown): string {
   if (isCtlAgeAnswerValue(answer)) {
-    return String(answer.exactAge);
+    return Number.isFinite(answer.exactAge) && answer.exactAge > 0 ? String(answer.exactAge) : "";
   }
 
   return String(answer ?? "").trim();
 }
 
-function isValidCtlAgeInput(answer: unknown): boolean {
+function validateCtlAgeInput(answer: unknown): { ok: true } | { message: string; ok: false } {
   const value = formatCtlAgeInputValue(answer);
-  return /^\d{1,3}$/.test(value) && Number(value) >= 1 && Number(value) <= 120;
+  if (isLegacyCtlAgeRangeCode(value) && !isRecord(answer)) {
+    return { ok: true };
+  }
+
+  if (!/^\d{1,3}$/.test(value) || Number(value) < 1 || Number(value) > 120) {
+    return { message: "Captura la edad exacta con numeros.", ok: false };
+  }
+
+  const derived = deriveCtlAgeRangeOption(value);
+  const selectedRangeCode = getCtlAgeRangeInput(answer) || derived?.value || "";
+
+  if (!derived || selectedRangeCode !== derived.value) {
+    return { message: "El rango operativo no coincide con la edad capturada.", ok: false };
+  }
+
+  return { ok: true };
+}
+
+function getCtlAgeExactInput(answer: unknown): string {
+  if (isCtlAgeAnswerValue(answer)) {
+    return Number.isFinite(answer.exactAge) && answer.exactAge > 0 ? String(answer.exactAge) : "";
+  }
+
+  const value = String(answer ?? "").trim();
+  return isLegacyCtlAgeRangeCode(value) ? "" : value;
+}
+
+function getCtlAgeRangeInput(answer: unknown): string {
+  if (isCtlAgeAnswerValue(answer)) {
+    return String(answer.rangeCode ?? "");
+  }
+
+  const value = String(answer ?? "").trim();
+  return isLegacyCtlAgeRangeCode(value) ? value : "";
+}
+
+function deriveCtlAgeRangeOption(exactAgeInput: unknown): (typeof CTL_AGE_RANGE_OPTIONS)[number] | null {
+  const value = String(exactAgeInput ?? "").trim();
+  if (!/^\d{1,3}$/.test(value)) {
+    return null;
+  }
+
+  const exactAge = Number(value);
+  if (!Number.isInteger(exactAge) || exactAge < 1 || exactAge > 120) {
+    return null;
+  }
+
+  if (exactAge <= 29) {
+    return CTL_AGE_RANGE_OPTIONS[0];
+  }
+  if (exactAge <= 45) {
+    return CTL_AGE_RANGE_OPTIONS[1];
+  }
+  if (exactAge <= 55) {
+    return CTL_AGE_RANGE_OPTIONS[2];
+  }
+
+  return CTL_AGE_RANGE_OPTIONS[3];
+}
+
+function ctlAgeRangeLabel(rangeCode: string): string {
+  return CTL_AGE_RANGE_OPTIONS.find((option) => option.value === rangeCode)?.label ?? "";
+}
+
+function isLegacyCtlAgeRangeCode(value: string): value is CtlAgeAnswerValue["rangeCode"] {
+  return value === "1" || value === "2" || value === "3" || value === "4";
 }
 
 function buildAutomaticCtlAnswers({
@@ -970,40 +1176,6 @@ function buildAutomaticCtlAnswers({
   };
 }
 
-function requiredCtlPhaseForQuestion(sectionTitle: string, questionCode: string): CtlOperationalPhase | null {
-  if (questionCode.startsWith("P5A") || questionCode.startsWith("P6A") || questionCode.startsWith("P7A") || questionCode.startsWith("P8A") || questionCode.startsWith("P9A") || questionCode.startsWith("P10A") || questionCode.startsWith("P11A") || questionCode.startsWith("P12A") || questionCode.startsWith("P13A")) {
-    return "COLOCACION";
-  }
-  if (questionCode.startsWith("P5B") || questionCode.startsWith("P6B") || questionCode.startsWith("P7B") || questionCode.startsWith("P8B") || questionCode.startsWith("P9B") || questionCode.startsWith("P10B") || questionCode.startsWith("P11B") || questionCode.startsWith("P12B") || questionCode.startsWith("P13B")) {
-    return "EVALUACION_1";
-  }
-  if (sectionTitle.includes("COMPARATIVA") || sectionTitle.includes("DEMOGRAF")) {
-    return "EVALUACION_2";
-  }
-
-  return null;
-}
-
-function firstIncompletePhase(phases: CtlPhaseProgressDisplay[]): CtlPhaseProgressDisplay | null {
-  if (phases.length === 0) {
-    return null;
-  }
-
-  return phases
-    .slice()
-    .sort((left, right) => left.referenceCodeSlot - right.referenceCodeSlot)
-    .find((phase) => phase.status !== "COMPLETED") ?? null;
-}
-
-function ctlPhaseLabel(phase: CtlOperationalPhase): string {
-  const labels: Record<CtlOperationalPhase, string> = {
-    COLOCACION: "Colocacion - Entrega 1",
-    EVALUACION_1: "Evaluacion 1 - Entrega 2",
-    EVALUACION_2: "Evaluacion 2"
-  };
-  return labels[phase];
-}
-
 function resolveQuestionLabel(
   question: CtlQuestionDefinition,
   answers: Record<string, unknown>,
@@ -1013,9 +1185,10 @@ function resolveQuestionLabel(
     name: string;
     secondSampleKey?: string | null;
     triangularRotation?: CtlTriangularRotationDisplay | null;
-  }
+  },
+  questionLookup: CtlQuestionLookup
 ): string {
-  return resolveTemplate(question.displayTemplate ?? question.label, answers, participant);
+  return resolveTemplate(question.displayTemplate ?? question.label, answers, participant, questionLookup);
 }
 
 function resolveTemplate(
@@ -1027,10 +1200,10 @@ function resolveTemplate(
     name: string;
     secondSampleKey?: string | null;
     triangularRotation?: CtlTriangularRotationDisplay | null;
-  }
+  },
+  questionLookup: CtlQuestionLookup
 ): string {
   const values: Record<string, unknown> = {
-    ...answers,
     FIRST_SAMPLE: participant.firstSampleKey,
     FOLIO: participant.folio,
     PARTICIPANT_NAME: participant.name,
@@ -1044,13 +1217,8 @@ function resolveTemplate(
   };
 
   return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_match, token: string) => {
-    const value = values[token];
-    if (isRecord(value)) {
-      return Object.entries(value)
-        .map(([key, item]) => `${key}: ${String(item ?? "")}`)
-        .join(", ");
-    }
-    return String(value ?? "pendiente");
+    const value = token in values ? values[token] : answers[token];
+    return formatContextValue(token, value, answers, participant, questionLookup);
   });
 }
 
@@ -1089,6 +1257,73 @@ function resolveReferenceValue(
   if (source === "TRIANGULAR_2_PR3") return participant.triangularRotation?.triangular2.pr3;
 
   return answers[source];
+}
+
+function formatContextValue(
+  source: string,
+  value: unknown,
+  answers: Record<string, unknown>,
+  participant: {
+    firstSampleKey?: string | null;
+    folio: string;
+    name: string;
+    secondSampleKey?: string | null;
+    triangularRotation?: CtlTriangularRotationDisplay | null;
+  },
+  questionLookup: CtlQuestionLookup
+): string {
+  const sourceQuestion = questionLookup.get(source);
+  if (!sourceQuestion) {
+    return formatReferenceValue(value);
+  }
+
+  return formatQuestionAnswerValue(sourceQuestion, value, answers, participant, questionLookup);
+}
+
+function formatQuestionAnswerValue(
+  question: CtlQuestionDefinition,
+  value: unknown,
+  answers: Record<string, unknown>,
+  participant: {
+    firstSampleKey?: string | null;
+    folio: string;
+    name: string;
+    secondSampleKey?: string | null;
+    triangularRotation?: CtlTriangularRotationDisplay | null;
+  },
+  questionLookup: CtlQuestionLookup
+): string {
+  if (value === null || value === undefined || value === "") {
+    return "pendiente";
+  }
+
+  if (question.type === "SELECT") {
+    const selectedValue = getSelectAnswerValue(value);
+    const option = question.options.find((candidate) => String(candidate.value) === selectedValue);
+    return option ? resolveTemplate(option.label, answers, participant, questionLookup) : selectedValue;
+  }
+
+  if (question.type === "SCALE") {
+    const selectedValue = Number(String(value));
+    const label = Number.isFinite(selectedValue) ? question.labels?.[selectedValue] : undefined;
+    return label ?? String(value);
+  }
+
+  if (question.type === "MATRIX" && isRecord(value)) {
+    return Object.entries(value)
+      .map(([rowCode, item]) => {
+        const rowLabel = question.rows.find((row) => row.code === rowCode)?.label ?? rowCode;
+        const columnLabel = question.columns.find((column) => String(column.value) === String(item))?.label ?? String(item ?? "");
+        return `${rowLabel}: ${columnLabel}`;
+      })
+      .join(", ");
+  }
+
+  if (question.code === "F2" && isCtlAgeAnswerValue(value)) {
+    return `${value.exactAge} años (${value.rangeLabel})`;
+  }
+
+  return formatReferenceValue(value);
 }
 
 function formatReferenceValue(value: unknown): string {

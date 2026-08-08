@@ -1,35 +1,37 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { CtlDefinition } from "@/modules/ctl/definition";
+import { getCtlDefinition, type CtlDefinition } from "@/modules/ctl/definition";
 import {
   CtlMobileCapture,
+  flattenCtlQuestions,
   getInitialCtlQuestionIndex,
   getPendingCtlQuestionCodes
 } from "./CtlMobileCapture";
 import {
   finishPublicCtlSessionAction,
-  savePublicCtlQuestionAnswerAction,
-  validatePublicCtlPhaseCodeAction
+  savePublicCtlQuestionAnswerAction
 } from "@/modules/ctl/public-actions";
 
 vi.mock("@/modules/ctl/public-actions", () => ({
   finishPublicCtlSessionAction: vi.fn(),
-  savePublicCtlQuestionAnswerAction: vi.fn(),
-  validatePublicCtlPhaseCodeAction: vi.fn()
+  savePublicCtlQuestionAnswerAction: vi.fn()
 }));
 
 const saveQuestionMock = vi.mocked(savePublicCtlQuestionAnswerAction);
 const finishMock = vi.mocked(finishPublicCtlSessionAction);
-const validatePhaseMock = vi.mocked(validatePublicCtlPhaseCodeAction);
+const scrollIntoViewMock = vi.fn();
 
 describe("CtlMobileCapture", () => {
   beforeEach(() => {
     saveQuestionMock.mockReset();
     finishMock.mockReset();
-    validatePhaseMock.mockReset();
+    scrollIntoViewMock.mockReset();
+    Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoViewMock
+    });
     saveQuestionMock.mockResolvedValue({ ok: true });
     finishMock.mockResolvedValue({ ok: true, redirectTo: "" });
-    validatePhaseMock.mockResolvedValue({ ok: true });
   });
 
   it("starts on the first required pending question after reload", () => {
@@ -60,18 +62,91 @@ describe("CtlMobileCapture", () => {
     expect(await screen.findByText("Pregunta 2 de 3")).toBeInTheDocument();
   });
 
+  it("scrolls to the top of the capture when advancing to the next question", async () => {
+    renderMobileCapture();
+
+    fireEvent.click(screen.getByRole("button", { name: "Opcion A" }));
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    await screen.findByText("Pregunta 2 de 3");
+    await waitFor(() =>
+      expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: "smooth", block: "start" })
+    );
+    expect(saveQuestionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("scrolls to the top of the capture when going back to the previous question", () => {
+    renderMobileCapture({ answers: { Q1_SELECT: "A" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Anterior" }));
+
+    expect(screen.getByText("Pregunta 1 de 3")).toBeInTheDocument();
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+  });
+
+  it("scrolls to the top of the capture when moving into a new section", async () => {
+    renderMobileCapture({ definition: triangularInstructionDefinition });
+
+    fireEvent.click(screen.getByRole("button", { name: "A" }));
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    await screen.findByText("Pregunta 2 de 4");
+    scrollIntoViewMock.mockReset();
+
+    fireEvent.click(screen.getByRole("button", { name: "Buena" }));
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    await screen.findByText("Pregunta 3 de 4");
+    expect(screen.getByText("TRIANGULAR 2")).toBeInTheDocument();
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+  });
+
   it("renders SCALE as vertical options with number and full text", async () => {
     renderMobileCapture({ answers: { Q1_SELECT: "A" } });
 
-    expect(screen.getByRole("button", { name: "1 Muy mala" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "5 Excelente" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1 - Muy mala" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "5 - Excelente" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "5 Excelente" }));
+    fireEvent.click(screen.getByRole("button", { name: "5 - Excelente" }));
     fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
 
     await waitFor(() => expect(saveQuestionMock).toHaveBeenCalledTimes(1));
     expect(saveQuestionMock.mock.calls[0]?.[2]).toBe("Q2_SCALE");
     expect((saveQuestionMock.mock.calls[0]?.[3] as FormData).get("Q2_SCALE")).toBe("5");
+  });
+
+  it.each([
+    ["33", "30 a 45 años", "2"],
+    ["28", "29 años o menos", "1"],
+    ["60", "56 años o más", "4"]
+  ])("preselects the F2 operational range for age %s", async (age, expectedLabel, expectedRangeCode) => {
+    renderMobileCapture({ definition: ageDefinition });
+
+    fireEvent.change(screen.getByLabelText("Edad exacta"), { target: { value: age } });
+
+    expect(screen.getByRole("button", { name: new RegExp(expectedLabel) })).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Revisar respuestas" }));
+
+    await waitFor(() => expect(saveQuestionMock).toHaveBeenCalledTimes(1));
+    const formData = saveQuestionMock.mock.calls[0]?.[3] as FormData;
+    expect(formData.get("F2.exactAge")).toBe(age);
+    expect(formData.get("F2.rangeCode")).toBe(expectedRangeCode);
+  });
+
+  it("warns when the confirmed F2 range does not match the exact age", () => {
+    renderMobileCapture({ definition: ageDefinition });
+
+    fireEvent.change(screen.getByLabelText("Edad exacta"), { target: { value: "33" } });
+    fireEvent.click(screen.getByRole("button", { name: "29 años o menos" }));
+
+    expect(screen.getByText("El rango seleccionado no coincide con la edad capturada. Corrige el rango antes de continuar.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Revisar respuestas" }));
+
+    expect(screen.getByRole("dialog", { name: "Falta responder esta pregunta" })).toBeInTheDocument();
+    expect(screen.getAllByText("El rango operativo no coincide con la edad capturada.")).toHaveLength(2);
+    expect(saveQuestionMock).not.toHaveBeenCalled();
   });
 
   it("shows a matrix scale reminder every five randomized attributes", () => {
@@ -80,16 +155,16 @@ describe("CtlMobileCapture", () => {
       definition: matrixReminderDefinition
     });
 
-    expect(screen.getByText("Recordatorio de escala")).toBeInTheDocument();
-    expect(screen.getByText(/1 En desacuerdo/)).toBeInTheDocument();
-    expect(screen.getByText(/2 De acuerdo/)).toBeInTheDocument();
+    expect(screen.getByText("ENCUESTADOR: POR FAVOR HAGA EL RECORDATORIO DE ESCALA AL PANELISTA")).toBeInTheDocument();
+    expect(screen.getByText("1 - En desacuerdo · 2 - De acuerdo")).toBeInTheDocument();
+    expect(screen.getAllByText("ENCUESTADOR: POR FAVOR HAGA EL RECORDATORIO DE ESCALA AL PANELISTA")).toHaveLength(1);
   });
 
   it("renders MATRIX by row and saves grouped values", async () => {
     renderMobileCapture({ answers: { Q1_SELECT: "A", Q2_SCALE: 5 } });
 
-    fireEvent.click(screen.getByRole("button", { name: "Limpia: De acuerdo" }));
-    fireEvent.click(screen.getByRole("button", { name: "Masculina: En desacuerdo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Limpia: 2 - De acuerdo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Masculina: 1 - En desacuerdo" }));
     fireEvent.click(screen.getByRole("button", { name: "Revisar respuestas" }));
 
     await waitFor(() => expect(saveQuestionMock).toHaveBeenCalledTimes(1));
@@ -97,6 +172,42 @@ describe("CtlMobileCapture", () => {
     expect(saveQuestionMock.mock.calls[0]?.[2]).toBe("Q3_MATRIX");
     expect(formData.get("Q3_MATRIX.LIMPIA")).toBe("2");
     expect(formData.get("Q3_MATRIX.MASCULINA")).toBe("1");
+  });
+
+  it("renders yes/no matrix answers without internal codes and saves values 1/2", async () => {
+    renderMobileCapture({ definition: binaryMatrixDefinition });
+
+    expect(screen.getByRole("button", { name: "Floral: Sí" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Floral: No" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Floral: 1 - Sí" })).not.toBeInTheDocument();
+    expect(screen.queryByText("ENCUESTADOR: POR FAVOR HAGA EL RECORDATORIO DE ESCALA AL PANELISTA")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Floral: Sí" }));
+    fireEvent.click(screen.getByRole("button", { name: "Amaderada: No" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cítrica: Sí" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dulce: No" }));
+    fireEvent.click(screen.getByRole("button", { name: "Marina: Sí" }));
+    fireEvent.click(screen.getByRole("button", { name: "Herbal: No" }));
+    fireEvent.click(screen.getByRole("button", { name: "Revisar respuestas" }));
+
+    await waitFor(() => expect(saveQuestionMock).toHaveBeenCalledTimes(1));
+    const formData = saveQuestionMock.mock.calls[0]?.[3] as FormData;
+    expect(formData.get("P9_BINARY.FLORAL")).toBe("1");
+    expect(formData.get("P9_BINARY.AMADERADA")).toBe("2");
+  });
+
+  it("renders yes/no scale answers without internal codes while preserving values", async () => {
+    renderMobileCapture({ definition: binaryScaleDefinition });
+
+    expect(screen.getByRole("button", { name: "Sí" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "No" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "1 - Sí" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sí" }));
+    fireEvent.click(screen.getByRole("button", { name: "Revisar respuestas" }));
+
+    await waitFor(() => expect(saveQuestionMock).toHaveBeenCalledTimes(1));
+    expect((saveQuestionMock.mock.calls[0]?.[3] as FormData).get("Q_BINARY_SCALE")).toBe("1");
   });
 
   it("finishes CTL when all required answers are complete", async () => {
@@ -132,6 +243,83 @@ describe("CtlMobileCapture", () => {
     expect(screen.getByText(/Participante ANA PEREZ/)).toBeInTheDocument();
     expect(screen.getByText("Primera fragancia:")).toBeInTheDocument();
     expect(screen.getByText("247")).toBeInTheDocument();
+  });
+
+  it("shows previous coded answers as their visible option labels", () => {
+    renderMobileCapture({
+      answers: { P14: "2" },
+      definition: contextualAnswerDefinition
+    });
+
+    expect(screen.getByText("Razones de La segunda fragancia")).toBeInTheDocument();
+    expect(screen.getAllByText((_content, element) =>
+      element?.tagName === "P" && element.textContent === "Respuesta P14: La segunda fragancia"
+    )).toHaveLength(1);
+    expect(screen.queryAllByText((_content, element) =>
+      element?.tagName === "P" && element.textContent === "Respuesta P14: 2"
+    )).toHaveLength(0);
+  });
+
+  it("falls back to the stored value when a previous coded answer has no label", () => {
+    renderMobileCapture({
+      answers: { P14: "99" },
+      definition: contextualAnswerDefinition
+    });
+
+    expect(screen.getByText("Razones de 99")).toBeInTheDocument();
+    expect(screen.getAllByText((_content, element) =>
+      element?.tagName === "P" && element.textContent === "Respuesta P14: 99"
+    )).toHaveLength(1);
+  });
+
+  it("shows automatic CTL times as information and skips them as editable questions", () => {
+    renderMobileCapture({
+      completedAtLabel: "01:26 a.m.",
+      definition: automaticTimesDefinition,
+      startedAtLabel: "12:26 a.m.",
+      todayLabel: "08/08/2026"
+    });
+
+    expect(screen.getByText("Datos automaticos CTL")).toBeInTheDocument();
+    expect(screen.getByText("08/08/2026")).toBeInTheDocument();
+    expect(screen.getByText("12:26 a.m.")).toBeInTheDocument();
+    expect(screen.getByText("01:26 a.m.")).toBeInTheDocument();
+    expect(screen.getByText("Pregunta 1 de 1")).toBeInTheDocument();
+    expect(screen.getByText("Pregunta manual")).toBeInTheDocument();
+    expect(screen.queryByText("DG_HORA_TERMINO")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Hora termino CTL/)).not.toBeInTheDocument();
+  });
+
+  it("shows calculated NSE as a result block and skips NSE result fields as editable questions", () => {
+    renderMobileCapture({
+      answers: {
+        D1_ESCOLARIDAD_JEFE_HOGAR: "8",
+        D2_BANOS_COMPLETOS: "1",
+        D3_AUTOS: "1",
+        D4_INTERNET: "1",
+        D5_PERSONAS_TRABAJARON: "1",
+        D6_CUARTOS_DORMIR: "2"
+      },
+      definition: nseDefinition
+    });
+
+    expect(screen.getByText("NSE calculado")).toBeInTheDocument();
+    expect(screen.getByText("Total de puntos NSE")).toBeInTheDocument();
+    expect(screen.getByText("168")).toBeInTheDocument();
+    expect(screen.getByText("Nivel NSE (letra)")).toBeInTheDocument();
+    expect(screen.getByText("C+")).toBeInTheDocument();
+    expect(screen.getByText("Clasificacion NSE (numero)")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.queryByText("TOTAL de puntos NSE")).not.toBeInTheDocument();
+    expect(screen.queryByText("Registrar NSE de acuerdo al puntaje")).not.toBeInTheDocument();
+  });
+
+  it("warns when NSE cannot be calculated because demographic answers are incomplete", () => {
+    renderMobileCapture({ definition: nseDefinition });
+
+    expect(screen.getByText("NSE calculado")).toBeInTheDocument();
+    expect(screen.getByText("Faltan datos demograficos para calcular NSE.")).toBeInTheDocument();
+    expect(screen.getAllByText(/D1_ESCOLARIDAD_JEFE_HOGAR/).length).toBeGreaterThan(0);
   });
 
   it("renders P1 with triangular 1 keys from the participant rotation", () => {
@@ -173,7 +361,33 @@ describe("CtlMobileCapture", () => {
     expect((saveQuestionMock.mock.calls[0]?.[3] as FormData).get("P1")).toBe("PR2");
   });
 
-  it("requires the operational phase code before showing fragrance evaluation questions", async () => {
+  it("shows triangular section instructions only on the first question of each section", async () => {
+    renderMobileCapture({ definition: triangularInstructionDefinition });
+
+    expect(screen.getAllByText("ENTREVISTADOR: IR A LA MESA DE CONTROL POR LAS TRES PRIMERAS TIRAS.")).toHaveLength(1);
+    expect(screen.getByText("MOSTRAR Y LEER TARJETA.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "A" }));
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    await screen.findByText("Pregunta 2 de 4");
+    expect(screen.queryByText("ENTREVISTADOR: IR A LA MESA DE CONTROL POR LAS TRES PRIMERAS TIRAS.")).not.toBeInTheDocument();
+    expect(screen.getByText("LEER PREGUNTA DE SEGUIMIENTO.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Buena" }));
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    await screen.findByText("Pregunta 3 de 4");
+    expect(screen.getAllByText("ENTREVISTADOR: IR A LA MESA DE CONTROL POR LAS TRES SEGUNDAS TIRAS.")).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "A" }));
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    await screen.findByText("Pregunta 4 de 4");
+    expect(screen.queryByText("ENTREVISTADOR: IR A LA MESA DE CONTROL POR LAS TRES SEGUNDAS TIRAS.")).not.toBeInTheDocument();
+  });
+
+  it("does not require CTL phase codes before showing fragrance evaluation questions", () => {
     renderMobileCapture({
       definition: phaseDefinition,
       phaseProgress: [
@@ -204,33 +418,98 @@ describe("CtlMobileCapture", () => {
       ]
     });
 
-    expect(screen.getByText("Fase operativa")).toBeInTheDocument();
-    expect(screen.getByText("Colocacion - Entrega 1")).toBeInTheDocument();
-    expect(screen.getByText("247")).toBeInTheDocument();
-    expect(screen.queryByText("Gusto primera fragancia")).not.toBeInTheDocument();
+    expect(screen.queryByText("Fase operativa")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Codigo de fase")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Validar codigo" })).not.toBeInTheDocument();
+    expect(screen.getByText("Gusto primera fragancia")).toBeInTheDocument();
+  });
 
-    fireEvent.change(screen.getByLabelText("Codigo de fase"), { target: { value: "A7K4" } });
-    fireEvent.click(screen.getByRole("button", { name: "Validar codigo" }));
+  it("shows fragrance section logistics only at the start of each fragrance section", async () => {
+    renderMobileCapture({ definition: fragranceInstructionDefinition });
 
-    await waitFor(() => expect(validatePhaseMock).toHaveBeenCalledTimes(1));
-    expect(validatePhaseMock.mock.calls[0]?.[2]).toBe("COLOCACION");
-    expect((validatePhaseMock.mock.calls[0]?.[3] as FormData).get("phaseCode")).toBe("A7K4");
-    expect(await screen.findByText("Gusto primera fragancia")).toBeInTheDocument();
+    expect(screen.getAllByText(PRIMERA_FRAGANCIA_INSTRUCTION)).toHaveLength(1);
+    expect(screen.getAllByText(VERIFY_FRAGRANCE_INSTRUCTION)).toHaveLength(1);
+    expect(screen.getByText("MOSTRAR Y LEER TARJETA.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "1 - Valor 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    await screen.findByText("Pregunta 2 de 4");
+    expect(screen.queryByText(PRIMERA_FRAGANCIA_INSTRUCTION)).not.toBeInTheDocument();
+    expect(screen.queryByText(VERIFY_FRAGRANCE_INSTRUCTION)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "1 - Valor 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    await screen.findByText("Pregunta 3 de 4");
+    expect(screen.getAllByText(SEGUNDA_FRAGANCIA_INSTRUCTION)).toHaveLength(1);
+    expect(screen.getAllByText(VERIFY_FRAGRANCE_INSTRUCTION)).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "1 - Valor 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    await screen.findByText("Pregunta 4 de 4");
+    expect(screen.queryByText(SEGUNDA_FRAGANCIA_INSTRUCTION)).not.toBeInTheDocument();
+    expect(screen.queryByText(VERIFY_FRAGRANCE_INSTRUCTION)).not.toBeInTheDocument();
+  });
+
+  it("shows comparative section instructions once even when duplicated in question instructions", async () => {
+    renderMobileCapture({ definition: repeatedComparativeInstructionDefinition });
+
+    expect(screen.getAllByText(COMPARATIVE_SMELL_INSTRUCTION)).toHaveLength(1);
+    expect(screen.getByText("P14 comparativa")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Primera" }));
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    await screen.findByText("Pregunta 2 de 2");
+    expect(screen.getByText("P15 comparativa")).toBeInTheDocument();
+    expect(screen.queryByText(COMPARATIVE_SMELL_INSTRUCTION)).not.toBeInTheDocument();
+  });
+
+  it("keeps operational section instructions scoped to the first question for the full CLT definition", () => {
+    const flattened = flattenCtlQuestions(getCtlDefinition(), {});
+    const sectionsWithInstructions = new Set(
+      flattened
+        .filter((flatQuestion) => flatQuestion.sectionInstructions?.length)
+        .map((flatQuestion) => flatQuestion.sectionTitle)
+    );
+
+    expect(sectionsWithInstructions).toEqual(new Set([
+      "DATOS GENERALES",
+      "SECCIÓN II - TRIANGULAR - 1",
+      "SECCIÓN II - TRIANGULAR - 2",
+      "SECCIÓN III - EVALUACIÓN DE PRIMERA FRAGANCIA",
+      "SECCIÓN IV - EVALUACIÓN DE SEGUNDA FRAGANCIA",
+      "SECCIÓN V - COMPARATIVA - 15 MINUTOS",
+      "DEMOGRAFICOS"
+    ]));
+
+    for (const sectionTitle of sectionsWithInstructions) {
+      expect(flattened.filter((flatQuestion) => flatQuestion.sectionTitle === sectionTitle && flatQuestion.sectionInstructions?.length)).toHaveLength(1);
+    }
   });
 });
 
 function renderMobileCapture({
   answers = {},
+  completedAtLabel,
   definition = mobileDefinition,
-  phaseProgress = []
+  phaseProgress = [],
+  startedAtLabel,
+  todayLabel
 }: {
   answers?: Record<string, unknown>;
+  completedAtLabel?: string | null;
   definition?: CtlDefinition;
   phaseProgress?: React.ComponentProps<typeof CtlMobileCapture>["phaseProgress"];
+  startedAtLabel?: string | null;
+  todayLabel?: string;
 } = {}) {
   render(
     <CtlMobileCapture
       answers={answers}
+      completedAtLabel={completedAtLabel}
       definition={definition}
       participant={{
         firstSampleKey: "247",
@@ -254,6 +533,8 @@ function renderMobileCapture({
       sessionId="session-1"
       studyCode="FMASCULINA-NAVIGO-2026"
       phaseProgress={phaseProgress}
+      startedAtLabel={startedAtLabel}
+      todayLabel={todayLabel}
     />
   );
 }
@@ -319,6 +600,121 @@ const mobileDefinition: CtlDefinition = {
   version: 2
 };
 
+const automaticTimesDefinition: CtlDefinition = {
+  sections: [
+    {
+      id: "DATOS_GENERALES",
+      questions: [
+        {
+          captureMode: "AUTO",
+          code: "DG_HORA_INICIO",
+          displayTemplate: "Hora inicio CTL: {{CTL_STARTED_AT}}",
+          label: "Hora inicio",
+          required: false,
+          type: "SHORT_TEXT"
+        },
+        {
+          captureMode: "AUTO",
+          code: "DG_HORA_TERMINO",
+          displayTemplate: "Hora termino CTL: {{CTL_COMPLETED_AT}}",
+          label: "Hora termino",
+          required: false,
+          type: "SHORT_TEXT"
+        },
+        {
+          code: "DG_DIRECCION",
+          label: "Pregunta manual",
+          required: true,
+          type: "SHORT_TEXT"
+        }
+      ],
+      title: "Datos generales"
+    }
+  ],
+  version: 2
+};
+
+const nseOptions = {
+  D1_ESCOLARIDAD_JEFE_HOGAR: [
+    { label: "Licenciatura completa (59 puntos)", value: "8" }
+  ],
+  D2_BANOS_COMPLETOS: [
+    { label: "1 bano completo (24 puntos)", value: "1" }
+  ],
+  D3_AUTOS: [
+    { label: "1 auto (22 puntos)", value: "1" }
+  ],
+  D4_INTERNET: [
+    { label: "Si tiene (32 puntos)", value: "1" }
+  ],
+  D5_PERSONAS_TRABAJARON: [
+    { label: "1 persona (15 puntos)", value: "1" }
+  ],
+  D6_CUARTOS_DORMIR: [
+    { label: "2 cuartos (16 puntos)", value: "2" }
+  ]
+} as const;
+
+const nseDefinition: CtlDefinition = {
+  sections: [
+    {
+      id: "DEMOGRAFICOS",
+      questions: [
+        ...Object.entries(nseOptions).map(([code, options]) => ({
+          code,
+          label: code,
+          options: [...options],
+          required: true,
+          type: "SELECT" as const
+        })),
+        {
+          captureMode: "AUTO",
+          code: "D_TOTAL_PUNTOS_NSE",
+          label: "TOTAL de puntos NSE",
+          required: false,
+          type: "SHORT_TEXT"
+        },
+        {
+          captureMode: "AUTO",
+          code: "D_NSE_CLASIFICACION",
+          label: "Registrar NSE de acuerdo al puntaje",
+          options: [
+            { label: "A/B", value: "A_B" },
+            { label: "C+", value: "C_PLUS" },
+            { label: "C tipico", value: "C_TIPICO" },
+            { label: "C-", value: "C_MINUS" },
+            { label: "D+", value: "D_PLUS" },
+            { label: "D", value: "D" },
+            { label: "E", value: "E" }
+          ],
+          required: false,
+          type: "SELECT"
+        }
+      ],
+      title: "DEMOGRAFICOS"
+    }
+  ],
+  version: 2
+};
+
+const ageDefinition: CtlDefinition = {
+  sections: [
+    {
+      id: "FILTROS",
+      questions: [
+        {
+          code: "F2",
+          label: "F2. Edad exacta",
+          required: true,
+          type: "SHORT_TEXT"
+        }
+      ],
+      title: "Filtros"
+    }
+  ],
+  version: 2
+};
+
 const matrixReminderDefinition: CtlDefinition = {
   sections: [
     {
@@ -368,6 +764,148 @@ const matrixReminderDefinition: CtlDefinition = {
   version: 2
 };
 
+const binaryMatrixDefinition: CtlDefinition = {
+  sections: [
+    {
+      id: "BINARIA",
+      questions: [
+        {
+          code: "P9_BINARY",
+          columns: [
+            { label: "Sí", value: 1 },
+            { label: "No", value: 2 }
+          ],
+          label: "Atributos binarios",
+          randomizeRows: false,
+          required: true,
+          rows: [
+            { code: "FLORAL", label: "Floral" },
+            { code: "AMADERADA", label: "Amaderada" },
+            { code: "CITRICA", label: "Cítrica" },
+            { code: "DULCE", label: "Dulce" },
+            { code: "MARINA", label: "Marina" },
+            { code: "HERBAL", label: "Herbal" }
+          ],
+          type: "MATRIX"
+        }
+      ],
+      title: "Binaria"
+    }
+  ],
+  version: 2
+};
+
+const binaryScaleDefinition: CtlDefinition = {
+  sections: [
+    {
+      id: "BINARIA",
+      questions: [
+        {
+          code: "Q_BINARY_SCALE",
+          label: "Pregunta binaria",
+          labels: {
+            1: "Sí",
+            2: "No"
+          },
+          max: 2,
+          min: 1,
+          required: true,
+          type: "SCALE"
+        }
+      ],
+      title: "Binaria"
+    }
+  ],
+  version: 2
+};
+
+const contextualAnswerDefinition: CtlDefinition = {
+  sections: [
+    {
+      id: "COMPARATIVA",
+      questions: [
+        {
+          code: "P14",
+          label: "Preferencia",
+          options: [
+            { label: "La primera fragancia", value: "1" },
+            { label: "La segunda fragancia", value: "2" },
+            { label: "Ambas", value: "3" },
+            { label: "Ninguna", value: "4" }
+          ],
+          required: true,
+          type: "SELECT"
+        },
+        {
+          code: "P14A",
+          displayTemplate: "Razones de {{P14}}",
+          label: "Razones",
+          references: [{ label: "Respuesta P14", source: "P14" }],
+          required: true,
+          type: "LONG_TEXT"
+        }
+      ],
+      title: "Comparativa"
+    }
+  ],
+  version: 2
+};
+
+const COMPARATIVE_SMELL_INSTRUCTION = "POR FAVOR HUELA AMBOS ANTEBRAZOS Y RESPONDA LAS SIGUIENTES PREGUNTAS.";
+
+const repeatedComparativeInstructionDefinition: CtlDefinition = {
+  sections: [
+    {
+      id: "COMPARATIVA_15_MIN",
+      instructions: [
+        {
+          text: COMPARATIVE_SMELL_INSTRUCTION,
+          title: "INSTRUCCION",
+          type: "SECTION"
+        }
+      ],
+      questions: [
+        {
+          code: "P14",
+          instructions: [
+            {
+              text: COMPARATIVE_SMELL_INSTRUCTION,
+              title: "INSTRUCCION",
+              type: "BEFORE_QUESTION"
+            }
+          ],
+          label: "P14 comparativa",
+          options: [
+            { label: "Primera", value: "1" },
+            { label: "Segunda", value: "2" }
+          ],
+          required: true,
+          type: "SELECT"
+        },
+        {
+          code: "P15",
+          instructions: [
+            {
+              text: COMPARATIVE_SMELL_INSTRUCTION,
+              title: "INSTRUCCION",
+              type: "BEFORE_QUESTION"
+            }
+          ],
+          label: "P15 comparativa",
+          options: [
+            { label: "Primera", value: "1" },
+            { label: "Segunda", value: "2" }
+          ],
+          required: true,
+          type: "SELECT"
+        }
+      ],
+      title: "SECCIÓN V - COMPARATIVA - 15 MINUTOS"
+    }
+  ],
+  version: 2
+};
+
 const triangularDefinition: CtlDefinition = {
   sections: [
     {
@@ -402,6 +940,80 @@ const triangularDefinition: CtlDefinition = {
   version: 2
 };
 
+const triangularInstructionDefinition: CtlDefinition = {
+  sections: [
+    {
+      id: "TRIANGULAR_1",
+      instructions: [
+        {
+          text: "ENTREVISTADOR: IR A LA MESA DE CONTROL POR LAS TRES PRIMERAS TIRAS.",
+          title: "INSTRUCCION OPERATIVA",
+          type: "SECTION"
+        }
+      ],
+      questions: [
+        {
+          code: "T1_P1",
+          instructions: [{ text: "MOSTRAR Y LEER TARJETA.", type: "BEFORE_QUESTION" }],
+          label: "Triangular 1 identificacion",
+          options: [
+            { label: "A", value: "A" },
+            { label: "B", value: "B" }
+          ],
+          required: true,
+          type: "SELECT"
+        },
+        {
+          code: "T1_P2",
+          instructions: [{ text: "LEER PREGUNTA DE SEGUIMIENTO.", type: "BEFORE_QUESTION" }],
+          label: "Triangular 1 evaluacion",
+          options: [
+            { label: "Buena", value: "BUENA" },
+            { label: "Mala", value: "MALA" }
+          ],
+          required: true,
+          type: "SELECT"
+        }
+      ],
+      title: "TRIANGULAR 1"
+    },
+    {
+      id: "TRIANGULAR_2",
+      instructions: [
+        {
+          text: "ENTREVISTADOR: IR A LA MESA DE CONTROL POR LAS TRES SEGUNDAS TIRAS.",
+          title: "INSTRUCCION OPERATIVA",
+          type: "SECTION"
+        }
+      ],
+      questions: [
+        {
+          code: "T2_P1",
+          label: "Triangular 2 identificacion",
+          options: [
+            { label: "A", value: "A" },
+            { label: "B", value: "B" }
+          ],
+          required: true,
+          type: "SELECT"
+        },
+        {
+          code: "T2_P2",
+          label: "Triangular 2 evaluacion",
+          options: [
+            { label: "Buena", value: "BUENA" },
+            { label: "Mala", value: "MALA" }
+          ],
+          required: true,
+          type: "SELECT"
+        }
+      ],
+      title: "TRIANGULAR 2"
+    }
+  ],
+  version: 2
+};
+
 const phaseDefinition: CtlDefinition = {
   sections: [
     {
@@ -417,6 +1029,80 @@ const phaseDefinition: CtlDefinition = {
         }
       ],
       title: "Evaluacion primera fragancia"
+    }
+  ],
+  version: 2
+};
+
+const PRIMERA_FRAGANCIA_INSTRUCTION =
+  "ENTREVISTADOR: LLEVAR AL ENTREVISTADO A LA MESA DE CONTROL PARA QUE LE APLIQUEN LA PRIMERA FRAGANCIA EN EL BRAZO IZQUIERDO.";
+const SEGUNDA_FRAGANCIA_INSTRUCTION =
+  "ENTREVISTADOR: LLEVAR AL ENTREVISTADO A LA MESA DE CONTROL PARA QUE LE APLIQUEN LA SEGUNDA FRAGANCIA EN EL BRAZO DERECHO.";
+const VERIFY_FRAGRANCE_INSTRUCTION =
+  "ENTREVISTADOR: VERIFICAR QUE LA CLAVE A EVALUAR COINCIDE CON LA CARATULA DE ROTACION. DESPUES APLIQUE LA CLAVE A EVALUAR AL ENTREVISTADO.";
+
+const fragranceInstructionDefinition: CtlDefinition = {
+  sections: [
+    {
+      id: "FRAGRANCIA_1",
+      description: PRIMERA_FRAGANCIA_INSTRUCTION,
+      instructions: [
+        {
+          text: VERIFY_FRAGRANCE_INSTRUCTION,
+          title: "INSTRUCCION OPERATIVA",
+          type: "SECTION"
+        }
+      ],
+      questions: [
+        {
+          code: "P5A_GUSTO_M1",
+          instructions: [{ text: "MOSTRAR Y LEER TARJETA.", type: "BEFORE_QUESTION" }],
+          label: "Gusto primera fragancia",
+          max: 7,
+          min: 1,
+          required: true,
+          type: "SCALE"
+        },
+        {
+          code: "P6A_INTENSIDAD_M1",
+          label: "Intensidad primera fragancia",
+          max: 7,
+          min: 1,
+          required: true,
+          type: "SCALE"
+        }
+      ],
+      title: "Evaluacion primera fragancia"
+    },
+    {
+      id: "FRAGRANCIA_2",
+      description: SEGUNDA_FRAGANCIA_INSTRUCTION,
+      instructions: [
+        {
+          text: VERIFY_FRAGRANCE_INSTRUCTION,
+          title: "INSTRUCCION OPERATIVA",
+          type: "SECTION"
+        }
+      ],
+      questions: [
+        {
+          code: "P5B_GUSTO_M2",
+          label: "Gusto segunda fragancia",
+          max: 7,
+          min: 1,
+          required: true,
+          type: "SCALE"
+        },
+        {
+          code: "P6B_INTENSIDAD_M2",
+          label: "Intensidad segunda fragancia",
+          max: 7,
+          min: 1,
+          required: true,
+          type: "SCALE"
+        }
+      ],
+      title: "Evaluacion segunda fragancia"
     }
   ],
   version: 2
