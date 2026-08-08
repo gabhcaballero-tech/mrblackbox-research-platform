@@ -17,7 +17,8 @@ import {
   sendHutRegistrationWhatsAppAction,
   setHutTestModeAction,
   setHutVisualOverrideAction,
-  startHutBlockAction
+  startHutBlockAction,
+  syncHutParticipantProfileFromNavAction
 } from "@/modules/hut/actions";
 import { createHutRepository, type HutAdminParticipant, type HutRegistrationSlotAdmin } from "@/modules/hut";
 import { normalizeWhatsAppRecipient } from "@/modules/oneui-whatsapp";
@@ -405,6 +406,26 @@ function HutParticipantCard({
                 Error WhatsApp: {participant.whatsappRegistration.error}
               </p>
             ) : null}
+            <div className="mt-4 rounded-md border border-sky-200 bg-sky-50 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-sky-950">Sincronizar datos desde NAV</p>
+                  <p className="mt-1 text-xs leading-5 text-sky-900">
+                    Herramienta temporal: copia nombre, celular y correo del participante NAV vinculado. Conserva folio HUT, EVA1/EVA2, fases, respuestas y fotos.
+                  </p>
+                </div>
+                <form action={syncHutParticipantProfileFromNavAction.bind(null, studyId, participant.id)}>
+                  <SubmitButton disabled={!participant.studyParticipantId} pendingLabel="Sincronizando...">
+                    Sincronizar datos HUT desde participante NAV
+                  </SubmitButton>
+                </form>
+              </div>
+              {!participant.studyParticipantId ? (
+                <p className="mt-2 text-xs font-semibold text-amber-800">
+                  Este HUT no tiene participante NAV vinculado.
+                </p>
+              ) : null}
+            </div>
             <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>

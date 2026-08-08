@@ -84,6 +84,16 @@ export async function assignHutParticipantRotationAction(studyId: string, partic
   redirectWithHutMessage(studyId, result, participantId);
 }
 
+export async function syncHutParticipantProfileFromNavAction(studyId: string, participantId: string) {
+  await requireCapability("screening:review");
+  const result = await createHutRepository().syncParticipantProfileFromLinkedNav({
+    participantId,
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
 export async function sendHutRegistrationWhatsAppAction(studyId: string, participantId: string, formData: FormData) {
   await requireCapability("screening:review");
   const result = await createHutRepository().sendRegistrationWhatsApp({

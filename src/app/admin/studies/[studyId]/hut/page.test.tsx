@@ -42,7 +42,8 @@ vi.mock("@/modules/hut/actions", () => {
     sendHutRegistrationWhatsAppAction: action,
     setHutTestModeAction: action,
     setHutVisualOverrideAction: action,
-    startHutBlockAction: action
+    startHutBlockAction: action,
+    syncHutParticipantProfileFromNavAction: action
   };
 });
 
@@ -397,6 +398,25 @@ describe("HutAdminPage", () => {
     expect(screen.queryByText("Selfie de registro: Faltante")).not.toBeInTheDocument();
     expect(screen.queryByText("Bloques y videos")).not.toBeInTheDocument();
   });
+
+  it("muestra accion temporal para sincronizar datos HUT desde participante NAV", async () => {
+    getAdminDashboardMock.mockResolvedValue(
+      createDashboard({
+        participants: [
+          createParticipant({
+            origin: "CLT_HUT",
+            protocolVersion: "APPLICATION_PHOTO",
+            studyParticipantId: "study-participant-nav-111"
+          })
+        ]
+      })
+    );
+
+    render(await HutAdminPage({ params: Promise.resolve({ studyId: "study-hut" }), searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole("button", { name: "Sincronizar datos HUT desde participante NAV" })).toBeEnabled();
+    expect(screen.getByText(/copia nombre, celular y correo/)).toBeInTheDocument();
+  });
 });
 
 type TestParticipant = {
@@ -552,6 +572,7 @@ type TestParticipant = {
     | "COMPLETED"
     | "DISQUALIFIED"
     | "NOT_STARTED";
+  studyParticipantId: string | null;
   testMode: boolean;
   token: string;
   usedToleranceInCurrentBlock: boolean;
@@ -707,6 +728,7 @@ function baseParticipant() {
     reminderPending: false,
     secondFragranceRightArm: "FRAGANCIA B",
     status: "NOT_STARTED" as const,
+    studyParticipantId: null,
     testMode: false,
     token: "token-1",
     usedToleranceInCurrentBlock: false,

@@ -102,6 +102,63 @@ describe("HUT module foundation", () => {
     expect(prisma.state.participants[0]?.blocks).toHaveLength(0);
   });
 
+  it("syncs HUT contact data from the linked NAV participant without changing rotation or phases", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const created = await repository.createParticipant({
+      firstFragranceLeftArm: "247",
+      folio: "HUT-111",
+      name: "HUT-111",
+      phone: null,
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0];
+
+    expect(created.ok).toBe(true);
+    expect(participant).toBeDefined();
+    if (!participant) {
+      throw new Error("missing test participant");
+    }
+
+    participant.studyParticipantId = "study-participant-nav-111";
+    participant.studyParticipant = {
+      participantProfile: {
+        email: "martin@example.test",
+        name: "Martin Valerio Gonzalez",
+        phone: "5569613589"
+      }
+    };
+    participant.phaseCodes = [
+      {
+        codeHash: "hash-1",
+        encryptedCode: "encrypted-1",
+        id: "phase-1",
+        participantId: participant.id,
+        phase: "COLOCACION",
+        slot: 1,
+        status: "GENERATED"
+      }
+    ];
+
+    const result = await repository.syncParticipantProfileFromLinkedNav({
+      participantId: participant.id,
+      studyId: "study-hut"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(participant).toMatchObject({
+      email: "martin@example.test",
+      firstFragranceLeftArm: "247",
+      folio: "HUT-111",
+      name: "Martin Valerio Gonzalez",
+      phone: "5569613589",
+      secondFragranceRightArm: "583"
+    });
+    expect(participant.phaseCodes).toHaveLength(1);
+  });
+
   it("defines an optional StudyParticipant link for HUT participants", () => {
     const schema = readWorkspaceFile("prisma", "schema.prisma");
     const migration = readWorkspaceFile(
@@ -2426,6 +2483,8 @@ function createFakeHutPrisma() {
           status: (args.data.status as FakeParticipant["status"]) ?? "NOT_STARTED",
           study: state.study,
           studyId: String(args.data.studyId),
+          studyParticipant: null,
+          studyParticipantId: null,
           testMode: Boolean(args.data.testMode ?? false),
           token: String(args.data.token),
           visualOverrideEnabled: false,
@@ -2972,6 +3031,14 @@ type FakeParticipant = {
     timeZoneIana: string;
   };
   studyId: string;
+  studyParticipant: {
+    participantProfile: {
+      email: string | null;
+      name: string;
+      phone: string | null;
+    };
+  } | null;
+  studyParticipantId: string | null;
   testMode: boolean;
   token: string;
   visualOverrideEnabled: boolean;

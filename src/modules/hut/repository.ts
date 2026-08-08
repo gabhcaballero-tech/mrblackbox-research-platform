@@ -140,6 +140,7 @@ export type HutAdminParticipant = {
   } | null;
   secondFragranceRightArm: string | null;
   status: HutParticipantStatus;
+  studyParticipantId: string | null;
   testMode: boolean;
   token: string;
   usedToleranceInCurrentBlock: boolean;
@@ -419,6 +420,15 @@ export type HutRepository = {
     reminderSent?: boolean;
     studyId: string;
   }) => Promise<HutActionResult<{ participantId: string }>>;
+  syncParticipantProfileFromLinkedNav: (input: {
+    participantId: string;
+    studyId: string;
+  }) => Promise<HutActionResult<{
+    email: string | null;
+    name: string;
+    participantId: string;
+    phone: string | null;
+  }>>;
   resetReferenceSelfie: (input: {
     confirmation: string;
     participantId: string;
@@ -1988,6 +1998,44 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         return {
           data: { participantId: participant.id },
           message: "Dia omitido registrado. La tolerancia del bloque quedo consumida.",
+          ok: true
+        };
+      });
+    },
+
+    async syncParticipantProfileFromLinkedNav(input) {
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipant(tx, input.participantId);
+
+        if (!participant || participant.studyId !== input.studyId) {
+          return { message: "No encontramos el participante HUT.", ok: false };
+        }
+
+        const profile = participant.studyParticipant?.participantProfile ?? null;
+
+        if (!participant.studyParticipantId || !profile) {
+          return { message: "Este HUT no tiene un participante NAV vinculado.", ok: false };
+        }
+
+        await tx.hutParticipant.update?.({
+          data: {
+            email: profile.email,
+            name: profile.name,
+            phone: profile.phone
+          },
+          where: { id: participant.id }
+        });
+
+        return {
+          data: {
+            email: profile.email,
+            name: profile.name,
+            participantId: participant.id,
+            phone: profile.phone
+          },
+          message: "Datos HUT sincronizados desde el participante NAV vinculado.",
           ok: true
         };
       });
@@ -4052,6 +4100,7 @@ async function toAdminParticipant(
       : null,
     status: participant.status,
     secondFragranceRightArm: participant.secondFragranceRightArm,
+    studyParticipantId: participant.studyParticipantId ?? null,
     testMode: participant.testMode,
     token: participant.token,
     usedToleranceInCurrentBlock: Boolean(block && block.missedDaysCount >= block.maxMissedDaysAllowed),
