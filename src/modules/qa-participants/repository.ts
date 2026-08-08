@@ -16,12 +16,18 @@ import {
   recordQaCleanupCount
 } from "./service";
 import type {
+  CleanupOrphanParticipantProfilesReport,
   QaParticipantActionResult,
   QaParticipantCleanupReport,
   QaParticipantExecutionMode,
   LegacyQaCleanupPreview,
   LegacyQaCleanupReport,
   LegacyQaRotationPlanPreview,
+  OrphanParticipantProfileConservedItem,
+  OrphanParticipantProfilePreview,
+  OrphanParticipantProfilePreviewItem,
+  OrphanParticipantProfileRelationCounts,
+  QaParticipantProfileCleanup,
   QaParticipantScenarioReport,
   QaParticipantRunStatus,
   QaParticipantRunSummary,
@@ -43,6 +49,7 @@ type Delegate = {
 };
 
 const LEGACY_QA_CLEANUP_AUTHORIZED_FOLIOS = ["NAV-104", "NAV-106", "NAV-110", "NAV-115", "NAV-117"] as const;
+const ORPHAN_PARTICIPANT_PROFILE_PREVIEW_LIMIT = 250;
 const OFFICIAL_NAVIGO_ROTATION_PLAN_PAIRS = new Map([
   ["ROTACION1", "247->583"],
   ["ROTACION2", "583->247"]
@@ -70,6 +77,7 @@ type QaPrismaClient = {
   hutVisitProgress: Delegate;
   hutVisualVerification: Delegate;
   mediaEvidencePlaceholder: Delegate;
+  oneuiWhatsAppConversation: Delegate;
   oneuiWhatsAppMessage: Delegate;
   participantAccessToken: Delegate;
   participantActivity: Delegate;
@@ -143,6 +151,11 @@ export type CleanupLegacyQaParticipantsInput = PreviewLegacyQaCleanupInput & {
   cleanedByUserId: string;
 };
 
+export type CleanupOrphanParticipantProfilesInput = {
+  cleanedByUserId: string;
+  studyId: string;
+};
+
 export type CreateQaParticipantScenarioInput = {
   baseUrl?: string;
   createdByUserId: string;
@@ -156,12 +169,14 @@ export type CreateQaParticipantScenarioInput = {
 export type QaParticipantsRepository = {
   cleanupLegacyQaParticipant: (input: CleanupLegacyQaParticipantsInput) => Promise<QaParticipantActionResult<LegacyQaCleanupReport>>;
   cleanupLegacyAuthorizedFolios: (input: CleanupLegacyQaParticipantsInput) => Promise<QaParticipantActionResult<LegacyQaCleanupReport>>;
+  cleanupOrphanParticipantProfiles: (input: CleanupOrphanParticipantProfilesInput) => Promise<QaParticipantActionResult<CleanupOrphanParticipantProfilesReport>>;
   cleanupRun: (input: CleanupQaParticipantRunInput) => Promise<QaParticipantActionResult<QaParticipantRunSummary>>;
   createEmptyRun: (input: CreateEmptyQaParticipantRunInput) => Promise<QaParticipantActionResult<QaParticipantRunSummary>>;
   createScenario: (input: CreateQaParticipantScenarioInput) => Promise<QaParticipantActionResult<QaParticipantRunSummary>>;
   getRun: (runId: string) => Promise<QaParticipantRunSummary | null>;
   listRuns: (input: ListQaParticipantRunsInput) => Promise<QaParticipantRunSummary[]>;
   previewLegacyCleanup: (input: PreviewLegacyQaCleanupInput) => Promise<LegacyQaCleanupPreview>;
+  previewOrphanParticipantProfiles: () => Promise<OrphanParticipantProfilePreview>;
 };
 
 const qaRunSelect = {
@@ -199,12 +214,23 @@ export function createQaParticipantsRepository(prismaClient?: QaPrismaClient): Q
       return buildLegacyQaCleanupPreview(prisma, input);
     },
 
+    async previewOrphanParticipantProfiles() {
+      const prisma = await getPrisma();
+      return buildOrphanParticipantProfilePreview(prisma);
+    },
+
     async cleanupLegacyQaParticipant(input) {
       return cleanupLegacyQaParticipants(getPrisma, input);
     },
 
     async cleanupLegacyAuthorizedFolios(input) {
       return cleanupLegacyQaParticipants(getPrisma, input);
+    },
+
+    async cleanupOrphanParticipantProfiles(input) {
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => cleanupOrphanParticipantProfiles(tx, input));
     },
 
     async cleanupRun(input) {
@@ -366,6 +392,230 @@ function toQaParticipantRunSummary(run: QaParticipantRunRecord): QaParticipantRu
   };
 }
 
+type OrphanParticipantProfileRecord = {
+  _count?: { participations: number };
+  createdAt: Date;
+  email: string | null;
+  id: string;
+  name: string;
+  phone: string | null;
+  status: string;
+  updatedAt: Date;
+};
+
+async function buildOrphanParticipantProfilePreview(prisma: QaPrismaClient): Promise<OrphanParticipantProfilePreview> {
+  const profiles = ((await prisma.participantProfile.findMany?.({
+    orderBy: { createdAt: "asc" },
+    select: {
+      _count: {
+        select: { participations: true }
+      },
+      createdAt: true,
+      email: true,
+      id: true,
+      name: true,
+      phone: true,
+      status: true,
+      updatedAt: true
+    },
+    take: ORPHAN_PARTICIPANT_PROFILE_PREVIEW_LIMIT,
+    where: {
+      participations: { none: {} }
+    }
+  })) as OrphanParticipantProfileRecord[] | undefined) ?? [];
+  const evaluated = await Promise.all(profiles.map((profile) => buildOrphanParticipantProfilePreviewItem(prisma, profile)));
+  const candidates = evaluated.filter((item): item is OrphanParticipantProfilePreviewItem => !("conservationReason" in item));
+  const conserved = evaluated.filter((item): item is OrphanParticipantProfileConservedItem => "conservationReason" in item);
+
+  return {
+    candidateCount: candidates.length,
+    candidates,
+    conserved,
+    evaluatedAt: new Date().toISOString(),
+    evaluatedCount: profiles.length,
+    limit: ORPHAN_PARTICIPANT_PROFILE_PREVIEW_LIMIT
+  };
+}
+
+async function buildOrphanParticipantProfilePreviewItem(
+  prisma: QaPrismaClient,
+  profile: OrphanParticipantProfileRecord
+): Promise<OrphanParticipantProfilePreviewItem | OrphanParticipantProfileConservedItem> {
+  const relationCounts = await countOrphanParticipantProfileRelations(prisma, profile);
+  const blockingRelations = Object.entries(relationCounts).filter(([, count]) => count > 0);
+  const base: OrphanParticipantProfilePreviewItem = {
+    createdAt: profile.createdAt,
+    email: profile.email,
+    id: profile.id,
+    name: profile.name,
+    phone: profile.phone,
+    reason: "Sin StudyParticipant ni relaciones historicas detectadas.",
+    relationCounts,
+    status: profile.status,
+    updatedAt: profile.updatedAt
+  };
+
+  if (blockingRelations.length > 0) {
+    return {
+      ...base,
+      conservationReason: `Conservado por relaciones existentes: ${blockingRelations.map(([name, count]) => `${name}=${count}`).join(", ")}.`
+    };
+  }
+
+  return base;
+}
+
+async function countOrphanParticipantProfileRelations(
+  prisma: QaPrismaClient,
+  profile: Pick<OrphanParticipantProfileRecord, "email" | "id" | "phone">
+): Promise<OrphanParticipantProfileRelationCounts> {
+  const phoneFilters = buildParticipantProfilePhoneFilters(profile.phone, "phone");
+  const conversationPhoneFilters = buildParticipantProfilePhoneFilters(profile.phone, "phoneNumber");
+  const emailFilters = profile.email ? [{ email: { equals: profile.email, mode: "insensitive" } }] : [];
+  const hutOrFilters = [...phoneFilters, ...emailFilters];
+  const conversationOrFilters = conversationPhoneFilters;
+  const counts: OrphanParticipantProfileRelationCounts = {
+    studyParticipants: await countIfAvailable(prisma.studyParticipant, { participantProfileId: profile.id })
+  };
+
+  counts.screeningAttempts = counts.studyParticipants > 0 ? 1 : 0;
+  counts.screeningAnswers = counts.studyParticipants > 0 ? 1 : 0;
+  counts.participantConfirmations = counts.studyParticipants > 0 ? 1 : 0;
+  counts.participantScreeningReviews = counts.studyParticipants > 0 ? 1 : 0;
+  counts.participantReferenceCodes = counts.studyParticipants > 0 ? 1 : 0;
+  counts.ctlSessions = counts.studyParticipants > 0 ? 1 : 0;
+  counts.ctlAnswers = counts.studyParticipants > 0 ? 1 : 0;
+  counts.ctlPhaseProgress = counts.studyParticipants > 0 ? 1 : 0;
+  counts.participantAccessTokens = counts.studyParticipants > 0 ? 1 : 0;
+  counts.participantActivities = counts.studyParticipants > 0 ? 1 : 0;
+  counts.participantActivityEvidence = counts.studyParticipants > 0 ? 1 : 0;
+  counts.participantRotationAssignments = counts.studyParticipants > 0 ? 1 : 0;
+  counts.participantArmAssignments = counts.studyParticipants > 0 ? 1 : 0;
+
+  counts.hutParticipants = hutOrFilters.length > 0 ? await countIfAvailable(prisma.hutParticipant, { OR: hutOrFilters }) : 0;
+  counts.hutQuestionnaireAttempts = counts.hutParticipants > 0 ? 1 : 0;
+  counts.hutAnswers = counts.hutParticipants > 0 ? 1 : 0;
+  counts.hutApplicationPhotoEntries = counts.hutParticipants > 0 ? 1 : 0;
+
+  counts.oneuiWhatsAppConversations = conversationOrFilters.length > 0
+    ? await countIfAvailable(prisma.oneuiWhatsAppConversation, { OR: conversationOrFilters })
+    : 0;
+  counts.oneuiWhatsAppMessages = conversationOrFilters.length > 0
+    ? await countIfAvailable(prisma.oneuiWhatsAppMessage, { conversation: { OR: conversationOrFilters } })
+    : 0;
+  counts.qaParticipantRuns = await countQaRunsForParticipantProfile(prisma, profile.id);
+
+  return counts;
+}
+
+async function countQaRunsForParticipantProfile(prisma: QaPrismaClient, participantProfileId: string): Promise<number> {
+  const filters = [
+    { reportJson: { path: ["objects", "participantProfileId"], equals: participantProfileId } },
+    { cleanupReportJson: { path: ["participantProfile", "id"], equals: participantProfileId } }
+  ];
+  return countIfAvailable(prisma.qaParticipantRun, { OR: filters });
+}
+
+function buildParticipantProfilePhoneFilters(phone: string | null, field: "phone" | "phoneNumber"): Array<Record<string, unknown>> {
+  const digits = phone?.replace(/\D/g, "") ?? "";
+  if (!digits) {
+    return [];
+  }
+  const local = digits.length > 10 ? digits.slice(-10) : digits;
+  const variants = [...new Set([phone, digits, local, `52${local}`, `+52${local}`].filter(Boolean) as string[])];
+  return [
+    { [field]: { in: variants } },
+    { [field]: { contains: local } }
+  ];
+}
+
+async function cleanupOrphanParticipantProfiles(
+  tx: QaPrismaClient,
+  input: CleanupOrphanParticipantProfilesInput
+): Promise<QaParticipantActionResult<CleanupOrphanParticipantProfilesReport>> {
+  const preview = await buildOrphanParticipantProfilePreview(tx);
+  const deleted: OrphanParticipantProfilePreviewItem[] = [];
+  const preserved: OrphanParticipantProfileConservedItem[] = [...preview.conserved];
+  const deletionCounts: Record<string, number> = {};
+
+  for (const candidate of preview.candidates) {
+    const latest = ((await tx.participantProfile.findUnique?.({
+      select: {
+        _count: {
+          select: { participations: true }
+        },
+        createdAt: true,
+        email: true,
+        id: true,
+        name: true,
+        phone: true,
+        status: true,
+        updatedAt: true
+      },
+      where: { id: candidate.id }
+    })) as OrphanParticipantProfileRecord | null) ?? null;
+    if (!latest) {
+      preserved.push({
+        ...candidate,
+        conservationReason: "Conservado porque ya no existe al revalidar."
+      });
+      continue;
+    }
+    const revalidated = await buildOrphanParticipantProfilePreviewItem(tx, latest);
+    if ("conservationReason" in revalidated) {
+      preserved.push(revalidated);
+      continue;
+    }
+    const result = await tx.participantProfile.deleteMany?.({
+      where: {
+        id: revalidated.id,
+        participations: { none: {} }
+      }
+    });
+    const count = result?.count ?? 0;
+    deletionCounts.participantProfile = (deletionCounts.participantProfile ?? 0) + count;
+    if (count > 0) {
+      deleted.push(revalidated);
+    } else {
+      preserved.push({
+        ...revalidated,
+        conservationReason: "Conservado porque la condicion de huerfano ya no se cumplio al eliminar."
+      });
+    }
+  }
+
+  const report: CleanupOrphanParticipantProfilesReport = {
+    cleanedAt: new Date().toISOString(),
+    cleanedByUserId: input.cleanedByUserId,
+    deleted,
+    deletionCounts,
+    preserved,
+    preview
+  };
+
+  await tx.qaParticipantRun.create?.({
+    data: {
+      cleanedAt: new Date(report.cleanedAt),
+      cleanedByUserId: input.cleanedByUserId,
+      cleanupReportJson: report,
+      createdByUserId: input.cleanedByUserId,
+      executionMode: "FAST_FORWARD",
+      folio: null,
+      reportJson: {
+        preview,
+        qa: true,
+        source: "ORPHAN_PARTICIPANT_PROFILE_CLEANUP"
+      },
+      scenario: "CLT_ONLY",
+      status: "CLEANED",
+      studyId: input.studyId
+    },
+    select: qaRunSelect
+  });
+
+  return { data: report, ok: true };
+}
+
 async function cleanupLegacyQaParticipants(
   getPrisma: () => Promise<QaPrismaClient>,
   input: CleanupLegacyQaParticipantsInput
@@ -454,9 +704,18 @@ type LegacyQaConfirmationRecord = {
   folio: string;
   studyParticipant?: {
     hutParticipant?: { id: string } | null;
-    participantProfile?: { name: string | null } | null;
+    participantProfile?: LegacyQaParticipantProfileRecord | null;
   } | null;
   studyParticipantId: string;
+};
+
+type LegacyQaParticipantProfileRecord = {
+  _count?: { participations: number };
+  email: string | null;
+  id: string;
+  name: string | null;
+  phone: string | null;
+  status: string | null;
 };
 
 type LegacyQaHutParticipantRecord = {
@@ -515,7 +774,16 @@ async function buildLegacyQaCleanupPreview(
             select: { id: true }
           },
           participantProfile: {
-            select: { name: true }
+            select: {
+              _count: {
+                select: { participations: true }
+              },
+              email: true,
+              id: true,
+              name: true,
+              phone: true,
+              status: true
+            }
           }
         }
       },
@@ -555,6 +823,7 @@ async function buildLegacyQaCleanupPreview(
         found: Boolean(studyParticipantId || hutParticipantId),
         hutParticipantId,
         participantName: confirmation?.studyParticipant?.participantProfile?.name ?? hutParticipant?.name ?? null,
+        participantProfile: toParticipantProfileCleanupPreview(confirmation?.studyParticipant?.participantProfile ?? null),
         relationCounts: await countLegacyQaRelations(prisma, {
           hutParticipantId,
           studyParticipantId
@@ -564,6 +833,22 @@ async function buildLegacyQaCleanupPreview(
     })),
     rotationPlans: rotationPlans.map((plan) => toLegacyQaRotationPlanPreview(plan, normalized.authorizedFolios)),
     studyId: input.studyId
+  };
+}
+
+function toParticipantProfileCleanupPreview(profile: LegacyQaParticipantProfileRecord | null): QaParticipantProfileCleanup | null {
+  if (!profile) {
+    return null;
+  }
+  const participations = profile._count?.participations ?? null;
+  return {
+    action: participations !== null && participations > 1 ? "PRESERVE_HAS_PARTICIPATIONS" : "DELETE_AFTER_CLEANUP",
+    email: profile.email,
+    id: profile.id,
+    name: profile.name,
+    phone: profile.phone,
+    remainingParticipations: participations,
+    status: profile.status
   };
 }
 
@@ -1596,9 +1881,20 @@ async function cleanupHutParticipant(tx: QaPrismaClient, report: QaParticipantCl
 
 async function cleanupStudyParticipant(tx: QaPrismaClient, report: QaParticipantCleanupReport, studyParticipantId: string): Promise<void> {
   const profile = (await tx.studyParticipant.findUnique?.({
-    select: { participantProfileId: true },
+    select: {
+      participantProfile: {
+        select: {
+          email: true,
+          id: true,
+          name: true,
+          phone: true,
+          status: true
+        }
+      },
+      participantProfileId: true
+    },
     where: { id: studyParticipantId }
-  })) as { participantProfileId: string } | null;
+  })) as { participantProfile?: Omit<LegacyQaParticipantProfileRecord, "_count"> | null; participantProfileId: string } | null;
 
   await deleteMany(tx.researchResponse, report, "researchResponse", { participantActivity: { studyParticipantId } });
   await deleteMany(tx.mediaEvidencePlaceholder, report, "mediaEvidencePlaceholder", { participantActivity: { studyParticipantId } });
@@ -1634,11 +1930,76 @@ async function cleanupStudyParticipant(tx: QaPrismaClient, report: QaParticipant
 
   await deleteMany(tx.studyParticipant, report, "studyParticipant", { id: studyParticipantId });
   if (profile?.participantProfileId) {
-    await deleteMany(tx.participantProfile, report, "participantProfile", {
-      id: profile.participantProfileId,
-      participations: { none: {} }
-    });
+    await cleanupParticipantProfileIfOrphan(tx, report, profile);
   }
+}
+
+async function cleanupParticipantProfileIfOrphan(
+  tx: QaPrismaClient,
+  report: QaParticipantCleanupReport,
+  profileLink: {
+    participantProfile?: Omit<LegacyQaParticipantProfileRecord, "_count"> | null;
+    participantProfileId: string;
+  }
+): Promise<void> {
+  const profile = (await tx.participantProfile.findUnique?.({
+    select: {
+      _count: {
+        select: { participations: true }
+      },
+      email: true,
+      id: true,
+      name: true,
+      phone: true,
+      status: true
+    },
+    where: { id: profileLink.participantProfileId }
+  })) as LegacyQaParticipantProfileRecord | null;
+
+  if (!profile) {
+    report.participantProfile = {
+      action: "NOT_FOUND",
+      email: profileLink.participantProfile?.email ?? null,
+      id: profileLink.participantProfileId,
+      name: profileLink.participantProfile?.name ?? null,
+      phone: profileLink.participantProfile?.phone ?? null,
+      remainingParticipations: null,
+      status: profileLink.participantProfile?.status ?? null
+    };
+    return;
+  }
+
+  const remainingParticipations = profile._count?.participations ?? 0;
+  if (remainingParticipations > 0) {
+    report.participantProfile = {
+      action: "PRESERVE_HAS_PARTICIPATIONS",
+      email: profile.email,
+      id: profile.id,
+      name: profile.name,
+      phone: profile.phone,
+      remainingParticipations,
+      status: profile.status
+    };
+    report.notes.push(`ParticipantProfile ${profile.id}: preservado porque conserva ${remainingParticipations} participacion(es).`);
+    return;
+  }
+
+  const result = await tx.participantProfile.deleteMany?.({
+    where: {
+      id: profile.id,
+      participations: { none: {} }
+    }
+  });
+  recordQaCleanupCount(report, "participantProfile", result);
+  report.participantProfile = {
+    action: (result?.count ?? 0) > 0 ? "DELETED_ORPHAN" : "PRESERVE_HAS_PARTICIPATIONS",
+    email: profile.email,
+    id: profile.id,
+    name: profile.name,
+    phone: profile.phone,
+    remainingParticipations,
+    status: profile.status
+  };
 }
 
 async function cleanupLegacyQaRotationPlans(

@@ -1,0 +1,39 @@
+{
+  "action": "DELETE_ORPHAN_PARTICIPANT_PROFILE_BY_ID",
+  "authorizedProfileId": "2077940e-7ed0-4c57-a163-022e286a8f8c",
+  "authorizedPhone": "+525579347433",
+  "authorizedEmail": "ruiztellezfrancisco@gmail.com",
+  "startedAt": "2026-08-08T15:08:55.489Z",
+  "precheck": {
+    "id": "2077940e-7ed0-4c57-a163-022e286a8f8c",
+    "name": "FRANCISCO GABRIEL RUIZ TELLEZ",
+    "phone": "+525579347433",
+    "email": "ruiztellezfrancisco@gmail.com",
+    "status": "ACTIVE",
+    "participantAuthUserId": "ddfc50e9-aaf6-4d95-a4e8-05d02b7ea55d",
+    "createdAt": "2026-08-07T07:59:43.104Z",
+    "updatedAt": "2026-08-07T07:59:43.104Z",
+    "participations": 0
+  },
+  "deletion": {
+    "deletedCount": 1,
+    "deletedRows": [
+      {
+        "id": "2077940e-7ed0-4c57-a163-022e286a8f8c",
+        "name": "FRANCISCO GABRIEL RUIZ TELLEZ",
+        "phone": "+525579347433",
+        "email": "ruiztellezfrancisco@gmail.com",
+        "status": "ACTIVE",
+        "participantAuthUserId": "ddfc50e9-aaf6-4d95-a4e8-05d02b7ea55d",
+        "createdAt": "2026-08-07T07:59:43.104Z",
+        "updatedAt": "2026-08-07T07:59:43.104Z"
+      }
+    ]
+  },
+  "postcheck": {
+    "byId": [],
+    "byPhoneOrEmail": []
+  },
+  "status": "DELETED",
+  "finishedAt": "2026-08-08T15:08:56.672Z"
+}

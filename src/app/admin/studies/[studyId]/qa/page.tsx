@@ -7,12 +7,14 @@ import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import {
   cleanupLegacyQaParticipantAction,
+  cleanupOrphanParticipantProfilesAction,
   cleanupQaParticipantRunAction,
   createQaParticipantScenarioAction
 } from "@/modules/qa-participants/actions";
 import { createQaParticipantsRepository } from "@/modules/qa-participants";
 import { validateQaE2eRun, type QaE2eValidationReport } from "@/modules/qa-e2e-validator";
 import type {
+  LegacyQaCleanupPreview,
   QaParticipantExecutionMode,
   QaParticipantRunSummary,
   QaParticipantScenario,
@@ -39,6 +41,7 @@ type QaAdminPageProps = {
     diagnosticRunId?: string;
     legacyFolios?: string | string[];
     legacyPreview?: string;
+    orphanProfilesPreview?: string;
     qaError?: string;
     qaMessage?: string;
   }>;
@@ -60,6 +63,9 @@ export default async function QaAdminPage({ params, searchParams }: QaAdminPageP
         folios: legacySelectedFolios,
         studyId
       })
+    : null;
+  const orphanProfilesPreview = query.orphanProfilesPreview === "1"
+    ? await createQaParticipantsRepository().previewOrphanParticipantProfiles()
     : null;
   const diagnosticReport = query.diagnosticRunId
     ? await validateQaE2eRun({
@@ -106,9 +112,121 @@ export default async function QaAdminPage({ params, searchParams }: QaAdminPageP
 
         <CreateQaParticipantSection studyId={studyId} />
         <LegacyQaCleanupSection preview={legacyPreview} selectedFolios={legacySelectedFolios} studyId={studyId} />
+        <OrphanParticipantProfilesCleanupSection preview={orphanProfilesPreview} studyId={studyId} />
         <QaRunsSection diagnosticReport={diagnosticReport} runs={runs} studyId={studyId} />
       </div>
     </AppShell>
+  );
+}
+
+function OrphanParticipantProfilesCleanupSection({
+  preview,
+  studyId
+}: {
+  preview: Awaited<ReturnType<ReturnType<typeof createQaParticipantsRepository>["previewOrphanParticipantProfiles"]>> | null;
+  studyId: string;
+}) {
+  return (
+    <section className="rounded-lg border border-orange-200 bg-orange-50 p-5 shadow-sm">
+      <div>
+        <h2 className="text-lg font-semibold text-orange-950">Limpieza temporal de ParticipantProfile huerfanos</h2>
+        <p className="mt-1 text-sm leading-6 text-orange-900">
+          Herramienta de solo ADMIN para detectar perfiles sin StudyParticipant ni relaciones historicas. Exige vista previa antes de borrar.
+        </p>
+      </div>
+
+      <form className="mt-5" method="get">
+        <input name="orphanProfilesPreview" type="hidden" value="1" />
+        <button className="rounded-md bg-orange-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-800" type="submit">
+          Ver perfiles huerfanos candidatos
+        </button>
+      </form>
+
+      {preview ? (
+        <div className="mt-5 rounded-lg border border-orange-200 bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-zinc-950">Preview de perfiles huerfanos</h3>
+              <p className="mt-1 text-xs text-zinc-600">
+                Evaluados: {preview.evaluatedCount} / Limite: {preview.limit} / Candidatos: {preview.candidateCount}
+              </p>
+            </div>
+            <span className={preview.candidateCount > 0 ? "rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-800" : "rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800"}>
+              {preview.candidateCount > 0 ? "Requiere confirmacion" : "Sin candidatos"}
+            </span>
+          </div>
+
+          {preview.candidates.length > 0 ? (
+            <div className="mt-4 grid gap-3">
+              {preview.candidates.map((profile) => (
+                <article className="rounded-md border border-zinc-200 bg-zinc-50 p-3" key={profile.id}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-zinc-950">{profile.name}</p>
+                      <p className="font-mono text-xs text-zinc-600">{profile.id}</p>
+                    </div>
+                    <span className="rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-800">Candidato</span>
+                  </div>
+                  <dl className="mt-3 grid gap-2 text-xs text-zinc-700 sm:grid-cols-2 lg:grid-cols-3">
+                    <ProfilePreviewField label="Telefono" value={profile.phone} />
+                    <ProfilePreviewField label="Correo" value={profile.email} />
+                    <ProfilePreviewField label="Estado" value={profile.status} />
+                    <ProfilePreviewField label="Creado" value={formatDateTime(profile.createdAt)} />
+                    <ProfilePreviewField label="Actualizado" value={formatDateTime(profile.updatedAt)} />
+                    <ProfilePreviewField label="Motivo" value={profile.reason} />
+                  </dl>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              No hay ParticipantProfile huerfanos candidatos para eliminar.
+            </p>
+          )}
+
+          {preview.conserved.length > 0 ? (
+            <div className="mt-5 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+              <h4 className="text-sm font-semibold text-zinc-950">Perfiles conservados por seguridad</h4>
+              <div className="mt-3 grid gap-2">
+                {preview.conserved.map((profile) => (
+                  <article className="rounded-md border border-zinc-200 bg-white p-3 text-xs text-zinc-700" key={profile.id}>
+                    <p className="font-semibold text-zinc-950">{profile.name}</p>
+                    <p className="font-mono text-zinc-600">{profile.id}</p>
+                    <p className="mt-2 text-rose-800">{profile.conservationReason}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {preview.candidateCount > 0 ? (
+            <form action={cleanupOrphanProfilesFormAction.bind(null, studyId)} className="mt-5 rounded-md border border-rose-200 bg-rose-50 p-3">
+              <p className="text-sm font-semibold text-rose-900">Confirmar limpieza de perfiles huerfanos</p>
+              <p className="mt-1 text-xs leading-5 text-rose-800">
+                Escribe ELIMINAR PERFILES HUERFANOS para borrar solo perfiles que sigan sin StudyParticipant ni relaciones al revalidar.
+              </p>
+              <input
+                className="mt-2 w-full rounded-md border border-rose-200 px-3 py-2 text-sm text-zinc-950"
+                name="confirmation"
+                placeholder="ELIMINAR PERFILES HUERFANOS"
+              />
+              <button className="mt-2 rounded-md bg-rose-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-800" type="submit">
+                Eliminar perfiles huerfanos
+              </button>
+            </form>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function ProfilePreviewField({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div>
+      <dt className="font-semibold text-zinc-500">{label}</dt>
+      <dd>{value ?? "-"}</dd>
+    </div>
   );
 }
 
@@ -182,6 +300,7 @@ function LegacyQaCleanupSection({
                     <dd className="font-mono">{item.hutParticipantId ?? "-"}</dd>
                   </div>
                 </dl>
+                <ParticipantProfilePreview profile={item.participantProfile} />
                 <RelationCounts counts={item.relationCounts} />
               </article>
             ))}
@@ -239,6 +358,53 @@ function LegacyQaCleanupSection({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function ParticipantProfilePreview({ profile }: { profile: LegacyQaCleanupPreview["folios"][number]["participantProfile"] }) {
+  if (!profile) {
+    return (
+      <div className="mt-3 rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-600">
+        ParticipantProfile: no encontrado para este folio.
+      </div>
+    );
+  }
+  const actionLabel =
+    profile.action === "DELETE_AFTER_CLEANUP"
+      ? "Accion propuesta: eliminar si queda huerfano despues de limpiar relaciones."
+      : profile.action === "PRESERVE_HAS_PARTICIPATIONS"
+        ? "Accion propuesta: preservar porque conserva otras participaciones."
+        : profile.action === "DELETED_ORPHAN"
+          ? "Perfil huerfano eliminado."
+          : "Sin accion de borrado propuesta.";
+
+  return (
+    <div className="mt-3 rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-700">
+      <p className="font-semibold text-zinc-900">ParticipantProfile encontrado</p>
+      <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+        <div>
+          <dt className="font-semibold text-zinc-500">ID</dt>
+          <dd className="font-mono">{profile.id ?? "-"}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-zinc-500">Estado</dt>
+          <dd>{profile.status ?? "-"}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-zinc-500">Telefono</dt>
+          <dd>{profile.phone ?? "-"}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-zinc-500">Correo</dt>
+          <dd>{profile.email ?? "-"}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-zinc-500">Participaciones restantes</dt>
+          <dd className="font-mono">{profile.remainingParticipations ?? "-"}</dd>
+        </div>
+      </dl>
+      <p className="mt-2 font-semibold text-amber-800">{actionLabel}</p>
+    </div>
   );
 }
 
@@ -578,6 +744,22 @@ async function cleanupLegacyQaFoliosFormAction(studyId: string, formData: FormDa
   }
   const cleaned = result.data.folios.filter((item) => item.cleanupReport).map((item) => item.folio);
   redirect(`/admin/studies/${studyId}/qa?qaMessage=${encodeURIComponent(`Limpieza antigua completada: ${cleaned.join(", ") || "sin registros encontrados"}.`)}`);
+}
+
+async function cleanupOrphanProfilesFormAction(studyId: string, formData: FormData) {
+  "use server";
+
+  const confirmation = String(formData.get("confirmation") ?? "").trim();
+  if (confirmation !== "ELIMINAR PERFILES HUERFANOS") {
+    redirect(`/admin/studies/${studyId}/qa?qaError=${encodeURIComponent("Escribe ELIMINAR PERFILES HUERFANOS para confirmar la limpieza.")}`);
+  }
+
+  const result = await cleanupOrphanParticipantProfilesAction({ studyId });
+  revalidatePath(`/admin/studies/${studyId}/qa`);
+  if (!result.ok) {
+    redirect(`/admin/studies/${studyId}/qa?qaError=${encodeURIComponent(result.message)}`);
+  }
+  redirect(`/admin/studies/${studyId}/qa?qaMessage=${encodeURIComponent(`Perfiles huerfanos eliminados: ${result.data.deleted.length}. Conservados: ${result.data.preserved.length}.`)}`);
 }
 
 function normalizeLegacyFolioSelection(value: string | string[] | undefined): string[] {

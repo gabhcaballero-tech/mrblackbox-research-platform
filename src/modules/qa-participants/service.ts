@@ -45,6 +45,7 @@ export function createEmptyQaCleanupReport(input: {
     deleted: {},
     hutParticipantId: input.hutParticipantId,
     notes: [],
+    participantProfile: null,
     studyParticipantId: input.studyParticipantId
   };
 }

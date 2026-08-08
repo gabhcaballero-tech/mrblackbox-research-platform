@@ -12,12 +12,15 @@ export async function GET(request: NextRequest) {
 }
 
 async function processNavigoRemindersRequest(request: NextRequest) {
-  const secret = process.env.NAVIGO_REMINDER_CRON_SECRET ?? process.env.CRON_SECRET;
+  const secrets = [
+    process.env.NAVIGO_REMINDER_CRON_SECRET,
+    process.env.CRON_SECRET
+  ].filter((value): value is string => Boolean(value));
 
-  if (secret) {
+  if (secrets.length > 0) {
     const authorization = request.headers.get("authorization");
 
-    if (authorization !== `Bearer ${secret}`) {
+    if (!secrets.some((secret) => authorization === `Bearer ${secret}`)) {
       return NextResponse.json({ message: "Unauthorized", ok: false }, { status: 401 });
     }
   } else if (process.env.NODE_ENV === "production") {

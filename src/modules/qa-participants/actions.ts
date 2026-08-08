@@ -3,6 +3,7 @@
 import { requireCapability } from "@/shared/auth/session";
 import { createQaParticipantsRepository } from "./repository";
 import type {
+  CleanupOrphanParticipantProfilesReport,
   LegacyQaCleanupPreview,
   LegacyQaCleanupReport,
   QaParticipantActionResult,
@@ -76,6 +77,17 @@ export async function cleanupLegacyQaParticipantAction(input: {
   return createQaParticipantsRepository().cleanupLegacyQaParticipant({
     cleanedByUserId: actor.id,
     folios: input.folios,
+    studyId: input.studyId
+  });
+}
+
+export async function cleanupOrphanParticipantProfilesAction(input: {
+  studyId: string;
+}): Promise<QaParticipantActionResult<CleanupOrphanParticipantProfilesReport>> {
+  const actor = await requireCapability("admin:access");
+
+  return createQaParticipantsRepository().cleanupOrphanParticipantProfiles({
+    cleanedByUserId: actor.id,
     studyId: input.studyId
   });
 }

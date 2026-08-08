@@ -1,6 +1,7 @@
 export {
   createQaParticipantsRepository,
   type CleanupLegacyQaParticipantsInput,
+  type CleanupOrphanParticipantProfilesInput,
   type CleanupQaParticipantRunInput,
   type CreateEmptyQaParticipantRunInput,
   type CreateQaParticipantScenarioInput,
@@ -19,6 +20,8 @@ export type {
   LegacyQaCleanupPreview,
   LegacyQaCleanupReport,
   LegacyQaCleanupFolioPreview,
+  CleanupOrphanParticipantProfilesReport,
+  OrphanParticipantProfilePreview,
   QaParticipantActionResult,
   QaParticipantCleanupReport,
   QaParticipantExecutionMode,

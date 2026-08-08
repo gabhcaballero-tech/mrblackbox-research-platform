@@ -8,7 +8,61 @@ export type QaParticipantCleanupReport = {
   deleted: Record<string, number>;
   hutParticipantId: string | null;
   notes: string[];
+  participantProfile: QaParticipantProfileCleanup | null;
   studyParticipantId: string | null;
+};
+
+export type QaParticipantProfileCleanupAction =
+  | "DELETE_AFTER_CLEANUP"
+  | "DELETED_ORPHAN"
+  | "NOT_FOUND"
+  | "NOT_LINKED"
+  | "PRESERVE_HAS_PARTICIPATIONS";
+
+export type QaParticipantProfileCleanup = {
+  action: QaParticipantProfileCleanupAction;
+  email: string | null;
+  id: string | null;
+  name: string | null;
+  phone: string | null;
+  remainingParticipations: number | null;
+  status: string | null;
+};
+
+export type OrphanParticipantProfileRelationCounts = Record<string, number>;
+
+export type OrphanParticipantProfilePreviewItem = {
+  createdAt: Date;
+  email: string | null;
+  id: string;
+  name: string;
+  phone: string | null;
+  reason: string;
+  relationCounts: OrphanParticipantProfileRelationCounts;
+  status: string;
+  updatedAt: Date;
+};
+
+export type OrphanParticipantProfileConservedItem = OrphanParticipantProfilePreviewItem & {
+  conservationReason: string;
+};
+
+export type OrphanParticipantProfilePreview = {
+  candidateCount: number;
+  candidates: OrphanParticipantProfilePreviewItem[];
+  conserved: OrphanParticipantProfileConservedItem[];
+  evaluatedAt: string;
+  evaluatedCount: number;
+  limit: number;
+};
+
+export type CleanupOrphanParticipantProfilesReport = {
+  cleanedAt: string;
+  cleanedByUserId: string;
+  deleted: OrphanParticipantProfilePreviewItem[];
+  deletionCounts: Record<string, number>;
+  preserved: OrphanParticipantProfileConservedItem[];
+  preview: OrphanParticipantProfilePreview;
 };
 
 export type LegacyQaCleanupAuthorizedFolio = "NAV-104" | "NAV-106" | "NAV-110" | "NAV-115" | "NAV-117";
@@ -18,6 +72,7 @@ export type LegacyQaCleanupFolioPreview = {
   found: boolean;
   hutParticipantId: string | null;
   participantName: string | null;
+  participantProfile: QaParticipantProfileCleanup | null;
   relationCounts: Record<string, number>;
   studyParticipantId: string | null;
 };

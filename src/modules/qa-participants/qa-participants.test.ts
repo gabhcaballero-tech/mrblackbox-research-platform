@@ -132,6 +132,11 @@ describe("qa participants repository", () => {
       whatsAppMessagesHut: 1,
       whatsAppMessagesNavigo: 1
     });
+    expect(preview.folios[0]?.participantProfile).toMatchObject({
+      action: "DELETE_AFTER_CLEANUP",
+      id: "profile-study-participant-nav-104",
+      remainingParticipations: 1
+    });
     expect(prisma.calls).toContainEqual(
       expect.objectContaining({
         modelName: "oneuiWhatsAppMessage",
@@ -240,6 +245,11 @@ describe("qa participants repository", () => {
     expect(result.ok).toBe(true);
     expect(result.ok ? result.data.folios[0]?.cleanupReport : null).toMatchObject({
       hutParticipantId: "hut-nav-106",
+      participantProfile: {
+        action: "DELETED_ORPHAN",
+        id: "profile-study-participant-nav-106",
+        remainingParticipations: 0
+      },
       studyParticipantId: "study-participant-nav-106"
     });
     expect(prisma.calls).toContainEqual(
@@ -254,6 +264,16 @@ describe("qa participants repository", () => {
         modelName: "hutParticipant",
         operation: "deleteMany",
         where: { id: "hut-nav-106" }
+      })
+    );
+    expect(prisma.calls).toContainEqual(
+      expect.objectContaining({
+        modelName: "participantProfile",
+        operation: "deleteMany",
+        where: {
+          id: "profile-study-participant-nav-106",
+          participations: { none: {} }
+        }
       })
     );
     expect(prisma.calls).toContainEqual(
@@ -304,6 +324,128 @@ describe("qa participants repository", () => {
       })
     );
     expect(prisma.runs.some((run: FakeQaRun) => run.status === "CLEANED" && run.cleanupReportJson)).toBe(true);
+  });
+
+  it("preserva ParticipantProfile si conserva participaciones no QA despues de la limpieza", async () => {
+    const prisma = createQaPrisma();
+    prisma.seedRun({
+      studyParticipantId: "study-participant-qa"
+    });
+    prisma.setProfileParticipationCount("profile-qa", 2);
+    const repository = createQaParticipantsRepository(prisma as never);
+
+    const result = await repository.cleanupRun({
+      cleanedByUserId: "user-admin",
+      runId: "qa-run-1"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.cleanupReportJson : null).toMatchObject({
+      participantProfile: {
+        action: "PRESERVE_HAS_PARTICIPATIONS",
+        id: "profile-qa",
+        remainingParticipations: 1
+      }
+    });
+    expect(prisma.calls).not.toContainEqual(
+      expect.objectContaining({
+        modelName: "participantProfile",
+        operation: "deleteMany",
+        where: {
+          id: "profile-qa",
+          participations: { none: {} }
+        }
+      })
+    );
+  });
+
+  it("previsualiza ParticipantProfile huerfanos sin relaciones historicas", async () => {
+    const prisma = createQaPrisma();
+    prisma.seedOrphanProfile({
+      email: "orphan@example.test",
+      id: "profile-orphan",
+      name: "Perfil huerfano",
+      phone: "+525551112222"
+    });
+    const repository = createQaParticipantsRepository(prisma as never);
+
+    const preview = await repository.previewOrphanParticipantProfiles();
+
+    expect(preview.candidateCount).toBe(1);
+    expect(preview.candidates).toEqual([
+      expect.objectContaining({
+        email: "orphan@example.test",
+        id: "profile-orphan",
+        phone: "+525551112222"
+      })
+    ]);
+    expect(preview.candidates[0]?.relationCounts).toMatchObject({
+      hutParticipants: 0,
+      oneuiWhatsAppConversations: 0,
+      qaParticipantRuns: 0,
+      studyParticipants: 0
+    });
+  });
+
+  it("elimina ParticipantProfile huerfanos con revalidacion y guarda reporte", async () => {
+    const prisma = createQaPrisma();
+    prisma.seedOrphanProfile({
+      email: "delete-me@example.test",
+      id: "profile-orphan-delete",
+      name: "Perfil para borrar",
+      phone: "+525559998888"
+    });
+    const repository = createQaParticipantsRepository(prisma as never);
+
+    const result = await repository.cleanupOrphanParticipantProfiles({
+      cleanedByUserId: "user-admin",
+      studyId: "study-qa"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.deleted : null).toEqual([
+      expect.objectContaining({ id: "profile-orphan-delete" })
+    ]);
+    expect(result.ok ? result.data.deletionCounts : null).toMatchObject({
+      participantProfile: 1
+    });
+    expect(prisma.calls).toContainEqual(
+      expect.objectContaining({
+        modelName: "participantProfile",
+        operation: "deleteMany",
+        where: {
+          id: "profile-orphan-delete",
+          participations: { none: {} }
+        }
+      })
+    );
+    expect(prisma.runs.some((run: FakeQaRun) =>
+      run.status === "CLEANED" &&
+      (run.reportJson as { source?: string } | null)?.source === "ORPHAN_PARTICIPANT_PROFILE_CLEANUP"
+    )).toBe(true);
+  });
+
+  it("conserva ParticipantProfile sin StudyParticipant si tiene relacion HUT o WhatsApp por telefono", async () => {
+    const prisma = createQaPrisma();
+    prisma.seedOrphanProfile({
+      email: "preserve@example.test",
+      id: "profile-orphan-preserve",
+      name: "Perfil con relacion",
+      phone: "+525554443333"
+    });
+    prisma.seedExternalHutParticipant({ email: null, phone: "+525554443333" });
+    prisma.seedWhatsAppConversation({ phoneNumber: "525554443333" });
+    const repository = createQaParticipantsRepository(prisma as never);
+
+    const preview = await repository.previewOrphanParticipantProfiles();
+
+    expect(preview.candidateCount).toBe(0);
+    expect(preview.conserved).toEqual([
+      expect.objectContaining({
+        conservationReason: expect.stringContaining("hutParticipants=1"),
+        id: "profile-orphan-preserve"
+      })
+    ]);
   });
 
   it("crea escenario CLT_ONLY listo para reclamar CTL sin crear link Navigo", async () => {
@@ -496,6 +638,10 @@ function createQaPrisma() {
   const legacyConfirmations: FakeLegacyConfirmation[] = [];
   const legacyHutParticipants: FakeLegacyHutParticipant[] = [];
   const legacyRotationPlans: FakeLegacyRotationPlan[] = [];
+  const studyParticipantProfiles = new Map<string, string>();
+  const participantProfiles = new Map<string, FakeParticipantProfile>();
+  const externalHutParticipants: Array<{ email: string | null; phone: string | null }> = [];
+  const whatsappConversations: Array<{ phoneNumber: string | null }> = [];
   const now = new Date("2026-08-08T12:00:00.000Z");
   let idSequence = 1;
 
@@ -529,19 +675,33 @@ function createQaPrisma() {
     runs: FakeQaRun[];
     seedLegacyParticipant: (input: FakeLegacyParticipantInput) => void;
     seedLegacyRotationPlan: (input: FakeLegacyRotationPlanInput) => void;
+    seedExternalHutParticipant: (input: { email: string | null; phone: string | null }) => void;
+    seedOrphanProfile: (input: { email: string | null; id: string; name: string; phone: string | null }) => void;
     seedRun: (input: Partial<FakeQaRun>) => FakeQaRun;
+    seedWhatsAppConversation: (input: { phoneNumber: string | null }) => void;
+    setProfileParticipationCount: (profileId: string, count: number) => void;
     [key: string]: unknown;
   };
 
   const prisma: FakeQaPrisma = {
     calls,
     runs,
+    setProfileParticipationCount(profileId: string, count: number) {
+      const existing = participantProfiles.get(profileId) ?? createFakeParticipantProfile(profileId, "Participante QA");
+      participantProfiles.set(profileId, {
+        ...existing,
+        participationCount: count
+      });
+    },
     seedLegacyParticipant(input: FakeLegacyParticipantInput) {
+      const profileId = input.profileId ?? `profile-${input.studyParticipantId}`;
+      studyParticipantProfiles.set(input.studyParticipantId, profileId);
+      participantProfiles.set(profileId, createFakeParticipantProfile(profileId, input.name, input.profileParticipationCount ?? 1));
       legacyConfirmations.push({
         folio: input.folio,
         studyParticipant: {
           hutParticipant: input.hutParticipantId ? { id: input.hutParticipantId } : null,
-          participantProfile: { name: input.name }
+          participantProfile: toFakeParticipantProfileSelect(participantProfiles.get(profileId)!)
         },
         studyParticipantId: input.studyParticipantId
       });
@@ -580,6 +740,24 @@ function createQaPrisma() {
         rotationCode: input.rotationCode
       });
     },
+    seedExternalHutParticipant(input: { email: string | null; phone: string | null }) {
+      externalHutParticipants.push(input);
+    },
+    seedOrphanProfile(input: { email: string | null; id: string; name: string; phone: string | null }) {
+      participantProfiles.set(input.id, {
+        createdAt: now,
+        email: input.email,
+        id: input.id,
+        name: input.name,
+        participationCount: 0,
+        phone: input.phone,
+        status: "ACTIVE",
+        updatedAt: now
+      });
+    },
+    seedWhatsAppConversation(input: { phoneNumber: string | null }) {
+      whatsappConversations.push(input);
+    },
     seedRun(input: Partial<FakeQaRun>) {
       const run: FakeQaRun = {
         cleanupReportJson: null,
@@ -600,6 +778,12 @@ function createQaPrisma() {
         ...input
       };
       runs.push(run);
+      if (run.studyParticipantId) {
+        studyParticipantProfiles.set(run.studyParticipantId, "profile-qa");
+        if (!participantProfiles.has("profile-qa")) {
+          participantProfiles.set("profile-qa", createFakeParticipantProfile("profile-qa", "Participante QA"));
+        }
+      }
       return run;
     },
     $transaction: async <T>(callback: (tx: FakeQaPrisma) => Promise<T>) => callback(prisma),
@@ -634,6 +818,10 @@ function createQaPrisma() {
     hutParticipant: {
       ...createDelegate("hutParticipant"),
       ...deleteDelegate("hutParticipant"),
+      count: async (args: { where: { OR?: Array<Record<string, unknown>> } }) => {
+        calls.push({ modelName: "hutParticipant", operation: "count", where: args.where });
+        return externalHutParticipants.some((participant) => matchesProfileOrFilters(participant, args.where.OR ?? [])) ? 1 : 0;
+      },
       findMany: async (args: { where: { folio: { in: string[] }; studyId: string } }) =>
         legacyHutParticipants.filter((participant) => participant.folio && args.where.folio.in.includes(participant.folio))
     },
@@ -657,7 +845,26 @@ function createQaPrisma() {
     hutVisitProgress: deleteDelegate("hutVisitProgress"),
     hutVisualVerification: deleteDelegate("hutVisualVerification"),
     mediaEvidencePlaceholder: deleteDelegate("mediaEvidencePlaceholder"),
-    oneuiWhatsAppMessage: deleteDelegate("oneuiWhatsAppMessage"),
+    oneuiWhatsAppMessage: {
+      count: async (args: { where: { conversation?: { OR?: Array<Record<string, unknown>> } } }) => {
+        calls.push({ modelName: "oneuiWhatsAppMessage", operation: "count", where: args.where });
+        const filters = args.where.conversation?.OR;
+        if (filters) {
+          return whatsappConversations.some((conversation) => matchesProfileOrFilters(conversation, filters)) ? 1 : 0;
+        }
+        return 1;
+      },
+      deleteMany: async (args: { where: unknown }) => {
+        calls.push({ modelName: "oneuiWhatsAppMessage", operation: "deleteMany", where: args.where });
+        return { count: 1 };
+      }
+    },
+    oneuiWhatsAppConversation: {
+      count: async (args: { where: { OR?: Array<Record<string, unknown>> } }) => {
+        calls.push({ modelName: "oneuiWhatsAppConversation", operation: "count", where: args.where });
+        return whatsappConversations.some((conversation) => matchesProfileOrFilters(conversation, args.where.OR ?? [])) ? 1 : 0;
+      }
+    },
     participantAccessToken: {
       ...createDelegate("participantAccessToken"),
       ...deleteDelegate("participantAccessToken")
@@ -679,7 +886,38 @@ function createQaPrisma() {
     participantEvidence: deleteDelegate("participantEvidence"),
     participantProfile: {
       ...createDelegate("participantProfile"),
-      ...deleteDelegate("participantProfile")
+      count: async (args: { where: { participations?: { some?: { id: string } } } }) => {
+        calls.push({ modelName: "participantProfile", operation: "count", where: args.where });
+        const studyParticipantId = args.where.participations?.some?.id;
+        if (studyParticipantId) {
+          return studyParticipantProfiles.has(studyParticipantId) ? 1 : 0;
+        }
+        return 1;
+      },
+      deleteMany: async (args: { where: { id?: string } }) => {
+        calls.push({ modelName: "participantProfile", operation: "deleteMany", where: args.where });
+        const profileId = args.where.id;
+        if (!profileId) {
+          return { count: 0 };
+        }
+        const profile = participantProfiles.get(profileId);
+        if (!profile || profile.participationCount > 0) {
+          return { count: 0 };
+        }
+        participantProfiles.delete(profileId);
+        return { count: 1 };
+      },
+      findUnique: async (args: { where: { id: string } }) => {
+        const profile = participantProfiles.get(args.where.id);
+        return profile ? toFakeParticipantProfileSelect(profile) : null;
+      },
+      findMany: async (args: { where?: { participations?: { none?: Record<string, never> } } }) => {
+        const values = [...participantProfiles.values()];
+        if (args.where?.participations?.none) {
+          return values.filter((profile) => profile.participationCount === 0).map(toFakeParticipantProfileSelect);
+        }
+        return values.map(toFakeParticipantProfileSelect);
+      }
     },
     participantReferenceCode: {
       ...createDelegate("participantReferenceCode"),
@@ -694,6 +932,10 @@ function createQaPrisma() {
       ...deleteDelegate("participantScreeningReview")
     },
     qaParticipantRun: {
+      count: async (args: { where: unknown }) => {
+        calls.push({ modelName: "qaParticipantRun", operation: "count", where: args.where });
+        return 0;
+      },
       create: async (args: { data: Partial<FakeQaRun> }) => {
         return prisma.seedRun(args.data);
       },
@@ -778,8 +1020,31 @@ function createQaPrisma() {
     },
     studyParticipant: {
       ...createDelegate("studyParticipant"),
-      ...deleteDelegate("studyParticipant"),
-      findUnique: async () => ({ participantProfileId: "profile-qa" }),
+      count: async (args: { where: { id?: string } }) => {
+        calls.push({ modelName: "studyParticipant", operation: "count", where: args.where });
+        return args.where.id && studyParticipantProfiles.has(args.where.id) ? 1 : 0;
+      },
+      deleteMany: async (args: { where: { id?: string } }) => {
+        calls.push({ modelName: "studyParticipant", operation: "deleteMany", where: args.where });
+        const studyParticipantId = args.where.id;
+        if (studyParticipantId) {
+          const profileId = studyParticipantProfiles.get(studyParticipantId);
+          const profile = profileId ? participantProfiles.get(profileId) : null;
+          if (profile) {
+            profile.participationCount = Math.max(0, profile.participationCount - 1);
+          }
+          studyParticipantProfiles.delete(studyParticipantId);
+        }
+        return { count: 1 };
+      },
+      findUnique: async (args: { where: { id: string } }) => {
+        const profileId = studyParticipantProfiles.get(args.where.id) ?? "profile-qa";
+        const profile = participantProfiles.get(profileId) ?? createFakeParticipantProfile(profileId, "Participante QA");
+        return {
+          participantProfile: toFakeParticipantProfileSelect(profile),
+          participantProfileId: profileId
+        };
+      },
       update: async (args: { data: Record<string, unknown>; where: unknown }) => {
         calls.push({ data: args.data, modelName: "studyParticipant", operation: "update", where: args.where });
         return { ...args.data, id: "studyParticipant-updated" };
@@ -801,6 +1066,8 @@ type FakeLegacyParticipantInput = {
   folio: string;
   hutParticipantId: string | null;
   name: string;
+  profileId?: string;
+  profileParticipationCount?: number;
   studyParticipantId: string;
 };
 
@@ -808,9 +1075,31 @@ type FakeLegacyConfirmation = {
   folio: string;
   studyParticipant: {
     hutParticipant: { id: string } | null;
-    participantProfile: { name: string };
+    participantProfile: FakeParticipantProfileSelect;
   };
   studyParticipantId: string;
+};
+
+type FakeParticipantProfile = {
+  createdAt: Date;
+  email: string | null;
+  id: string;
+  name: string;
+  participationCount: number;
+  phone: string | null;
+  status: string;
+  updatedAt: Date;
+};
+
+type FakeParticipantProfileSelect = {
+  _count: { participations: number };
+  createdAt: Date;
+  email: string | null;
+  id: string;
+  name: string;
+  phone: string | null;
+  status: string;
+  updatedAt: Date;
 };
 
 type FakeLegacyHutParticipant = {
@@ -864,4 +1153,49 @@ function selectFakeRecord(record: Record<string, unknown>, select?: Record<strin
     return record;
   }
   return Object.fromEntries(Object.entries(select).filter(([, enabled]) => enabled).map(([key]) => [key, record[key]]));
+}
+
+function createFakeParticipantProfile(id: string, name: string, participationCount = 1): FakeParticipantProfile {
+  return {
+    createdAt: new Date("2026-08-08T12:00:00.000Z"),
+    email: `${id}@example.test`,
+    id,
+    name,
+    participationCount,
+    phone: "5550000000",
+    status: "ACTIVE",
+    updatedAt: new Date("2026-08-08T12:00:00.000Z")
+  };
+}
+
+function toFakeParticipantProfileSelect(profile: FakeParticipantProfile): FakeParticipantProfileSelect {
+  return {
+    _count: { participations: profile.participationCount },
+    createdAt: profile.createdAt,
+    email: profile.email,
+    id: profile.id,
+    name: profile.name,
+    phone: profile.phone,
+    status: profile.status,
+    updatedAt: profile.updatedAt
+  };
+}
+
+function matchesProfileOrFilters(record: { email?: string | null; phone?: string | null; phoneNumber?: string | null }, filters: Array<Record<string, unknown>>): boolean {
+  return filters.some((filter) => {
+    const emailFilter = filter.email as { equals?: string; mode?: string } | undefined;
+    if (emailFilter?.equals && record.email?.toLowerCase() === emailFilter.equals.toLowerCase()) {
+      return true;
+    }
+    const phoneValue = record.phone ?? record.phoneNumber ?? "";
+    const normalized = phoneValue.replace(/\D/g, "");
+    const phoneFilter = (filter.phone ?? filter.phoneNumber) as { contains?: string; in?: string[] } | undefined;
+    if (!phoneFilter) {
+      return false;
+    }
+    if (phoneFilter.in?.some((value) => value.replace(/\D/g, "") === normalized || value === phoneValue)) {
+      return true;
+    }
+    return Boolean(phoneFilter.contains && normalized.includes(phoneFilter.contains.replace(/\D/g, "")));
+  });
 }
