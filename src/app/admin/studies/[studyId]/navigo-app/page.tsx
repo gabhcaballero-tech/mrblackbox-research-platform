@@ -261,7 +261,39 @@ function NavigoRotationCleanupPanel({
           <InfoTile label="Planes sospechosos" value={String(suspectPlans.filter((plan) => plan.isSuspectTestConfig).length)} />
           <InfoTile label="Planes eliminables" value={String(preview.deleteablePlanIds.length)} />
           <InfoTile label="Planes oficiales protegidos" value={String(preview.officialPlanIds.length)} />
+          <InfoTile label="QA heredados detectados" value={String(preview.legacyQaParticipants.length)} />
+          <InfoTile label="Participantes reales bloqueados" value={String(preview.blockedRealParticipants.length)} />
         </div>
+
+        {preview.legacyQaParticipants.length > 0 ? (
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
+            <p className="font-semibold">Participantes QA heredados que se limpiaran primero</p>
+            <ul className="mt-2 space-y-1">
+              {preview.legacyQaParticipants.map((participant) => (
+                <li key={`${participant.rotationCode}-${participant.studyParticipantId}`}>
+                  <span className="font-mono">{participant.folio}</span>{" "}
+                  {participant.name ? <span>{participant.name}</span> : null}{" "}
+                  <span className="font-mono text-emerald-700">({participant.rotationCode})</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {preview.blockedRealParticipants.length > 0 ? (
+          <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
+            <p className="font-semibold">Participantes reales bloqueando limpieza</p>
+            <ul className="mt-2 space-y-1">
+              {preview.blockedRealParticipants.map((participant) => (
+                <li key={`${participant.rotationCode}-${participant.studyParticipantId}`}>
+                  <span className="font-mono">{participant.folio ?? participant.studyParticipantId}</span>{" "}
+                  {participant.name ? <span>{participant.name}</span> : null}{" "}
+                  <span className="font-mono text-rose-700">({participant.rotationCode})</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         {suspectPlans.length === 0 ? (
           <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">

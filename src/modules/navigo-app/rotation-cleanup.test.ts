@@ -76,6 +76,7 @@ describe("Navigo test rotation cleanup", () => {
     expect(result.ok).toBe(true);
     expect(result.ok ? result.data.deleted : null).toMatchObject({
       participantArmAssignment: 1,
+      participantConfirmation: 1,
       participantRotationAssignment: 1,
       rotationPlan: 1,
       rotationPlanArm: 2
@@ -92,6 +93,58 @@ describe("Navigo test rotation cleanup", () => {
       plans: [expect.objectContaining({ rotationCode: "NAV-106__AAA__BBB" })],
       studyId: "study-1"
     });
+  });
+
+  it("shows inherited QA participants and real blocked participants in preview", async () => {
+    const prisma = createRotationCleanupPrisma();
+    prisma.seedPlan({
+      arms: ["AAA", "BBB"],
+      assignments: [
+        {
+          folio: "NAV-104",
+          id: "assignment-legacy-qa",
+          name: "Prueba NAV-104",
+          qa: false,
+          studyParticipantId: "participant-legacy"
+        }
+      ],
+      id: "plan-legacy",
+      rotationCode: "NAV-104__AAA__BBB"
+    });
+    prisma.seedPlan({
+      arms: ["CCC", "DDD"],
+      assignments: [
+        {
+          folio: "NAV-999",
+          id: "assignment-real",
+          name: "Participante real",
+          qa: false,
+          studyParticipantId: "participant-real"
+        }
+      ],
+      id: "plan-real",
+      rotationCode: "NAV-106__CCC__DDD"
+    });
+
+    const preview = await previewNavigoTestRotationCleanup("study-1", prisma as never);
+
+    expect(preview.deleteablePlanIds).toEqual(["plan-legacy"]);
+    expect(preview.legacyQaParticipants).toEqual([
+      {
+        folio: "NAV-104",
+        name: "Prueba NAV-104",
+        rotationCode: "NAV-104__AAA__BBB",
+        studyParticipantId: "participant-legacy"
+      }
+    ]);
+    expect(preview.blockedRealParticipants).toEqual([
+      {
+        folio: "NAV-999",
+        name: "Participante real",
+        rotationCode: "NAV-106__CCC__DDD",
+        studyParticipantId: "participant-real"
+      }
+    ]);
   });
 });
 
@@ -134,22 +187,44 @@ function createRotationCleanupPrisma() {
     $transaction: <T>(callback: (tx: FakeRotationCleanupPrisma) => Promise<T>) => Promise<T>;
     calls: typeof calls;
     createdReports: typeof createdReports;
+    applicationTimeEvent: ReturnType<typeof deleteDelegate>;
+    ctlAnswer: ReturnType<typeof deleteDelegate>;
+    ctlPhaseProgress: ReturnType<typeof deleteDelegate>;
+    ctlSession: ReturnType<typeof deleteDelegate>;
+    ctlTriangularRotationAssignment: ReturnType<typeof deleteDelegate>;
+    mediaEvidencePlaceholder: ReturnType<typeof deleteDelegate>;
+    oneuiWhatsAppMessage: ReturnType<typeof deleteDelegate>;
+    participantAccessToken: ReturnType<typeof deleteDelegate>;
     participantArmAssignment: ReturnType<typeof deleteDelegate>;
+    participantActivity: ReturnType<typeof deleteDelegate>;
+    participantActivityEvidence: ReturnType<typeof deleteDelegate>;
+    participantAttributeOrder: ReturnType<typeof deleteDelegate>;
+    participantConfirmation: ReturnType<typeof deleteDelegate>;
+    participantConsent: ReturnType<typeof deleteDelegate>;
+    participantEvidence: ReturnType<typeof deleteDelegate>;
+    participantReferenceCode: ReturnType<typeof deleteDelegate>;
     participantRotationAssignment: ReturnType<typeof deleteDelegate>;
+    participantScreeningReview: ReturnType<typeof deleteDelegate>;
     qaParticipantRun: {
       create: (args: { data: { cleanupReportJson: unknown } }) => Promise<{ cleanupReportJson: unknown }>;
     };
+    quotaEvaluation: ReturnType<typeof deleteDelegate>;
+    reminderLog: ReturnType<typeof deleteDelegate>;
+    researchResponse: ReturnType<typeof deleteDelegate>;
     rotationPlan: {
       deleteMany: (args: { where: { id: { in: string[] } } }) => Promise<{ count: number }>;
       findMany: () => Promise<FakeRotationPlan[]>;
     };
     rotationPlanArm: ReturnType<typeof deleteDelegate>;
+    screeningAnswer: ReturnType<typeof deleteDelegate>;
+    screeningAttempt: ReturnType<typeof deleteDelegate>;
     seedPlan: (input: {
       arms: string[];
       assignments?: FakeAssignmentInput[];
       id: string;
       rotationCode: string;
     }) => void;
+    studyParticipant: ReturnType<typeof deleteDelegate>;
   };
 
   const prisma: FakeRotationCleanupPrisma = {
@@ -184,14 +259,37 @@ function createRotationCleanupPrisma() {
       });
     },
     $transaction: async <T>(callback: (tx: typeof prisma) => Promise<T>) => callback(prisma),
-    participantArmAssignment: deleteDelegate("participantArmAssignment", calls, () => 1),
-    participantRotationAssignment: deleteDelegate("participantRotationAssignment", calls, () => 1),
+    applicationTimeEvent: deleteDelegate("applicationTimeEvent", calls, () => 0),
+    ctlAnswer: deleteDelegate("ctlAnswer", calls, () => 0),
+    ctlPhaseProgress: deleteDelegate("ctlPhaseProgress", calls, () => 0),
+    ctlSession: deleteDelegate("ctlSession", calls, () => 0),
+    ctlTriangularRotationAssignment: deleteDelegate("ctlTriangularRotationAssignment", calls, () => 0),
+    mediaEvidencePlaceholder: deleteDelegate("mediaEvidencePlaceholder", calls, () => 0),
+    oneuiWhatsAppMessage: deleteDelegate("oneuiWhatsAppMessage", calls, () => 0),
+    participantAccessToken: deleteDelegate("participantAccessToken", calls, () => 1),
+    participantArmAssignment: deleteDelegate("participantArmAssignment", calls, (where) =>
+      "studyParticipantId" in (where as Record<string, unknown>) ? 1 : 0
+    ),
+    participantActivity: deleteDelegate("participantActivity", calls, () => 1),
+    participantActivityEvidence: deleteDelegate("participantActivityEvidence", calls, () => 0),
+    participantAttributeOrder: deleteDelegate("participantAttributeOrder", calls, () => 0),
+    participantConfirmation: deleteDelegate("participantConfirmation", calls, () => 1),
+    participantConsent: deleteDelegate("participantConsent", calls, () => 0),
+    participantEvidence: deleteDelegate("participantEvidence", calls, () => 0),
+    participantReferenceCode: deleteDelegate("participantReferenceCode", calls, () => 3),
+    participantRotationAssignment: deleteDelegate("participantRotationAssignment", calls, (where) =>
+      "studyParticipantId" in (where as Record<string, unknown>) ? 1 : 0
+    ),
+    participantScreeningReview: deleteDelegate("participantScreeningReview", calls, () => 0),
     qaParticipantRun: {
       create: async (args: { data: { cleanupReportJson: unknown } }) => {
         createdReports.push(args.data);
         return args.data;
       }
     },
+    quotaEvaluation: deleteDelegate("quotaEvaluation", calls, () => 0),
+    reminderLog: deleteDelegate("reminderLog", calls, () => 0),
+    researchResponse: deleteDelegate("researchResponse", calls, () => 0),
     rotationPlan: {
       deleteMany: async (args: { where: { id: { in: string[] } } }) => {
         calls.push({ modelName: "rotationPlan", operation: "deleteMany", where: args.where });
@@ -203,7 +301,10 @@ function createRotationCleanupPrisma() {
       plans
         .filter((plan) => (where as { rotationPlanId: { in: string[] } }).rotationPlanId.in.includes(plan.id))
         .reduce((total, plan) => total + plan.arms.length, 0)
-    )
+    ),
+    screeningAnswer: deleteDelegate("screeningAnswer", calls, () => 1),
+    screeningAttempt: deleteDelegate("screeningAttempt", calls, () => 1),
+    studyParticipant: deleteDelegate("studyParticipant", calls, () => 1)
   };
 
   return prisma;

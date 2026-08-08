@@ -10,6 +10,15 @@ const AUTHORIZED_TEST_FOLIOS = [
   "NAV-014",
   "NAV-015",
   "NAV-030",
+  "NAV-104",
+  "NAV-106",
+  "NAV-110",
+  "NAV-115",
+  "NAV-117"
+] as const;
+
+const AUTHORIZED_LEGACY_QA_PARTICIPANT_FOLIOS = [
+  "NAV-104",
   "NAV-106",
   "NAV-110",
   "NAV-115",
@@ -34,11 +43,33 @@ type Delegate = {
 
 type RotationCleanupPrismaClient = {
   $transaction: <T>(callback: (tx: RotationCleanupPrismaClient) => Promise<T>) => Promise<T>;
+  applicationTimeEvent: Delegate;
+  ctlAnswer: Delegate;
+  ctlPhaseProgress: Delegate;
+  ctlSession: Delegate;
+  ctlTriangularRotationAssignment: Delegate;
+  mediaEvidencePlaceholder: Delegate;
+  oneuiWhatsAppMessage: Delegate;
+  participantAccessToken: Delegate;
   participantArmAssignment: Delegate;
+  participantActivity: Delegate;
+  participantActivityEvidence: Delegate;
+  participantAttributeOrder: Delegate;
+  participantConfirmation: Delegate;
+  participantConsent: Delegate;
+  participantEvidence: Delegate;
+  participantReferenceCode: Delegate;
   participantRotationAssignment: Delegate;
+  participantScreeningReview: Delegate;
   qaParticipantRun: Delegate;
+  quotaEvaluation: Delegate;
+  reminderLog: Delegate;
+  researchResponse: Delegate;
   rotationPlan: Delegate;
   rotationPlanArm: Delegate;
+  screeningAnswer: Delegate;
+  screeningAttempt: Delegate;
+  studyParticipant: Delegate;
 };
 
 type RotationPlanRecord = {
@@ -92,7 +123,19 @@ export type NavigoRotationCleanupPlanPreview = {
 
 export type NavigoRotationCleanupPreview = {
   authorizedTestFolios: string[];
+  blockedRealParticipants: Array<{
+    folio: string | null;
+    name: string | null;
+    rotationCode: string;
+    studyParticipantId: string;
+  }>;
   deleteablePlanIds: string[];
+  legacyQaParticipants: Array<{
+    folio: string;
+    name: string | null;
+    rotationCode: string;
+    studyParticipantId: string;
+  }>;
   officialPlanIds: string[];
   plans: NavigoRotationCleanupPlanPreview[];
   studyId: string;
@@ -103,6 +146,7 @@ export type NavigoRotationCleanupReport = {
   cleanedAt: string;
   cleanedByUserId: string;
   deleted: Record<string, number>;
+  legacyQaParticipants: NavigoRotationCleanupPreview["legacyQaParticipants"];
   plans: NavigoRotationCleanupPlanPreview[];
   studyId: string;
 };
@@ -129,7 +173,7 @@ export async function cleanupNavigoTestRotations(input: {
   return prisma.$transaction(async (tx) => {
     const plans = await loadRotationCleanupPlans(tx, input.studyId);
     const preview = buildRotationCleanupPreview(input.studyId, plans);
-    const blocked = preview.plans.filter((plan) => plan.isSuspectTestConfig && plan.blockReasons.length > 0);
+    const blocked = preview.plans.filter((plan) => plan.isSuspectTestConfig && hasRealParticipantBlockReason(plan));
 
     if (blocked.length > 0) {
       return {
@@ -145,30 +189,36 @@ export async function cleanupNavigoTestRotations(input: {
       };
     }
 
+    const legacyQaParticipantIds = Array.from(new Set(preview.legacyQaParticipants.map((participant) => participant.studyParticipantId)));
     const rotationAssignmentIds = plans
       .filter((plan) => preview.deleteablePlanIds.includes(plan.id))
       .flatMap((plan) => plan.assignments.map((assignment) => assignment.id));
     const deleted: Record<string, number> = {};
 
-    deleted.participantArmAssignment = (await tx.participantArmAssignment.deleteMany?.({
+    for (const studyParticipantId of legacyQaParticipantIds) {
+      await cleanupLegacyQaStudyParticipant(tx, deleted, studyParticipantId);
+    }
+
+    incrementDeleted(deleted, "participantArmAssignment", (await tx.participantArmAssignment.deleteMany?.({
       where: {
         participantRotationAssignmentId: { in: rotationAssignmentIds }
       }
-    }))?.count ?? 0;
-    deleted.participantRotationAssignment = (await tx.participantRotationAssignment.deleteMany?.({
+    }))?.count ?? 0);
+    incrementDeleted(deleted, "participantRotationAssignment", (await tx.participantRotationAssignment.deleteMany?.({
       where: { rotationPlanId: { in: preview.deleteablePlanIds } }
-    }))?.count ?? 0;
-    deleted.rotationPlanArm = (await tx.rotationPlanArm.deleteMany?.({
+    }))?.count ?? 0);
+    incrementDeleted(deleted, "rotationPlanArm", (await tx.rotationPlanArm.deleteMany?.({
       where: { rotationPlanId: { in: preview.deleteablePlanIds } }
-    }))?.count ?? 0;
-    deleted.rotationPlan = (await tx.rotationPlan.deleteMany?.({
+    }))?.count ?? 0);
+    incrementDeleted(deleted, "rotationPlan", (await tx.rotationPlan.deleteMany?.({
       where: { id: { in: preview.deleteablePlanIds } }
-    }))?.count ?? 0;
+    }))?.count ?? 0);
 
     const report: NavigoRotationCleanupReport = {
       cleanedAt: new Date().toISOString(),
       cleanedByUserId: input.actorUserId,
       deleted,
+      legacyQaParticipants: preview.legacyQaParticipants,
       plans: preview.plans.filter((plan) => preview.deleteablePlanIds.includes(plan.id)),
       studyId: input.studyId
     };
@@ -250,10 +300,36 @@ function buildRotationCleanupPreview(
   const deleteablePlanIds = previewPlans
     .filter((plan) => plan.isSuspectTestConfig && !plan.isOfficialRotation && plan.blockReasons.length === 0)
     .map((plan) => plan.id);
+  const legacyQaParticipants = previewPlans
+    .filter((plan) => deleteablePlanIds.includes(plan.id))
+    .flatMap((plan) =>
+      plan.assignedParticipants
+        .filter(isLegacyQaParticipant)
+        .map((participant) => ({
+          folio: participant.folio!,
+          name: participant.name,
+          rotationCode: plan.rotationCode,
+          studyParticipantId: participant.studyParticipantId
+        }))
+    );
+  const blockedRealParticipants = previewPlans
+    .filter((plan) => plan.isSuspectTestConfig && !plan.isOfficialRotation)
+    .flatMap((plan) =>
+      plan.assignedParticipants
+        .filter((participant) => !participant.isAuthorizedTestFolio && !participant.isQaRun)
+        .map((participant) => ({
+          folio: participant.folio,
+          name: participant.name,
+          rotationCode: plan.rotationCode,
+          studyParticipantId: participant.studyParticipantId
+        }))
+    );
 
   return {
     authorizedTestFolios: [...AUTHORIZED_TEST_FOLIOS],
+    blockedRealParticipants,
     deleteablePlanIds,
+    legacyQaParticipants,
     officialPlanIds: previewPlans.filter((plan) => plan.isOfficialRotation).map((plan) => plan.id),
     plans: previewPlans,
     studyId,
@@ -322,4 +398,66 @@ function isSuspectRotationPlan(plan: RotationPlanRecord): boolean {
 
 function normalizeRotationCleanupCode(value: unknown): string {
   return String(value ?? "").trim().toUpperCase();
+}
+
+async function cleanupLegacyQaStudyParticipant(
+  tx: RotationCleanupPrismaClient,
+  deleted: Record<string, number>,
+  studyParticipantId: string
+): Promise<void> {
+  await deleteMany(tx.ctlAnswer, deleted, "ctlAnswer", { ctlSession: { studyParticipantId } });
+  await deleteMany(tx.ctlPhaseProgress, deleted, "ctlPhaseProgress", { ctlSession: { studyParticipantId } });
+  await deleteMany(tx.ctlSession, deleted, "ctlSession", { studyParticipantId });
+  await deleteMany(tx.ctlTriangularRotationAssignment, deleted, "ctlTriangularRotationAssignment", { studyParticipantId });
+
+  await deleteMany(tx.researchResponse, deleted, "researchResponse", { participantActivity: { studyParticipantId } });
+  await deleteMany(tx.mediaEvidencePlaceholder, deleted, "mediaEvidencePlaceholder", { participantActivity: { studyParticipantId } });
+  await deleteMany(tx.participantActivityEvidence, deleted, "participantActivityEvidence", { studyParticipantId });
+  await deleteMany(tx.reminderLog, deleted, "reminderLog", { participantActivity: { studyParticipantId } });
+  await deleteMany(tx.participantActivity, deleted, "participantActivity", { studyParticipantId });
+  await deleteMany(tx.participantAttributeOrder, deleted, "participantAttributeOrder", { studyParticipantId });
+  await deleteMany(tx.applicationTimeEvent, deleted, "applicationTimeEvent", { studyParticipantId });
+  await deleteMany(tx.participantAccessToken, deleted, "participantAccessToken", { studyParticipantId });
+
+  await deleteMany(tx.participantArmAssignment, deleted, "participantArmAssignment", { studyParticipantId });
+  await deleteMany(tx.participantRotationAssignment, deleted, "participantRotationAssignment", { studyParticipantId });
+
+  await deleteMany(tx.participantConsent, deleted, "participantConsent", { studyParticipantId });
+  await deleteMany(tx.participantEvidence, deleted, "participantEvidence", { studyParticipantId });
+  await deleteMany(tx.participantScreeningReview, deleted, "participantScreeningReview", { studyParticipantId });
+  await deleteMany(tx.screeningAnswer, deleted, "screeningAnswer", { screeningAttempt: { studyParticipantId } });
+  await deleteMany(tx.participantReferenceCode, deleted, "participantReferenceCode", { confirmation: { studyParticipantId } });
+  await deleteMany(tx.participantConfirmation, deleted, "participantConfirmation", { studyParticipantId });
+  await deleteMany(tx.screeningAttempt, deleted, "screeningAttempt", { studyParticipantId });
+  await deleteMany(tx.quotaEvaluation, deleted, "quotaEvaluation", { studyParticipantId });
+  await deleteMany(tx.oneuiWhatsAppMessage, deleted, "oneuiWhatsAppMessage", {
+    linkedParticipantId: studyParticipantId,
+    sourceModule: "NAVIGO"
+  });
+  await deleteMany(tx.studyParticipant, deleted, "studyParticipant", { id: studyParticipantId });
+}
+
+async function deleteMany(
+  delegate: Delegate,
+  deleted: Record<string, number>,
+  modelName: string,
+  where: unknown
+): Promise<void> {
+  const count = (await delegate.deleteMany?.({ where }))?.count ?? 0;
+  incrementDeleted(deleted, modelName, count);
+}
+
+function incrementDeleted(deleted: Record<string, number>, modelName: string, count: number): void {
+  deleted[modelName] = (deleted[modelName] ?? 0) + count;
+}
+
+function isLegacyQaParticipant(participant: NavigoRotationCleanupPlanPreview["assignedParticipants"][number]): boolean {
+  return Boolean(
+    participant.folio &&
+      AUTHORIZED_LEGACY_QA_PARTICIPANT_FOLIOS.includes(participant.folio as typeof AUTHORIZED_LEGACY_QA_PARTICIPANT_FOLIOS[number])
+  );
+}
+
+function hasRealParticipantBlockReason(plan: NavigoRotationCleanupPlanPreview): boolean {
+  return plan.blockReasons.some((reason) => reason.includes("participantes reales"));
 }
