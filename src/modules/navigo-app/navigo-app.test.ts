@@ -56,7 +56,7 @@ import {
   classifyNavigoFaceSimilarity,
   normalizeNavigoFaceVerificationForStorage
 } from "./face-verification-contract";
-import { parseNavigoRotationWorkbook } from "./rotation-workbook";
+import { parseNavigoRotationWorkbook, type NavigoRotationWorkbookRowInput } from "./rotation-workbook";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -2124,6 +2124,64 @@ describe("navigo app MVP rules", () => {
     ]);
     expect(state.hutParticipants[0]?.blocks).toHaveLength(0);
     expect(state.hutParticipants[0]?.callEvaluations).toHaveLength(0);
+  });
+
+  it("applies 100+ official workbook rows in multiple transactions", async () => {
+    vi.stubEnv("HUT_PHASE_CODE_SECRET", "hut-phase-secret-for-tests");
+    const state = createNavigoRotationImportState();
+    for (let folioNumber = 2; folioNumber <= 105; folioNumber += 1) {
+      seedRotationWorkbookParticipant(state, `NAV-${String(folioNumber).padStart(3, "0")}`);
+    }
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const rows = state.participants.map((participant, index) =>
+      createRotationWorkbookRow(participant.participantConfirmation.folio, index)
+    );
+
+    const applied = await repository.applyRotationWorkbookImport({
+      actorUserId: "admin-1",
+      filename: "ROTACIONES NAVIGO.xlsx",
+      hutRows: [],
+      rows,
+      studyId: state.study.id
+    });
+
+    expect(applied.ok).toBe(true);
+    expect(state.rotationAssignments).toHaveLength(105);
+    expect(state.ctlTriangularRotationAssignments).toHaveLength(105);
+    expect(state.transactionCount).toBeGreaterThanOrEqual(5);
+  });
+
+  it("reports the exact folio when a workbook batch has one failing participant", async () => {
+    vi.stubEnv("HUT_PHASE_CODE_SECRET", "hut-phase-secret-for-tests");
+    const state = createNavigoRotationImportState({
+      failArmAssignmentForParticipantId: "study-participant-26"
+    });
+    for (let folioNumber = 2; folioNumber <= 30; folioNumber += 1) {
+      seedRotationWorkbookParticipant(state, `NAV-${String(folioNumber).padStart(3, "0")}`);
+    }
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const rows = state.participants.map((participant, index) =>
+      createRotationWorkbookRow(participant.participantConfirmation.folio, index)
+    );
+
+    const applied = await repository.applyRotationWorkbookImport({
+      actorUserId: "admin-1",
+      filename: "ROTACIONES NAVIGO.xlsx",
+      hutRows: [],
+      rows,
+      studyId: state.study.id
+    });
+
+    expect(applied.ok).toBe(false);
+    expect(applied.ok ? [] : applied.data?.applyErrors).toMatchObject([
+      {
+        folio: "NAV-026",
+        scope: "CLT",
+        step: "participant-arm-left"
+      }
+    ]);
+    expect(state.rotationAssignments.some((assignment) => assignment.studyParticipantId === "study-participant-25")).toBe(true);
+    expect(state.rotationAssignments.some((assignment) => assignment.studyParticipantId === "study-participant-27")).toBe(true);
   });
 
   it("synchronizes HUT rows from workbook without requiring the legacy screening flag", async () => {
@@ -4865,11 +4923,64 @@ function createFakeWhatsAppMessage(input: {
   };
 }
 
+function seedRotationWorkbookParticipant(
+  state: ReturnType<typeof createNavigoRotationImportState>,
+  folio: string
+) {
+  const sequence = state.participants.length + 1;
+  const participant = {
+    ...state.participant,
+    ctlTriangularRotationAssignment: null,
+    id: `study-participant-${sequence}`,
+    participantConfirmation: {
+      ...state.participant.participantConfirmation,
+      folio,
+      id: `confirmation-${sequence}`,
+      referenceCodes: [
+        { code: `CODE-${sequence}-1`, slot: 1 },
+        { code: `CODE-${sequence}-2`, slot: 2 },
+        { code: `CODE-${sequence}-3`, slot: 3 }
+      ],
+      screeningAttempt: {
+        ...state.participant.participantConfirmation.screeningAttempt,
+        id: `attempt-${sequence}`
+      }
+    },
+    participantProfile: {
+      ...state.participant.participantProfile,
+      id: `profile-${sequence}`,
+      name: `Participante ${sequence}`
+    },
+    rotationAssignment: null
+  };
+  state.participants.push(participant);
+
+  return participant;
+}
+
+function createRotationWorkbookRow(folio: string, index: number): NavigoRotationWorkbookRowInput {
+  return {
+    folio,
+    primeraFragancia: index % 2 === 0 ? "247" : "583",
+    segundaFragancia: index % 2 === 0 ? "583" : "247",
+    triangular1Pr1: `PR1-${index}`,
+    triangular1Pr2: `PR2-${index}`,
+    triangular1Pr3: `PR3-${index}`,
+    triangular1Verify: `PR2-${index}`,
+    triangular2Pr1: `PR4-${index}`,
+    triangular2Pr2: `PR5-${index}`,
+    triangular2Pr3: `PR6-${index}`,
+    triangular2Verify: `PR5-${index}`
+  };
+}
+
 function createNavigoRotationImportState({
   failProductUpsert = false,
+  failArmAssignmentForParticipantId = null,
   hutAccessAnswer = NAVIGO_HUT_ACCESS_YES_VALUE,
   participantFolio = "NAV-001"
 }: {
+  failArmAssignmentForParticipantId?: string | null;
   failProductUpsert?: boolean;
   hutAccessAnswer?: string;
   participantFolio?: string;
@@ -4939,6 +5050,7 @@ function createNavigoRotationImportState({
     study,
     visualVerificationMode: null
   };
+  const participants = [participant];
   const arms: Array<{ code: string; id: string; label: string; sortOrder: number; studyId: string }> = [];
   const products: Array<{
     displayLabel: string;
@@ -5027,15 +5139,19 @@ function createNavigoRotationImportState({
     status: string;
   }> = [];
 
-  function syncParticipantRotation() {
-    const assignment = rotationAssignments.find((candidate) => candidate.studyParticipantId === participant.id) ?? null;
+  function syncParticipantRotation(studyParticipantId = participant.id) {
+    const targetParticipant = participants.find((candidate) => candidate.id === studyParticipantId);
+    if (!targetParticipant) {
+      return;
+    }
+    const assignment = rotationAssignments.find((candidate) => candidate.studyParticipantId === targetParticipant.id) ?? null;
 
     if (!assignment) {
-      participant.rotationAssignment = null;
+      targetParticipant.rotationAssignment = null;
       return;
     }
 
-    participant.rotationAssignment = {
+    targetParticipant.rotationAssignment = {
       arms: armAssignments
         .filter((armAssignment) => armAssignment.participantRotationAssignmentId === assignment.id)
         .sort((left, right) => left.applicationOrder - right.applicationOrder)
@@ -5062,9 +5178,13 @@ function createNavigoRotationImportState({
     };
   }
 
-  function syncCtlTriangularRotation() {
-    participant.ctlTriangularRotationAssignment =
-      ctlTriangularRotationAssignments.find((assignment) => assignment.studyParticipantId === participant.id) ?? null;
+  function syncCtlTriangularRotation(studyParticipantId = participant.id) {
+    const targetParticipant = participants.find((candidate) => candidate.id === studyParticipantId);
+    if (!targetParticipant) {
+      return;
+    }
+    targetParticipant.ctlTriangularRotationAssignment =
+      ctlTriangularRotationAssignments.find((assignment) => assignment.studyParticipantId === targetParticipant.id) ?? null;
   }
 
   const tx = {
@@ -5080,13 +5200,13 @@ function createNavigoRotationImportState({
 
         if (target) {
           Object.assign(target, args.update);
-          syncCtlTriangularRotation();
+          syncCtlTriangularRotation(args.where.studyParticipantId);
           return target;
         }
 
         const record = { ...args.create, id: `ctl-triangular-${ctlTriangularRotationAssignments.length + 1}` };
         ctlTriangularRotationAssignments.push(record);
-        syncCtlTriangularRotation();
+        syncCtlTriangularRotation(args.where.studyParticipantId);
         return record;
       }
     },
@@ -5195,6 +5315,10 @@ function createNavigoRotationImportState({
         update: Partial<(typeof armAssignments)[number]>;
         where: { studyParticipantId_studyArmId: { studyArmId: string; studyParticipantId: string } };
       }) {
+        if (args.where.studyParticipantId_studyArmId.studyParticipantId === failArmAssignmentForParticipantId) {
+          throw { code: "P2028", message: "A query cannot be executed on an expired transaction." };
+        }
+
         const target = armAssignments.find(
           (assignment) =>
             assignment.studyArmId === args.where.studyParticipantId_studyArmId.studyArmId &&
@@ -5203,30 +5327,32 @@ function createNavigoRotationImportState({
 
         if (target) {
           Object.assign(target, args.update);
-          syncParticipantRotation();
+          syncParticipantRotation(args.where.studyParticipantId_studyArmId.studyParticipantId);
           return target;
         }
 
         const record = { ...args.create, id: `arm-assignment-${armAssignments.length + 1}` };
         armAssignments.push(record);
-        syncParticipantRotation();
+        syncParticipantRotation(args.where.studyParticipantId_studyArmId.studyParticipantId);
         return record;
       }
     },
     participantConfirmation: {
       async findMany(args: { where: { folio: { in: string[] }; studyId: string } }) {
-        if (args.where.studyId !== study.id || !args.where.folio.in.includes(participant.participantConfirmation.folio)) {
+        if (args.where.studyId !== study.id) {
           return [];
         }
 
-        syncParticipantRotation();
-        syncCtlTriangularRotation();
-        return [
-          {
-            folio: participant.participantConfirmation.folio,
-            studyParticipant: participant
-          }
-        ];
+        return participants
+          .filter((candidate) => args.where.folio.in.includes(candidate.participantConfirmation.folio))
+          .map((candidate) => {
+            syncParticipantRotation(candidate.id);
+            syncCtlTriangularRotation(candidate.id);
+            return {
+              folio: candidate.participantConfirmation.folio,
+              studyParticipant: candidate
+            };
+          });
       }
     },
     participantRotationAssignment: {
@@ -5248,13 +5374,13 @@ function createNavigoRotationImportState({
 
         if (target) {
           Object.assign(target, args.update);
-          syncParticipantRotation();
+          syncParticipantRotation(args.where.studyParticipantId);
           return { id: target.id };
         }
 
         const record = { ...args.create, id: `rotation-assignment-${rotationAssignments.length + 1}` };
         rotationAssignments.push(record);
-        syncParticipantRotation();
+        syncParticipantRotation(args.where.studyParticipantId);
         return { id: record.id };
       }
     },
@@ -5388,9 +5514,11 @@ function createNavigoRotationImportState({
     }
   };
 
+  let transactionCount = 0;
   const prisma = {
     ...tx,
     async $transaction<T>(callback: (transaction: typeof tx) => Promise<T>) {
+      transactionCount += 1;
       return callback(tx);
     }
   };
@@ -5403,12 +5531,16 @@ function createNavigoRotationImportState({
     hutParticipants,
     hutRegistrationSlots,
     participant,
+    participants,
     prisma,
     products,
     rotationAssignments,
     rotationPlanArms,
     rotationPlans,
-    study
+    study,
+    get transactionCount() {
+      return transactionCount;
+    }
   };
 }
 

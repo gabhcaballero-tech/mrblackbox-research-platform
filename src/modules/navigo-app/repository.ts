@@ -1918,83 +1918,71 @@ export function createNavigoAppRepository(
       const prisma = await getPrisma();
 
       try {
-        return await prisma.$transaction(async (tx) => {
-          const study = (await tx.study.findUnique?.({
-            select: studySelect,
-            where: { id: input.studyId }
-          })) as StudyRecord | null;
+        const study = (await prisma.study.findUnique?.({
+          select: studySelect,
+          where: { id: input.studyId }
+        })) as StudyRecord | null;
 
-          if (!study || study.code !== NAVIGO_STUDY_CODE) {
-            return { message: "Solo el estudio Navigo permite importar rotacion.", ok: false };
-          }
+        if (!study || study.code !== NAVIGO_STUDY_CODE) {
+          return { message: "Solo el estudio Navigo permite importar rotacion.", ok: false };
+        }
 
-          const preview = await buildRotationWorkbookImportPreview({
-            hutRows: input.hutRows ?? [],
-            prisma: tx,
-            rows: input.rows,
-            studyId: input.studyId
-          });
-
-          if (preview.summary.rowsWithError > 0) {
-            return {
-              data: preview,
-              message: "Corrige los errores de la previsualizacion antes de aplicar la importacion.",
-              ok: false
-            };
-          }
-
-          const confirmations = await findConfirmationsByFolio({
-            prisma: tx,
-            rows: input.rows,
-            studyId: input.studyId
-          });
-
-          for (const row of preview.rows) {
-            const confirmation = confirmations.get(row.folio);
-
-            if (!confirmation) {
-              throw new NavigoRotationApplyError({
-                folio: row.folio,
-                message: `No se encontro confirmacion para el folio ${row.folio}.`,
-                step: "confirmation"
-              });
-            }
-
-            await upsertParticipantRotationForCodes({
-              actorUserId: input.actorUserId,
-              leftFragranceCode: row.primeraFragancia,
-              participant: confirmation.studyParticipant,
-              prisma: tx,
-              rightFragranceCode: row.segundaFragancia
-            });
-
-            await upsertCtlTriangularRotationAssignment({
-              actorUserId: input.actorUserId,
-              filename: input.filename,
-              prisma: tx,
-              row,
-              studyParticipantId: confirmation.studyParticipant.id
-            });
-          }
-
-          await applyHutRotationWorkbookRows({
-            prisma: tx,
-            rows: input.hutRows ?? [],
-            studyId: input.studyId
-          });
-
-          const appliedPreview = await buildRotationWorkbookImportPreview({
-            hutRows: input.hutRows ?? [],
-            prisma: tx,
-            rows: input.rows,
-            studyId: input.studyId
-          });
-
-          return {
-            data: appliedPreview,
-            ok: true
-          };
+        const preview = await buildRotationWorkbookImportPreview({
+          hutRows: input.hutRows ?? [],
+          prisma,
+          rows: input.rows,
+          studyId: input.studyId
         });
+
+        if (preview.summary.rowsWithError > 0) {
+          return {
+            data: preview,
+            message: "Corrige los errores de la previsualizacion antes de aplicar la importacion.",
+            ok: false
+          };
+        }
+
+        const applyErrors: NonNullable<NavigoRotationWorkbookPreview["applyErrors"]> = [];
+
+        await applyRotationWorkbookRowsInBatches({
+          actorUserId: input.actorUserId,
+          filename: input.filename,
+          onError: (error) => applyErrors.push(error),
+          prisma,
+          rows: preview.rows,
+          studyId: input.studyId
+        });
+
+        await applyHutRotationWorkbookRowsInBatches({
+          onError: (error) => applyErrors.push(error),
+          prisma,
+          rows: preview.hutRows,
+          studyId: input.studyId
+        });
+
+        const appliedPreview = await buildRotationWorkbookImportPreview({
+          hutRows: input.hutRows ?? [],
+          prisma,
+          rows: input.rows,
+          studyId: input.studyId
+        });
+        const data = {
+          ...appliedPreview,
+          applyErrors
+        };
+
+        if (applyErrors.length > 0) {
+          return {
+            data,
+            message: "La previsualizacion era valida, pero algunas filas no pudieron aplicarse. Revisa los folios reportados.",
+            ok: false
+          };
+        }
+
+        return {
+          data,
+          ok: true
+        };
       } catch (error) {
         const failure = toNavigoRotationApplyFailure(error);
         logNavigoRotationApplyFailure({
@@ -4578,6 +4566,284 @@ async function buildRotationWorkbookImportPreview({
       validRows: rowsWithTriangularState.filter((row) => row.errors.length === 0).length
     }
   };
+}
+
+async function applyRotationWorkbookRowsInBatches({
+  actorUserId,
+  filename,
+  onError,
+  prisma,
+  rows,
+  studyId
+}: {
+  actorUserId: string;
+  filename: string;
+  onError: (error: NonNullable<NavigoRotationWorkbookPreview["applyErrors"]>[number]) => void;
+  prisma: NavigoPrismaClient;
+  rows: NavigoRotationWorkbookPreviewRow[];
+  studyId: string;
+}) {
+  const batches = chunkRows(rows, NAVIGO_ROTATION_WORKBOOK_IMPORT_BATCH_SIZE);
+
+  for (const [batchIndex, batch] of batches.entries()) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        await applyRotationWorkbookRowsInTransaction({
+          actorUserId,
+          filename,
+          prisma: tx,
+          rows: batch,
+          studyId
+        });
+      });
+      logNavigoRotationWorkbookBatchProgress({
+        batchIndex,
+        rowCount: batch.length,
+        scope: "CLT",
+        studyId
+      });
+    } catch (error) {
+      await applyRotationWorkbookRowsIndividually({
+        actorUserId,
+        error,
+        filename,
+        onError,
+        prisma,
+        rows: batch,
+        studyId
+      });
+    }
+  }
+}
+
+async function applyRotationWorkbookRowsIndividually({
+  actorUserId,
+  error,
+  filename,
+  onError,
+  prisma,
+  rows,
+  studyId
+}: {
+  actorUserId: string;
+  error: unknown;
+  filename: string;
+  onError: (error: NonNullable<NavigoRotationWorkbookPreview["applyErrors"]>[number]) => void;
+  prisma: NavigoPrismaClient;
+  rows: NavigoRotationWorkbookPreviewRow[];
+  studyId: string;
+}) {
+  if (rows.length <= 1) {
+    onError(toWorkbookApplyError(error, rows[0], "CLT"));
+    return;
+  }
+
+  logNavigoRotationApplyFailure({
+    error,
+    folio: rows[0]?.folio,
+    message: sanitizeRotationImportLogMessage(error),
+    step: "workbook-batch-clt",
+    studyId
+  });
+
+  for (const row of rows) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        await applyRotationWorkbookRowsInTransaction({
+          actorUserId,
+          filename,
+          prisma: tx,
+          rows: [row],
+          studyId
+        });
+      });
+    } catch (rowError) {
+      onError(toWorkbookApplyError(rowError, row, "CLT"));
+      logNavigoRotationApplyFailure({
+        error: rowError,
+        folio: row.folio,
+        message: sanitizeRotationImportLogMessage(rowError),
+        step: toNavigoRotationApplyFailure(rowError).step,
+        studyId
+      });
+    }
+  }
+}
+
+async function applyRotationWorkbookRowsInTransaction({
+  actorUserId,
+  filename,
+  prisma,
+  rows,
+  studyId
+}: {
+  actorUserId: string;
+  filename: string;
+  prisma: NavigoTransactionClient;
+  rows: NavigoRotationWorkbookPreviewRow[];
+  studyId: string;
+}) {
+  const confirmations = await findConfirmationsByFolio({
+    prisma,
+    rows,
+    studyId
+  });
+
+  for (const row of rows) {
+    const confirmation = confirmations.get(row.folio);
+
+    if (!confirmation) {
+      throw new NavigoRotationApplyError({
+        folio: row.folio,
+        message: `No se encontro confirmacion para el folio ${row.folio}.`,
+        step: "confirmation"
+      });
+    }
+
+    await upsertParticipantRotationForCodes({
+      actorUserId,
+      leftFragranceCode: row.primeraFragancia,
+      participant: confirmation.studyParticipant,
+      prisma,
+      rightFragranceCode: row.segundaFragancia
+    });
+
+    await upsertCtlTriangularRotationAssignment({
+      actorUserId,
+      filename,
+      prisma,
+      row,
+      studyParticipantId: confirmation.studyParticipant.id
+    });
+  }
+}
+
+async function applyHutRotationWorkbookRowsInBatches({
+  onError,
+  prisma,
+  rows,
+  studyId
+}: {
+  onError: (error: NonNullable<NavigoRotationWorkbookPreview["applyErrors"]>[number]) => void;
+  prisma: NavigoPrismaClient;
+  rows: NavigoHutRotationWorkbookPreviewRow[];
+  studyId: string;
+}) {
+  const batches = chunkRows(rows, NAVIGO_ROTATION_WORKBOOK_IMPORT_BATCH_SIZE);
+
+  for (const [batchIndex, batch] of batches.entries()) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        await applyHutRotationWorkbookRows({
+          prisma: tx,
+          rows: batch,
+          studyId
+        });
+      });
+      logNavigoRotationWorkbookBatchProgress({
+        batchIndex,
+        rowCount: batch.length,
+        scope: "HUT",
+        studyId
+      });
+    } catch (error) {
+      await applyHutRotationWorkbookRowsIndividually({
+        error,
+        onError,
+        prisma,
+        rows: batch,
+        studyId
+      });
+    }
+  }
+}
+
+async function applyHutRotationWorkbookRowsIndividually({
+  error,
+  onError,
+  prisma,
+  rows,
+  studyId
+}: {
+  error: unknown;
+  onError: (error: NonNullable<NavigoRotationWorkbookPreview["applyErrors"]>[number]) => void;
+  prisma: NavigoPrismaClient;
+  rows: NavigoHutRotationWorkbookPreviewRow[];
+  studyId: string;
+}) {
+  if (rows.length <= 1) {
+    onError(toWorkbookApplyError(error, rows[0], "HUT"));
+    return;
+  }
+
+  logNavigoRotationApplyFailure({
+    error,
+    folio: rows[0]?.folio,
+    message: sanitizeRotationImportLogMessage(error),
+    step: "workbook-batch-hut",
+    studyId
+  });
+
+  for (const row of rows) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        await applyHutRotationWorkbookRows({
+          prisma: tx,
+          rows: [row],
+          studyId
+        });
+      });
+    } catch (rowError) {
+      onError(toWorkbookApplyError(rowError, row, "HUT"));
+      logNavigoRotationApplyFailure({
+        error: rowError,
+        folio: row.folio,
+        message: sanitizeRotationImportLogMessage(rowError),
+        step: toNavigoRotationApplyFailure(rowError).step,
+        studyId
+      });
+    }
+  }
+}
+
+function toWorkbookApplyError(
+  error: unknown,
+  row: { folio: string; rowNumber: number } | undefined,
+  scope: "CLT" | "HUT"
+): NonNullable<NavigoRotationWorkbookPreview["applyErrors"]>[number] {
+  const failure = toNavigoRotationApplyFailure(error);
+
+  return {
+    folio: failure.folio ?? row?.folio ?? "",
+    message: failure.message,
+    rowNumber: row?.rowNumber ?? -1,
+    scope,
+    step: failure.step
+  };
+}
+
+function chunkRows<T>(rows: T[], batchSize: number): T[][] {
+  const batches: T[][] = [];
+
+  for (let index = 0; index < rows.length; index += batchSize) {
+    batches.push(rows.slice(index, index + batchSize));
+  }
+
+  return batches;
+}
+
+function logNavigoRotationWorkbookBatchProgress({
+  batchIndex,
+  rowCount,
+  scope,
+  studyId
+}: {
+  batchIndex: number;
+  rowCount: number;
+  scope: "CLT" | "HUT";
+  studyId: string;
+}) {
+  console.info(`navigo rotation workbook batch applied: scope=${scope} batch=${batchIndex + 1} rows=${rowCount} studyId=${studyId}`);
 }
 
 async function buildHutRotationWorkbookPreview({
