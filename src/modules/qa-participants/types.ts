@@ -11,7 +11,7 @@ export type QaParticipantCleanupReport = {
   studyParticipantId: string | null;
 };
 
-export type LegacyQaCleanupAuthorizedFolio = "NAV-106" | "NAV-110" | "NAV-115" | "NAV-117" | "PRUEBA";
+export type LegacyQaCleanupAuthorizedFolio = "NAV-104" | "NAV-106" | "NAV-110" | "NAV-115" | "NAV-117";
 
 export type LegacyQaCleanupFolioPreview = {
   folio: string;
@@ -26,6 +26,7 @@ export type LegacyQaCleanupPreview = {
   authorizedFolios: string[];
   blockedFolios: string[];
   folios: LegacyQaCleanupFolioPreview[];
+  rotationPlans: LegacyQaRotationPlanPreview[];
   studyId: string;
 };
 
@@ -37,7 +38,32 @@ export type LegacyQaCleanupReport = {
   folios: Array<LegacyQaCleanupFolioPreview & {
     cleanupReport: QaParticipantCleanupReport | null;
   }>;
+  rotationCleanup: {
+    blockedPlans: LegacyQaRotationPlanPreview[];
+    deleted: Record<string, number>;
+    plans: LegacyQaRotationPlanPreview[];
+  };
   studyId: string;
+};
+
+export type LegacyQaRotationPlanPreview = {
+  arms: Array<{
+    applicationOrder: number;
+    sampleKey: string;
+  }>;
+  assignedParticipants: Array<{
+    folio: string | null;
+    isAuthorizedLegacyQaFolio: boolean;
+    isQaRun: boolean;
+    name: string | null;
+    studyParticipantId: string;
+  }>;
+  blockReasons: string[];
+  id: string;
+  isOfficialRotation: boolean;
+  name: string;
+  rotationCode: string;
+  willDelete: boolean;
 };
 
 export type QaParticipantRunSummary = {

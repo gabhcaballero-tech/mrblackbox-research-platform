@@ -21,6 +21,7 @@ import type {
   QaParticipantExecutionMode,
   LegacyQaCleanupPreview,
   LegacyQaCleanupReport,
+  LegacyQaRotationPlanPreview,
   QaParticipantScenarioReport,
   QaParticipantRunStatus,
   QaParticipantRunSummary,
@@ -41,7 +42,8 @@ type Delegate = {
   upsert?: (args: unknown) => Promise<unknown>;
 };
 
-const LEGACY_QA_CLEANUP_AUTHORIZED_FOLIOS = ["NAV-106", "NAV-110", "NAV-115", "NAV-117", "PRUEBA"] as const;
+const LEGACY_QA_CLEANUP_AUTHORIZED_FOLIOS = ["NAV-104", "NAV-106", "NAV-110", "NAV-115", "NAV-117"] as const;
+const OFFICIAL_NAVIGO_ROTATION_PAIRS = new Set(["247->583", "583->247"]);
 
 type QaPrismaClient = {
   $transaction: <T>(callback: (tx: QaPrismaClient) => Promise<T>) => Promise<T>;
@@ -83,6 +85,7 @@ type QaPrismaClient = {
   reminderLog: Delegate;
   researchResponse: Delegate;
   rotationPlan: Delegate;
+  rotationPlanArm: Delegate;
   screeningAnswer: Delegate;
   screeningAttempt: Delegate;
   study: Delegate;
@@ -219,6 +222,11 @@ export function createQaParticipantsRepository(prismaClient?: QaPrismaClient): Q
           cleanedAt: new Date().toISOString(),
           cleanedByUserId: input.cleanedByUserId,
           folios: [],
+          rotationCleanup: {
+            blockedPlans: preview.rotationPlans.filter((plan) => plan.blockReasons.length > 0),
+            deleted: {},
+            plans: []
+          },
           studyId: input.studyId
         };
 
@@ -240,6 +248,8 @@ export function createQaParticipantsRepository(prismaClient?: QaPrismaClient): Q
           }
           report.folios.push({ ...item, cleanupReport });
         }
+
+        await cleanupLegacyQaRotationPlans(tx, report, preview.rotationPlans);
 
         await tx.qaParticipantRun.create?.({
           data: {
@@ -441,6 +451,29 @@ type LegacyQaHutParticipantRecord = {
   studyParticipantId: string | null;
 };
 
+type LegacyQaRotationPlanRecord = {
+  arms: Array<{
+    applicationOrder: number;
+    id: string;
+    studyProduct: {
+      internalCode: string;
+    };
+  }>;
+  assignments: Array<{
+    id: string;
+    studyParticipant: {
+      id: string;
+      participantConfirmation: { folio: string | null } | null;
+      participantProfile: { name: string | null } | null;
+      qaParticipantRun: { id: string } | null;
+    };
+    studyParticipantId: string;
+  }>;
+  id: string;
+  name: string;
+  rotationCode: string;
+};
+
 function normalizeLegacyQaCleanupFolios(folios: string[]): {
   authorizedFolios: string[];
   blockedFolios: string[];
@@ -492,6 +525,7 @@ async function buildLegacyQaCleanupPreview(
   })) as LegacyQaHutParticipantRecord[] | undefined) ?? [];
   const confirmationsByFolio = new Map(confirmations.map((confirmation) => [confirmation.folio, confirmation]));
   const hutByFolio = new Map(hutParticipants.filter((participant) => participant.folio).map((participant) => [participant.folio!, participant]));
+  const rotationPlans = await loadLegacyQaRotationPlans(prisma, input.studyId, normalized.authorizedFolios);
 
   return {
     authorizedFolios: normalized.authorizedFolios,
@@ -513,8 +547,112 @@ async function buildLegacyQaCleanupPreview(
         studyParticipantId
       };
     })),
+    rotationPlans: rotationPlans.map((plan) => toLegacyQaRotationPlanPreview(plan, normalized.authorizedFolios)),
     studyId: input.studyId
   };
+}
+
+async function loadLegacyQaRotationPlans(
+  prisma: QaPrismaClient,
+  studyId: string,
+  folios: string[]
+): Promise<LegacyQaRotationPlanRecord[]> {
+  if (folios.length === 0 || !prisma.rotationPlan.findMany) {
+    return [];
+  }
+  return ((await prisma.rotationPlan.findMany({
+    orderBy: { rotationCode: "asc" },
+    select: {
+      arms: {
+        orderBy: { applicationOrder: "asc" },
+        select: {
+          applicationOrder: true,
+          id: true,
+          studyProduct: {
+            select: { internalCode: true }
+          }
+        }
+      },
+      assignments: {
+        select: {
+          id: true,
+          studyParticipant: {
+            select: {
+              id: true,
+              participantConfirmation: {
+                select: { folio: true }
+              },
+              participantProfile: {
+                select: { name: true }
+              },
+              qaParticipantRun: {
+                select: { id: true }
+              }
+            }
+          },
+          studyParticipantId: true
+        }
+      },
+      id: true,
+      name: true,
+      rotationCode: true
+    },
+    where: {
+      assignments: {
+        some: {
+          studyParticipant: {
+            participantConfirmation: {
+              folio: { in: folios }
+            }
+          }
+        }
+      },
+      studyId
+    }
+  })) ?? []) as LegacyQaRotationPlanRecord[];
+}
+
+function toLegacyQaRotationPlanPreview(plan: LegacyQaRotationPlanRecord, authorizedFolios: string[]): LegacyQaRotationPlanPreview {
+  const orderedArms = [...plan.arms].sort((left, right) => left.applicationOrder - right.applicationOrder);
+  const pair = orderedArms.map((arm) => normalizeLegacyQaRotationCode(arm.studyProduct.internalCode)).join("->");
+  const isOfficialRotation = OFFICIAL_NAVIGO_ROTATION_PAIRS.has(pair);
+  const assignedParticipants = plan.assignments.map((assignment) => {
+    const folio = normalizeLegacyQaRotationCode(assignment.studyParticipant.participantConfirmation?.folio);
+    return {
+      folio: folio || null,
+      isAuthorizedLegacyQaFolio: Boolean(folio && authorizedFolios.includes(folio)),
+      isQaRun: Boolean(assignment.studyParticipant.qaParticipantRun),
+      name: assignment.studyParticipant.participantProfile?.name ?? null,
+      studyParticipantId: assignment.studyParticipantId
+    };
+  });
+  const realParticipants = assignedParticipants.filter((participant) => !participant.isAuthorizedLegacyQaFolio && !participant.isQaRun);
+  const blockReasons: string[] = [];
+
+  if (isOfficialRotation) {
+    blockReasons.push("Rotacion oficial conservada.");
+  }
+  if (realParticipants.length > 0) {
+    blockReasons.push(`Tiene participantes reales asociados: ${realParticipants.map((participant) => participant.folio ?? participant.studyParticipantId).join(", ")}.`);
+  }
+
+  return {
+    arms: orderedArms.map((arm) => ({
+      applicationOrder: arm.applicationOrder,
+      sampleKey: arm.studyProduct.internalCode
+    })),
+    assignedParticipants,
+    blockReasons,
+    id: plan.id,
+    isOfficialRotation,
+    name: plan.name,
+    rotationCode: plan.rotationCode,
+    willDelete: blockReasons.length === 0
+  };
+}
+
+function normalizeLegacyQaRotationCode(value: unknown): string {
+  return String(value ?? "").trim().toUpperCase();
 }
 
 async function countLegacyQaRelations(
@@ -849,10 +987,10 @@ async function createQaStudyParticipantFoundation(
 
   await tx.participantScreeningReview.create?.({
     data: {
-      evidenceReviewStatus: "APPROVED",
       internalNote: "Participante QA generado para pruebas internas.",
       reviewedAt: input.now,
       reviewedByUserId: input.actorUserId,
+      screeningAttemptId: screeningAttempt.id,
       status: "APPROVED",
       studyParticipantId: studyParticipant.id
     }
@@ -1436,6 +1574,37 @@ async function cleanupStudyParticipant(tx: QaPrismaClient, report: QaParticipant
   }
 }
 
+async function cleanupLegacyQaRotationPlans(
+  tx: QaPrismaClient,
+  report: LegacyQaCleanupReport,
+  rotationPlans: LegacyQaRotationPlanPreview[]
+): Promise<void> {
+  const deleteablePlans = rotationPlans.filter((plan) => plan.willDelete);
+  if (deleteablePlans.length === 0) {
+    return;
+  }
+  const planIds = deleteablePlans.map((plan) => plan.id);
+  const rotationDeleted: Record<string, number> = {};
+
+  await deleteManyForRecord(tx.participantArmAssignment, rotationDeleted, "participantArmAssignment", {
+    participantRotationAssignment: {
+      rotationPlanId: { in: planIds }
+    }
+  });
+  await deleteManyForRecord(tx.participantRotationAssignment, rotationDeleted, "participantRotationAssignment", {
+    rotationPlanId: { in: planIds }
+  });
+  await deleteManyForRecord(tx.rotationPlanArm, rotationDeleted, "rotationPlanArm", {
+    rotationPlanId: { in: planIds }
+  });
+  await deleteManyForRecord(tx.rotationPlan, rotationDeleted, "rotationPlan", {
+    id: { in: planIds }
+  });
+
+  report.rotationCleanup.deleted = rotationDeleted;
+  report.rotationCleanup.plans = deleteablePlans;
+}
+
 async function deleteMany(
   delegate: Delegate,
   report: QaParticipantCleanupReport,
@@ -1448,6 +1617,16 @@ async function deleteMany(
   }
   const result = await delegate.deleteMany({ where });
   recordQaCleanupCount(report, modelName, result);
+}
+
+async function deleteManyForRecord(
+  delegate: Delegate,
+  deleted: Record<string, number>,
+  modelName: string,
+  where: unknown
+): Promise<void> {
+  const result = await delegate.deleteMany?.({ where });
+  deleted[modelName] = (deleted[modelName] ?? 0) + (result?.count ?? 0);
 }
 
 async function updateMany(

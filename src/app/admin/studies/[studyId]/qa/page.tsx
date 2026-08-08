@@ -44,7 +44,7 @@ type QaAdminPageProps = {
   }>;
 };
 
-const LEGACY_QA_CLEANUP_FOLIOS = ["NAV-106", "NAV-110", "NAV-115", "NAV-117", "PRUEBA"] as const;
+const LEGACY_QA_CLEANUP_FOLIOS = ["NAV-104", "NAV-106", "NAV-110", "NAV-115", "NAV-117"] as const;
 
 export default async function QaAdminPage({ params, searchParams }: QaAdminPageProps) {
   const { studyId } = await params;
@@ -186,6 +186,38 @@ function LegacyQaCleanupSection({
               </article>
             ))}
           </div>
+          {preview.rotationPlans.length > 0 ? (
+            <div className="mt-5 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+              <h4 className="text-sm font-semibold text-zinc-950">Rotaciones de prueba asociadas</h4>
+              <div className="mt-3 grid gap-2">
+                {preview.rotationPlans.map((plan) => (
+                  <article className="rounded-md border border-zinc-200 bg-white p-3" key={plan.id}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="font-mono text-sm font-bold text-zinc-950">{plan.rotationCode}</p>
+                        <p className="text-xs text-zinc-600">
+                          {plan.arms.map((arm) => arm.sampleKey).join(" -> ") || "Sin brazos configurados"}
+                        </p>
+                      </div>
+                      <span className={plan.willDelete ? "rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-800" : "rounded-full bg-zinc-200 px-2 py-1 text-xs font-semibold text-zinc-700"}>
+                        {plan.willDelete ? "Se eliminara" : "Bloqueada/protegida"}
+                      </span>
+                    </div>
+                    {plan.blockReasons.length > 0 ? (
+                      <ul className="mt-2 list-disc pl-5 text-xs text-rose-800">
+                        {plan.blockReasons.map((reason) => (
+                          <li key={reason}>{reason}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    <p className="mt-2 text-xs text-zinc-600">
+                      Participantes: {plan.assignedParticipants.map((participant) => participant.folio ?? participant.studyParticipantId).join(", ") || "sin participantes"}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <form action={cleanupLegacyQaFoliosFormAction.bind(null, studyId)} className="mt-5 rounded-md border border-rose-200 bg-rose-50 p-3">
             <p className="text-sm font-semibold text-rose-900">Confirmar limpieza transaccional</p>
