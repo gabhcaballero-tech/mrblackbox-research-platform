@@ -4,8 +4,10 @@ import { getCtlDefinition } from "./definition";
 import {
   canAccessCtl,
   ctlStatusLabel,
+  buildPermanentCtlInterviewerCode,
   generateCtlInterviewerCode,
   hashCtlInterviewerCode,
+  INITIAL_PERMANENT_CTL_INTERVIEWERS,
   isPublicCtlInterviewerActor,
   normalizeCtlCode,
   type CtlActor,
@@ -104,6 +106,7 @@ export type CtlInterviewerCodeView = {
   id: string;
   label: string;
   lastUsedAt: Date | null;
+  operationalCode: string | null;
   sessionCount: number;
   status: CtlInterviewerCodeStatus;
   studyId: string;
@@ -227,6 +230,14 @@ export type CtlRepository = {
     label: string;
     studyId: string;
   }) => Promise<{ code: string; interviewerCode: CtlInterviewerCodeView; ok: true } | { message: string; ok: false }>;
+  ensurePermanentInterviewerCodes: (input: {
+    actor: CtlActor;
+    studyId: string;
+  }) => Promise<{
+    blocked: Array<{ code: string; label: string }>;
+    codes: Array<{ code: string; interviewerCode: CtlInterviewerCodeView; mode: "created" | "updated" }>;
+    ok: true;
+  } | { message: string; ok: false }>;
   deleteInterviewerCode: (input: {
     actor: CtlActor;
     ctlInterviewerCodeId: string;
@@ -482,6 +493,78 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
       return {
         code,
         interviewerCode: toInterviewerCodeView(created)!,
+        ok: true
+      };
+    },
+
+    async ensurePermanentInterviewerCodes(input) {
+      if (!isInternalAdmin(input.actor)) {
+        return { message: "No tienes permiso para generar codigos CTL.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+      const codes: Array<{ code: string; interviewerCode: CtlInterviewerCodeView; mode: "created" | "updated" }> = [];
+      const blocked: Array<{ code: string; label: string }> = [];
+
+      for (const label of INITIAL_PERMANENT_CTL_INTERVIEWERS) {
+        const code = buildPermanentCtlInterviewerCode(label);
+
+        if (!code) {
+          continue;
+        }
+
+        const codeHash = hashCtlInterviewerCode(code);
+        const existing = toInterviewerCodeView(await prisma.ctlInterviewerCode.findFirst?.({
+          select: ctlInterviewerCodeSelect,
+          where: { codeHash }
+        }));
+
+        if (existing && existing.studyId !== input.studyId) {
+          blocked.push({ code, label });
+          continue;
+        }
+
+        if (existing) {
+          const updated = await prisma.ctlInterviewerCode.update?.({
+            data: {
+              expiresAt: null,
+              label,
+              status: "ACTIVE"
+            },
+            select: ctlInterviewerCodeSelect,
+            where: { id: existing.id }
+          });
+
+          codes.push({
+            code,
+            interviewerCode: toInterviewerCodeView(updated)!,
+            mode: "updated"
+          });
+          continue;
+        }
+
+        const created = await prisma.ctlInterviewerCode.create?.({
+          data: {
+            codeHash,
+            createdByUserId: input.actor.id,
+            expiresAt: null,
+            label,
+            status: "ACTIVE",
+            studyId: input.studyId
+          },
+          select: ctlInterviewerCodeSelect
+        });
+
+        codes.push({
+          code,
+          interviewerCode: toInterviewerCodeView(created)!,
+          mode: "created"
+        });
+      }
+
+      return {
+        blocked,
+        codes,
         ok: true
       };
     },
@@ -1182,6 +1265,7 @@ const ctlInterviewerCodeSelect = {
   _count: {
     select: { ctlSessions: true }
   },
+  codeHash: true,
   createdAt: true,
   expiresAt: true,
   id: true,
@@ -1714,6 +1798,7 @@ function toInterviewerCodeView(value: unknown): CtlInterviewerCodeView | null {
 
   const record = value as {
     _count?: { ctlSessions?: number };
+    codeHash: string;
     createdAt: Date;
     expiresAt: Date | null;
     id: string;
@@ -1729,10 +1814,21 @@ function toInterviewerCodeView(value: unknown): CtlInterviewerCodeView | null {
     id: record.id,
     label: record.label,
     lastUsedAt: record.lastUsedAt,
+    operationalCode: getVerifiedPermanentOperationalCode(record),
     sessionCount: record._count?.ctlSessions ?? 0,
     status: record.status,
     studyId: record.studyId
   };
+}
+
+function getVerifiedPermanentOperationalCode(record: { codeHash: string; expiresAt: Date | null; label: string }): string | null {
+  const operationalCode = buildPermanentCtlInterviewerCode(record.label);
+
+  if (!operationalCode || record.expiresAt || hashCtlInterviewerCode(operationalCode) !== record.codeHash) {
+    return null;
+  }
+
+  return operationalCode;
 }
 
 export { ctlStatusLabel };

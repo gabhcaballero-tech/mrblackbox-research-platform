@@ -74,6 +74,33 @@ export function normalizeCtlCode(value: unknown): string {
     .toUpperCase();
 }
 
+export const INITIAL_PERMANENT_CTL_INTERVIEWERS = [
+  "Jesus",
+  "Mauricio",
+  "Laura",
+  "Esly",
+  "Isabel",
+  "Ulises",
+  "Liz",
+  "Susana",
+  "Alondra",
+  "Francisca",
+  "Lupita",
+  "Fatima"
+] as const;
+
+export function buildPermanentCtlInterviewerCode(label: string): string | null {
+  const prefix = label
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ñ/gi, "N")
+    .replace(/[^A-Za-z]/g, "")
+    .toUpperCase()
+    .slice(0, 3);
+
+  return prefix.length === 3 ? `${prefix}26` : null;
+}
+
 export function generateCtlInterviewerCode(): string {
   const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ2346789";
   const bytes = randomBytes(8);

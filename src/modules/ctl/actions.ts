@@ -71,6 +71,41 @@ export async function resetCtlInterviewerCodeAction(
   };
 }
 
+export async function createPermanentCtlInterviewerCodesAction(
+  studyId: string,
+  _previousState: CreateCtlInterviewerCodeActionState,
+  _formData: FormData
+): Promise<CreateCtlInterviewerCodeActionState> {
+  void _previousState;
+  void _formData;
+
+  const actor = await requireCapability("field:access");
+  const result = await createCtlRepository().ensurePermanentInterviewerCodes({
+    actor,
+    studyId
+  });
+
+  if (!result.ok) {
+    return {
+      message: result.message,
+      status: "error"
+    };
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/ctl`);
+
+  const createdCount = result.codes.filter((code) => code.mode === "created").length;
+  const updatedCount = result.codes.filter((code) => code.mode === "updated").length;
+  const blockedMessage = result.blocked.length > 0
+    ? ` ${result.blocked.length} codigo(s) ya existen en otro estudio y no se modificaron.`
+    : "";
+
+  return {
+    message: `Codigos permanentes listos: ${createdCount} creado(s), ${updatedCount} actualizado(s).${blockedMessage}`,
+    status: result.blocked.length > 0 ? "error" : "success"
+  };
+}
+
 export async function deleteCtlInterviewerCodeAction(studyId: string, ctlInterviewerCodeId: string) {
   const actor = await requireCapability("field:access");
   const result = await createCtlRepository().deleteInterviewerCode({

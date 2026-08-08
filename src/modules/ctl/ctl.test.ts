@@ -608,6 +608,52 @@ describe("ctl module", () => {
     expect(invalidByStudyId.ok).toBe(false);
   });
 
+  it("creates permanent personal CTL interviewer codes without expiration", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+
+    const created = await repository.ensurePermanentInterviewerCodes({
+      actor: admin,
+      studyId: state.study.id
+    });
+    const validJesus = await repository.validateInterviewerCode({
+      code: " jes26 ",
+      studyCode: state.study.code
+    });
+
+    expect(created.ok).toBe(true);
+    expect(created.ok ? created.blocked : []).toEqual([]);
+    expect(created.ok ? created.codes : []).toHaveLength(12);
+    expect(state.ctlInterviewerCodes.find((code) => code.label === "Jesus")?.expiresAt).toBeNull();
+    expect(state.ctlInterviewerCodes.find((code) => code.label === "Jesus")?.status).toBe("ACTIVE");
+    expect(state.ctlInterviewerCodes.find((code) => code.label === "Jesus")?.codeHash).not.toBe("JES26");
+    expect(validJesus.ok).toBe(true);
+    expect(validJesus.ok ? validJesus.interviewerCode.operationalCode : null).toBe("JES26");
+    expect(validJesus.ok ? validJesus.interviewerCode.expiresAt : undefined).toBeNull();
+  });
+
+  it("links a permanent personal CTL interviewer code to the claimed session", async () => {
+    const state = createCtlState();
+    const repository = createCtlRepository(state.prisma as never);
+    const created = await repository.ensurePermanentInterviewerCodes({
+      actor: admin,
+      studyId: state.study.id
+    });
+    const jesus = created.ok
+      ? created.codes.find((code) => code.interviewerCode.label === "Jesus")?.interviewerCode
+      : null;
+
+    const claim = await repository.claimFolioForInterviewerCode({
+      ctlInterviewerCodeId: jesus?.id ?? "",
+      folio: "NAV-001"
+    });
+
+    expect(claim.ok).toBe(true);
+    expect(state.sessions).toHaveLength(1);
+    expect(state.sessions[0]?.ctlInterviewerCodeId).toBe(jesus?.id);
+    expect(state.sessions[0]?.interviewerId).toBeNull();
+  });
+
   it("rejects disabled public CTL interviewer codes", async () => {
     const state = createCtlState();
     const repository = createCtlRepository(state.prisma as never);
@@ -1700,7 +1746,16 @@ function createCtlState() {
         const found = ctlInterviewerCodes.find((code) => code.id === args.where.id) ?? null;
         return found ? toInterviewerCodeRecord(found) : null;
       },
-      async update(args: { data: Partial<{ codeHash: string; lastUsedAt: Date | null; status: "ACTIVE" | "DISABLED" | "EXPIRED" }>; where: { id: string } }) {
+      async update(args: {
+        data: Partial<{
+          codeHash: string;
+          expiresAt: Date | null;
+          label: string;
+          lastUsedAt: Date | null;
+          status: "ACTIVE" | "DISABLED" | "EXPIRED";
+        }>;
+        where: { id: string };
+      }) {
         const code = ctlInterviewerCodes.find((candidate) => candidate.id === args.where.id);
         if (!code) throw new Error("interviewer code not found");
         Object.assign(code, args.data, { updatedAt: new Date() });

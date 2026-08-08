@@ -3,6 +3,7 @@
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
+  createPermanentCtlInterviewerCodesAction,
   createCtlInterviewerCodeAction,
   deleteCtlInterviewerCodeAction,
   resetCtlInterviewerCodeAction,
@@ -31,6 +32,10 @@ export function CtlInterviewerCodesSection({ codes, studyId }: CtlInterviewerCod
     resetCtlInterviewerCodeAction.bind(null, studyId),
     initialState
   );
+  const [permanentState, permanentAction, permanentPending] = useActionState(
+    createPermanentCtlInterviewerCodesAction.bind(null, studyId),
+    initialState
+  );
 
   useEffect(() => {
     if (state.status === "success") {
@@ -44,6 +49,12 @@ export function CtlInterviewerCodesSection({ codes, studyId }: CtlInterviewerCod
     }
   }, [router, resetState.status]);
 
+  useEffect(() => {
+    if (permanentState.status === "success") {
+      router.refresh();
+    }
+  }, [permanentState.status, router]);
+
   return (
     <section className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
       <div className="border-b border-zinc-200 px-4 py-3">
@@ -54,43 +65,69 @@ export function CtlInterviewerCodesSection({ codes, studyId }: CtlInterviewerCod
       </div>
 
       <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,360px)_1fr]">
-        <form action={formAction} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
-          <h3 className="font-semibold text-zinc-950">Crear codigo</h3>
-          <label className="mt-4 flex flex-col gap-1 text-sm font-medium text-zinc-700">
-            Nombre o etiqueta del encuestador
-            <input
-              className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-950"
-              name="label"
-              placeholder="Encuestador IKA 1"
-              required
-            />
-          </label>
-          <button
-            className="mt-4 inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
-            disabled={pending}
-            type="submit"
-          >
-            {pending ? "Generando..." : "Generar codigo"}
-          </button>
-
-          {state.message ? (
-            <p className={`mt-3 rounded-md border px-3 py-2 text-sm ${
-              state.status === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                : "border-rose-200 bg-rose-50 text-rose-800"
-            }`}>
-              {state.message}
+        <div className="space-y-4">
+          <form action={permanentAction} className="rounded-md border border-teal-200 bg-teal-50 p-4">
+            <h3 className="font-semibold text-teal-950">Codigos personales permanentes</h3>
+            <p className="mt-2 text-sm leading-6 text-teal-900">
+              Crea o reactiva la lista inicial de encuestadores con formato de campo: primeras tres letras del nombre + 26.
             </p>
-          ) : null}
-          <OneTimeCodeNotice state={state} />
-          <OneTimeCodeNotice state={resetState} />
-        </form>
+            <button
+              className="mt-4 inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+              disabled={permanentPending}
+              type="submit"
+            >
+              {permanentPending ? "Preparando..." : "Crear codigos permanentes"}
+            </button>
+            {permanentState.message ? (
+              <p className={`mt-3 rounded-md border px-3 py-2 text-sm ${
+                permanentState.status === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-rose-200 bg-rose-50 text-rose-800"
+              }`}>
+                {permanentState.message}
+              </p>
+            ) : null}
+          </form>
+
+          <form action={formAction} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
+            <h3 className="font-semibold text-zinc-950">Crear codigo temporal o de respaldo</h3>
+            <label className="mt-4 flex flex-col gap-1 text-sm font-medium text-zinc-700">
+              Nombre o etiqueta del encuestador
+              <input
+                className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-950"
+                name="label"
+                placeholder="Encuestador IKA 1"
+                required
+              />
+            </label>
+            <button
+              className="mt-4 inline-flex rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+              disabled={pending}
+              type="submit"
+            >
+              {pending ? "Generando..." : "Generar codigo de respaldo"}
+            </button>
+
+            {state.message ? (
+              <p className={`mt-3 rounded-md border px-3 py-2 text-sm ${
+                state.status === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-rose-200 bg-rose-50 text-rose-800"
+              }`}>
+                {state.message}
+              </p>
+            ) : null}
+            <OneTimeCodeNotice state={state} />
+            <OneTimeCodeNotice state={resetState} />
+          </form>
+        </div>
 
         <div className="overflow-x-auto rounded-md border border-zinc-200">
           <table className="min-w-full text-left text-sm">
             <thead className="border-b border-zinc-200 bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
               <tr>
                 <th className="px-4 py-3">Nombre</th>
+                <th className="px-4 py-3">Codigo operativo</th>
                 <th className="px-4 py-3">Estado</th>
                 <th className="px-4 py-3">Creacion</th>
                 <th className="px-4 py-3">Expiracion</th>
@@ -103,9 +140,10 @@ export function CtlInterviewerCodesSection({ codes, studyId }: CtlInterviewerCod
               {codes.length > 0 ? codes.map((code) => (
                 <tr key={code.id}>
                   <td className="px-4 py-3 font-semibold text-zinc-950">{code.label}</td>
+                  <td className="px-4 py-3 font-mono text-xs font-semibold text-zinc-900">{code.operationalCode ?? "-"}</td>
                   <td className="px-4 py-3 text-zinc-700">{interviewerCodeStatusLabel(code.status)}</td>
                   <td className="px-4 py-3 text-zinc-700">{formatDateTime(code.createdAt)}</td>
-                  <td className="px-4 py-3 text-zinc-700">{formatDateTime(code.expiresAt)}</td>
+                  <td className="px-4 py-3 text-zinc-700">{formatExpiration(code.expiresAt)}</td>
                   <td className="px-4 py-3 text-zinc-700">{formatDateTime(code.lastUsedAt)}</td>
                   <td className="px-4 py-3 text-zinc-700">{code.sessionCount}</td>
                   <td className="px-4 py-3">
@@ -143,7 +181,7 @@ export function CtlInterviewerCodesSection({ codes, studyId }: CtlInterviewerCod
                 </tr>
               )) : (
                 <tr>
-                  <td className="px-4 py-6 text-center text-zinc-500" colSpan={7}>
+                  <td className="px-4 py-6 text-center text-zinc-500" colSpan={8}>
                     Aun no hay codigos de encuestadores IKA para este estudio.
                   </td>
                 </tr>
@@ -194,4 +232,8 @@ function formatDateTime(value: Date | null): string {
     timeStyle: "short",
     timeZone: "America/Mexico_City"
   }).format(value);
+}
+
+function formatExpiration(value: Date | null): string {
+  return value ? formatDateTime(value) : "Sin expiracion";
 }
