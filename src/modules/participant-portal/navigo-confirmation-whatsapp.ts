@@ -1,4 +1,5 @@
 import { createOneuiWhatsAppRepository, sendNavigoConfirmationWhatsApp } from "@/modules/oneui-whatsapp";
+import { isQaStudyParticipant } from "@/modules/qa-participants/guards";
 
 export type NavigoConfirmationWhatsAppInput = {
   attemptId: string;
@@ -28,6 +29,14 @@ export async function sendNavigoConfirmationWhatsAppBestEffort({
       console.error(`${sourceLabel} navigo whatsapp skipped or failed`, {
         attemptId,
         code: "MISSING_CONFIRMATION",
+        step: "send_confirmation_template"
+      });
+      return;
+    }
+    if (await isQaStudyParticipant(studyParticipantId)) {
+      console.error(`${sourceLabel} navigo whatsapp skipped or failed`, {
+        attemptId,
+        code: "QA_PARTICIPANT",
         step: "send_confirmation_template"
       });
       return;

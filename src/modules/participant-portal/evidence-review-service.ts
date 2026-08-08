@@ -14,6 +14,7 @@ import type {
 } from "./evidence-review-repository";
 import { buildManualWhatsAppMessage, generateParticipantReferenceCode } from "./review";
 import { createOneuiWhatsAppRepository, sendNavigoConfirmationWhatsApp } from "@/modules/oneui-whatsapp";
+import { isQaStudyParticipant } from "@/modules/qa-participants/guards";
 import { whatsappAutomationStatusFromMessage, type WhatsAppAutomationStatus } from "@/modules/oneui-whatsapp/templates";
 import {
   isMexicoPhone,
@@ -996,6 +997,9 @@ async function sendNavigoConfirmationWhatsAppForAttempt({
     const attempt = loadedAttempt ?? (await repository.getAttemptReview(attemptId));
     if (!attempt) {
       return { message: "No encontramos el intento para enviar WhatsApp.", ok: false };
+    }
+    if (await isQaStudyParticipant(attempt.studyParticipantId)) {
+      return { message: "Los participantes QA no envian WhatsApp real.", ok: false };
     }
 
     const whatsappRepository = createOneuiWhatsAppRepository();

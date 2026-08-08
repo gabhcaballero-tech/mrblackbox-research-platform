@@ -676,6 +676,7 @@ type HutParticipantRecord = {
   origin?: "CLT_HUT" | "HUT_DIRECTO";
   phaseCodes?: HutPhaseCodeRecord[];
   protocolVersion?: "APPLICATION_PHOTO" | "LEGACY_VIDEO";
+  qaParticipantRun?: { id: string } | null;
   questionnaireAttempt?: HutQuestionnaireAttemptRecord | null;
   recruiter: string | null;
   startDate: Date | null;
@@ -934,6 +935,9 @@ const participantSelect = {
       usedAt: true,
       validatedAt: true
     }
+  },
+  qaParticipantRun: {
+    select: { id: true }
   },
   questionnaireAttempt: {
     select: {
@@ -1409,7 +1413,10 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       const participants = (await prisma.hutParticipant.findMany?.({
         orderBy: [{ createdAt: "asc" }],
         select: participantSelect,
-        where: { studyId: input.studyId }
+        where: {
+          qaParticipantRun: { is: null },
+          studyId: input.studyId
+        }
       })) as HutParticipantRecord[];
       const registrationSlots = (await prisma.hutRegistrationSlot.findMany?.({
         orderBy: [{ folio: "asc" }],
@@ -4107,6 +4114,9 @@ async function sendHutRegistrationWhatsAppForParticipant({
   }
   if (isLegacyVideoProtocol(participant) && !participant.referenceSelfie) {
     return { message: "Guarda la selfie de registro para habilitar el inicio del HUT.", ok: false };
+  }
+  if (participant.qaParticipantRun) {
+    return { message: "Los participantes QA no envian WhatsApp real.", ok: false };
   }
 
   try {

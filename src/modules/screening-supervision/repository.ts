@@ -417,7 +417,10 @@ export function createScreeningSupervisionRepository(
           }
         },
         where: {
-          studyParticipant: { studyId: input.studyId }
+          studyParticipant: {
+            qaParticipantRun: { is: null },
+            studyId: input.studyId
+          }
         }
       }) as Promise<SupervisionPerfumeExportRecord[]>;
     },
@@ -435,7 +438,7 @@ export function createScreeningSupervisionRepository(
 function buildAttemptWhere(studyId: string, filters: ScreeningAttemptFilters) {
   const startedAt: { gte?: Date; lte?: Date } = {};
   const codeStatus = supervisionStatusFromText(filters.code);
-  const andClauses: Record<string, unknown>[] = [{ studyParticipant: { studyId } }];
+  const andClauses: Record<string, unknown>[] = [{ studyParticipant: { qaParticipantRun: { is: null }, studyId } }];
 
   if (filters.dateFrom) {
     startedAt.gte = filters.dateFrom;

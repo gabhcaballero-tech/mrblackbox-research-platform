@@ -217,6 +217,7 @@ export type CtlRepository = {
   claimFolioForInterviewerCode: (input: {
     ctlInterviewerCodeId: string;
     folio: string;
+    includeQa?: boolean;
     now?: Date;
   }) => Promise<{ message: string; ok: false } | { ok: true; sessionId: string }>;
   createInterviewerCode: (input: {
@@ -243,14 +244,16 @@ export type CtlRepository = {
   }) => Promise<CtlPublicInterviewerActor | null>;
   listAvailableParticipantsForInterviewerCode: (input: {
     ctlInterviewerCodeId: string;
+    includeQa?: boolean;
     now?: Date;
   }) => Promise<{ ok: true; participants: CtlAvailableParticipantSummary[] } | { message: string; ok: false }>;
   listOpenSessionsForInterviewerCode: (input: {
     ctlInterviewerCodeId: string;
+    includeQa?: boolean;
     now?: Date;
     studyCode: string;
   }) => Promise<{ ok: true; sessions: CtlOpenInterviewerSessionSummary[] } | { message: string; ok: false }>;
-  listParticipants: (input: { actor: CtlActor; studyId: string }) => Promise<{
+  listParticipants: (input: { actor: CtlActor; includeQa?: boolean; studyId: string }) => Promise<{
     ok: true;
     participants: CtlParticipantSummary[];
     study: { code: string; id: string; name: string };
@@ -258,6 +261,7 @@ export type CtlRepository = {
   previewFolioForInterviewerCode: (input: {
     ctlInterviewerCodeId: string;
     folio: string;
+    includeQa?: boolean;
     now?: Date;
   }) => Promise<{ ok: true; participant: CtlParticipantSummary } | { message: string; ok: false }>;
   resetInterviewerCode: (input: {
@@ -278,6 +282,7 @@ export type CtlRepository = {
   startSession: (input: {
     actor: CtlActor;
     folio: string;
+    includeQa?: boolean;
     studyId: string;
   }) => Promise<{ message: string; ok: false } | { ok: true; sessionId: string }>;
   validateInterviewerCode: (input: {
@@ -368,7 +373,8 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
           select: confirmationSelect,
           where: {
             folio: normalizeCtlCode(input.folio),
-            studyId: interviewerCode.studyId
+            studyId: interviewerCode.studyId,
+            ...(input.includeQa ? {} : { studyParticipant: { qaParticipantRun: { is: null } } })
           }
         })) as ConfirmationRecord | null;
 
@@ -590,7 +596,10 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
       const confirmations = (await prisma.participantConfirmation.findMany?.({
         orderBy: { folioSequence: "asc" },
         select: confirmationSelect,
-        where: { studyId: interviewerCode.studyId }
+        where: {
+          studyId: interviewerCode.studyId,
+          ...(input.includeQa ? {} : { studyParticipant: { qaParticipantRun: { is: null } } })
+        }
       })) as ConfirmationRecord[];
       const sessions = (await prisma.ctlSession.findMany?.({
         select: {
@@ -651,6 +660,7 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
         },
         where: {
           ctlInterviewerCodeId: interviewerCode.id,
+          ...(input.includeQa ? {} : { studyParticipant: { qaParticipantRun: { is: null } } }),
           status: { in: ["PENDING", "IN_PROGRESS"] },
           studyId: interviewerCode.studyId
         }
@@ -693,7 +703,10 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
       const confirmations = (await prisma.participantConfirmation.findMany?.({
         orderBy: { folioSequence: "asc" },
         select: confirmationSelect,
-        where: { studyId: input.studyId }
+        where: {
+          studyId: input.studyId,
+          ...(input.includeQa ? {} : { studyParticipant: { qaParticipantRun: { is: null } } })
+        }
       })) as ConfirmationRecord[];
       const sessions = (await prisma.ctlSession.findMany?.({
         orderBy: { createdAt: "desc" },
@@ -704,7 +717,10 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
           status: true,
           studyParticipantId: true
         },
-        where: { studyId: input.studyId }
+        where: {
+          ...(input.includeQa ? {} : { studyParticipant: { qaParticipantRun: { is: null } } }),
+          studyId: input.studyId
+        }
       })) as Array<{
         ctlInterviewerCode: { label: string } | null;
         id: string;
@@ -744,7 +760,8 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
         select: confirmationSelect,
         where: {
           folio: normalizeCtlCode(input.folio),
-          studyId: interviewerCode.studyId
+          studyId: interviewerCode.studyId,
+          ...(input.includeQa ? {} : { studyParticipant: { qaParticipantRun: { is: null } } })
         }
       })) as ConfirmationRecord | null;
 
@@ -1047,7 +1064,8 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
         select: confirmationSelect,
         where: {
           folio: normalizeCtlCode(input.folio),
-          studyId: input.studyId
+          studyId: input.studyId,
+          ...(input.includeQa ? {} : { studyParticipant: { qaParticipantRun: { is: null } } })
         }
       })) as ConfirmationRecord | null;
 

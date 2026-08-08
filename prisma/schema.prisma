@@ -228,6 +228,24 @@ enum HutPhaseCodeStatus {
   REVOKED
 }
 
+enum QaParticipantScenario {
+  CLT_ONLY
+  CLT_NAVIGO
+  CLT_NAVIGO_HUT
+  HUT_DIRECTO
+}
+
+enum QaParticipantExecutionMode {
+  REALISTIC
+  FAST_FORWARD
+}
+
+enum QaParticipantRunStatus {
+  CREATED
+  CLEANED
+  FAILED
+}
+
 enum HutQuestionnaireAttemptStatus {
   PENDING
   IN_PROGRESS
@@ -487,6 +505,8 @@ model InternalUser {
   capturedHutReferenceSelfies         HutReferenceSelfie[]              @relation("HutReferenceSelfieCapturedBy")
   reviewedHutVisualVerifications      HutVisualVerification[]           @relation("HutVisualVerificationReviewedBy")
   hutVisualOverrides                  HutParticipant[]                  @relation("HutVisualOverrideBy")
+  createdQaParticipantRuns            QaParticipantRun[]                @relation("QaParticipantRunCreatedBy")
+  cleanedQaParticipantRuns            QaParticipantRun[]                @relation("QaParticipantRunCleanedBy")
 
   @@map("internal_users")
 }
@@ -521,6 +541,7 @@ model Study {
   exportJobs               ExportJob[]
   hutParticipants          HutParticipant[]
   hutRegistrationSlots     HutRegistrationSlot[]
+  qaParticipantRuns        QaParticipantRun[]
 
   @@index([status])
   @@index([createdByUserId])
@@ -687,6 +708,7 @@ model StudyParticipant {
   attributeOrders                  ParticipantAttributeOrder[]
   ctlSessions                      CtlSession[]
   hutParticipant                   HutParticipant?
+  qaParticipantRun                 QaParticipantRun?
 
   @@unique([participantProfileId, studyId])
   @@index([studyId, operationalStatus])
@@ -781,6 +803,7 @@ model HutParticipant {
   dailyChecks             HutDailyCheck[]
   callEvaluations         HutCallEvaluation[]
   visualVerifications     HutVisualVerification[]
+  qaParticipantRun        QaParticipantRun?
 
   @@unique([studyId, folio])
   @@index([studyId, status])
@@ -944,6 +967,37 @@ model HutParticipantPhaseCode {
   @@index([participantId, status])
   @@index([phase, status])
   @@map("hut_participant_phase_codes")
+}
+
+model QaParticipantRun {
+  id                 String                     @id @default(uuid()) @db.Uuid
+  studyId            String                     @db.Uuid
+  scenario           QaParticipantScenario
+  executionMode      QaParticipantExecutionMode
+  status             QaParticipantRunStatus     @default(CREATED)
+  studyParticipantId String?                    @unique @db.Uuid
+  hutParticipantId   String?                    @unique @db.Uuid
+  folio              String?
+  reportJson         Json?
+  cleanupReportJson  Json?
+  createdByUserId    String                     @db.Uuid
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+  cleanedAt          DateTime?
+  cleanedByUserId    String?                    @db.Uuid
+
+  study            Study             @relation(fields: [studyId], references: [id])
+  studyParticipant StudyParticipant? @relation(fields: [studyParticipantId], references: [id])
+  hutParticipant   HutParticipant?   @relation(fields: [hutParticipantId], references: [id])
+  createdBy        InternalUser      @relation("QaParticipantRunCreatedBy", fields: [createdByUserId], references: [id])
+  cleanedBy        InternalUser?     @relation("QaParticipantRunCleanedBy", fields: [cleanedByUserId], references: [id])
+
+  @@index([studyId, status, createdAt])
+  @@index([scenario])
+  @@index([executionMode])
+  @@index([createdByUserId])
+  @@index([cleanedByUserId])
+  @@map("qa_participant_runs")
 }
 
 model HutReferenceSelfie {

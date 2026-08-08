@@ -1642,6 +1642,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           participantConfirmation: {
             isNot: null
           },
+          qaParticipantRun: { is: null },
           studyId
         }
       })) as ParticipantRecord[];
@@ -2554,6 +2555,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           select: participantWithActivitiesSelect,
           where: {
             participantConfirmation: { isNot: null },
+            qaParticipantRun: { is: null },
             studyId: input.studyId
           }
         })) as ParticipantRecord[];
@@ -2615,6 +2617,7 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
         select: participantWithActivitiesSelect,
         where: {
           participantConfirmation: { isNot: null },
+          qaParticipantRun: { is: null },
           studyId: input.studyId
         }
       })) as ParticipantRecord[];
