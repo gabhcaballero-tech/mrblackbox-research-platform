@@ -900,6 +900,7 @@ const hutRegistrationSlotWorkbookSelect = {
   folio: true,
   id: true,
   participantId: true,
+  registeredAt: true,
   secondFragranceRightArm: true,
   status: true,
   studyId: true
@@ -1230,6 +1231,7 @@ type HutRegistrationSlotWorkbookRecord = {
   folio: string;
   id: string;
   participantId: string | null;
+  registeredAt: Date | null;
   secondFragranceRightArm: string;
   status: "AVAILABLE" | "CANCELLED" | "REGISTERED";
   studyId: string;
@@ -5632,6 +5634,9 @@ async function upsertHutParticipantFromWorkbookRow({
       protocolVersion: "APPLICATION_PHOTO"
     };
     if (studyParticipant) {
+      data.email = studyParticipant.participantProfile.email ?? null;
+      data.name = studyParticipant.participantProfile.name;
+      data.phone = studyParticipant.participantProfile.phone ?? null;
       data.studyParticipantId = existing.studyParticipantId ?? studyParticipant.id;
     }
 
@@ -5709,12 +5714,14 @@ async function upsertHutRegistrationSlotFromWorkbookRow({
     : null;
 
   if (existing) {
+    const nextStatus = existing.status === "CANCELLED" ? "CANCELLED" : "REGISTERED";
     await prisma.hutRegistrationSlot?.update?.({
       data: {
         firstFragranceLeftArm: row.hutEva1,
         participantId: existing.participantId ?? participantId,
+        registeredAt: nextStatus === "REGISTERED" ? existing.registeredAt ?? new Date() : existing.registeredAt,
         secondFragranceRightArm: row.hutEva2,
-        status: existing.status === "CANCELLED" ? "CANCELLED" : "REGISTERED"
+        status: nextStatus
       },
       where: { id: existing.id }
     });
@@ -5726,6 +5733,7 @@ async function upsertHutRegistrationSlotFromWorkbookRow({
       firstFragranceLeftArm: row.hutEva1,
       folio: row.folio,
       participantId,
+      registeredAt: new Date(),
       registrationToken: createHutRegistrationToken(),
       secondFragranceRightArm: row.hutEva2,
       status: "REGISTERED",

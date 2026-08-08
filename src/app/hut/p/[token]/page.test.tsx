@@ -102,7 +102,7 @@ describe("HutParticipantPage", () => {
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
     expect(screen.getByText("Codigo requerido")).toBeInTheDocument();
-    expect(screen.getByText("Colocacion")).toBeInTheDocument();
+    expect(screen.getAllByText("Colocacion").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole("button", { name: "Validar codigo" })).toBeInTheDocument();
     expect(screen.queryByText("Formulario HUT")).not.toBeInTheDocument();
   });
@@ -150,6 +150,57 @@ describe("HutParticipantPage", () => {
     expect(screen.queryByRole("button", { name: "Validar codigo" })).not.toBeInTheDocument();
     expect(screen.queryByText("Formulario HUT")).not.toBeInTheDocument();
     expect(screen.queryByText(/selfie/i)).not.toBeInTheDocument();
+  });
+
+  it("muestra nombre real, folio y rotacion HUT en protocolo nuevo", async () => {
+    getPortalViewMock.mockResolvedValue({
+      data: createPortalView({
+        applicationEvidence: [],
+        availableApplicationPhoto: {
+          phase: "COLOCACION",
+          productCode: "247"
+        },
+        availability: {
+          nextAvailableAt: null,
+          reason: "AVAILABLE_FOR_APPLICATION_PHOTO"
+        },
+        block1: null,
+        block2: null,
+        folio: "HUT-111",
+        name: "Martin Valerio Gonzalez",
+        protocolVersion: "APPLICATION_PHOTO",
+        rotation: {
+          firstFragranceLeftArm: "247",
+          secondFragranceRightArm: "583"
+        },
+        status: "NOT_STARTED"
+      }),
+      ok: true
+    });
+    getQuestionnaireStateByTokenMock.mockResolvedValue({
+      data: createQuestionnaireState({
+        answers: {
+          HUT_DG_FOLIO: "HUT-111",
+          HUT_DG_NOMBRE: "Martin Valerio Gonzalez",
+          HUT_PARTICIPO_CLT: "SI"
+        }
+      }),
+      ok: true
+    });
+    getApplicationPhotoDailyAvailabilityByTokenMock.mockResolvedValue({
+      data: createPhotoAvailability({ available: true }),
+      ok: true
+    });
+
+    render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
+
+    expect(screen.getByRole("heading", { name: "Martin Valerio Gonzalez" })).toBeInTheDocument();
+    expect(screen.getByText("HUT-111")).toBeInTheDocument();
+    expect(screen.getByText("EVA1")).toBeInTheDocument();
+    expect(screen.getAllByText("247").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("EVA2")).toBeInTheDocument();
+    expect(screen.getAllByText("583").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByRole("heading", { name: "HUT-111" })).not.toBeInTheDocument();
   });
 
   it("muestra pregunta pendiente de HUT_DIRECTO antes de la foto", async () => {
@@ -303,11 +354,16 @@ function createPortalView(overrides: Partial<PortalViewForTest> = {}): PortalVie
       videos: []
     },
     message: "Tu participacion HUT esta completa. Gracias por tu tiempo.",
+    folio: "HUT-001",
     name: "Participante HUT",
     origin: "HUT_DIRECTO",
     phaseGate: null,
     participantId: "participant-1",
     protocolVersion: "LEGACY_VIDEO",
+    rotation: {
+      firstFragranceLeftArm: "247",
+      secondFragranceRightArm: "583"
+    },
     status: "COMPLETED",
     studyName: "Estudio HUT",
     testMode: false,
@@ -342,6 +398,7 @@ type PortalViewForTest = {
     submittedVideosCount: number;
     videos: [];
   } | null;
+  folio: string | null;
   message: string;
   name: string;
   origin: "CLT_HUT" | "HUT_DIRECTO";
@@ -353,6 +410,10 @@ type PortalViewForTest = {
   } | null;
   participantId: string;
   protocolVersion: "APPLICATION_PHOTO" | "LEGACY_VIDEO";
+  rotation: {
+    firstFragranceLeftArm: string | null;
+    secondFragranceRightArm: string | null;
+  };
   status: string;
   studyName: string;
   testMode: boolean;

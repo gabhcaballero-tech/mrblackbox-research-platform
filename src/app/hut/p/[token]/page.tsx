@@ -66,6 +66,12 @@ export default async function HutParticipantPage({ params, searchParams }: HutPa
               {hutParticipantStatusLabel(view.status)}
             </StatusBadge>
           </div>
+          <div className="mt-5 grid gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm sm:grid-cols-2">
+            <ParticipantFact label="Folio HUT" value={view.folio ?? "No asignado"} />
+            <ParticipantFact label="Fase actual" value={currentHutPhaseLabel(view)} />
+            <ParticipantFact label="EVA1" value={view.rotation.firstFragranceLeftArm ?? "No asignada"} />
+            <ParticipantFact label="EVA2" value={view.rotation.secondFragranceRightArm ?? "No asignada"} />
+          </div>
           <ProgressSummary view={view} />
         </section>
 
@@ -346,6 +352,27 @@ function HutPhaseCodeForm({ token, view }: { token: string; view: HutPortalView 
       </form>
     </section>
   );
+}
+
+function ParticipantFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="font-semibold text-zinc-500">{label}</p>
+      <p className="mt-1 font-semibold text-zinc-950">{value}</p>
+    </div>
+  );
+}
+
+function currentHutPhaseLabel(view: HutPortalView): string {
+  if (view.phaseGate) {
+    return view.phaseGate.label;
+  }
+
+  if (view.availableApplicationPhoto) {
+    return phaseLabel(view.availableApplicationPhoto.phase);
+  }
+
+  return view.status === "COMPLETED" ? "Completado" : "Sin fase pendiente";
 }
 
 function CompletionMessage() {

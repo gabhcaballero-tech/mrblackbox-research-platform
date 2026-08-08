@@ -323,6 +323,7 @@ export type HutPortalView = {
   };
   block1: HutBlockSummary | null;
   block2: HutBlockSummary | null;
+  folio: string | null;
   message: string;
   name: string;
   phaseGate: {
@@ -338,6 +339,10 @@ export type HutPortalView = {
   studyName: string;
   testMode: boolean;
   token: string;
+  rotation: {
+    firstFragranceLeftArm: string | null;
+    secondFragranceRightArm: string | null;
+  };
 };
 
 export type HutRepository = {
@@ -683,6 +688,13 @@ type HutParticipantRecord = {
   status: HutParticipantStatus;
   study: HutStudySummary;
   studyId: string;
+  studyParticipant?: {
+    participantProfile: {
+      email: string | null;
+      name: string;
+      phone: string | null;
+    };
+  } | null;
   studyParticipantId?: string | null;
   testMode: boolean;
   token: string;
@@ -992,6 +1004,17 @@ const participantSelect = {
   status: true,
   study: { select: studySelect },
   studyId: true,
+  studyParticipant: {
+    select: {
+      participantProfile: {
+        select: {
+          email: true,
+          name: true,
+          phone: true
+        }
+      }
+    }
+  },
   studyParticipantId: true,
   testMode: true,
   token: true,
@@ -4214,13 +4237,15 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
       },
       block1: block1 ? toBasicBlockSummary(block1) : null,
       block2: block2 ? toBasicBlockSummary(block2) : null,
+      folio: participant.folio,
       message:
         "Gracias por tu participacion. Por las reglas del estudio, no es posible continuar con esta etapa. El equipo podra contactarte si requiere informacion adicional.",
-      name: participant.name,
+      name: hutParticipantDisplayName(participant),
       origin: participantOrigin(participant),
       phaseGate,
       participantId: participant.id,
       protocolVersion: "LEGACY_VIDEO",
+      rotation: hutParticipantRotation(participant),
       status: participant.status,
       studyName: participant.study.name,
       testMode: participant.testMode,
@@ -4247,12 +4272,14 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
     },
     block1: block1 ? toBasicBlockSummary(block1) : null,
     block2: block2 ? toBasicBlockSummary(block2) : null,
+    folio: participant.folio,
     message: hutPortalMessage(participant),
-    name: participant.name,
+    name: hutParticipantDisplayName(participant),
     origin: participantOrigin(participant),
     phaseGate,
     participantId: participant.id,
     protocolVersion: "LEGACY_VIDEO",
+    rotation: hutParticipantRotation(participant),
     status: participant.status,
     studyName: participant.study.name,
     testMode: participant.testMode,
@@ -4281,16 +4308,29 @@ function toApplicationPhotoPortalView(participant: HutParticipantRecord): HutPor
     },
     block1: null,
     block2: null,
+    folio: participant.folio,
     message: applicationPhotoPortalMessage(participant),
-    name: participant.name,
+    name: hutParticipantDisplayName(participant),
     origin: participantOrigin(participant),
     phaseGate,
     participantId: participant.id,
     protocolVersion: "APPLICATION_PHOTO",
+    rotation: hutParticipantRotation(participant),
     status: participant.status,
     studyName: participant.study.name,
     testMode: participant.testMode,
     token: participant.token
+  };
+}
+
+function hutParticipantDisplayName(participant: HutParticipantRecord): string {
+  return participant.studyParticipant?.participantProfile.name ?? participant.name;
+}
+
+function hutParticipantRotation(participant: HutParticipantRecord): HutPortalView["rotation"] {
+  return {
+    firstFragranceLeftArm: participant.firstFragranceLeftArm,
+    secondFragranceRightArm: participant.secondFragranceRightArm
   };
 }
 

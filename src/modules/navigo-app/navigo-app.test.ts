@@ -2575,6 +2575,9 @@ describe("navigo app MVP rules", () => {
   it("links HUT folios to the equivalent NAV participant when present", async () => {
     vi.stubEnv("HUT_PHASE_CODE_SECRET", "hut-phase-secret-for-tests");
     const state = createNavigoRotationImportState({ participantFolio: "NAV-003" });
+    state.participant.participantProfile.email = "martin@example.test";
+    state.participant.participantProfile.name = "Martin Valerio Gonzalez";
+    state.participant.participantProfile.phone = "5569613589";
     const repository = createNavigoAppRepository(state.prisma as never);
     const parsed = parseNavigoRotationWorkbook({
       bytes: createMinimalRotationWorkbook({ cltFolio: "3", hutFolio: "HUT-003" }),
@@ -2611,12 +2614,96 @@ describe("navigo app MVP rules", () => {
     expect(applied?.ok).toBe(true);
     expect(state.hutParticipants).toMatchObject([
       {
+        email: "martin@example.test",
         folio: "HUT-003",
+        name: "Martin Valerio Gonzalez",
         origin: "CLT_HUT",
+        phone: "5569613589",
         protocolVersion: "APPLICATION_PHOTO",
         studyParticipantId: state.participant.id
       }
     ]);
+    expect(state.hutRegistrationSlots[0]).toMatchObject({
+      folio: "HUT-003",
+      participantId: state.hutParticipants[0]?.id,
+      registeredAt: expect.any(Date),
+      status: "REGISTERED"
+    });
+  });
+
+  it("updates an existing HUT reservation with NAV profile data without duplicating participant or phases", async () => {
+    vi.stubEnv("HUT_PHASE_CODE_SECRET", "hut-phase-secret-for-tests");
+    const state = createNavigoRotationImportState({ participantFolio: "NAV-111" });
+    state.participant.participantProfile.email = "martin@example.test";
+    state.participant.participantProfile.name = "Martin Valerio Gonzalez";
+    state.participant.participantProfile.phone = "5569613589";
+    state.hutParticipants.push({
+      blocks: [],
+      callEvaluations: [],
+      dailyChecks: [],
+      email: null,
+      firstFragranceLeftArm: "247",
+      folio: "HUT-111",
+      id: "hut-participant-existing",
+      name: "HUT-111",
+      origin: "HUT_DIRECTO",
+      phone: null,
+      phaseCodes: [
+        { id: "phase-1", phase: "COLOCACION", slot: 1, status: "GENERATED" },
+        { id: "phase-2", phase: "REGRESO_1", slot: 2, status: "GENERATED" },
+        { id: "phase-3", phase: "REGRESO_2", slot: 3, status: "GENERATED" }
+      ],
+      protocolVersion: "APPLICATION_PHOTO",
+      secondFragranceRightArm: "583",
+      status: "NOT_STARTED",
+      studyId: state.study.id,
+      studyParticipantId: null,
+      token: "hut-token-existing",
+      videoSubmissions: []
+    });
+    state.hutRegistrationSlots.push({
+      firstFragranceLeftArm: "247",
+      folio: "HUT-111",
+      id: "hut-slot-existing",
+      participantId: "hut-participant-existing",
+      registeredAt: null,
+      registrationToken: "hut-registration-token-existing",
+      secondFragranceRightArm: "583",
+      status: "REGISTERED",
+      studyId: state.study.id
+    });
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const parsed = parseNavigoRotationWorkbook({
+      bytes: createMinimalRotationWorkbook({ cltFolio: "111", hutFolio: "HUT-111" }),
+      filename: "ROTACIONES NAVIGO.xlsx"
+    });
+
+    const applied = parsed.ok
+      ? await repository.applyRotationWorkbookImport({
+          actorUserId: "admin-1",
+          filename: "ROTACIONES NAVIGO.xlsx",
+          hutRows: parsed.hutRows,
+          rows: parsed.rows,
+          studyId: state.study.id
+        })
+      : null;
+
+    expect(applied?.ok).toBe(true);
+    expect(state.hutParticipants).toHaveLength(1);
+    expect(state.hutParticipants[0]).toMatchObject({
+      email: "martin@example.test",
+      folio: "HUT-111",
+      name: "Martin Valerio Gonzalez",
+      origin: "CLT_HUT",
+      phone: "5569613589",
+      studyParticipantId: state.participant.id
+    });
+    expect(state.hutParticipants[0]?.phaseCodes).toHaveLength(3);
+    expect(state.hutRegistrationSlots[0]).toMatchObject({
+      participantId: "hut-participant-existing",
+      registeredAt: expect.any(Date),
+      status: "REGISTERED"
+    });
   });
 
   it("prepares direct HUT participants when the equivalent NAV participant does not exist", async () => {
@@ -5392,11 +5479,11 @@ function createNavigoRotationImportState({
     },
     participantEvidence: [],
     participantProfile: {
-      email: null,
+      email: null as string | null,
       id: "profile-1",
       name: "Participante Uno",
       participantAuthUserId: null,
-      phone: null
+      phone: null as string | null
     },
     participantScreeningReviews: [{ status: "APPROVED" as const }],
     rotationAssignment: null as null | {
@@ -5504,6 +5591,7 @@ function createNavigoRotationImportState({
     folio: string;
     id: string;
     participantId: string | null;
+    registeredAt: Date | null;
     registrationToken: string;
     secondFragranceRightArm: string;
     status: string;
