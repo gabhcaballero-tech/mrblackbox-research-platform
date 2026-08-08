@@ -98,6 +98,7 @@ export type CtlSessionView = {
   interviewerName: string;
   participant: CtlParticipantSummary;
   phaseProgress: CtlPhaseProgressView[];
+  responsibleUserId: string | null;
   startedAt: Date | null;
   status: CtlSessionStatus;
 };
@@ -1687,6 +1688,7 @@ function toSessionView(session: SessionRecord): CtlSessionView {
           triangularRotation
         },
     phaseProgress: toPhaseProgressViews(session.phaseProgress ?? []),
+    responsibleUserId: session.ctlInterviewerCode?.createdByUserId ?? session.interviewer?.id ?? null,
     startedAt: session.startedAt,
     status: session.status
   };

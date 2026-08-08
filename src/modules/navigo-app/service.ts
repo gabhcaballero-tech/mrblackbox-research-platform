@@ -921,11 +921,7 @@ function hasBlockingIdentityIssue(activities: Array<Pick<NavigoActivityRecord, "
       return activity.identityStatus === "REJECTED";
     }
 
-    if ((activity.selfieCount ?? 0) === 0) {
-      return false;
-    }
-
-    return activity.identityReviewStatus !== "APPROVED";
+    return false;
   });
 }
 

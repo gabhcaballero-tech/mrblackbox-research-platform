@@ -360,7 +360,7 @@ function createNavigoServiceChecks(catalog: NavigoHommeSimulatorServiceCatalog):
     serviceCheck("navigo.token", "Crear token/link participante", catalog.navigo.canCreateToken),
     serviceCheck(
       "navigo.initial_application",
-      "Registrar aplicacion inicial",
+      "Registrar T0 desde CLT",
       catalog.navigo.canRegisterInitialApplication
     ),
     serviceCheck("navigo.activities", "Crear actividades Navigo", catalog.navigo.canCreateActivities)

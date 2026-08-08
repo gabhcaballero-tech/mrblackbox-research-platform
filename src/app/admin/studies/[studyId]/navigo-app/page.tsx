@@ -13,7 +13,7 @@ import {
   releaseNavigoAfterCtlAction,
   resetNavigoParticipantAppAction,
   reviewNavigoActivityIdentityAction,
-  startNavigoT0Action,
+  sendNavigoEvaluationLinkWhatsAppAction,
   updateNavigoVisualVerificationModeAction
 } from "@/modules/navigo-app/actions";
 import {
@@ -25,7 +25,6 @@ import {
   formatNavigoDateTimeLocal,
   isInitialNavigoEvaluation,
   navigoActivityLabel,
-  nowInStudyTimezoneForDateTimeLocal,
   resolveNavigoTimelineSequence,
   type NavigoActivityListItem,
   type NavigoParticipantListItem,
@@ -565,7 +564,7 @@ function ParticipantRow({
           </dl>
           {t0Activity?.identityStatus === "REJECTED" ? (
             <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800">
-              Incidencia de identidad en T0. No continúes con las evaluaciones posteriores hasta que supervisor revise el caso.
+              Incidencia de identidad en T0. Revisar posteriormente con supervisor.
             </p>
           ) : null}
           {participantUrl ? (
@@ -579,42 +578,51 @@ function ParticipantRow({
             </Link>
           ) : null}
         </section>
-        <form action={startNavigoT0Action.bind(null, studyId, participant.id)} className="space-y-3">
-          <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
-            {participant.applicationStartedAt ? "Corregir hora de aplicacion inicial" : "Hora de aplicacion inicial"}
-            <input
-              className="rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-950"
-              defaultValue={
-                participant.applicationStartedAt
-                  ? formatNavigoDateTimeLocal(participant.applicationStartedAt, timeZoneIana)
-                  : nowInStudyTimezoneForDateTimeLocal(timeZoneIana)
-              }
-              name="applicationStartedAt"
-              type="datetime-local"
-            />
-            <input name="timeZoneIana" type="hidden" value={timeZoneIana} />
-          </label>
-          <p className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs leading-5 text-zinc-600">
-            El flujo normal registra la aplicacion inicial desde el link participante. Esta correccion solo ajusta la hora base y recalcula evaluaciones pendientes.
-          </p>
-          <SubmitButton disabled={!canStart} pendingLabel="Guardando aplicacion inicial...">
-            Guardar aplicacion inicial
-          </SubmitButton>
-        </form>
+        <section className="space-y-3 rounded-md border border-zinc-200 bg-white p-3">
+          <h3 className="text-sm font-semibold text-zinc-950">Aplicacion inicial registrada en CTL</h3>
+          {participant.applicationStartedAt ? (
+            <dl className="space-y-1 text-xs text-zinc-700">
+              <div>
+                <dt className="inline font-medium text-zinc-500">Fecha/hora T0: </dt>
+                <dd className="inline font-semibold text-zinc-950">
+                  {formatNavigoDateTimeLocal(participant.applicationStartedAt, timeZoneIana)}
+                </dd>
+              </div>
+              <div>
+                <dt className="inline font-medium text-zinc-500">Primera fragancia: </dt>
+                <dd className="inline font-mono text-zinc-950">{participant.rotation.leftCode ?? "Sin asignar"} - brazo izquierdo</dd>
+              </div>
+              <div>
+                <dt className="inline font-medium text-zinc-500">Segunda fragancia: </dt>
+                <dd className="inline font-mono text-zinc-950">{participant.rotation.rightCode ?? "Sin asignar"} - brazo derecho</dd>
+              </div>
+            </dl>
+          ) : (
+            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              T0 se registrara automaticamente cuando la captura CTL entre a la comparativa de 15 minutos.
+            </p>
+          )}
+        </section>
         {!canStart ? (
           <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
             {pendingMessage ?? "Pendiente para iniciar T0: configuracion de rotacion."}
           </p>
         ) : null}
         {participantUrl ? <ParticipantLinkPanel testUrl={participantTestUrl} url={participantUrl} /> : null}
+        <form action={sendNavigoEvaluationLinkWhatsAppAction.bind(null, studyId, participant.id)} className="space-y-2">
+          <input name="requestOrigin" type="hidden" value={requestOrigin} />
+          <SubmitButton disabled={!canStart || !participant.participant.phone} pendingLabel="Enviando WhatsApp...">
+            Enviar enlace de evaluacion al panelista
+          </SubmitButton>
+          {!participant.participant.phone ? (
+            <p className="text-xs text-amber-700">Captura telefono para enviar WhatsApp.</p>
+          ) : null}
+        </form>
         <form action={generateNavigoParticipantLinkAction.bind(null, studyId, participant.id, Boolean(participantUrl))}>
           <SubmitButton disabled={!canStart} pendingLabel="Generando link...">
             {participantUrl ? "Regenerar link participante" : "Generar link participante"}
           </SubmitButton>
         </form>
-        {participant.applicationStartedAt ? (
-          <p className="text-xs text-zinc-500">Para corregir la aplicacion inicial, ajusta el campo de hora y presiona Guardar aplicacion inicial.</p>
-        ) : null}
         <CorrectionActions participant={participant} studyId={studyId} />
       </div>
     </article>
@@ -924,7 +932,7 @@ function ActivityDetail({
             <p className="font-semibold">Identidad en salón: {identityStatusLabel(activity?.identityStatus)}</p>
             {activity?.identityStatus === "REJECTED" ? (
               <p className="mt-2 font-semibold text-rose-800">
-                Incidencia de identidad: bloquear avance hasta revisión.
+                Incidencia de identidad: revisar posteriormente con supervisor.
               </p>
             ) : null}
           </div>
@@ -1034,7 +1042,7 @@ function ActivityIdentityReview({
           <p className="mt-3 text-xs text-zinc-500">Umbrales: MATCH &gt;= 0.60, NO_MATCH &lt;= 0.35</p>
           {activitySelfie.reviewStatus === "REJECTED" ? (
             <p className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
-              Incidencia de identidad: bloquear avance hasta revisión.
+              Incidencia de identidad: revisar posteriormente. No bloquea el avance del panelista.
             </p>
           ) : null}
           {activitySelfie.rejectionReason ? <p className="mt-2 text-sm text-zinc-700">Motivo: {activitySelfie.rejectionReason}</p> : null}

@@ -9,22 +9,26 @@ import {
 } from "./CtlMobileCapture";
 import {
   finishPublicCtlSessionAction,
+  markPublicCtlComparativeStartedAction,
   savePublicCtlQuestionAnswerAction
 } from "@/modules/ctl/public-actions";
 
 vi.mock("@/modules/ctl/public-actions", () => ({
   finishPublicCtlSessionAction: vi.fn(),
+  markPublicCtlComparativeStartedAction: vi.fn(),
   savePublicCtlQuestionAnswerAction: vi.fn()
 }));
 
 const saveQuestionMock = vi.mocked(savePublicCtlQuestionAnswerAction);
 const finishMock = vi.mocked(finishPublicCtlSessionAction);
+const markComparativeStartedMock = vi.mocked(markPublicCtlComparativeStartedAction);
 const scrollIntoViewMock = vi.fn();
 
 describe("CtlMobileCapture", () => {
   beforeEach(() => {
     saveQuestionMock.mockReset();
     finishMock.mockReset();
+    markComparativeStartedMock.mockReset();
     scrollIntoViewMock.mockReset();
     Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", {
       configurable: true,
@@ -32,6 +36,7 @@ describe("CtlMobileCapture", () => {
     });
     saveQuestionMock.mockResolvedValue({ ok: true });
     finishMock.mockResolvedValue({ ok: true, redirectTo: "" });
+    markComparativeStartedMock.mockResolvedValue({ ok: true });
   });
 
   it("starts on the first required pending question after reload", () => {
@@ -460,11 +465,29 @@ describe("CtlMobileCapture", () => {
     expect(screen.getByText("P14 comparativa")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Primera" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Siguiente" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
 
     await screen.findByText("Pregunta 2 de 2");
     expect(screen.getByText("P15 comparativa")).toBeInTheDocument();
     expect(screen.queryByText(COMPARATIVE_SMELL_INSTRUCTION)).not.toBeInTheDocument();
+  });
+
+  it("marks Navigo T0 when the capture enters the 15-minute comparative section", async () => {
+    renderMobileCapture({
+      definition: comparativeTransitionDefinition
+    });
+
+    expect(markComparativeStartedMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Siguiente" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    await screen.findByText("P14 comparativa");
+    await waitFor(() =>
+      expect(markComparativeStartedMock).toHaveBeenCalledWith("FMASCULINA-NAVIGO-2026", "session-1")
+    );
   });
 
   it("keeps operational section instructions scoped to the first question for the full CLT definition", () => {
@@ -901,6 +924,38 @@ const repeatedComparativeInstructionDefinition: CtlDefinition = {
         }
       ],
       title: "SECCIÓN V - COMPARATIVA - 15 MINUTOS"
+    }
+  ],
+  version: 2
+};
+
+const comparativeTransitionDefinition: CtlDefinition = {
+  sections: [
+    {
+      id: "INTRO",
+      questions: [
+        {
+          code: "Q1_SELECT",
+          label: "Pregunta previa",
+          options: [{ label: "Continuar", value: "A" }],
+          required: true,
+          type: "SELECT"
+        }
+      ],
+      title: "Intro"
+    },
+    {
+      id: "COMPARATIVA_15_MIN",
+      questions: [
+        {
+          code: "P14",
+          label: "P14 comparativa",
+          options: [{ label: "Primera", value: "1" }],
+          required: true,
+          type: "SELECT"
+        }
+      ],
+      title: "SECCION V - COMPARATIVA - 15 MINUTOS"
     }
   ],
   version: 2

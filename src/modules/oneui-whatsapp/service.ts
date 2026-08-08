@@ -41,6 +41,18 @@ export type OneuiWhatsAppTemplateParameter = {
   type: "text";
 };
 
+type OneuiWhatsAppTemplateComponent =
+  | {
+      parameters: OneuiWhatsAppTemplateParameter[];
+      type: "body";
+    }
+  | {
+      index: string;
+      parameters: OneuiWhatsAppTemplateParameter[];
+      sub_type: "url";
+      type: "button";
+    };
+
 export type OneuiWhatsAppSendTemplateResult =
   | {
       ok: true;
@@ -135,6 +147,7 @@ export async function sendOneuiWhatsAppTemplate(input: {
   linkedParticipantId?: string | null;
   linkedStudyId?: string | null;
   now?: Date;
+  buttonUrl?: string | null;
   parameters: OneuiWhatsAppTemplateParameter[];
   profileName?: string | null;
   repository?: OneuiWhatsAppRepository;
@@ -195,15 +208,33 @@ export async function sendOneuiWhatsAppTemplate(input: {
     };
   }
 
+  const templateComponents: OneuiWhatsAppTemplateComponent[] = [];
+
+  if (input.parameters.length > 0) {
+    templateComponents.push({
+      parameters: input.parameters,
+      type: "body"
+    });
+  }
+
+  if (input.buttonUrl) {
+    templateComponents.push({
+      index: "0",
+      parameters: [
+        {
+          text: input.buttonUrl,
+          type: "text"
+        }
+      ],
+      sub_type: "url",
+      type: "button"
+    });
+  }
+
   const requestPayload = {
     messaging_product: "whatsapp",
     template: {
-      components: [
-        {
-          parameters: input.parameters,
-          type: "body"
-        }
-      ],
+      components: templateComponents,
       language: {
         code: input.language
       },

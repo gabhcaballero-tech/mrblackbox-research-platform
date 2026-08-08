@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { getCtlPublicSessionSecret, getPublicCtlInterviewerActor } from "@/shared/auth/ctl-public";
 import { createCtlRepository } from "./repository";
 import type { CtlSessionView } from "./repository";
+import { createNavigoAppRepository } from "@/modules/navigo-app/repository";
 import {
   createCtlPublicSessionToken,
   ctlPublicSessionCookieName,
@@ -241,6 +242,53 @@ export async function savePublicCtlQuestionAnswerAction(
 
   revalidatePath(`/ctl/${studyCode}`);
   revalidatePath(`/ctl/${studyCode}/sessions/${sessionId}`);
+
+  return {
+    ok: true
+  };
+}
+
+export async function markPublicCtlComparativeStartedAction(studyCode: string, sessionId: string) {
+  const actor = await getPublicCtlInterviewerActor({ studyCode });
+
+  if (!actor) {
+    return {
+      message: "Ingresa tu codigo de encuestador para continuar.",
+      ok: false
+    };
+  }
+
+  const session = await createCtlRepository().getSession({ actor, sessionId });
+  if (!session) {
+    return {
+      message: "No encontramos la sesion CTL.",
+      ok: false
+    };
+  }
+
+  if (!session.responsibleUserId) {
+    return {
+      message: "No encontramos el responsable interno para registrar T0.",
+      ok: false
+    };
+  }
+
+  const result = await createNavigoAppRepository().recordApplicationStartedFromCtl({
+    actorUserId: session.responsibleUserId,
+    studyParticipantId: session.participant.id
+  });
+
+  if (!result.ok) {
+    return {
+      message: result.message,
+      ok: false
+    };
+  }
+
+  revalidatePath(`/ctl/${studyCode}/sessions/${sessionId}`);
+  if (session.participant.participantLinkToken) {
+    revalidatePath(`/p/${encodeURIComponent(session.participant.participantLinkToken)}/activities`);
+  }
 
   return {
     ok: true

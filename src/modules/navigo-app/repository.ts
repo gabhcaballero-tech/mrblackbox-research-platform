@@ -1,6 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
 import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
 import {
+  createOneuiWhatsAppRepository,
+  sendNavigoEvaluationLinkWhatsApp,
+  sendNavigoEvaluationReminderWhatsApp,
+  type OneuiWhatsAppRepository
+} from "@/modules/oneui-whatsapp";
+import {
   PARTICIPANT_EVIDENCE_BUCKET,
   assertEvidenceStorageKeyBelongsToAttempt,
   buildEvidenceStorageKey,
@@ -206,6 +212,22 @@ export type NavigoMaintenanceResult =
       ok: false;
     };
 
+export type NavigoEvaluationReminderProcessingResult = {
+  failed: number;
+  scanned: number;
+  sent: number;
+  skipped: number;
+  results: Array<{
+    activityCode: NavigoActivityCode;
+    activityId: string;
+    folio: string | null;
+    message: string;
+    participantId: string;
+    status: "FAILED" | "SENT" | "SKIPPED";
+    whatsappMessageId: string | null;
+  }>;
+};
+
 export type NavigoConfigureRotationInput = {
   actorUserId: string;
   leftFragranceCode: string;
@@ -264,6 +286,13 @@ export type NavigoHutRotationWorkbookPreviewRow = NavigoHutRotationWorkbookRowIn
 };
 
 export type NavigoRotationWorkbookPreview = {
+  applyErrors?: Array<{
+    folio: string;
+    message: string;
+    rowNumber: number;
+    scope: "CLT" | "HUT";
+    step: string;
+  }>;
   hutRows: NavigoHutRotationWorkbookPreviewRow[];
   rows: NavigoRotationWorkbookPreviewRow[];
   summary: NavigoRotationImportPreview["summary"] & {
@@ -551,6 +580,23 @@ export type NavigoAppRepository = {
   }) => Promise<NavigoActionResult<{
     applicationStartedAt: Date;
   }>>;
+  recordApplicationStartedFromCtl: (input: {
+    actorUserId: string;
+    now?: Date;
+    studyParticipantId: string;
+  }) => Promise<NavigoMaintenanceResult & { applicationStartedAt?: Date }>;
+  sendEvaluationLinkWhatsApp: (input: {
+    actorUserId: string;
+    now?: Date;
+    requestOrigin: string;
+    studyId: string;
+    studyParticipantId: string;
+  }) => Promise<NavigoMaintenanceResult>;
+  processEvaluationWhatsAppReminders: (input: {
+    now?: Date;
+    requestOrigin: string;
+    studyId?: string;
+  }) => Promise<NavigoActionResult<NavigoEvaluationReminderProcessingResult>>;
   updateParticipantVisualVerificationMode: (input: {
     actorUserId: string;
     mode: NavigoVisualVerificationMode;
@@ -642,6 +688,46 @@ type NavigoPrismaClient = PrismaClientLike & {
 
 type NavigoTransactionClient = Omit<NavigoPrismaClient, "$connect" | "$disconnect" | "$transaction"> & {
   applicationTimeEvent: Delegate;
+};
+
+const NAVIGO_ROTATION_WORKBOOK_IMPORT_BATCH_SIZE = 25;
+const NAVIGO_EVALUATION_REMINDER_SOURCE = "NAVIGO_WHATSAPP_EVALUATION_REMINDER";
+
+type DueNavigoReminderActivity = {
+  activitySchedule: {
+    code: string;
+    id: string;
+  };
+  availableFrom: Date;
+  id: string;
+  reminders: Array<{
+    id: string;
+    metadataJson: unknown;
+    status: string;
+  }>;
+  status: string;
+  studyParticipant: {
+    accessTokens: Array<{
+      expiresAt: Date;
+      id: string;
+      status: string;
+      tokenHash: string;
+    }>;
+    id: string;
+    participantConfirmation: {
+      folio: string;
+    } | null;
+    participantProfile: {
+      name: string;
+      phone: string | null;
+    };
+    qaParticipantRun: {
+      id: string;
+      status: string;
+    } | null;
+    study: NavigoStudySummary;
+    studyId: string;
+  };
 };
 
 const studySelect = {
@@ -1071,9 +1157,16 @@ type HutRegistrationSlotWorkbookRecord = {
   studyId: string;
 };
 
-export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): NavigoAppRepository {
+export function createNavigoAppRepository(
+  prismaClient?: NavigoPrismaClient,
+  whatsappRepository?: OneuiWhatsAppRepository
+): NavigoAppRepository {
   async function getPrisma() {
     return prismaClient ?? ((await createPrismaClient()) as NavigoPrismaClient);
+  }
+
+  function getWhatsAppRepository() {
+    return whatsappRepository ?? createOneuiWhatsAppRepository();
   }
 
   async function getParticipantByToken(token: string, prisma: NavigoPrismaClient | NavigoTransactionClient, now = new Date()) {
@@ -2495,6 +2588,383 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
       });
     },
 
+    async recordApplicationStartedFromCtl(input) {
+      const prisma = await getPrisma();
+      const now = input.now ?? new Date();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = (await tx.studyParticipant.findUnique?.({
+          select: participantWithActivitiesSelect,
+          where: { id: input.studyParticipantId }
+        })) as ParticipantRecord | null;
+
+        if (!participant) {
+          return { message: "No encontramos el participante para registrar T0 desde CTL.", ok: false };
+        }
+
+        if (participant.applicationStartedAt) {
+          await ensureCurrentNavigoActivitiesForParticipant({
+            now,
+            participant,
+            prisma: tx
+          });
+          return {
+            applicationStartedAt: participant.applicationStartedAt,
+            message: "La aplicacion inicial ya estaba registrada.",
+            ok: true
+          };
+        }
+
+        await ensureCurrentNavigoSchedulesForParticipant({ participant, prisma: tx });
+        const schedules = await getNavigoSchedules({ participant, prisma: tx });
+        const prepared = prepareNavigoParticipantActivities({
+          existingActivities: (participant.activities ?? []).map(toNavigoActivityRecord),
+          now,
+          participant: {
+            applicationStartedAt: now,
+            id: participant.id,
+            reviewStatus: participantStatus(participant),
+            studyCode: participant.study.code,
+            timeZoneIana: resolveNavigoTimeZone(participant.study.timeZoneIana)
+          },
+          schedules
+        });
+
+        if (!prepared.ok) {
+          return { message: prepared.message, ok: false };
+        }
+
+        const timeZoneIana = resolveNavigoTimeZone(participant.study.timeZoneIana);
+        await tx.studyParticipant.update?.({
+          data: {
+            applicationStartedAt: now,
+            applicationStartedAtRegisteredAt: now,
+            applicationStartedAtRegisteredByUserId: input.actorUserId,
+            operationalStatus: "IN_PROGRESS"
+          },
+          where: { id: participant.id }
+        });
+
+        await tx.applicationTimeEvent.create?.({
+          data: {
+            activityStateAtEvent: activityStateAtEvent((participant.activities ?? []).map(toNavigoActivityRecord)),
+            createdByUserId: input.actorUserId,
+            eventType: "REGISTERED",
+            newApplicationStartedAt: now,
+            previousApplicationStartedAt: null,
+            reason: "Registro automatico de aplicacion inicial al entrar a comparativa 15 minutos en CTL.",
+            studyParticipantId: participant.id,
+            timeZoneIana
+          }
+        });
+
+        for (const activity of prepared.created) {
+          await tx.participantActivity.create?.({
+            data: {
+              activityScheduleId: activity.activityScheduleId,
+              actualCompletedAt: null,
+              actualStartedAt: null,
+              availableFrom: activity.availableFrom,
+              availableUntil: activity.availableUntil,
+              lastSavedAt: null,
+              occurrenceKey: activity.occurrenceKey,
+              scheduledAt: activity.scheduledAt,
+              status: activity.status,
+              studyParticipantId: activity.studyParticipantId
+            }
+          });
+        }
+
+        for (const activity of prepared.updated) {
+          await tx.participantActivity.update?.({
+            data: {
+              availableFrom: activity.availableFrom,
+              availableUntil: activity.availableUntil,
+              scheduledAt: activity.scheduledAt,
+              status: activity.status
+            },
+            where: {
+              studyParticipantId_activityScheduleId_occurrenceKey: {
+                activityScheduleId: activity.activityScheduleId,
+                occurrenceKey: "DEFAULT",
+                studyParticipantId: participant.id
+              }
+            }
+          });
+        }
+
+        return {
+          applicationStartedAt: now,
+          message: "Aplicacion inicial registrada automaticamente desde CTL.",
+          ok: true
+        };
+      });
+    },
+
+    async sendEvaluationLinkWhatsApp(input) {
+      const prisma = await getPrisma();
+      const now = input.now ?? new Date();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = (await tx.studyParticipant.findUnique?.({
+          select: participantWithActivitiesSelect,
+          where: { id: input.studyParticipantId }
+        })) as ParticipantRecord | null;
+
+        if (!participant || participant.study.id !== input.studyId) {
+          return { message: "No encontramos el participante en este estudio.", ok: false };
+        }
+
+        if (!participant.participantProfile.phone) {
+          return { message: "El participante no tiene telefono capturado.", ok: false };
+        }
+
+        const linkToken = await ensureParticipantAccessToken({
+          actorUserId: input.actorUserId,
+          now,
+          participant,
+          prisma: tx
+        });
+        const evaluationUrl = new URL(`/p/${encodeURIComponent(linkToken)}/activities`, input.requestOrigin).toString();
+        const result = await sendNavigoEvaluationLinkWhatsApp({
+          evaluationUrl,
+          now,
+          participantId: participant.id,
+          participantName: participant.participantProfile.name,
+          phone: participant.participantProfile.phone,
+          repository: getWhatsAppRepository(),
+          studyId: participant.study.id
+        });
+
+        if (!result.ok) {
+          return { message: result.message, ok: false };
+        }
+
+        return {
+          message: "Enlace de evaluacion enviado por WhatsApp.",
+          ok: true
+        };
+      });
+    },
+
+    async processEvaluationWhatsAppReminders(input) {
+      const prisma = await getPrisma();
+      const now = input.now ?? new Date();
+      const reminderLog = prisma.reminderLog;
+
+      if (!reminderLog) {
+        return { message: "La auditoria de recordatorios no esta disponible.", ok: false };
+      }
+
+      const dueActivities = (await prisma.participantActivity.findMany?.({
+        orderBy: [
+          { availableFrom: "asc" },
+          { scheduledAt: "asc" }
+        ],
+        select: {
+          activitySchedule: {
+            select: {
+              code: true,
+              id: true
+            }
+          },
+          availableFrom: true,
+          id: true,
+          reminders: {
+            select: {
+              id: true,
+              metadataJson: true,
+              status: true
+            },
+            where: {
+              channel: "INTERNAL_FOLLOWUP"
+            }
+          },
+          status: true,
+          studyParticipant: {
+            select: {
+              accessTokens: {
+                orderBy: { createdAt: "desc" },
+                select: {
+                  expiresAt: true,
+                  id: true,
+                  status: true,
+                  tokenHash: true
+                },
+                take: 1,
+                where: { status: "ACTIVE" }
+              },
+              id: true,
+              participantConfirmation: {
+                select: {
+                  folio: true
+                }
+              },
+              participantProfile: {
+                select: {
+                  name: true,
+                  phone: true
+                }
+              },
+              qaParticipantRun: {
+                select: {
+                  id: true,
+                  status: true
+                }
+              },
+              study: {
+                select: studySelect
+              },
+              studyId: true
+            }
+          }
+        },
+        where: {
+          activitySchedule: {
+            code: { in: NAVIGO_ACTIVITY_CODES },
+            status: "ACTIVE"
+          },
+          availableFrom: {
+            lte: now
+          },
+          status: {
+            not: "COMPLETED"
+          },
+          studyParticipant: {
+            ...(input.studyId ? { studyId: input.studyId } : {}),
+            qaParticipantRun: {
+              is: null
+            }
+          }
+        }
+      })) as DueNavigoReminderActivity[];
+
+      const report: NavigoEvaluationReminderProcessingResult = {
+        failed: 0,
+        results: [],
+        scanned: dueActivities.length,
+        sent: 0,
+        skipped: 0
+      };
+
+      for (const activity of dueActivities) {
+        const activityCode = String(activity.activitySchedule.code) as NavigoActivityCode;
+        const participant = activity.studyParticipant;
+        const existingReminder = activity.reminders.some((log) => isNavigoEvaluationReminderLog(log.metadataJson, activityCode));
+        const folio = participant.participantConfirmation?.folio ?? null;
+
+        if (existingReminder) {
+          report.skipped += 1;
+          report.results.push({
+            activityCode,
+            activityId: activity.id,
+            folio,
+            message: "Recordatorio ya registrado previamente.",
+            participantId: participant.id,
+            status: "SKIPPED",
+            whatsappMessageId: null
+          });
+          continue;
+        }
+
+        const activeToken = participant.accessTokens[0] ?? null;
+        const linkToken = activeToken && activeToken.tokenHash === hashToken(activeToken.id) && activeToken.expiresAt.getTime() > now.getTime()
+          ? activeToken.id
+          : null;
+        const participantName = participant.participantProfile.name;
+        const participantPhone = participant.participantProfile.phone;
+
+        if (!participantPhone || !linkToken) {
+          report.skipped += 1;
+          report.results.push({
+            activityCode,
+            activityId: activity.id,
+            folio,
+            message: !participantPhone
+              ? "Participante sin telefono para WhatsApp."
+              : "Participante sin enlace activo vigente.",
+            participantId: participant.id,
+            status: "SKIPPED",
+            whatsappMessageId: null
+          });
+          continue;
+        }
+
+        const evaluationUrl = new URL(`/p/${encodeURIComponent(linkToken)}/activities`, input.requestOrigin).toString();
+        const plannedLog = (await reminderLog.create?.({
+          data: {
+            channel: "INTERNAL_FOLLOWUP",
+            metadataJson: {
+              activityCode,
+              source: NAVIGO_EVALUATION_REMINDER_SOURCE,
+              templateName: "navigo_recordatorio_evaluacion",
+              timeZoneIana: resolveNavigoTimeZone(participant.study.timeZoneIana)
+            },
+            participantActivityId: activity.id,
+            scheduledFor: activity.availableFrom,
+            status: "PLANNED"
+          },
+          select: { id: true }
+        })) as { id: string };
+
+        const result = await sendNavigoEvaluationReminderWhatsApp({
+          activityCode,
+          evaluationUrl,
+          now,
+          participantId: participant.id,
+          participantName,
+          phone: participantPhone,
+          repository: getWhatsAppRepository(),
+          studyId: participant.study.id
+        });
+        const whatsAppMessage = result.ok ? result.data : "data" in result ? result.data : undefined;
+
+        await reminderLog.update?.({
+          data: {
+            metadataJson: {
+              activityCode,
+              message: result.ok ? "Recordatorio enviado." : result.message,
+              metaMessageId: whatsAppMessage?.metaMessageId ?? null,
+              source: NAVIGO_EVALUATION_REMINDER_SOURCE,
+              status: result.ok ? "SENT" : "FAILED",
+              templateName: "navigo_recordatorio_evaluacion",
+              timeZoneIana: resolveNavigoTimeZone(participant.study.timeZoneIana),
+              whatsappMessageId: whatsAppMessage?.id ?? null
+            },
+            sentAt: result.ok ? now : null,
+            status: result.ok ? "COMPLETED" : "CANCELLED"
+          },
+          where: { id: plannedLog.id }
+        });
+
+        if (result.ok) {
+          report.sent += 1;
+          report.results.push({
+            activityCode,
+            activityId: activity.id,
+            folio,
+            message: "Recordatorio enviado por WhatsApp.",
+            participantId: participant.id,
+            status: "SENT",
+            whatsappMessageId: result.data.id
+          });
+        } else {
+          report.failed += 1;
+          report.results.push({
+            activityCode,
+            activityId: activity.id,
+            folio,
+            message: result.message,
+            participantId: participant.id,
+            status: "FAILED",
+            whatsappMessageId: whatsAppMessage?.id ?? null
+          });
+        }
+      }
+
+      return { data: report, ok: true };
+    },
+
     async generateParticipantLink(input) {
       const prisma = await getPrisma();
       const now = input.now ?? new Date();
@@ -2970,8 +3440,8 @@ export function createNavigoAppRepository(prismaClient?: NavigoPrismaClient): Na
           };
         }
 
-        if (resolveParticipantVisualVerificationMode(participant) === "required" && !hasApprovedActivitySelfie(activity)) {
-          return { message: "Toma una selfie aprobada de esta evaluacion antes de guardar las respuestas.", ok: false };
+        if (resolveParticipantVisualVerificationMode(participant) === "required" && !hasActivitySelfie(activity)) {
+          return { message: "Toma y guarda la selfie de esta evaluacion antes de guardar las respuestas.", ok: false };
         }
 
         const validation = validateNavigoMeasurementAnswers({ input: input.answers });
@@ -3527,6 +3997,16 @@ function hasLegacyNavigoActivities(activities: NonNullable<ParticipantRecord["ac
   return activities.some((activity) =>
     NAVIGO_LEGACY_ACTIVITY_CODES.includes(String(activity.activitySchedule.code) as never)
   );
+}
+
+function isNavigoEvaluationReminderLog(metadataJson: unknown, activityCode: NavigoActivityCode): boolean {
+  if (!metadataJson || typeof metadataJson !== "object") {
+    return false;
+  }
+
+  const metadata = metadataJson as { activityCode?: unknown; source?: unknown };
+
+  return metadata.source === NAVIGO_EVALUATION_REMINDER_SOURCE && metadata.activityCode === activityCode;
 }
 
 async function resolveNavigoMeasurementQuestionnaireVersionId({
@@ -6768,11 +7248,10 @@ function getActivitySelfieCount(activity: Pick<ActivityRecord, "id" | "participa
   ).length;
 }
 
-function hasApprovedActivitySelfie(activity: Pick<ActivityRecord, "id" | "participantActivityEvidence">): boolean {
+function hasActivitySelfie(activity: Pick<ActivityRecord, "id" | "participantActivityEvidence">): boolean {
   return activity.participantActivityEvidence.some(
     (evidence) =>
       evidence.participantActivityId === activity.id &&
-      evidence.reviewStatus === "APPROVED" &&
       evidence.type === "SELFIE_IDENTIFICATION"
   );
 }

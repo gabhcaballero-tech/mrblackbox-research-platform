@@ -315,7 +315,7 @@ export function NavigoActivityCapture({
         if (selfieCapturePurpose === "reference_capture") {
           setIdentityConfirmed(true);
         }
-        setMessage(activityIdentityMessage(confirmed.data.reviewStatus));
+        setMessage(activityIdentityMessage());
         clearCapturedPhoto();
       } catch {
         setUploadError("No fue posible subir la selfie. Revisa tu conexión e intenta nuevamente.");
@@ -347,8 +347,8 @@ export function NavigoActivityCapture({
   }
 
   const busy = isUploading || isPending || isSavingEvaluation;
-  const hasApprovedIdentitySelfie = !requiresSelfie || (selfies >= 1 && identityReviewStatus === "APPROVED");
-  const showQuestions = requiresSelfie ? hasApprovedIdentitySelfie : identityStep === "questions";
+  const hasActivitySelfie = !requiresSelfie || selfies >= 1;
+  const showQuestions = requiresSelfie ? hasActivitySelfie : identityStep === "questions";
 
   return (
     <div className="space-y-6">
@@ -370,7 +370,7 @@ export function NavigoActivityCapture({
           </p>
           <p className="mt-2 text-sm text-zinc-500">Selfie registrada: {selfies}/1</p>
 
-          {message && identityReviewStatus === "APPROVED" ? (
+          {message ? (
             <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
               {message}
             </p>
@@ -439,14 +439,14 @@ export function NavigoActivityCapture({
             </div>
           ) : null}
 
-          {selfies >= 1 ? (
+          {selfies >= 1 && !message ? (
             <p className="mt-4 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
-              Selfie lista. Ya puedes guardar la evaluación.
+              Selfie registrada correctamente. Puedes continuar con tu evaluación.
             </p>
           ) : null}
           {requiresSelfie && selfies >= 1 && identityReviewStatus !== "APPROVED" ? (
             <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">
-              {activityIdentityMessage(identityReviewStatus)}
+              La revisión de identidad queda pendiente para el equipo interno y no bloquea esta evaluación.
             </p>
           ) : null}
           <canvas className="hidden" ref={canvasRef} />
@@ -922,16 +922,8 @@ function cameraErrorMessage(error: unknown): string {
   return "No fue posible preparar la cámara. Intenta nuevamente.";
 }
 
-function activityIdentityMessage(status: "APPROVED" | "PENDING" | "REJECTED" | null): string {
-  if (status === "APPROVED") {
-    return "Identidad verificada. Continúa con la evaluación.";
-  }
-
-  if (status === "REJECTED") {
-    return "No fue posible confirmar tu identidad. Contacta a tu reclutador.";
-  }
-
-  return "No fue posible confirmar tu identidad automáticamente. Contacta a tu reclutador.";
+function activityIdentityMessage(): string {
+  return "Selfie registrada correctamente. Puedes continuar con tu evaluación.";
 }
 
 export function shouldMirrorCameraPreview(facingMode: "user" | "environment") {

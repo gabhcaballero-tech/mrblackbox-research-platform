@@ -13,6 +13,7 @@ import {
 } from "@/modules/ctl/definition";
 import {
   finishPublicCtlSessionAction,
+  markPublicCtlComparativeStartedAction,
   savePublicCtlQuestionAnswerAction
 } from "@/modules/ctl/public-actions";
 import type { CtlAgeAnswerValue } from "@/modules/ctl/service";
@@ -99,6 +100,7 @@ export function CtlMobileCapture({
   const [validationModal, setValidationModal] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const captureTopRef = useRef<HTMLElement | null>(null);
+  const comparativeStartRecordedRef = useRef(false);
   const hasMountedRef = useRef(false);
 
   const current = questions[currentIndex];
@@ -119,6 +121,25 @@ export function CtlMobileCapture({
 
     captureTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [currentIndex, isReviewing]);
+
+  useEffect(() => {
+    if (
+      readOnly ||
+      isReviewing ||
+      comparativeStartRecordedRef.current ||
+      current?.sectionId !== "COMPARATIVA_15_MIN"
+    ) {
+      return;
+    }
+
+    comparativeStartRecordedRef.current = true;
+    startTransition(async () => {
+      const result = await markPublicCtlComparativeStartedAction(studyCode, sessionId) as ActionResult;
+      if (!result.ok) {
+        setError(result.message);
+      }
+    });
+  }, [current?.sectionId, isReviewing, readOnly, sessionId, startTransition, studyCode]);
 
   function setAnswer(questionCode: string, answer: unknown) {
     setLocalAnswers((currentAnswers) => ({

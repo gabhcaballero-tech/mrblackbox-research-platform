@@ -2,6 +2,10 @@
 import { join } from "node:path";
 import { deflateRawSync } from "node:zlib";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type {
+  OneuiWhatsAppMessageRecord,
+  OneuiWhatsAppRepository
+} from "@/modules/oneui-whatsapp";
 import {
   createNavigoFoundationRepository,
   createNavigoMeasurementDefinition,
@@ -56,6 +60,7 @@ import { parseNavigoRotationWorkbook } from "./rotation-workbook";
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 
 describe("navigo app schema foundation", () => {
@@ -451,7 +456,7 @@ describe("navigo app MVP rules", () => {
     });
   });
 
-  it("blocks measurements with pending or rejected identity review and allows approved review", () => {
+  it("does not block measurements with pending or rejected activity identity review", () => {
     const pending = buildNavigoActivityTimeline({
       activities: navigoActivityRecords({ t3Completed: false, t3IdentityReviewStatus: "PENDING", t3SelfieCount: 1 }),
       now: new Date("2026-06-25T16:40:00.000Z"),
@@ -469,12 +474,12 @@ describe("navigo app MVP rules", () => {
     });
 
     expect(pending.find((activity) => activity.code === "T3_HORAS")?.availability).toMatchObject({
-      canCapture: false,
-      reason: "IDENTITY_REVIEW_REQUIRED"
+      canCapture: true,
+      reason: "AVAILABLE"
     });
     expect(rejected.find((activity) => activity.code === "T3_HORAS")?.availability).toMatchObject({
-      canCapture: false,
-      reason: "IDENTITY_REVIEW_REQUIRED"
+      canCapture: true,
+      reason: "AVAILABLE"
     });
     expect(approved.find((activity) => activity.code === "T3_HORAS")?.availability).toMatchObject({
       canCapture: true,
@@ -681,10 +686,11 @@ describe("navigo app MVP rules", () => {
     expect(adminPage).toContain("resolveRequestOrigin");
     expect(adminPage).toContain("participant.participantLinkToken");
     expect(adminPage).toContain("new URL(`/p/${encodeURIComponent(participant.participantLinkToken)}/activities`, requestOrigin).toString()");
-    expect(adminPage).toContain("Guardar aplicacion inicial");
+    expect(adminPage).not.toContain("Guardar aplicacion inicial");
+    expect(adminPage).toContain("Enviar enlace de evaluacion al panelista");
     expect(adminPage).toContain("Generar link participante");
     expect(adminPage).toContain("Regenerar link participante");
-    expect(adminPage).toContain("Corregir hora de aplicacion inicial");
+    expect(adminPage).toContain("Aplicacion inicial registrada en CTL");
     expect(linkPanel).toContain("Copiar link");
     expect(linkPanel).toContain("Abrir link");
     expect(linkPanel).toContain("${url}");
@@ -713,11 +719,12 @@ describe("navigo app MVP rules", () => {
     const capture = readWorkspaceFile("src", "app", "p", "[token]", "activities", "_components", "NavigoActivityCapture.tsx");
 
     expect(adminPage).toContain("Abrir link participante");
-    expect(participantPage).toContain("Aplicacion inicial de fragancia");
+    expect(participantPage).toContain("Aplicacion inicial registrada en CTL");
     expect(participantPage).toContain("evaluaciones de fragancia a 3, 4.5 y 6 horas");
-    expect(participantPage).toContain("La primera evaluacion de App Navigo se abrira a las 3 horas");
+    expect(participantPage).toContain("base para calcular las evaluaciones posteriores de 3, 4.5 y 6 horas");
     expect(actions).toContain("La primera evaluacion estara disponible a las 3 horas.");
     expect(repository).toContain("registerInitialApplication");
+    expect(repository).toContain("recordApplicationStartedFromCtl");
     expect(repository).toContain("createRegisteredSelfiePreview");
     expect(capture).toContain("Verificación visual de identidad");
     expect(capture).toContain("IdentityConfirmation");
@@ -769,7 +776,8 @@ describe("navigo app MVP rules", () => {
     expect(adminPage).toContain("Marcar como coincide");
     expect(adminPage).toContain("Marcar como no coincide");
     expect(adminPage).toContain("Marcar como requiere revisión");
-    expect(adminPage).toContain("Incidencia de identidad: bloquear avance hasta revisión.");
+    expect(adminPage).toContain("Incidencia de identidad: revisar posteriormente con supervisor.");
+    expect(adminPage).toContain("Incidencia de identidad: revisar posteriormente. No bloquea el avance del panelista.");
     expect(adminPage).toContain("Verificación automática");
     expect(adminPage).toContain("Score/similitud");
     expect(adminPage).toContain("Umbrales: MATCH &gt;= 0.60, NO_MATCH &lt;= 0.35");
@@ -846,15 +854,16 @@ describe("navigo app MVP rules", () => {
     );
   });
 
-  it("keeps initial application correction operable and separates correction actions in admin", () => {
+  it("keeps destructive correction actions separated after moving application start to CLT", () => {
     const adminPage = readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "page.tsx");
     const actions = readWorkspaceFile("src", "modules", "navigo-app", "actions.ts");
     const repository = readWorkspaceFile("src", "modules", "navigo-app", "repository.ts");
 
-    expect(adminPage).toContain("nowInStudyTimezoneForDateTimeLocal");
     expect(adminPage).not.toContain("toISOString().slice");
-    expect(adminPage).toContain("Guardar aplicacion inicial");
-    expect(adminPage).toContain("Guardando aplicacion inicial...");
+    expect(adminPage).not.toContain("Guardar aplicacion inicial");
+    expect(adminPage).not.toContain("Guardando aplicacion inicial...");
+    expect(adminPage).toContain("Aplicacion inicial registrada en CTL");
+    expect(adminPage).toContain("sendNavigoEvaluationLinkWhatsAppAction");
     expect(adminPage).toContain("Acciones de correccion");
     expect(adminPage).toContain("REINICIAR APP");
     expect(adminPage).toContain("ELIMINAR ETAPAS");
@@ -863,12 +872,121 @@ describe("navigo app MVP rules", () => {
     expect(adminPage).toContain("deleteNavigoParticipantAction");
     expect(actions).toContain("resetNavigoParticipantAppAction");
     expect(actions).toContain("deleteNavigoParticipantAction");
+    expect(actions).toContain("sendNavigoEvaluationLinkWhatsAppAction");
     expect(actions).toContain("admin:access");
     expect(actions).toContain("Selecciona la hora de aplicacion inicial.");
     expect(repository).toContain("NAVIGO_T0_IDENTITY_QUESTION_ID");
     expect(repository).toContain("resetParticipantApp");
     expect(repository).toContain("deleteParticipantStagesFrom");
     expect(repository).toContain("deleteParticipant");
+  });
+
+  it("envia recordatorio WhatsApp T3 cuando la evaluacion esta disponible y pendiente", async () => {
+    const state = createNavigoParticipantImportState();
+    const whatsApp = createFakeNavigoWhatsAppRepository();
+    const repository = createNavigoAppRepository(state.prisma as never, whatsApp.repository);
+    seedDueNavigoReminderActivity(state, "T3_HORAS", new Date("2026-08-08T09:00:00.000Z"));
+    vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "phone-number-id");
+    vi.stubEnv("WHATSAPP_ONEUI_PHONE_NUMBER", "5215511303411");
+    const fetcher = vi.fn(async () => ({
+      json: async () => ({ messages: [{ id: "wamid-t3", message_status: "accepted" }] }),
+      ok: true,
+      status: 200
+    }));
+    vi.stubGlobal("fetch", fetcher);
+
+    const result = await repository.processEvaluationWhatsAppReminders({
+      now: new Date("2026-08-08T09:00:00.000Z"),
+      requestOrigin: "https://example.test",
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.sent : 0).toBe(1);
+    expect(result.ok ? result.data.results[0] : null).toMatchObject({
+      activityCode: "T3_HORAS",
+      status: "SENT"
+    });
+    expect(state.reminderLogs).toHaveLength(1);
+    expect(state.reminderLogs[0]).toMatchObject({
+      status: "COMPLETED"
+    });
+    expect(whatsApp.messages[0]).toMatchObject({
+      bodyText: "Tu siguiente evaluacion ya se encuentra disponible.\n\nTe invitamos a realizarla ahora.",
+      metaMessageId: "wamid-t3",
+      status: "accepted"
+    });
+    expect((whatsApp.messages[0]?.rawPayload as { request?: { template?: unknown } }).request?.template).toMatchObject({
+      components: [
+        {
+          index: "0",
+          parameters: [{ text: "https://example.test/p/token-reminder/activities", type: "text" }],
+          sub_type: "url",
+          type: "button"
+        }
+      ],
+      name: "navigo_recordatorio_evaluacion"
+    });
+  });
+
+  it("no duplica recordatorios WhatsApp Navigo ya auditados", async () => {
+    const state = createNavigoParticipantImportState();
+    const whatsApp = createFakeNavigoWhatsAppRepository();
+    const repository = createNavigoAppRepository(state.prisma as never, whatsApp.repository);
+    seedDueNavigoReminderActivity(state, "T3_HORAS", new Date("2026-08-08T09:00:00.000Z"));
+    vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "phone-number-id");
+    const fetcher = vi.fn(async () => ({
+      json: async () => ({ messages: [{ id: "wamid-t3", message_status: "accepted" }] }),
+      ok: true,
+      status: 200
+    }));
+    vi.stubGlobal("fetch", fetcher);
+
+    await repository.processEvaluationWhatsAppReminders({
+      now: new Date("2026-08-08T09:00:00.000Z"),
+      requestOrigin: "https://example.test",
+      studyId: state.study.id
+    });
+    const secondResult = await repository.processEvaluationWhatsAppReminders({
+      now: new Date("2026-08-08T09:01:00.000Z"),
+      requestOrigin: "https://example.test",
+      studyId: state.study.id
+    });
+
+    expect(secondResult.ok).toBe(true);
+    expect(secondResult.ok ? secondResult.data.sent : -1).toBe(0);
+    expect(secondResult.ok ? secondResult.data.skipped : 0).toBe(1);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(state.reminderLogs).toHaveLength(1);
+  });
+
+  it("envia recordatorios WhatsApp para T4.5 y T6 cuando corresponden", async () => {
+    const state = createNavigoParticipantImportState();
+    const whatsApp = createFakeNavigoWhatsAppRepository();
+    const repository = createNavigoAppRepository(state.prisma as never, whatsApp.repository);
+    seedDueNavigoReminderActivity(state, "T4_5_HORAS", new Date("2026-08-08T10:30:00.000Z"));
+    seedDueNavigoReminderActivity(state, "T6_HORAS", new Date("2026-08-08T12:00:00.000Z"));
+    vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "phone-number-id");
+    const fetcher = vi.fn(async () => ({
+      json: async () => ({ messages: [{ id: `wamid-${fetcher.mock.calls.length + 1}`, message_status: "accepted" }] }),
+      ok: true,
+      status: 200
+    }));
+    vi.stubGlobal("fetch", fetcher);
+
+    const result = await repository.processEvaluationWhatsAppReminders({
+      now: new Date("2026-08-08T12:00:00.000Z"),
+      requestOrigin: "https://example.test",
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.sent : 0).toBe(2);
+    expect(result.ok ? result.data.results.map((item) => item.activityCode) : []).toEqual(["T4_5_HORAS", "T6_HORAS"]);
+    expect(state.reminderLogs.map((log) => log.status)).toEqual(["COMPLETED", "COMPLETED"]);
   });
 
   it("does not treat T0 as completed only because an application time exists", () => {
@@ -2270,6 +2388,59 @@ describe("navigo app MVP rules", () => {
     })).toBe(false);
   });
 
+  it("records T0 from CTL comparative start and keeps existing availability calculations", async () => {
+    const state = createNavigoParticipantImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    await repository.configureStudyRotation({
+      actorUserId: "admin-1",
+      firstInternalName: "Fragancia A",
+      firstSampleKey: "247",
+      secondInternalName: "Fragancia B",
+      secondSampleKey: "583",
+      studyId: state.study.id
+    });
+    const registered = await repository.registerDirectParticipant({
+      actorUserId: "admin-1",
+      celular: "5512345678",
+      folio: "NAV-001",
+      generateLink: false,
+      nombre: "Participante Uno",
+      studyId: state.study.id
+    });
+    const participantId = registered.ok ? registered.data.studyParticipantId : "";
+    state.ctlSessions.push({
+      completedAt: new Date("2026-08-08T06:20:00.000Z"),
+      createdAt: new Date("2026-08-08T05:00:00.000Z"),
+      ctlInterviewerCode: { label: "Jesus" },
+      id: "ctl-session-1",
+      interviewer: null,
+      status: "COMPLETED",
+      studyParticipantId: participantId
+    });
+
+    const result = await repository.recordApplicationStartedFromCtl({
+      actorUserId: "admin-1",
+      now: new Date("2026-08-08T06:30:00.000Z"),
+      studyParticipantId: participantId
+    });
+
+    expect(result.ok).toBe(true);
+    expect(state.studyParticipants.find((participant) => participant.id === participantId)?.applicationStartedAt?.toISOString()).toBe("2026-08-08T06:30:00.000Z");
+    const createdActivities = state.activities
+      .map((activity) => ({
+        code: state.schedules.find((schedule) => schedule.id === activity.activityScheduleId)?.code,
+        scheduledAt: activity.scheduledAt
+      }))
+      .sort((left, right) => left.scheduledAt.getTime() - right.scheduledAt.getTime());
+    expect(createdActivities.map((activity) => activity.code)).toEqual(["T3_HORAS", "T4_5_HORAS", "T6_HORAS"]);
+    expect(createdActivities.map((activity) => activity.scheduledAt.toISOString())).toEqual([
+      "2026-08-08T09:30:00.000Z",
+      "2026-08-08T11:00:00.000Z",
+      "2026-08-08T12:30:00.000Z"
+    ]);
+    expect(state.applicationTimeEvents).toHaveLength(1);
+  });
+
   it("keeps CTL release rotation fixed and assigns independent rotations to two participants", async () => {
     const state = createNavigoParticipantImportState();
     const repository = createNavigoAppRepository(state.prisma as never);
@@ -2370,7 +2541,7 @@ describe("navigo app MVP rules", () => {
     expect(view.ok ? view.data.selfieReviewStatus : "missing").toBeNull();
   });
 
-  it("requires an approved selfie from the current T4 activity before saving responses", async () => {
+  it("requires a selfie from the current T4 activity before saving responses without requiring approval", async () => {
     const state = createNavigoParticipantActivityState();
     const repository = createNavigoAppRepository(state.prisma as never);
     const t4 = state.activities.find((activity) => activity.id === "activity-T4_HORAS");
@@ -2394,7 +2565,7 @@ describe("navigo app MVP rules", () => {
       createActivitySelfieEvidence({
         id: "evidence-t4",
         participantActivityId: "activity-T4_HORAS",
-        reviewStatus: "APPROVED"
+        reviewStatus: "REJECTED"
       })
     );
     const saved = await repository.submitActivityResponses({
@@ -2405,7 +2576,7 @@ describe("navigo app MVP rules", () => {
     });
 
     expect(blocked.ok).toBe(false);
-    expect(blocked.ok ? "" : blocked.message).toBe("Toma una selfie aprobada de esta evaluacion antes de guardar las respuestas.");
+    expect(blocked.ok ? "" : blocked.message).toBe("Toma y guarda la selfie de esta evaluacion antes de guardar las respuestas.");
     expect(saved.ok).toBe(true);
     expect(state.responses.filter((response) => response.participantActivityId === "activity-T4_HORAS")).toHaveLength(7);
     expect(t4?.status).toBe("COMPLETED");
@@ -3716,7 +3887,15 @@ function createNavigoParticipantImportState(
   const participantScreeningReviews: Array<{ id: string; screeningAttemptId: string; studyParticipantId: string }> = [];
   const participantConsents: Array<{ id: string; studyParticipantId: string }> = [];
   const quotaEvaluations: Array<{ id: string; studyParticipantId: string }> = [];
-  const reminderLogs: Array<{ id: string; participantActivityId: string }> = [];
+  const reminderLogs: Array<{
+    channel?: string;
+    id: string;
+    metadataJson?: unknown;
+    participantActivityId: string;
+    scheduledFor?: Date | null;
+    sentAt?: Date | null;
+    status?: string;
+  }> = [];
   const mediaEvidencePlaceholders: Array<{ id: string; participantActivityId: string }> = [];
   const researchResponses: Array<{ id: string; participantActivityId: string }> = [];
   const screeningAnswers: Array<{ id: string; screeningAttemptId: string }> = [];
@@ -3944,8 +4123,66 @@ function createNavigoParticipantImportState(
       async deleteMany(args: { where: { id: { in: string[] } } }) {
         return deleteWhere(activities, (activity) => args.where.id.in.includes(activity.id));
       },
-      async findMany(args: { where: { studyParticipantId: string } }) {
-        return activities.filter((activity) => activity.studyParticipantId === args.where.studyParticipantId);
+      async findMany(args: {
+        where: {
+          activitySchedule?: { code?: { in: readonly string[] }; status?: string };
+          availableFrom?: { lte: Date };
+          status?: { not: string };
+          studyParticipant?: { studyId?: string };
+          studyParticipantId?: string;
+        };
+      }) {
+        if (args.where.studyParticipantId) {
+          return activities.filter((activity) => activity.studyParticipantId === args.where.studyParticipantId);
+        }
+
+        return activities
+          .filter((activity) => {
+            const schedule = schedules.find((item) => item.id === activity.activityScheduleId);
+            const participant = studyParticipants.find((item) => item.id === activity.studyParticipantId);
+
+            return (
+              Boolean(schedule) &&
+              Boolean(participant) &&
+              (args.where.activitySchedule?.code === undefined ||
+                args.where.activitySchedule.code.in.includes(schedule!.code)) &&
+              (args.where.activitySchedule?.status === undefined || schedule!.status === args.where.activitySchedule.status) &&
+              (args.where.availableFrom === undefined || activity.availableFrom.getTime() <= args.where.availableFrom.lte.getTime()) &&
+              (args.where.status === undefined || activity.status !== args.where.status.not) &&
+              (args.where.studyParticipant?.studyId === undefined || participant!.studyId === args.where.studyParticipant.studyId)
+            );
+          })
+          .map((activity) => {
+            const schedule = schedules.find((item) => item.id === activity.activityScheduleId);
+            const participant = buildParticipantRecord(activity.studyParticipantId);
+            if (!schedule || !participant) {
+              throw new Error("test fixture missing reminder relation");
+            }
+
+            return {
+              activitySchedule: {
+                code: schedule.code,
+                id: schedule.id
+              },
+              availableFrom: activity.availableFrom,
+              id: activity.id,
+              reminders: reminderLogs
+                .filter((log) => log.participantActivityId === activity.id && log.channel === "INTERNAL_FOLLOWUP")
+                .map((log) => ({ id: log.id, metadataJson: log.metadataJson, status: log.status })),
+              status: activity.status,
+              studyParticipant: {
+                accessTokens: participant.accessTokens,
+                id: participant.id,
+                participantConfirmation: participant.participantConfirmation
+                  ? { folio: participant.participantConfirmation.folio }
+                  : null,
+                participantProfile: participant.participantProfile,
+                qaParticipantRun: null,
+                study: participant.study,
+                studyId: participant.study.id
+              }
+            };
+          });
       }
     },
     participantActivityEvidence: {
@@ -4193,8 +4430,41 @@ function createNavigoParticipantImportState(
       }
     },
     reminderLog: {
+      async create(args: {
+        data: {
+          channel: string;
+          metadataJson: unknown;
+          participantActivityId: string;
+          scheduledFor: Date;
+          status: string;
+        };
+        select?: { id: true };
+      }) {
+        const record = {
+          ...args.data,
+          id: `reminder-${reminderLogs.length + 1}`,
+          sentAt: null
+        };
+        reminderLogs.push(record);
+        return args.select ? { id: record.id } : record;
+      },
       async deleteMany(args: { where: { participantActivityId: { in: string[] } } }) {
         return deleteWhere(reminderLogs, (log) => args.where.participantActivityId.in.includes(log.participantActivityId));
+      },
+      async update(args: {
+        data: {
+          metadataJson?: unknown;
+          sentAt?: Date | null;
+          status?: string;
+        };
+        where: { id: string };
+      }) {
+        const target = reminderLogs.find((log) => log.id === args.where.id);
+        if (!target) {
+          throw new Error("reminder not found");
+        }
+        Object.assign(target, args.data);
+        return target;
       }
     },
     researchResponse: {
@@ -4212,6 +4482,11 @@ function createNavigoParticipantImportState(
       }
     },
     applicationTimeEvent: {
+      async create(args: { data: { studyParticipantId: string } }) {
+        const record = { id: `application-time-event-${applicationTimeEvents.length + 1}`, studyParticipantId: args.data.studyParticipantId };
+        applicationTimeEvents.push(record);
+        return record;
+      },
       async deleteMany(args: { where: { studyParticipantId: string } }) {
         return deleteWhere(applicationTimeEvents, (event) => event.studyParticipantId === args.where.studyParticipantId);
       }
@@ -4423,6 +4698,170 @@ function createNavigoParticipantImportState(
     screeningAttempts,
     study,
     studyParticipants
+  };
+}
+
+function seedDueNavigoReminderActivity(
+  state: ReturnType<typeof createNavigoParticipantImportState>,
+  activityCode: "T3_HORAS" | "T4_5_HORAS" | "T6_HORAS",
+  availableFrom: Date
+) {
+  const participantId = state.studyParticipants[0]?.id ?? seedApprovedFieldParticipantForNavigo(state);
+  const schedule = {
+    code: activityCode,
+    id: `schedule-${activityCode}`,
+    offsetMinutes: activityCode === "T3_HORAS" ? 180 : activityCode === "T4_5_HORAS" ? 270 : 360,
+    questionnaireVersionId: "questionnaire-active-1",
+    sortOrder: state.schedules.length + 1,
+    status: "ACTIVE" as const,
+    studyId: state.study.id,
+    type: "QUESTIONNAIRE_MEASUREMENT" as const,
+    windowEndsMinutes: 420,
+    windowStartsMinutes: -30
+  };
+  state.schedules.push(schedule as never);
+  if (!state.accessTokens.some((token) => token.id === "token-reminder")) {
+    state.accessTokens.push({
+      createdByUserId: "admin-1",
+      expiresAt: new Date("2026-08-15T09:00:00.000Z"),
+      id: "token-reminder",
+      status: "ACTIVE",
+      studyParticipantId: participantId,
+      tokenHash: hashToken("token-reminder")
+    });
+  }
+  state.activities.push({
+    activityScheduleId: schedule.id,
+    actualCompletedAt: null,
+    actualStartedAt: null,
+    availableFrom,
+    availableUntil: new Date(availableFrom.getTime() + 4 * 60 * 60 * 1000),
+    id: `activity-${activityCode}`,
+    occurrenceKey: "DEFAULT",
+    scheduledAt: availableFrom,
+    status: "AVAILABLE",
+    studyParticipantId: participantId
+  });
+}
+
+function createFakeNavigoWhatsAppRepository(): {
+  conversations: Array<{ id: string; linkedParticipantId: string | null; linkedStudyId: string | null; phoneNumber: string }>;
+  messages: OneuiWhatsAppMessageRecord[];
+  repository: OneuiWhatsAppRepository;
+} {
+  const conversations: Array<{ id: string; linkedParticipantId: string | null; linkedStudyId: string | null; phoneNumber: string }> = [];
+  const messages: OneuiWhatsAppMessageRecord[] = [];
+  const repository: OneuiWhatsAppRepository = {
+    async createOutboundMessage(input) {
+      const message = createFakeWhatsAppMessage({
+        bodyText: input.bodyText,
+        conversationId: input.conversationId,
+        fromPhone: input.fromPhone,
+        id: `message-${messages.length + 1}`,
+        rawPayload: input.rawPayload,
+        timestamp: input.timestamp,
+        toPhone: input.toPhone
+      });
+      messages.push(message);
+      return message;
+    },
+    async findLatestOutboundTemplateMessage() {
+      return null;
+    },
+    async getConversationWithMessages() {
+      return null;
+    },
+    async listConversations() {
+      return [];
+    },
+    async markOutboundMessageAccepted(input) {
+      const message = messages.find((candidate) => candidate.id === input.messageId);
+      if (!message) {
+        throw new Error("message not found");
+      }
+      Object.assign(message, {
+        metaMessageId: input.metaMessageId,
+        rawPayload: input.rawPayload,
+        status: input.status,
+        timestamp: input.timestamp,
+        updatedAt: input.timestamp
+      });
+      return message;
+    },
+    async markOutboundMessageFailed(input) {
+      const message = messages.find((candidate) => candidate.id === input.messageId);
+      if (!message) {
+        throw new Error("message not found");
+      }
+      Object.assign(message, {
+        rawPayload: input.rawPayload,
+        status: input.status
+      });
+      return message;
+    },
+    async saveInboundMessage() {
+      throw new Error("not implemented");
+    },
+    async saveStatusEvent() {
+      throw new Error("not implemented");
+    },
+    async upsertInboundConversation() {
+      throw new Error("not implemented");
+    },
+    async upsertOutboundConversation(input) {
+      let conversation = conversations.find((candidate) => candidate.phoneNumber === input.phoneNumber);
+      if (!conversation) {
+        conversation = {
+          id: `conversation-${conversations.length + 1}`,
+          linkedParticipantId: input.linkedParticipantId ?? null,
+          linkedStudyId: input.linkedStudyId ?? null,
+          phoneNumber: input.phoneNumber
+        };
+        conversations.push(conversation);
+      }
+      return {
+        createdAt: new Date("2026-08-08T09:00:00.000Z"),
+        id: conversation.id,
+        lastInboundAt: null,
+        lastMessageAt: null,
+        lastOutboundAt: null,
+        linkedParticipantId: conversation.linkedParticipantId,
+        linkedStudyId: conversation.linkedStudyId,
+        phoneNumber: conversation.phoneNumber,
+        profileName: input.profileName ?? null,
+        sourceModule: input.sourceModule,
+        updatedAt: new Date("2026-08-08T09:00:00.000Z"),
+        waId: input.waId
+      };
+    }
+  };
+
+  return { conversations, messages, repository };
+}
+
+function createFakeWhatsAppMessage(input: {
+  bodyText: string;
+  conversationId: string;
+  fromPhone: string;
+  id: string;
+  rawPayload: unknown;
+  timestamp: Date;
+  toPhone: string;
+}): OneuiWhatsAppMessageRecord {
+  return {
+    bodyText: input.bodyText,
+    conversationId: input.conversationId,
+    createdAt: input.timestamp,
+    direction: "OUTBOUND",
+    fromPhone: input.fromPhone,
+    id: input.id,
+    messageType: "template",
+    metaMessageId: null,
+    rawPayload: input.rawPayload,
+    status: "pending",
+    timestamp: input.timestamp,
+    toPhone: input.toPhone,
+    updatedAt: input.timestamp
   };
 }
 

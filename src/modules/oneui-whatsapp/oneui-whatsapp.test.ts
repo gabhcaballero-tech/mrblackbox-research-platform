@@ -22,7 +22,13 @@ import {
   sendOneuiWhatsAppTemplate,
   sendOneuiWhatsAppTextReply
 } from "./service";
-import { buildNavigoCodesWhatsAppBody, sendHutRegistrationWhatsApp, sendNavigoConfirmationWhatsApp } from "./templates";
+import {
+  buildNavigoCodesWhatsAppBody,
+  sendHutRegistrationWhatsApp,
+  sendNavigoConfirmationWhatsApp,
+  sendNavigoEvaluationLinkWhatsApp,
+  sendNavigoEvaluationReminderWhatsApp
+} from "./templates";
 
 describe("ONEUI WhatsApp webhook processing", () => {
   it("crea conversación GENERAL y guarda mensaje inbound", async () => {
@@ -313,6 +319,83 @@ describe("ONEUI WhatsApp template sending", () => {
     expect(repository.messages[0]).toMatchObject({
       messageType: "template",
       metaMessageId: "wamid.navigo-1",
+      status: "accepted"
+    });
+  });
+
+  it("arma payload de plantilla Navigo evaluacion con nombre y enlace", async () => {
+    const repository = createFakeRepository();
+    const fetcher = viFetch({
+      contacts: [{ wa_id: "5215512345678" }],
+      messages: [{ id: "wamid.navigo-eval-1", message_status: "accepted" }]
+    });
+    const result = await sendNavigoEvaluationLinkWhatsApp({
+      env: whatsappEnv(),
+      evaluationUrl: "https://example.test/p/token/activities",
+      participantId: "participant-1",
+      participantName: "ANA",
+      phone: "5512345678",
+      repository,
+      sender: (input) => sendOneuiWhatsAppTemplate({ ...input, fetcher }),
+      studyId: "study-1"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(JSON.parse(fetcher.calls[0]?.init.body ?? "{}").template).toMatchObject({
+      components: [
+        {
+          parameters: [
+            { text: "ANA", type: "text" },
+            { text: "https://example.test/p/token/activities", type: "text" }
+          ],
+          type: "body"
+        }
+      ],
+      name: "navigo_evaluacion"
+    });
+    expect(repository.messages[0]).toMatchObject({
+      messageType: "template",
+      metaMessageId: "wamid.navigo-eval-1",
+      status: "accepted"
+    });
+  });
+
+  it("arma payload de recordatorio Navigo con boton de enlace personal", async () => {
+    const repository = createFakeRepository();
+    const fetcher = viFetch({
+      contacts: [{ wa_id: "5215512345678" }],
+      messages: [{ id: "wamid.navigo-reminder-1", message_status: "accepted" }]
+    });
+    const result = await sendNavigoEvaluationReminderWhatsApp({
+      activityCode: "T3_HORAS",
+      env: whatsappEnv(),
+      evaluationUrl: "https://example.test/p/token/activities",
+      participantId: "participant-1",
+      participantName: "ANA",
+      phone: "5512345678",
+      repository,
+      sender: (input) => sendOneuiWhatsAppTemplate({ ...input, fetcher }),
+      studyId: "study-1"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(JSON.parse(fetcher.calls[0]?.init.body ?? "{}").template).toMatchObject({
+      components: [
+        {
+          index: "0",
+          parameters: [
+            { text: "https://example.test/p/token/activities", type: "text" }
+          ],
+          sub_type: "url",
+          type: "button"
+        }
+      ],
+      name: "navigo_recordatorio_evaluacion"
+    });
+    expect(repository.messages[0]).toMatchObject({
+      bodyText: "Tu siguiente evaluacion ya se encuentra disponible.\n\nTe invitamos a realizarla ahora.",
+      messageType: "template",
+      metaMessageId: "wamid.navigo-reminder-1",
       status: "accepted"
     });
   });

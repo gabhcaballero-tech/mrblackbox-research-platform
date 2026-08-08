@@ -215,17 +215,17 @@ describe("NavigoActivityCapture", () => {
     expect(screen.getByText("Preguntas AP1 a AP7")).toBeInTheDocument();
   });
 
-  it("keeps AP1 to AP7 hidden when activity identity review is pending or rejected", () => {
+  it("shows AP1 to AP7 when activity selfie exists even if identity review is pending or rejected", () => {
     const pending = renderCapture({ selfieCount: 1, selfieReviewStatus: "PENDING" });
 
-    expect(screen.queryByText("Preguntas AP1 a AP7")).not.toBeInTheDocument();
-    expect(screen.getByText("No fue posible confirmar tu identidad automáticamente. Contacta a tu reclutador.")).toBeInTheDocument();
+    expect(screen.getByText("Preguntas AP1 a AP7")).toBeInTheDocument();
+    expect(screen.getByText("La revisión de identidad queda pendiente para el equipo interno y no bloquea esta evaluación.")).toBeInTheDocument();
     pending.unmount();
 
     renderCapture({ selfieCount: 1, selfieReviewStatus: "REJECTED" });
 
-    expect(screen.queryByText("Preguntas AP1 a AP7")).not.toBeInTheDocument();
-    expect(screen.getByText("No fue posible confirmar tu identidad. Contacta a tu reclutador.")).toBeInTheDocument();
+    expect(screen.getByText("Preguntas AP1 a AP7")).toBeInTheDocument();
+    expect(screen.getByText("La revisión de identidad queda pendiente para el equipo interno y no bloquea esta evaluación.")).toBeInTheDocument();
   });
 
   it("keeps T0 on identity confirmation and only shows AP1 to AP7 after identity YES", async () => {
@@ -428,7 +428,7 @@ describe("NavigoActivityCapture", () => {
     expect(screen.getByText(/Segunda fragancia:/)).toHaveTextContent("Segunda fragancia: CODIGO-B · brazo derecho");
   });
 
-  it("rejects an automatic NO_MATCH result and keeps AP1 to AP7 hidden", async () => {
+  it("keeps AP1 to AP7 available when automatic verification returns NO_MATCH", async () => {
     vi.mocked(verifyNavigoFaceIdentity).mockResolvedValueOnce({
       evaluatedAt: "2026-06-26T12:00:00.000Z",
       method: "@vladmandic/human:faceres+blazeface:v1",
@@ -440,11 +440,11 @@ describe("NavigoActivityCapture", () => {
 
     await uploadSelfie();
 
-    expect(await screen.findByText("No fue posible confirmar tu identidad. Contacta a tu reclutador.")).toBeInTheDocument();
-    expect(screen.queryByText("Preguntas AP1 a AP7")).not.toBeInTheDocument();
+    expect(await screen.findByText("Selfie registrada correctamente. Puedes continuar con tu evaluación.")).toBeInTheDocument();
+    expect(screen.getByText("Preguntas AP1 a AP7")).toBeInTheDocument();
   });
 
-  it("keeps AP1 to AP7 hidden when automatic verification is uncertain", async () => {
+  it("keeps AP1 to AP7 available when automatic verification is uncertain", async () => {
     vi.mocked(verifyNavigoFaceIdentity).mockResolvedValueOnce({
       evaluatedAt: "2026-06-26T12:00:00.000Z",
       method: "@vladmandic/human:faceres+blazeface:v1",
@@ -456,11 +456,11 @@ describe("NavigoActivityCapture", () => {
 
     await uploadSelfie();
 
-    expect(await screen.findByText("No fue posible confirmar tu identidad automáticamente. Contacta a tu reclutador.")).toBeInTheDocument();
-    expect(screen.queryByText("Preguntas AP1 a AP7")).not.toBeInTheDocument();
+    expect(await screen.findByText("Selfie registrada correctamente. Puedes continuar con tu evaluación.")).toBeInTheDocument();
+    expect(screen.getByText("Preguntas AP1 a AP7")).toBeInTheDocument();
   });
 
-  it("keeps AP1 to AP7 hidden when the similarity is 0.351 and remains uncertain", async () => {
+  it("keeps AP1 to AP7 available when the similarity is 0.351 and remains uncertain", async () => {
     vi.mocked(verifyNavigoFaceIdentity).mockResolvedValueOnce({
       evaluatedAt: "2026-06-26T12:00:00.000Z",
       method: "@vladmandic/human:faceres+blazeface:v1",
@@ -472,11 +472,11 @@ describe("NavigoActivityCapture", () => {
 
     await uploadSelfie();
 
-    expect(await screen.findByText("No fue posible confirmar tu identidad automáticamente. Contacta a tu reclutador.")).toBeInTheDocument();
-    expect(screen.queryByText("Preguntas AP1 a AP7")).not.toBeInTheDocument();
+    expect(await screen.findByText("Selfie registrada correctamente. Puedes continuar con tu evaluación.")).toBeInTheDocument();
+    expect(screen.getByText("Preguntas AP1 a AP7")).toBeInTheDocument();
   });
 
-  it("keeps AP1 to AP7 hidden when the facial model returns an error", async () => {
+  it("keeps AP1 to AP7 available when the facial model returns an error", async () => {
     vi.mocked(verifyNavigoFaceIdentity).mockResolvedValueOnce({
       evaluatedAt: "2026-06-26T12:00:00.000Z",
       method: "@vladmandic/human:faceres+blazeface:v1",
@@ -488,8 +488,8 @@ describe("NavigoActivityCapture", () => {
 
     await uploadSelfie();
 
-    expect(await screen.findByText("No fue posible confirmar tu identidad automáticamente. Contacta a tu reclutador.")).toBeInTheDocument();
-    expect(screen.queryByText("Preguntas AP1 a AP7")).not.toBeInTheDocument();
+    expect(await screen.findByText("Selfie registrada correctamente. Puedes continuar con tu evaluación.")).toBeInTheDocument();
+    expect(screen.getByText("Preguntas AP1 a AP7")).toBeInTheDocument();
   });
 
   it("keeps AP1 to AP7 hidden when upload fails", async () => {

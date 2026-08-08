@@ -133,6 +133,29 @@ export async function registerNavigoDirectParticipantAction(studyId: string, for
   });
 }
 
+export async function sendNavigoEvaluationLinkWhatsAppAction(
+  studyId: string,
+  studyParticipantId: string,
+  formData: FormData
+) {
+  const actor = await requireCapability("screening:review");
+  const requestOrigin = String(formData.get("requestOrigin") ?? "");
+  const result = await createNavigoAppRepository().sendEvaluationLinkWhatsApp({
+    actorUserId: actor.id,
+    requestOrigin,
+    studyId,
+    studyParticipantId
+  });
+
+  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+
+  if (!result.ok) {
+    redirectWithNavigoMessage(studyId, { error: result.message });
+  }
+
+  redirectWithNavigoMessage(studyId, { message: result.message });
+}
+
 export async function generateNavigoParticipantLinksForStudyAction(studyId: string, formData: FormData) {
   const actor = await requireCapability("screening:review");
   await ensureNavigoAppFoundation({ actorUserId: actor.id });

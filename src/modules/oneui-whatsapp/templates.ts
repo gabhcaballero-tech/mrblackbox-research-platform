@@ -16,6 +16,8 @@ export type WhatsAppTemplateSender = typeof sendOneuiWhatsAppTemplate;
 
 const NAVIGO_CONFIRMATION_TEMPLATE_NAME = "oneui_navigo_confirmation_participacion";
 const LEGACY_NAVIGO_CONFIRMATION_TEMPLATE_NAME = "oneui_navigo_confirmacion_participacion";
+const NAVIGO_EVALUATION_TEMPLATE_NAME = "navigo_evaluacion";
+const NAVIGO_EVALUATION_REMINDER_TEMPLATE_NAME = "navigo_recordatorio_evaluacion";
 
 export function whatsappAutomationStatusFromMessage(
   message: Pick<OneuiWhatsAppMessageRecord, "createdAt" | "metaMessageId" | "rawPayload" | "status" | "timestamp"> | null
@@ -133,6 +135,120 @@ export function buildNavigoCodesWhatsAppBody({
     "Conserva este mensaje y tus códigos, ya que serán solicitados durante tu evaluación.",
     "",
     "Gracias por participar."
+  ].join("\n");
+}
+
+export async function sendNavigoEvaluationLinkWhatsApp(input: {
+  env?: NodeJS.ProcessEnv;
+  evaluationUrl: string;
+  now?: Date;
+  participantId: string;
+  participantName: string;
+  phone: string | null;
+  repository?: OneuiWhatsAppRepository;
+  sender?: WhatsAppTemplateSender;
+  studyId: string;
+}): Promise<OneuiWhatsAppSendTemplateResult | { ok: false; code: "SKIPPED"; message: string }> {
+  const env = input.env ?? process.env;
+
+  if (env.WHATSAPP_NAVIGO_AUTO_SEND_ENABLED === "false") {
+    return { code: "SKIPPED", message: "Envio automatico Navigo desactivado.", ok: false };
+  }
+
+  if (!input.participantName || !input.phone || !input.evaluationUrl) {
+    return { code: "SKIPPED", message: "Faltan datos para enviar enlace de evaluacion Navigo.", ok: false };
+  }
+
+  const sender = input.sender ?? sendOneuiWhatsAppTemplate;
+
+  return sender({
+    bodyText: buildNavigoEvaluationLinkWhatsAppBody({
+      evaluationUrl: input.evaluationUrl,
+      participantName: input.participantName
+    }),
+    env,
+    language: env.WHATSAPP_NAVIGO_EVALUATION_LANGUAGE ?? "es",
+    linkedParticipantId: input.participantId,
+    linkedStudyId: input.studyId,
+    now: input.now,
+    parameters: [
+      textParameter(input.participantName),
+      textParameter(input.evaluationUrl)
+    ],
+    profileName: input.participantName,
+    repository: input.repository,
+    sourceModule: "NAVIGO",
+    templateName: env.WHATSAPP_NAVIGO_EVALUATION_TEMPLATE ?? NAVIGO_EVALUATION_TEMPLATE_NAME,
+    toPhone: input.phone
+  });
+}
+
+export function buildNavigoEvaluationLinkWhatsAppBody({
+  evaluationUrl,
+  participantName
+}: {
+  evaluationUrl: string;
+  participantName: string;
+}): string {
+  return [
+    `Hola ${participantName}.`,
+    "",
+    "Tu evaluacion de fragancia ya esta disponible.",
+    "",
+    "Ingresa en el siguiente enlace:",
+    "",
+    evaluationUrl,
+    "",
+    "Gracias por participar."
+  ].join("\n");
+}
+
+export async function sendNavigoEvaluationReminderWhatsApp(input: {
+  activityCode: string;
+  env?: NodeJS.ProcessEnv;
+  evaluationUrl: string;
+  now?: Date;
+  participantId: string;
+  participantName: string;
+  phone: string | null;
+  repository?: OneuiWhatsAppRepository;
+  sender?: WhatsAppTemplateSender;
+  studyId: string;
+}): Promise<OneuiWhatsAppSendTemplateResult | { ok: false; code: "SKIPPED"; message: string }> {
+  const env = input.env ?? process.env;
+
+  if (env.WHATSAPP_NAVIGO_AUTO_SEND_ENABLED === "false") {
+    return { code: "SKIPPED", message: "Envio automatico Navigo desactivado.", ok: false };
+  }
+
+  if (!input.participantName || !input.phone || !input.evaluationUrl || !input.activityCode) {
+    return { code: "SKIPPED", message: "Faltan datos para enviar recordatorio Navigo.", ok: false };
+  }
+
+  const sender = input.sender ?? sendOneuiWhatsAppTemplate;
+
+  return sender({
+    bodyText: buildNavigoEvaluationReminderWhatsAppBody(),
+    buttonUrl: input.evaluationUrl,
+    env,
+    language: env.WHATSAPP_NAVIGO_REMINDER_LANGUAGE ?? "es",
+    linkedParticipantId: input.participantId,
+    linkedStudyId: input.studyId,
+    now: input.now,
+    parameters: [],
+    profileName: input.participantName,
+    repository: input.repository,
+    sourceModule: "NAVIGO",
+    templateName: env.WHATSAPP_NAVIGO_REMINDER_TEMPLATE ?? NAVIGO_EVALUATION_REMINDER_TEMPLATE_NAME,
+    toPhone: input.phone
+  });
+}
+
+export function buildNavigoEvaluationReminderWhatsAppBody(): string {
+  return [
+    "Tu siguiente evaluacion ya se encuentra disponible.",
+    "",
+    "Te invitamos a realizarla ahora."
   ].join("\n");
 }
 
