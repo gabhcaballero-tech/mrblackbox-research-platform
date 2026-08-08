@@ -77,6 +77,9 @@ export default async function HutAdminPage({ params, searchParams }: HutAdminPag
         <Link className="text-zinc-700 transition hover:text-zinc-950" href={`/admin/studies/${studyId}/hut/export`}>
           Exportar avance HUT (TSV)
         </Link>
+        <Link className="text-zinc-700 transition hover:text-zinc-950" href={`/admin/studies/${studyId}/hut-ops`}>
+          Operacion HUT
+        </Link>
       </div>
 
       {query?.hutMessage ? (
