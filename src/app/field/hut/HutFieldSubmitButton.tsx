@@ -11,7 +11,7 @@ export function HutFieldSubmitButton() {
       disabled={pending}
       type="submit"
     >
-      {pending ? "Guardando..." : "Guardar y continuar"}
+      {pending ? "Guardando..." : "Guardar respuesta"}
     </button>
   );
 }

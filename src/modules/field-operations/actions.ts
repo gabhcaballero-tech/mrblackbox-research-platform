@@ -26,6 +26,7 @@ export async function sendFieldNavigoEvaluationReminderNowAction(
     params.set("fieldOpsError", result.message);
   }
 
+  revalidatePath("/field/dashboard");
   revalidatePath("/field/operations");
   redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}${params.toString()}`);
 }

@@ -41,7 +41,7 @@ describe("FieldHutPage", () => {
     expect(screen.getByText("NAV-121")).toBeInTheDocument();
     expect(screen.getByText("EVA1")).toBeInTheDocument();
     expect(screen.getAllByText("247").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Evidencias fotograficas")).toBeInTheDocument();
+    expect(screen.getByText("Evidencias fotográficas")).toBeInTheDocument();
     expect(screen.getByText("Producto: 247")).toBeInTheDocument();
     expect(screen.getByText("Respuestas existentes")).toBeInTheDocument();
     expect(screen.getByText(/Participo anteriormente en CLT/)).toBeInTheDocument();
@@ -49,7 +49,8 @@ describe("FieldHutPage", () => {
     expect(screen.getByText("Primer perfume HUT:")).toBeInTheDocument();
     expect(screen.queryByText("HUT_EVA1")).not.toBeInTheDocument();
     expect(screen.queryByText("HUT_EVA2")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Guardar y continuar" })).toBeInTheDocument();
+    expect(screen.getByText("Preguntas contestadas")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Guardar respuesta" })).toBeInTheDocument();
   });
 
   it("resuelve rotacion, muestra etiquetas de escala y recupera seleccion guardada", async () => {
@@ -71,6 +72,10 @@ describe("FieldHutPage", () => {
     expect(screen.getByText("Me disgusta muchisimo")).toBeInTheDocument();
     expect(screen.getByText("Me gusta mucho")).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /Me gusta mucho/i })).toBeChecked();
+    expect(screen.getByRole("link", { name: "Continuar" })).toHaveAttribute(
+      "href",
+      "/field/hut?folio=HUT-121&questionCode=HUT_EVA1_ATRIBUTOS"
+    );
     expect(screen.queryByText("HUT_EVA1")).not.toBeInTheDocument();
     expect(screen.queryByText("HUT_EVA2")).not.toBeInTheDocument();
   });

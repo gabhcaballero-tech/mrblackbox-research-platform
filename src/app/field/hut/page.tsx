@@ -38,7 +38,7 @@ export default async function FieldHutPage({ searchParams }: FieldHutPageProps) 
       <div className="mx-auto w-full max-w-5xl space-y-6">
         <header>
           <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Campo HUT</p>
-          <h1 className="mt-2 text-3xl font-semibold text-zinc-950">Captura de evaluacion HUT</h1>
+          <h1 className="mt-2 text-3xl font-semibold text-zinc-950">Captura de evaluación HUT</h1>
           <p className="mt-2 text-sm text-zinc-600">
             Busca un participante por folio NAV o HUT para revisar evidencias y continuar el cuestionario.
           </p>
@@ -113,7 +113,7 @@ function FieldHutWorkspace({
 
   return (
     <div className="space-y-6">
-      <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+      <section className="sticky top-0 z-10 rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
@@ -121,31 +121,31 @@ function FieldHutWorkspace({
             </p>
             <h2 className="mt-2 text-2xl font-semibold text-zinc-950">{workspace.participant.name}</h2>
             <p className="mt-2 text-sm text-zinc-600">
-              NAV: {workspace.participant.navFolio ?? "Sin NAV vinculado"} · Origen: {workspace.participant.origin}
+              NAV: {workspace.participant.navFolio ?? "Sin NAV vinculado"} · Origen: {originLabel(workspace.participant.origin)}
             </p>
           </div>
           <StatusBadge status={workspace.questionnaire.attempt.status === "COMPLETED" ? "ready" : "planned"}>
-            {workspace.questionnaire.attempt.status}
+            {statusLabel(workspace.questionnaire.attempt.status)}
           </StatusBadge>
         </div>
         <div className="mt-5 grid gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm sm:grid-cols-3">
-          <Fact label="Telefono" value={workspace.participant.phone ?? "No disponible"} />
+          <Fact label="Teléfono" value={workspace.participant.phone ?? "No disponible"} />
           <Fact label="Correo" value={workspace.participant.email ?? "No disponible"} />
           <Fact label="EVA1" value={workspace.rotation.eva1 ?? "No asignada"} />
           <Fact label="EVA2" value={workspace.rotation.eva2 ?? "No asignada"} />
-          <Fact label="Protocolo" value={workspace.participant.protocolVersion} />
-          <Fact label="Estado HUT" value={workspace.participant.status} />
+          <Fact label="Sección actual" value={nextQuestion ? sectionTitle(nextQuestion.section) : "Sin preguntas pendientes"} />
+          <Fact label="Estado HUT" value={statusLabel(workspace.participant.status)} />
         </div>
       </section>
 
       <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-        <h3 className="text-lg font-semibold text-zinc-950">Evidencias fotograficas</h3>
+        <h3 className="text-lg font-semibold text-zinc-950">Evidencias fotográficas</h3>
         {workspace.photos.length ? (
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {workspace.photos.map((photo, index) => (
               <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={`${photo.source}-${photo.capturedAt.toISOString()}-${index}`}>
                 <p className="font-semibold text-zinc-950">
-                  {photo.phase ?? `Dia ${photo.useDayNumber ?? "-"}`}
+                  {photo.phase ?? `Día ${photo.useDayNumber ?? "-"}`}
                 </p>
                 <p className="mt-1 text-zinc-600">Producto: {photo.productCode ?? "No asignado"}</p>
                 <p className="text-zinc-600">Fecha: {photo.capturedAt.toLocaleString("es-MX")}</p>
@@ -158,17 +158,17 @@ function FieldHutWorkspace({
             ))}
           </div>
         ) : (
-          <p className="mt-3 text-sm text-zinc-600">No hay fotos registradas todavia.</p>
+          <p className="mt-3 text-sm text-zinc-600">Todavía no hay fotos registradas.</p>
         )}
       </section>
 
       <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-        <h3 className="text-lg font-semibold text-zinc-950">Fases y codigos HUT</h3>
+        <h3 className="text-lg font-semibold text-zinc-950">Fases y códigos HUT</h3>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {workspace.phaseCodes.map((phaseCode) => (
             <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={phaseCode.phase}>
               <p className="font-semibold text-zinc-950">{phaseCode.label}</p>
-              <p className="mt-1 text-zinc-600">Estado: {phaseCode.status}</p>
+              <p className="mt-1 text-zinc-600">Estado: {statusLabel(phaseCode.status)}</p>
             </div>
           ))}
         </div>
@@ -176,7 +176,7 @@ function FieldHutWorkspace({
 
       <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between gap-3 text-sm text-zinc-600">
-          <span>Progreso cuestionario</span>
+          <span>Preguntas contestadas</span>
           <span>
             {answeredRequired}/{requiredQuestions.length}
           </span>
@@ -192,7 +192,7 @@ function FieldHutWorkspace({
       ) : (
         <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
           <h3 className="text-lg font-semibold text-emerald-950">Cuestionario sin preguntas pendientes</h3>
-          <p className="mt-2 text-sm text-emerald-900">Revisa las secciones pendientes de cerrar antes de dar por terminada la evaluacion.</p>
+          <p className="mt-2 text-sm text-emerald-900">Revisa las secciones pendientes de cerrar antes de dar por terminada la evaluación.</p>
         </section>
       )}
 
@@ -212,7 +212,7 @@ function FieldHutWorkspace({
             ))}
           </dl>
         ) : (
-          <p className="mt-3 text-sm text-zinc-600">Todavia no hay respuestas guardadas.</p>
+          <p className="mt-3 text-sm text-zinc-600">Todavía no hay respuestas guardadas.</p>
         )}
       </section>
     </div>
@@ -243,7 +243,7 @@ function SectionProgressControls({
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={section.id}>
             <p className="font-semibold text-zinc-950">{section.title}</p>
             <p className="mt-1 text-zinc-600">
-              {required.length - pending.length}/{required.length} obligatorias · {visit?.status ?? "PENDING"}
+              {required.length - pending.length}/{required.length} obligatorias · {statusLabel(visit?.status ?? "PENDING")}
             </p>
             {canComplete ? (
               <form
@@ -257,7 +257,7 @@ function SectionProgressControls({
                 className="mt-3"
               >
                 <button className="rounded-md border border-teal-700 px-3 py-2 text-sm font-semibold text-teal-800" type="submit">
-                  Completar seccion
+                  Confirmar y cerrar sección
                 </button>
               </form>
             ) : null}
@@ -277,6 +277,13 @@ function QuestionnaireForm({
   searchedFolio: string;
   workspace: HutFieldQuestionnaireWorkspace;
 }) {
+  const savedAnswer = workspace.questionnaire.answers[question.code];
+  const nextQuestion = nextQuestionAfterCurrent({
+    answers: workspace.questionnaire.answers,
+    currentCode: question.code,
+    questions: applicableQuestions(workspace)
+  });
+
   return (
     <section className="rounded-lg border border-teal-200 bg-white p-5 shadow-sm">
       <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">
@@ -309,9 +316,26 @@ function QuestionnaireForm({
         )}
         className="mt-5 space-y-4"
       >
-        <HutQuestionInput answer={workspace.questionnaire.answers[question.code]} question={question} workspace={workspace} />
+        <input name="returnQuestionCode" type="hidden" value={question.code} />
+        <HutQuestionInput answer={savedAnswer} question={question} workspace={workspace} />
         <HutFieldSubmitButton />
       </form>
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        {savedAnswer == null ? (
+          <p className="text-sm text-zinc-600">Guarda la respuesta para habilitar Continuar.</p>
+        ) : nextQuestion ? (
+          <a
+            className="inline-flex min-h-12 items-center justify-center rounded-md border border-teal-700 px-4 py-3 text-sm font-semibold text-teal-800 transition hover:bg-teal-50"
+            href={`/field/hut?folio=${encodeURIComponent(searchedFolio)}&questionCode=${encodeURIComponent(nextQuestion.code)}`}
+          >
+            Continuar
+          </a>
+        ) : (
+          <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
+            No hay preguntas pendientes. Revisa y cierra las secciones completadas.
+          </p>
+        )}
+      </div>
     </section>
   );
 }
@@ -456,6 +480,24 @@ function HutQuestionInput({
   );
 }
 
+function nextQuestionAfterCurrent({
+  answers,
+  currentCode,
+  questions
+}: {
+  answers: Record<string, unknown>;
+  currentCode: string;
+  questions: HutQuestionDefinition[];
+}) {
+  const currentIndex = questions.findIndex((question) => question.code === currentCode);
+  const remainingQuestions = currentIndex >= 0 ? questions.slice(currentIndex + 1) : questions;
+  return remainingQuestions.find((question) => question.required && !(question.code in answers))
+    ?? remainingQuestions.find((question) => !(question.code in answers))
+    ?? questions.find((question) => question.required && !(question.code in answers))
+    ?? questions.find((question) => !(question.code in answers))
+    ?? null;
+}
+
 function applicableQuestions(workspace: HutFieldQuestionnaireWorkspace) {
   const applicableCodes = new Set(workspace.questionnaire.applicableQuestionCodes);
   return getHutQuestions().filter((question) => applicableCodes.has(question.code));
@@ -507,6 +549,32 @@ function matrixAnswerValue(answer: unknown, rowCode: string): string {
 
   const value = (answer as Record<string, unknown>)[rowCode];
   return value == null ? "" : String(value);
+}
+
+function originLabel(value: string): string {
+  const labels: Record<string, string> = {
+    CLT_HUT: "CLT + HUT",
+    HUT_DIRECTO: "HUT directo"
+  };
+
+  return labels[value] ?? value;
+}
+
+function statusLabel(value: string): string {
+  if (value === "COMPLETED" || value === "USED" || value === "VALIDATED") {
+    return "Completado";
+  }
+  if (value === "IN_PROGRESS" || value.includes("IN_PROGRESS")) {
+    return "En progreso";
+  }
+  if (value === "PENDING" || value.includes("PENDING") || value === "GENERATED") {
+    return "Pendiente";
+  }
+  if (value === "NOT_STARTED") {
+    return "No iniciado";
+  }
+
+  return value;
 }
 
 function formatAnswer(answer: unknown): string {

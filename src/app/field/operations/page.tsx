@@ -118,7 +118,7 @@ function StudySelector({
                 ? "border-teal-700 bg-teal-50 text-teal-800"
                 : "border-zinc-200 text-zinc-700 hover:bg-zinc-50"
             }`}
-            href={`/field/operations?studyId=${study.id}`}
+            href={`/field/dashboard?studyId=${study.id}`}
             key={study.id}
           >
             {study.code}
@@ -353,7 +353,7 @@ function returnPath(input: { sessionId?: string | null; studyId?: string | null 
   }
 
   const suffix = params.toString();
-  return suffix ? `/field/operations?${suffix}` : "/field/operations";
+  return suffix ? `/field/dashboard?${suffix}` : "/field/dashboard";
 }
 
 const buttonClass =

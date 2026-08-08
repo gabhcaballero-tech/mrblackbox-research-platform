@@ -418,13 +418,19 @@ export async function saveHutQuestionnaireAnswerForFieldAction(
   formData: FormData
 ) {
   await requireCapability("field:access");
+  const returnQuestionCode = String(formData.get("returnQuestionCode") ?? questionCode).trim();
   const result = await createHutRepository().saveQuestionnaireAnswer({
     answerInput: hutFormDataToAnswerInput(formData),
     participantId,
     questionCode,
     studyId
   });
-  redirectToFieldHut(folio, result.ok ? "Guardado correctamente" : null, result.ok ? null : result.message);
+  redirectToFieldHut(
+    folio,
+    result.ok ? "Guardado correctamente" : null,
+    result.ok ? null : result.message,
+    returnQuestionCode || questionCode
+  );
 }
 
 export async function completeHutQuestionnaireSectionForFieldAction(
@@ -575,7 +581,12 @@ function redirectWithHutMessage(
   redirect(`/admin/studies/${studyId}/hut?${params.toString()}`);
 }
 
-function redirectToFieldHut(folio: string, message: string | null, error: string | null): never {
+function redirectToFieldHut(
+  folio: string,
+  message: string | null,
+  error: string | null,
+  questionCode?: string | null
+): never {
   revalidatePath("/field/hut");
   const params = new URLSearchParams({ folio });
   if (message) {
@@ -583,6 +594,9 @@ function redirectToFieldHut(folio: string, message: string | null, error: string
   }
   if (error) {
     params.set("hutError", error);
+  }
+  if (questionCode) {
+    params.set("questionCode", questionCode);
   }
 
   redirect(`/field/hut?${params.toString()}`);
