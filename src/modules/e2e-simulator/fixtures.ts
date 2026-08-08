@@ -1,8 +1,4 @@
 import { NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
-import {
-  NAVIGO_HUT_ACCESS_QUESTION_ID,
-  NAVIGO_HUT_ACCESS_YES_VALUE
-} from "@/modules/screener/study-overrides";
 import type { NavigoHommeSimulationFixtures } from "./types";
 
 export const NAVIGO_HOMME_SIMULATION_STUDY_CODE = NAVIGO_STUDY_CODE;
@@ -14,9 +10,7 @@ export const NAVIGO_HOMME_SIMULATION_FIXTURES: NavigoHommeSimulationFixtures = {
     externalReference: NAVIGO_HOMME_SIMULATION_FOLIO,
     name: "SIM NAVIGO HOMME 001",
     phone: "+520000000001",
-    screeningAnswers: {
-      [NAVIGO_HUT_ACCESS_QUESTION_ID]: NAVIGO_HUT_ACCESS_YES_VALUE
-    }
+    screeningAnswers: {}
   },
   rotations: {
     ctl: {

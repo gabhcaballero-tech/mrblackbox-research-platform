@@ -1,9 +1,5 @@
 import type { ScreenerDefinition } from "@/modules/screener";
-import {
-  NAVIGO_HUT_ACCESS_NO_VALUE,
-  NAVIGO_HUT_ACCESS_QUESTION_ID,
-  NAVIGO_HUT_ACCESS_YES_VALUE
-} from "@/modules/screener/study-overrides";
+import { NAVIGO_HUT_ACCESS_QUESTION_ID } from "@/modules/screener/study-overrides";
 import { PARTICIPANT_EVIDENCE_BUCKET } from "@/modules/participant-portal/evidence-storage";
 import { generateParticipantReferenceCode } from "@/modules/participant-portal/review";
 import {
@@ -32,7 +28,7 @@ export type FieldScreeningSimulationCaseId =
   | "F6_INCOMPLETE_EVIDENCE"
   | "ABANDON_AND_RESUME"
   | "TERMINATION"
-  | "HUT_NAVIGO_FLAG";
+  | "HUT_DECISION_OUTSIDE_SCREENING";
 
 export type FieldScreeningSimulationCaseReport = {
   attemptId: string | null;
@@ -79,14 +75,7 @@ export async function simulateEligibleParticipant(): Promise<FieldScreeningSimul
   await answer(simulator.repository, attemptId, "F9_FRECUENCIA_SEMANAL", "MAS_DE_UNA_VEZ_DIA");
   await answer(simulator.repository, attemptId, "F9A_VECES_AL_DIA", "3");
   await answerNse(simulator.repository, attemptId, "HIGH");
-  const finalAnswer = await answer(
-    simulator.repository,
-    attemptId,
-    NAVIGO_HUT_ACCESS_QUESTION_ID,
-    NAVIGO_HUT_ACCESS_YES_VALUE
-  );
-
-  if (finalAnswer.ok && finalAnswer.data.closed && finalAnswer.data.status === "PASSED") {
+  if (simulator.getAttemptSnapshot(attemptId)?.status === "PASSED") {
     simulator.ensureParticipantConfirmation(attemptId);
   }
 
@@ -234,21 +223,20 @@ export async function simulateHutNavigoFlag(): Promise<FieldScreeningSimulationC
   await answer(simulator.repository, attemptId, "F9_FRECUENCIA_SEMANAL", "MAS_DE_UNA_VEZ_DIA");
   await answer(simulator.repository, attemptId, "F9A_VECES_AL_DIA", "3");
   await answerNse(simulator.repository, attemptId, "HIGH");
-  await answer(simulator.repository, attemptId, NAVIGO_HUT_ACCESS_QUESTION_ID, NAVIGO_HUT_ACCESS_NO_VALUE);
   const answers = simulator.getAnswersSnapshot(attemptId);
   const attempt = simulator.getAttemptSnapshot(attemptId);
 
   return caseReport({
     attempt,
-    caseId: "HUT_NAVIGO_FLAG",
+    caseId: "HUT_DECISION_OUTSIDE_SCREENING",
     codeGenerated: false,
     evidence: "COMPLETE",
     folio: null,
     notes: [
-      `Respuesta HUT disponible: ${answers[NAVIGO_HUT_ACCESS_QUESTION_ID] ?? "NO"}`,
-      `No afecta screening aprobado: ${attempt?.status === "PASSED" ? "SI" : "NO"}`
+      `Pregunta HUT legacy en screener: ${NAVIGO_HUT_ACCESS_QUESTION_ID in answers ? "SI" : "NO"}`,
+      `Decision HUT fuera del screening: ${!(NAVIGO_HUT_ACCESS_QUESTION_ID in answers) && attempt?.status === "PASSED" ? "SI" : "NO"}`
     ],
-    result: answers[NAVIGO_HUT_ACCESS_QUESTION_ID] === NAVIGO_HUT_ACCESS_NO_VALUE && attempt?.status === "PASSED"
+    result: !(NAVIGO_HUT_ACCESS_QUESTION_ID in answers) && attempt?.status === "PASSED"
       ? "OK"
       : "FAILED"
   });
@@ -660,11 +648,7 @@ function simulationScreenerDefinition(): ScreenerDefinition {
           option("HIGH", "Alto"),
           option("LOW", "Bajo")
         ])
-      ),
-      choiceQuestion(NAVIGO_HUT_ACCESS_QUESTION_ID, 13, "Acceso corrido HUT", [
-        option(NAVIGO_HUT_ACCESS_YES_VALUE, "Si"),
-        option(NAVIGO_HUT_ACCESS_NO_VALUE, "No")
-      ])
+      )
     ],
     rules: [
       {

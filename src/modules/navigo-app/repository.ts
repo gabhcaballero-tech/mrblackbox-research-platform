@@ -59,10 +59,6 @@ import {
 } from "./face-verification-contract";
 import { generateParticipantReferenceCode, generateReferenceCodes } from "@/modules/participant-portal/review";
 import {
-  NAVIGO_HUT_ACCESS_QUESTION_ID,
-  isNavigoHutAccessEnabled
-} from "@/modules/screener/study-overrides";
-import {
   createHutRegistrationToken,
   createHutParticipantToken
 } from "@/modules/hut/service";
@@ -4156,9 +4152,6 @@ async function buildHutRotationWorkbookPreview({
     if (confirmation && participantStatus(confirmation.studyParticipant) !== "APPROVED") {
       errors.push("participante no confirmado para HUT");
     }
-    if (confirmation && !participantHasHutAccessFromScreening(confirmation.studyParticipant)) {
-      errors.push("participante no marcado para HUT en screening");
-    }
     if (hutParticipant?.studyParticipantId && confirmation && hutParticipant.studyParticipantId !== confirmation.studyParticipant.id) {
       errors.push("participante HUT vinculado a otro StudyParticipant");
     }
@@ -6566,13 +6559,6 @@ function activityStateAtEvent(activities: NavigoActivityRecord[]): "COMPLETED_EX
   }
 
   return "NONE_STARTED";
-}
-
-function participantHasHutAccessFromScreening(participant: ParticipantRecord): boolean {
-  const answers = participant.participantConfirmation?.screeningAttempt?.answers ?? [];
-  const answer = answers.find((candidate) => candidate.questionId === NAVIGO_HUT_ACCESS_QUESTION_ID)?.answerJson;
-
-  return isNavigoHutAccessEnabled(answer);
 }
 
 function hasT0Started(participant: ParticipantRecord): boolean {

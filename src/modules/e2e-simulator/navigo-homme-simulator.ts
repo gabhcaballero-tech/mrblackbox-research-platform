@@ -287,7 +287,7 @@ function resolveScreenerPrecheck(study: NavigoHommePrecheckStudy | null): {
       study.code,
       parseScreenerDefinition(study.activeScreenerDefinitionJson)
     );
-    const hasHutQuestion = definition.questions.some((question) => question.id === NAVIGO_HUT_ACCESS_QUESTION_ID);
+    const hasLegacyHutQuestion = definition.questions.some((question) => question.id === NAVIGO_HUT_ACCESS_QUESTION_ID);
 
     return {
       checks: [
@@ -298,9 +298,9 @@ function resolveScreenerPrecheck(study: NavigoHommePrecheckStudy | null): {
           status: "OK"
         },
         {
-          code: "screener.hut_access_question",
-          label: `Pregunta ${NAVIGO_HUT_ACCESS_QUESTION_ID} existe`,
-          status: hasHutQuestion ? "OK" : "BLOCKED"
+          code: "screener.hut_access_question_removed",
+          label: `Pregunta legacy ${NAVIGO_HUT_ACCESS_QUESTION_ID} no se muestra`,
+          status: hasLegacyHutQuestion ? "BLOCKED" : "OK"
         }
       ],
       definition

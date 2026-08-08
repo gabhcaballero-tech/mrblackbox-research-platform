@@ -19,7 +19,7 @@ describe("field screening simulator", () => {
       "F6_INCOMPLETE_EVIDENCE",
       "ABANDON_AND_RESUME",
       "TERMINATION",
-      "HUT_NAVIGO_FLAG"
+      "HUT_DECISION_OUTSIDE_SCREENING"
     ]);
     expect(report.cases.every((item) => item.result === "OK")).toBe(true);
   });
@@ -77,17 +77,17 @@ describe("field screening simulator", () => {
     expect(result.notes).toContain("closureDiagnostics: TERMINATED");
   });
 
-  it("keeps HUT access answer available without blocking screening", async () => {
+  it("keeps the HUT decision outside screening", async () => {
     const result = await simulateHutNavigoFlag();
 
     expect(result).toMatchObject({
-      caseId: "HUT_NAVIGO_FLAG",
+      caseId: "HUT_DECISION_OUTSIDE_SCREENING",
       evidence: "COMPLETE",
       result: "OK",
       state: "PASSED"
     });
-    expect(result.notes).toContain("Respuesta HUT disponible: NO");
-    expect(result.notes).toContain("No afecta screening aprobado: SI");
+    expect(result.notes).toContain("Pregunta HUT legacy en screener: NO");
+    expect(result.notes).toContain("Decision HUT fuera del screening: SI");
   });
 
   it("formats the simulator report with requested operational fields", async () => {

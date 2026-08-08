@@ -2006,7 +2006,7 @@ describe("navigo app MVP rules", () => {
     expect(state.hutParticipants[0]?.callEvaluations).toHaveLength(0);
   });
 
-  it("does not synchronize HUT rows when screening marks the participant as Navigo only", async () => {
+  it("synchronizes HUT rows from workbook without requiring the legacy screening flag", async () => {
     vi.stubEnv("HUT_PHASE_CODE_SECRET", "hut-phase-secret-for-tests");
     const state = createNavigoRotationImportState({ hutAccessAnswer: NAVIGO_HUT_ACCESS_NO_VALUE });
     const repository = createNavigoAppRepository(state.prisma as never);
@@ -2025,9 +2025,7 @@ describe("navigo app MVP rules", () => {
         })
       : null;
 
-    expect(preview?.ok ? preview.data.hutRows[0]?.errors : []).toContain(
-      "participante no marcado para HUT en screening"
-    );
+    expect(preview?.ok ? preview.data.hutRows[0]?.errors : ["preview failed"]).toEqual([]);
 
     const applied = parsed.ok
       ? await repository.applyRotationWorkbookImport({
@@ -2039,10 +2037,10 @@ describe("navigo app MVP rules", () => {
         })
       : null;
 
-    expect(applied?.ok).toBe(false);
-    expect(state.hutParticipants).toHaveLength(0);
-    expect(state.hutRegistrationSlots).toHaveLength(0);
-    expect(state.hutParticipantPhaseCodes).toHaveLength(0);
+    expect(applied?.ok).toBe(true);
+    expect(state.hutParticipants).toHaveLength(1);
+    expect(state.hutRegistrationSlots).toHaveLength(1);
+    expect(state.hutParticipantPhaseCodes).toHaveLength(3);
   });
 
   it("retries rotation import without duplicating plans or assignments", async () => {

@@ -57,10 +57,6 @@ export function applyStudyScreenerDefinitionOverrides(
     return ensureDetergentRecruiterQuestion(definition);
   }
 
-  if (studyCode === NAVIGO_STUDY_CODE) {
-    return ensureNavigoHutAccessQuestion(definition);
-  }
-
   return definition;
 }
 

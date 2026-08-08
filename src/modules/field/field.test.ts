@@ -23,10 +23,6 @@ import type {
   FieldScreenerVersionSummary,
   FieldParticipantProfileRecord
 } from "./repository";
-import {
-  NAVIGO_HUT_ACCESS_QUESTION_ID,
-  NAVIGO_HUT_ACCESS_YES_VALUE
-} from "@/modules/screener/study-overrides";
 
 const studyId = "study-1";
 const activeVersionId = "version-1";
@@ -458,7 +454,6 @@ async function answerEligibleBase(
   for (const questionId of ["D1", "D2", "D3", "D4", "D5", "D6"]) {
     await answer(repository, attemptId, questionId, nseValue, currentActor);
   }
-  await answer(repository, attemptId, NAVIGO_HUT_ACCESS_QUESTION_ID, NAVIGO_HUT_ACCESS_YES_VALUE, currentActor);
 }
 
 describe("field service", () => {

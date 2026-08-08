@@ -121,6 +121,9 @@ type HutPhaseCodeSnapshot = {
 type HutParticipantSnapshot = {
   firstFragranceLeftArm: string | null;
   id: string;
+  origin: string;
+  protocolVersion: string;
+  questionnaireAttempt: { status: string } | null;
   registrationSlot: {
     firstFragranceLeftArm: string | null;
     secondFragranceRightArm: string | null;
@@ -332,7 +335,7 @@ function buildScreeningBlock(snapshot: FolioDiagnosticSnapshot): DiagnosticBlock
     item("Codigo slot 1", referenceCodeSlots.has(1) ? "OK" : "BLOCKED", referenceCodeSlots.has(1) ? "Existe" : "Falta"),
     item("Codigo slot 2", referenceCodeSlots.has(2) ? "OK" : "BLOCKED", referenceCodeSlots.has(2) ? "Existe" : "Falta"),
     item("Codigo slot 3", referenceCodeSlots.has(3) ? "OK" : "BLOCKED", referenceCodeSlots.has(3) ? "Existe" : "Falta"),
-    item("HUT_ACCESO_CORRIDO", "OK", hutCandidate ? "SI - candidato HUT" : "NO/vacio - solo Navigo")
+    item("HUT_ACCESO_CORRIDO historico", "OK", hutAccessAnswer === undefined ? "Sin respuesta historica" : hutCandidate ? "SI - legacy" : "NO/vacio - legacy")
   ]);
 }
 
@@ -424,15 +427,18 @@ function buildHutBlock(snapshot: FolioDiagnosticSnapshot): DiagnosticBlock {
 
   if (!hutCandidate) {
     return block("hut", "HUT", [
-      item("Preparado para HUT", "OK", "No aplica: HUT_ACCESO_CORRIDO no es SI")
+      item("Preparado para HUT", "OK", "No aplica: sin HutParticipant")
     ]);
   }
 
   return block("hut", "HUT", [
+    item("Origen HUT", hutParticipant?.origin ? "OK" : "BLOCKED", hutParticipant?.origin ?? "Falta"),
+    item("Protocolo HUT", hutParticipant?.protocolVersion ? "OK" : "BLOCKED", hutParticipant?.protocolVersion ?? "Falta"),
     item("HutParticipant vinculado", hutParticipant?.studyParticipantId === participant?.id ? "OK" : "BLOCKED", hutParticipant?.studyParticipantId === participant?.id ? "SI" : "Falta vinculo"),
     item("HutRegistrationSlot", hutSlot ? "OK" : "BLOCKED", hutSlot ? hutSlot.status : "Falta"),
     item("HUT EVA1", hutEva1(hutParticipant) ? "OK" : "BLOCKED", hutEva1(hutParticipant) ? "Existe" : "Falta"),
     item("HUT EVA2", hutEva2(hutParticipant) ? "OK" : "BLOCKED", hutEva2(hutParticipant) ? "Existe" : "Falta"),
+    item("Cuestionario HUT", hutParticipant?.questionnaireAttempt ? "OK" : "PENDING", hutParticipant?.questionnaireAttempt?.status ?? "Pendiente"),
     item("PhaseCode COLOCACION", phases.has("COLOCACION") ? "OK" : "BLOCKED", phases.get("COLOCACION")?.status ?? "Falta"),
     item("PhaseCode REGRESO_1", phases.has("REGRESO_1") ? "OK" : "BLOCKED", phases.get("REGRESO_1")?.status ?? "Falta"),
     item("PhaseCode REGRESO_2", phases.has("REGRESO_2") ? "OK" : "BLOCKED", phases.get("REGRESO_2")?.status ?? "Falta"),
@@ -628,11 +634,10 @@ function ctlInterviewerCodeStatus(
 }
 
 function isHutCandidate(snapshot: FolioDiagnosticSnapshot): boolean {
-  const answer = snapshot.confirmation?.screeningAttempt.answers.find(
-    (candidate) => candidate.questionId === NAVIGO_HUT_ACCESS_QUESTION_ID
-  )?.answerJson;
+  const participant = snapshot.confirmation?.studyParticipant ?? null;
+  const hutParticipant = participant?.hutParticipant ?? snapshot.hutParticipantByFolio;
 
-  return isNavigoHutAccessEnabled(answer);
+  return Boolean(hutParticipant);
 }
 
 function buildSuggestions(blocks: DiagnosticBlock[]): string[] {
@@ -699,6 +704,7 @@ function stringOrNull(value: unknown): string | null {
 const hutParticipantDiagnosticSelect = {
   firstFragranceLeftArm: true,
   id: true,
+  origin: true,
   phaseCodes: {
     orderBy: { slot: "asc" },
     select: {
@@ -706,6 +712,10 @@ const hutParticipantDiagnosticSelect = {
       slot: true,
       status: true
     }
+  },
+  protocolVersion: true,
+  questionnaireAttempt: {
+    select: { status: true }
   },
   registrationSlot: {
     select: {

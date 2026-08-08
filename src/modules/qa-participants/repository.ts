@@ -1,6 +1,5 @@
 import { createPrismaClient } from "@/shared/db/client";
 import { randomUUID, createHash } from "node:crypto";
-import { NAVIGO_HUT_ACCESS_NO_VALUE, NAVIGO_HUT_ACCESS_QUESTION_ID, NAVIGO_HUT_ACCESS_YES_VALUE } from "@/modules/screener/study-overrides";
 import { generateParticipantReferenceCode, generateReferenceCodes } from "@/modules/participant-portal/review";
 import { createHutParticipantToken, createHutRegistrationToken } from "@/modules/hut/service";
 import {
@@ -652,7 +651,6 @@ async function createQaScenarioData(
     participant = await createQaStudyParticipantFoundation(tx, {
       actorUserId: input.createdByUserId,
       folio,
-      hutAccess: input.scenario === "CLT_NAVIGO_HUT",
       now: input.now,
       runId: input.run.id,
       study
@@ -790,7 +788,6 @@ async function createQaStudyParticipantFoundation(
   input: {
     actorUserId: string;
     folio: string;
-    hutAccess: boolean;
     now: Date;
     runId: string;
     study: QaStudyRecord;
@@ -849,14 +846,6 @@ async function createQaStudyParticipantFoundation(
     },
     select: { id: true }
   })) as { id: string };
-
-  await tx.screeningAnswer.create?.({
-    data: {
-      answerJson: { value: input.hutAccess ? NAVIGO_HUT_ACCESS_YES_VALUE : NAVIGO_HUT_ACCESS_NO_VALUE },
-      questionId: NAVIGO_HUT_ACCESS_QUESTION_ID,
-      screeningAttemptId: screeningAttempt.id
-    }
-  });
 
   await tx.participantScreeningReview.create?.({
     data: {

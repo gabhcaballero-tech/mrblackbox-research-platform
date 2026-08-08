@@ -730,7 +730,7 @@ describe("screening supervision service", () => {
     expect(result.ok ? result.data.fileContent.startsWith("\uFEFF") : false).toBe(true);
     expect(result.ok ? result.data.fileContent : "").toContain("Folio\tNombre\tTeléfono\tWhatsApp");
     expect(result.ok ? result.data.fileContent : "").toContain(
-      "F1_GENERO\tF6_MARCAS\tF9A_VECES_AL_DIA\tD1\tHUT_ACCESO_CORRIDO\tF0_RECLUTADOR"
+      "F1_GENERO\tF6_MARCAS\tF9A_VECES_AL_DIA\tD1\tF0_RECLUTADOR"
     );
     expect(result.ok ? result.data.fileContent : "").toContain("MAR\u00cdA \u00d1AND\u00da");
     expect(result.ok ? result.data.fileContent : "").toContain("Portal participante");
@@ -783,7 +783,6 @@ describe("screening supervision service", () => {
         "F6_MARCAS",
         "F9A_VECES_AL_DIA",
         "D1",
-        "HUT_ACCESO_CORRIDO",
         "F0_RECLUTADOR"
       ]);
       expect(row?.Nombre).toBe("Participante Uno");

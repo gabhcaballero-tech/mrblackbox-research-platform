@@ -19,7 +19,9 @@ describe("navigo folio diagnostic", () => {
     expect(blockStatus(report, "NAVIGO")).toBe("OK");
     expect(blockStatus(report, "HUT")).toBe("OK");
     expect(itemValue(report, "Codigo slot 1")).toBe("Existe");
-    expect(itemValue(report, "HUT_ACCESO_CORRIDO")).toBe("SI - candidato HUT");
+    expect(itemValue(report, "HUT_ACCESO_CORRIDO historico")).toBe("SI - legacy");
+    expect(itemValue(report, "Origen HUT")).toBe("CLT_HUT");
+    expect(itemValue(report, "Protocolo HUT")).toBe("APPLICATION_PHOTO");
     expect(itemValue(report, "Navigo primera fragancia")).toBe("Existe");
     expect(report.technicalDetails).toBeNull();
   });
@@ -151,15 +153,27 @@ describe("navigo folio diagnostic", () => {
     expect(report.suggestions).toContain("CTL triangular asignada: Falta");
   });
 
-  it("keeps HUT as not applicable when the screening answer is not affirmative", () => {
+  it("keeps historical HUT screening answer visible without driving HUT applicability", () => {
     const snapshot = completeSnapshot();
     snapshot.confirmation!.screeningAttempt.answers = [{ answerJson: { value: "NO" }, questionId: "HUT_ACCESO_CORRIDO" }];
+
+    const report = buildFolioDiagnosticReport(snapshot);
+
+    expect(blockStatus(report, "HUT")).toBe("OK");
+    expect(itemValue(report, "HUT_ACCESO_CORRIDO historico")).toBe("NO/vacio - legacy");
+    expect(itemValue(report, "Preparado para HUT")).toBe("Ver detalle de fases");
+  });
+
+  it("keeps HUT as not applicable when there is no HutParticipant", () => {
+    const snapshot = completeSnapshot();
+    snapshot.confirmation!.screeningAttempt.answers = [];
     snapshot.confirmation!.studyParticipant.hutParticipant = null;
 
     const report = buildFolioDiagnosticReport(snapshot);
 
     expect(blockStatus(report, "HUT")).toBe("OK");
-    expect(itemValue(report, "Preparado para HUT")).toBe("No aplica: HUT_ACCESO_CORRIDO no es SI");
+    expect(itemValue(report, "HUT_ACCESO_CORRIDO historico")).toBe("Sin respuesta historica");
+    expect(itemValue(report, "Preparado para HUT")).toBe("No aplica: sin HutParticipant");
   });
 
   it("blocks HUT candidate when phase codes are missing", () => {
@@ -262,11 +276,14 @@ function completeSnapshot(overrides: Partial<FolioDiagnosticSnapshot> = {}): Fol
         hutParticipant: {
           firstFragranceLeftArm: "247",
           id: "hut-1",
+          origin: "CLT_HUT",
           phaseCodes: [
             { phase: "COLOCACION", slot: 1, status: "GENERATED" },
             { phase: "REGRESO_1", slot: 2, status: "GENERATED" },
             { phase: "REGRESO_2", slot: 3, status: "GENERATED" }
           ],
+          protocolVersion: "APPLICATION_PHOTO",
+          questionnaireAttempt: { status: "PENDING" },
           registrationSlot: {
             firstFragranceLeftArm: "247",
             secondFragranceRightArm: "583",

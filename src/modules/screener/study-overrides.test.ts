@@ -86,28 +86,17 @@ describe("study screener definition overrides", () => {
     expect(definition).toBe(original);
   });
 
-  it("adds the Navigo HUT access question at the end without eligibility actions", () => {
+  it("does not inject the legacy Navigo HUT access question for new screeners", () => {
     const definition = applyStudyScreenerDefinitionOverrides(NAVIGO_STUDY_CODE, baseDefinition());
 
     expect(definition.questions.map((question) => question.id)).toEqual([
       "F1_CIUDAD",
-      "F2_EDAD",
-      NAVIGO_HUT_ACCESS_QUESTION_ID
+      "F2_EDAD"
     ]);
-    expect(definition.questions[2]).toMatchObject({
-      dataDestination: "OPERATIONAL_INTERNAL",
-      id: NAVIGO_HUT_ACCESS_QUESTION_ID,
-      order: 3,
-      required: true,
-      type: "SINGLE_CHOICE"
-    });
-    expect(definition.questions[2] && "options" in definition.questions[2] ? definition.questions[2].options : []).toEqual([
-      expect.objectContaining({ actions: [], value: NAVIGO_HUT_ACCESS_YES_VALUE }),
-      expect.objectContaining({ actions: [], value: NAVIGO_HUT_ACCESS_NO_VALUE })
-    ]);
+    expect(definition.questions.some((question) => question.id === NAVIGO_HUT_ACCESS_QUESTION_ID)).toBe(false);
   });
 
-  it("keeps the Navigo HUT access override idempotent", () => {
+  it("keeps the legacy Navigo HUT access helper idempotent for historical definitions", () => {
     const once = ensureNavigoHutAccessQuestion(baseDefinition());
     const twice = ensureNavigoHutAccessQuestion(once);
 

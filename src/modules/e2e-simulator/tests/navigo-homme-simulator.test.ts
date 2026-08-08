@@ -26,7 +26,7 @@ describe("Navigo Homme E2E simulator precheck", () => {
     expect(report.status).toBe("OK");
     expect(report.study?.code).toBe(NAVIGO_HOMME_SIMULATION_STUDY_CODE);
     expect(report.screenerDefinition?.questions.some((question) => question.id === NAVIGO_HUT_ACCESS_QUESTION_ID)).toBe(
-      true
+      false
     );
     expect(report.sections.map((section) => section.title)).toEqual([
       "ESTUDIO",
