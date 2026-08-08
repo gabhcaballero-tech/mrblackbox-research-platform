@@ -6,10 +6,15 @@ import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { createScreeningSupervisionRepository } from "@/modules/screening-supervision/repository";
 import { getScreeningAttemptSupervisionDetail } from "@/modules/screening-supervision/service";
+import {
+  createDuplicateScreeningAttemptCleanupRepository,
+  getDuplicateScreeningAttemptCleanupPreview
+} from "@/modules/screening-supervision/duplicate-attempt-cleanup";
 import { createEvidenceReviewRepository } from "@/modules/participant-portal/evidence-review-repository";
 import { getParticipantEvidenceReviewDetail } from "@/modules/participant-portal/evidence-review-service";
 import { createSupabaseEvidenceStorageClient } from "@/modules/participant-portal/evidence-storage";
 import {
+  DuplicateAttemptCleanupPanel,
   EvidenceReviewPanel,
   ScreeningAttemptDetailView
 } from "../_components/ScreeningSupervisionComponents";
@@ -48,6 +53,14 @@ export default async function ScreeningAttemptDetailPage({ params, searchParams 
     repository: createEvidenceReviewRepository(),
     storage: createSupabaseEvidenceStorageClient()
   });
+  const duplicateCleanupPreview =
+    actor.role === "ADMIN"
+      ? await getDuplicateScreeningAttemptCleanupPreview({
+          actor,
+          attemptId,
+          repository: createDuplicateScreeningAttemptCleanupRepository()
+        })
+      : null;
 
   return (
     <AppShell>
@@ -74,6 +87,14 @@ export default async function ScreeningAttemptDetailPage({ params, searchParams 
       </div>
 
       <ScreeningAttemptDetailView detail={detail} />
+      {duplicateCleanupPreview?.ok ? (
+        <div className="mt-6">
+          <DuplicateAttemptCleanupPanel
+            error={firstParam(search.attemptCleanupError)}
+            preview={duplicateCleanupPreview.data}
+          />
+        </div>
+      ) : null}
       {evidenceResult.ok ? (
         <div className="mt-6">
           <EvidenceReviewPanel

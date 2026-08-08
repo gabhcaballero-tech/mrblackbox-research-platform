@@ -1,11 +1,13 @@
 ﻿import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type {
+  DuplicateScreeningAttemptCleanupPreview,
   ScreeningAttemptDetail,
   ScreeningAttemptListData,
   ScreeningAttemptListItem
 } from "@/modules/screening-supervision";
 import {
+  DuplicateAttemptCleanupPanel,
   EvidenceReviewPanel,
   ScreeningAttemptDetailView,
   ScreeningAttemptFilters,
@@ -122,6 +124,60 @@ const detail: ScreeningAttemptDetail = {
   studyId: study.id,
   terminationCode: null,
   terminationReason: null
+};
+
+const duplicateCleanupPreview: DuplicateScreeningAttemptCleanupPreview = {
+  attempt: {
+    completedAt: null,
+    id: "attempt-duplicate",
+    source: "FIELD",
+    startedAt: new Date("2026-08-08T05:00:00Z"),
+    status: "INCOMPLETE"
+  },
+  blockers: [],
+  canDelete: true,
+  confirmation: null,
+  counts: {
+    answers: 3,
+    ctlSessionsForAttempt: 0,
+    ctlSessionsForParticipant: 1,
+    evidence: 1,
+    hutParticipantsForParticipant: 0,
+    navigoActivitiesForParticipant: 2,
+    navigoTokensForParticipant: 1,
+    referenceCodes: 0,
+    review: 1
+  },
+  evidence: [
+    {
+      id: "evidence-1",
+      reviewStatus: "PENDING",
+      type: "PERFUME_PHOTO",
+      uploadedAt: new Date("2026-08-08T06:00:00Z")
+    }
+  ],
+  participant: {
+    email: "participante@example.com",
+    id: "profile-1",
+    name: "Participante Uno",
+    phone: "5550000000",
+    studyParticipantId: "study-participant-1"
+  },
+  participantOperationalContext: {
+    activeConfirmationFolio: "NAV-041",
+    operationalStatus: "SCREENING_PASSED",
+    screeningStatus: "PASSED"
+  },
+  requiresFolioReleaseConfirmation: false,
+  review: {
+    id: "review-1",
+    status: "PENDING"
+  },
+  study: {
+    code: "FMASCULINA-NAVIGO-2026",
+    id: "study-1",
+    name: "Navigo"
+  }
 };
 
 describe("ScreeningSupervisionComponents", () => {
@@ -339,6 +395,18 @@ describe("ScreeningSupervisionComponents", () => {
     expect(screen.getAllByText("Elegible confirmado").length).toBeGreaterThan(0);
     expect(screen.getByText("NAV-001")).toBeInTheDocument();
     expect(screen.queryByText("Pendiente de revisiÃ³n")).not.toBeInTheDocument();
+  });
+
+  it("renders duplicate attempt cleanup preview and strong confirmation", () => {
+    render(<DuplicateAttemptCleanupPanel preview={duplicateCleanupPreview} />);
+
+    expect(screen.getByRole("heading", { name: "Eliminar intento duplicado" })).toBeInTheDocument();
+    expect(screen.getByText("Participante Uno")).toBeInTheDocument();
+    expect(screen.getByText("attempt-duplicate")).toBeInTheDocument();
+    expect(screen.getByText("Sin folio")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByLabelText("Escribe ELIMINAR INTENTO DUPLICADO para confirmar")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Eliminar intento duplicado" })).toBeInTheDocument();
   });
 
   it("renders full evidence previews, signed links and inconsistency alert", () => {

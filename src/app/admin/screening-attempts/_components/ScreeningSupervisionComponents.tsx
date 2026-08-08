@@ -2,10 +2,12 @@
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import type {
+  DuplicateScreeningAttemptCleanupPreview,
   ScreeningAttemptDetail,
   ScreeningAttemptListData,
   ScreeningAttemptListItem
 } from "@/modules/screening-supervision";
+import { deleteDuplicateScreeningAttemptAction } from "@/modules/screening-supervision/actions";
 import type { ParticipantEvidenceReviewDetail } from "@/modules/participant-portal/evidence-review-service";
 import {
   approveParticipantEvidenceAction,
@@ -312,6 +314,126 @@ function AnswerList({ detail }: { detail: ScreeningAttemptDetail }) {
             </article>
           ))}
         </div>
+      )}
+    </section>
+  );
+}
+
+export function DuplicateAttemptCleanupPanel({
+  error,
+  preview
+}: {
+  error?: string;
+  preview: DuplicateScreeningAttemptCleanupPreview;
+}) {
+  const hasBlockers = preview.blockers.length > 0;
+
+  return (
+    <section id="eliminar-intento-duplicado" className="scroll-mt-24 rounded-lg border border-rose-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-rose-700">Zona peligrosa</p>
+          <h2 className="mt-2 text-xl font-semibold text-zinc-950">Eliminar intento duplicado</h2>
+          <p className="mt-2 text-sm leading-6 text-zinc-600">
+            Esta herramienta elimina solo el ScreeningAttempt seleccionado y sus relaciones directas. No borra el
+            ParticipantProfile, el StudyParticipant ni otros intentos validos del participante.
+          </p>
+        </div>
+        <StatusBadge status={hasBlockers ? "blocked" : "planned"}>{hasBlockers ? "Bloqueado" : "Disponible"}</StatusBadge>
+      </div>
+
+      <ActionFeedback error={error} />
+
+      <dl className="mt-5 grid gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-4 text-sm md:grid-cols-3">
+        <SummaryItem label="Participante" value={preview.participant.name} />
+        <SummaryItem label="Telefono" value={preview.participant.phone ?? "Sin telefono"} />
+        <SummaryItem label="Correo" value={preview.participant.email ?? "Sin correo"} />
+        <SummaryItem label="Intento" value={preview.attempt.id} mono />
+        <SummaryItem label="Estado intento" value={cleanupAttemptStatusLabel(preview.attempt.status)} />
+        <SummaryItem label="Fuente" value={sourceLabel(preview.attempt.source)} />
+        <SummaryItem label="Folio del intento" value={preview.confirmation?.folio ?? "Sin folio"} mono />
+        <SummaryItem
+          label="Confirmation"
+          value={preview.confirmation ? `Existe (${preview.confirmation.id})` : "Sin confirmation"}
+          mono={Boolean(preview.confirmation)}
+        />
+        <SummaryItem
+          label="ReferenceCodes"
+          value={
+            preview.confirmation
+              ? `${preview.confirmation.referenceCodeCount} codigo(s), slots ${preview.confirmation.referenceCodeSlots.join(", ")}`
+              : "Sin codigos"
+          }
+        />
+        <SummaryItem label="Respuestas" value={String(preview.counts.answers)} />
+        <SummaryItem label="Evidencias" value={String(preview.counts.evidence)} />
+        <SummaryItem label="Revision" value={preview.review ? reviewStatusLabel(preview.review.status) : "Sin revision"} />
+        <SummaryItem label="CTL del intento" value={String(preview.counts.ctlSessionsForAttempt)} />
+        <SummaryItem label="CTL del participante" value={String(preview.counts.ctlSessionsForParticipant)} />
+        <SummaryItem label="Tokens Navigo del participante" value={String(preview.counts.navigoTokensForParticipant)} />
+        <SummaryItem label="Actividades Navigo" value={String(preview.counts.navigoActivitiesForParticipant)} />
+        <SummaryItem label="HUT asociado" value={String(preview.counts.hutParticipantsForParticipant)} />
+        <SummaryItem label="Inicio" value={formatDate(preview.attempt.startedAt)} />
+      </dl>
+
+      {preview.evidence.length > 0 ? (
+        <div className="mt-4 rounded-md border border-zinc-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-zinc-900">Evidencias que se eliminarian del intento</h3>
+          <ul className="mt-3 space-y-2 text-sm text-zinc-700">
+            {preview.evidence.map((item) => (
+              <li key={item.id} className="rounded-md border border-zinc-100 bg-zinc-50 px-3 py-2">
+                {evidenceTypeLabel(item.type as "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION")} - {reviewStatusLabel(item.reviewStatus)} -{" "}
+                <span className="font-mono text-xs">{item.id}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {hasBlockers ? (
+        <div className="mt-4 rounded-md border border-rose-200 bg-rose-50 p-4">
+          <h3 className="text-sm font-semibold text-rose-950">No se puede eliminar este intento</h3>
+          <ul className="mt-2 space-y-1 text-sm text-rose-900">
+            {preview.blockers.map((blocker) => (
+              <li key={blocker}>{blocker}</li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <form
+          action={deleteDuplicateScreeningAttemptAction.bind(null, preview.attempt.id)}
+          className="mt-5 rounded-md border border-rose-200 bg-rose-50 p-4"
+        >
+          <h3 className="font-semibold text-rose-950">Confirmacion de eliminacion</h3>
+          <p className="mt-2 text-sm leading-6 text-rose-900">
+            Esta accion elimina reference codes, confirmation, evidencias, revision, respuestas y el intento
+            seleccionado. No recalcula secuencias de folios.
+          </p>
+          {preview.requiresFolioReleaseConfirmation ? (
+            <p className="mt-2 text-sm font-semibold leading-6 text-rose-950">
+              Este intento tiene folio. Si ese folio es el operativo a conservar, no continues.
+            </p>
+          ) : null}
+          <div className="mt-4 space-y-3">
+            <label className={labelClass}>
+              Escribe ELIMINAR INTENTO DUPLICADO para confirmar
+              <input className={inputClass} name="confirmationText" />
+            </label>
+            {preview.requiresFolioReleaseConfirmation ? (
+              <label className={labelClass}>
+                Escribe LIBERAR FOLIO DUPLICADO para liberar este folio
+                <input className={inputClass} name="releaseFolioConfirmation" />
+              </label>
+            ) : null}
+            <label className={labelClass}>
+              Motivo obligatorio
+              <textarea className={inputClass} name="deleteReason" required rows={3} />
+            </label>
+            <button className={secondaryButtonClass} type="submit">
+              Eliminar intento duplicado
+            </button>
+          </div>
+        </form>
       )}
     </section>
   );

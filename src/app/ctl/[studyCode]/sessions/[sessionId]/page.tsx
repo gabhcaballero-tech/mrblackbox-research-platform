@@ -1,9 +1,12 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getPublicCtlInterviewerActor } from "@/shared/auth/ctl-public";
 import { createCtlRepository, ctlStatusLabel } from "@/modules/ctl/repository";
 import { formatCtlDate, formatCtlTime } from "@/modules/ctl/service";
+import { resolveRequestOrigin } from "@/shared/utils/request-origin";
 import { CtlMobileCapture } from "./CtlMobileCapture";
+import { CtlNavigoPreparedPanel } from "./CtlNavigoPreparedPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +19,7 @@ export default async function CtlPublicCapturePage({ params, searchParams }: Ctl
   const { sessionId, studyCode } = await params;
   const query = await searchParams;
   const actor = await getPublicCtlInterviewerActor({ studyCode });
+  const requestOrigin = resolveRequestOrigin(await headers());
 
   if (!actor) {
     redirect(
@@ -34,6 +38,10 @@ export default async function CtlPublicCapturePage({ params, searchParams }: Ctl
   const readOnly = session.status === "COMPLETED" || session.status === "CANCELLED";
   const completedAtLabel = formatCtlTimestamp(session.completedAt);
   const startedAtLabel = formatCtlTimestamp(session.startedAt);
+  const participantUrl = session.participant.participantLinkToken
+    ? new URL(`/p/${encodeURIComponent(session.participant.participantLinkToken)}/activities`, requestOrigin).toString()
+    : null;
+  const showLegacyNavigoCompletionPanel = false;
 
   return (
     <main className="min-h-screen bg-zinc-50 px-4 py-6 text-zinc-950 sm:py-8">
@@ -73,6 +81,25 @@ export default async function CtlPublicCapturePage({ params, searchParams }: Ctl
         </section>
 
         {session.status === "COMPLETED" ? (
+          <CtlNavigoPreparedPanel
+            activities={session.participant.navigo.activities
+              .filter((activity) => ["T3_HORAS", "T4_5_HORAS", "T6_HORAS"].includes(activity.code))
+              .map((activity) => ({
+                availableFromLabel: formatCtlDateTime(activity.availableFrom),
+                code: activity.code
+              }))}
+            evaluationUrl={participantUrl}
+            firstSampleKey={session.participant.rotation.firstSampleKey}
+            folio={session.participant.folio}
+            requestOrigin={requestOrigin}
+            secondSampleKey={session.participant.rotation.secondSampleKey}
+            sessionId={session.id}
+            studyCode={studyCode}
+            t0Label={formatCtlDateTime(session.participant.navigo.applicationStartedAt)}
+          />
+        ) : null}
+
+        {showLegacyNavigoCompletionPanel && session.status === "COMPLETED" ? (
           <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Siguiente paso</p>
             <h2 className="mt-2 text-xl font-bold text-emerald-950">
@@ -167,4 +194,8 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 function formatCtlTimestamp(value: Date | null): string | null {
   return value ? formatCtlTime(value) : null;
+}
+
+function formatCtlDateTime(value: Date | null): string {
+  return value ? `${formatCtlDate(value)} ${formatCtlTime(value)}` : "Sin registro";
 }

@@ -7,6 +7,7 @@ import { getCtlPublicSessionSecret, getPublicCtlInterviewerActor } from "@/share
 import { createCtlRepository } from "./repository";
 import type { CtlSessionView } from "./repository";
 import { createNavigoAppRepository } from "@/modules/navigo-app/repository";
+import type { NavigoEvaluationLinkWhatsAppActionResult } from "@/modules/navigo-app/actions";
 import {
   createCtlPublicSessionToken,
   ctlPublicSessionCookieName,
@@ -291,6 +292,71 @@ export async function markPublicCtlComparativeStartedAction(studyCode: string, s
   }
 
   return {
+    ok: true
+  };
+}
+
+export async function sendPublicCtlNavigoEvaluationLinkWhatsAppAction(
+  studyCode: string,
+  sessionId: string,
+  requestOrigin: string
+): Promise<NavigoEvaluationLinkWhatsAppActionResult> {
+  const actor = await getPublicCtlInterviewerActor({ studyCode });
+
+  if (!actor) {
+    return {
+      message: "Ingresa tu codigo de encuestador para continuar.",
+      ok: false
+    };
+  }
+
+  const session = await createCtlRepository().getSession({ actor, sessionId });
+
+  if (!session || session.status !== "COMPLETED") {
+    return {
+      message: "La sesion CTL debe estar completada antes de enviar el enlace Navigo.",
+      ok: false
+    };
+  }
+
+  if (!session.responsibleUserId) {
+    return {
+      message: "No encontramos el responsable interno para enviar WhatsApp.",
+      ok: false
+    };
+  }
+
+  const result = await createNavigoAppRepository().sendEvaluationLinkWhatsApp({
+    actorUserId: session.responsibleUserId,
+    requestOrigin,
+    studyId: actor.studyId,
+    studyParticipantId: session.participant.id
+  });
+
+  if (!result.ok) {
+    return { message: result.message, ok: false };
+  }
+
+  try {
+    revalidatePath(`/ctl/${studyCode}/sessions/${sessionId}`);
+    revalidatePath(`/admin/studies/${actor.studyId}/navigo-app`);
+  } catch {
+    // El envio y la auditoria ya quedaron resueltos; no ocultamos el resultado por una revalidacion secundaria.
+  }
+
+  return {
+    data: {
+      evaluationUrl: result.data.evaluationUrl,
+      folio: result.data.folio,
+      generatedAtIso: result.data.generatedAt.toISOString(),
+      message: result.data.whatsappStatus === "ENVIADO"
+        ? "Enlace de evaluacion enviado por WhatsApp."
+        : "Enlace generado. WhatsApp fallo; copia el enlace para compartirlo manualmente.",
+      phone: result.data.phone,
+      whatsappError: result.data.whatsappError,
+      whatsappMessageId: result.data.whatsappMessageId,
+      whatsappStatus: result.data.whatsappStatus
+    },
     ok: true
   };
 }

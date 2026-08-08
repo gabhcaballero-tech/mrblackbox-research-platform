@@ -51,6 +51,15 @@ export type CtlParticipantSummary = {
   id: string;
   interviewerName: string | null;
   name: string;
+  navigo: {
+    activities: Array<{
+      availableFrom: Date;
+      code: string;
+      scheduledAt: Date;
+      status: string;
+    }>;
+    applicationStartedAt: Date | null;
+  };
   nse: string;
   participantLinkToken: string | null;
   referenceCodes: Array<{ code: string; slot: number }>;
@@ -129,6 +138,13 @@ type ConfirmationRecord = {
 
 type ParticipantRecord = {
   accessTokens?: Array<{ expiresAt: Date; id: string; status: string; tokenHash: string }>;
+  activities?: Array<{
+    activitySchedule: { code: string };
+    availableFrom: Date;
+    scheduledAt: Date;
+    status: string;
+  }>;
+  applicationStartedAt?: Date | null;
   ctlTriangularRotationAssignment?: CtlTriangularRotationAssignmentRecord | null;
   id: string;
   participantProfile: {
@@ -1307,6 +1323,16 @@ const confirmationSelect = {
         take: 1,
         where: { status: "ACTIVE" }
       },
+      activities: {
+        orderBy: { scheduledAt: "asc" },
+        select: {
+          activitySchedule: { select: { code: true } },
+          availableFrom: true,
+          scheduledAt: true,
+          status: true
+        }
+      },
+      applicationStartedAt: true,
       id: true,
       ctlTriangularRotationAssignment: {
         select: {
@@ -1377,6 +1403,16 @@ const sessionSelect = {
         take: 1,
         where: { status: "ACTIVE" }
       },
+      activities: {
+        orderBy: { scheduledAt: "asc" },
+        select: {
+          activitySchedule: { select: { code: true } },
+          availableFrom: true,
+          scheduledAt: true,
+          status: true
+        }
+      },
+      applicationStartedAt: true,
       id: true,
       participantConfirmation: {
         select: {
@@ -1620,6 +1656,15 @@ function toParticipantSummary(
     id: confirmation.studyParticipant.id,
     interviewerName: session ? getSessionInterviewerName(session) : null,
     name: confirmation.studyParticipant.participantProfile.name,
+    navigo: {
+      activities: (confirmation.studyParticipant.activities ?? []).map((activity) => ({
+        availableFrom: activity.availableFrom,
+        code: activity.activitySchedule.code,
+        scheduledAt: activity.scheduledAt,
+        status: activity.status
+      })),
+      applicationStartedAt: confirmation.studyParticipant.applicationStartedAt ?? null
+    },
     nse: formatNse(confirmation.screeningAttempt),
     participantLinkToken: confirmation.studyParticipant.accessTokens?.[0]?.id ?? null,
     referenceCodes: confirmation.referenceCodes,
@@ -1680,6 +1725,15 @@ function toSessionView(session: SessionRecord): CtlSessionView {
           id: session.studyParticipant.id,
           interviewerName,
           name: session.studyParticipant.participantProfile.name,
+          navigo: {
+            activities: (session.studyParticipant.activities ?? []).map((activity) => ({
+              availableFrom: activity.availableFrom,
+              code: activity.activitySchedule.code,
+              scheduledAt: activity.scheduledAt,
+              status: activity.status
+            })),
+            applicationStartedAt: session.studyParticipant.applicationStartedAt ?? null
+          },
           nse: "Sin NSE",
           participantLinkToken: session.studyParticipant.accessTokens?.[0]?.id ?? null,
           referenceCodes: [],
