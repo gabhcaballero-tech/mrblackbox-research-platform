@@ -165,9 +165,11 @@ export type EnsureFilterOnlyConfirmationInput = {
 
 export type EnsureFilterOnlyConfirmationResult =
   | {
+      actorUserId: string;
       confirmation: PortalParticipantConfirmationRecord;
       created: boolean;
       ok: true;
+      studyParticipantId: string;
     }
   | {
       message: string;
@@ -445,9 +447,11 @@ export function createParticipantPortalScreenerRepository(
 
         if (attempt.participantConfirmation) {
           return {
+            actorUserId: attempt.questionnaireVersion.study.createdByUserId,
             confirmation: attempt.participantConfirmation,
             created: false,
-            ok: true
+            ok: true,
+            studyParticipantId: attempt.studyParticipantId
           };
         }
 
@@ -504,9 +508,11 @@ export function createParticipantPortalScreenerRepository(
         });
 
         return {
+          actorUserId: study.createdByUserId,
           confirmation,
           created: true,
-          ok: true
+          ok: true,
+          studyParticipantId: attempt.studyParticipantId
         };
       });
     },

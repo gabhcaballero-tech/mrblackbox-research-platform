@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createParticipantPortalScreenerRepository } from "@/modules/participant-portal/screener-repository";
 import { generateParticipantReferenceCode } from "@/modules/participant-portal/review";
+import { applyStoredNavigoRotationForParticipantBestEffort } from "@/modules/navigo-app/rotation-folio-application";
 import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
 import { getFieldActorForRequest } from "./auth";
 import { createFieldRepository } from "./repository";
@@ -141,6 +142,12 @@ export async function saveFieldScreeningAnswerAction(
       if (!confirmation.ok) {
         redirect(fieldAttemptPath(attemptId, questionId, confirmation.message));
       }
+
+      await applyStoredNavigoRotationForParticipantBestEffort({
+        actorUserId: confirmation.actorUserId,
+        context: "field-screening",
+        studyParticipantId: confirmation.studyParticipantId
+      });
 
       const confirmationAttempt = await loadFieldConfirmationAttemptBestEffort({
         attemptId,

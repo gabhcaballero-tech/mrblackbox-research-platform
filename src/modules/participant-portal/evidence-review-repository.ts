@@ -130,9 +130,11 @@ export type EvidenceReviewRepository = {
 
 export type EvidenceReviewApprovalResult =
   | {
+      actorUserId: string;
       confirmation: EvidenceReviewConfirmationRecord;
       created: boolean;
       ok: true;
+      studyParticipantId: string;
     }
   | {
       message: string;
@@ -505,9 +507,11 @@ export function createEvidenceReviewRepository(
           });
 
           return {
+            actorUserId: input.approvedByUserId,
             confirmation: attempt.participantConfirmation,
             created: false,
-            ok: true
+            ok: true,
+            studyParticipantId: attempt.studyParticipantId
           };
         }
 
@@ -633,9 +637,11 @@ export function createEvidenceReviewRepository(
         });
 
         return {
+          actorUserId: input.approvedByUserId,
           confirmation,
           created: true,
-          ok: true
+          ok: true,
+          studyParticipantId: attempt.studyParticipantId
         };
       });
     },

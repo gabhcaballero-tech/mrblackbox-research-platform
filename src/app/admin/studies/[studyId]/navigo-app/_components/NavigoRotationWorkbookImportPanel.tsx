@@ -182,8 +182,9 @@ function WorkbookPreview({ state }: { state: NavigoRotationWorkbookImportActionS
         <Metric label="Validas" value={preview.summary.validRows} />
         <Metric label="Con error" value={preview.summary.rowsWithError} />
         <Metric label="Folios encontrados" value={preview.summary.foundFolios} />
+        <Metric label="Pendientes participante" value={preview.summary.pendingParticipants} />
         <Metric label="Triangular completo" value={preview.summary.triangularComplete} />
-        <Metric label="Triangular existente" value={preview.summary.existingTriangularRotations} />
+        <Metric label="Config. folio existente" value={preview.summary.existingStoredConfigurations} />
       </dl>
       <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
         <Metric label="Filas HUT" value={preview.summary.hut.totalRows} />
@@ -247,6 +248,8 @@ function PreviewTable({
                   <td className="px-2 py-2">
                     {showErrors ? (
                       <span className="text-xs font-semibold text-rose-700">{row.errors.join("; ")}</span>
+                    ) : row.pendingParticipant ? (
+                      <span className="text-xs font-semibold text-indigo-700">Guardara configuracion por folio</span>
                     ) : row.existingTriangularRotation || row.existingRotation ? (
                       <span className="text-xs font-semibold text-amber-700">Actualizara asignacion existente</span>
                     ) : (

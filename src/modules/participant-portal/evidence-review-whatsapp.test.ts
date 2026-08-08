@@ -3,6 +3,7 @@ import type { EvidenceReviewRepository } from "./evidence-review-repository";
 
 const mocks = vi.hoisted(() => ({
   findLatestOutboundTemplateMessage: vi.fn(),
+  applyStoredNavigoRotationForParticipantBestEffort: vi.fn(),
   sendNavigoConfirmationWhatsApp: vi.fn()
 }));
 
@@ -13,11 +14,31 @@ vi.mock("@/modules/oneui-whatsapp", () => ({
   sendNavigoConfirmationWhatsApp: mocks.sendNavigoConfirmationWhatsApp
 }));
 
+vi.mock("@/modules/navigo-app/rotation-folio-application", () => ({
+  applyStoredNavigoRotationForParticipantBestEffort: mocks.applyStoredNavigoRotationForParticipantBestEffort
+}));
+
 const admin = { id: "admin-1", role: "ADMIN" as const, status: "ACTIVE" as const };
 
 function repository(): EvidenceReviewRepository {
   return {
-    approveEvidence: vi.fn(async () => ({ created: false, ok: true })),
+    approveEvidence: vi.fn(async () => ({
+      actorUserId: "admin-1",
+      confirmation: {
+        folio: "NAV-001",
+        folioSequence: 1,
+        manualMessageMarkedSentAt: null,
+        manualMessageStatus: "NOT_SENT",
+        referenceCodes: [
+          { code: "A7K4", slot: 1 },
+          { code: "M3P9", slot: 2 },
+          { code: "T8R2", slot: 3 }
+        ]
+      },
+      created: false,
+      ok: true,
+      studyParticipantId: "study-participant-1"
+    })),
     getAttemptReview: vi.fn(async () => ({
       id: "attempt-1",
       participantConfirmation: {

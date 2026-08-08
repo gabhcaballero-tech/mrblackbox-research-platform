@@ -259,6 +259,9 @@ export type NavigoStudyRotationConfigInput = {
 export type NavigoRotationImportPreviewRow = NavigoRotationImportRowInput & {
   errors: string[];
   existingRotation: boolean;
+  existingStoredConfiguration: boolean;
+  participantFound: boolean;
+  pendingParticipant: boolean;
   rowNumber: number;
   t0Started: boolean;
   updatable: boolean;
@@ -268,7 +271,9 @@ export type NavigoRotationImportPreview = {
   rows: NavigoRotationImportPreviewRow[];
   summary: {
     duplicateFolios: number;
+    existingStoredConfigurations: number;
     foundFolios: number;
+    pendingParticipants: number;
     rowsWithError: number;
     t0Started: number;
     totalRows: number;
@@ -490,6 +495,10 @@ export type NavigoAppRepository = {
     actorUserId: string;
     studyParticipantId: string;
   }) => Promise<NavigoMaintenanceResult>;
+  applyStoredRotationForParticipant: (input: {
+    actorUserId: string;
+    studyParticipantId: string;
+  }) => Promise<NavigoMaintenanceResult>;
   configureStudyRotation: (input: NavigoStudyRotationConfigInput) => Promise<NavigoActionResult<NavigoStudyRotationConfiguration>>;
   confirmActivitySelfieUpload: (input: {
     activityId: string;
@@ -688,6 +697,7 @@ type NavigoPrismaClient = PrismaClientLike & {
   rotationPlan: Delegate;
   rotationPlanArm: Delegate;
   mediaEvidencePlaceholder?: Delegate;
+  navigoRotationFolioConfiguration?: Delegate;
   screeningAnswer?: Delegate;
   screeningAttempt: Delegate;
   studyArm: Delegate;
@@ -1134,6 +1144,12 @@ type ConfirmationWithParticipant = {
   folio: string;
   studyParticipant: ParticipantRecord;
 };
+type NavigoRotationFolioConfigurationRecord = NavigoRotationWorkbookRowInput & {
+  id: string;
+  importedByUserId: string | null;
+  sourceFileName: string | null;
+  studyId: string;
+};
 type HutParticipantWorkbookRecord = {
   blocks?: Array<{ status: string; submittedVideosCount: number }>;
   callEvaluations?: Array<{ completedAt: Date | null; status: string }>;
@@ -1525,6 +1541,52 @@ export function createNavigoAppRepository(
               rotationCode,
               rightFragranceCode
             },
+            ok: true
+          };
+        });
+      } catch (error) {
+        const failure = toNavigoRotationApplyFailure(error);
+        logNavigoRotationApplyFailure({
+          error,
+          folio: failure.folio,
+          message: failure.logMessage,
+          step: failure.step,
+          studyId: logStudyId
+        });
+        return {
+          message: failure.message,
+          ok: false
+        };
+      }
+    },
+
+    async applyStoredRotationForParticipant(input) {
+      const prisma = await getPrisma();
+      let logStudyId = "unknown";
+
+      try {
+        return await prisma.$transaction(async (tx) => {
+          const participant = (await tx.studyParticipant.findUnique?.({
+            select: participantWithActivitiesSelect,
+            where: { id: input.studyParticipantId }
+          })) as ParticipantRecord | null;
+
+          if (!participant) {
+            return { message: "No encontramos el participante.", ok: false };
+          }
+
+          logStudyId = participant.study.id;
+
+          const applied = await applyStoredNavigoRotationForParticipantInTransaction({
+            actorUserId: input.actorUserId,
+            participant,
+            prisma: tx
+          });
+
+          return {
+            message: applied
+              ? "Rotacion oficial importada aplicada al participante."
+              : "No hay rotacion oficial importada pendiente para este folio.",
             ok: true
           };
         });
@@ -4467,15 +4529,18 @@ async function buildParticipantImportPreview({
 }
 
 async function buildRotationImportPreview({
+  allowMissingFolios = false,
   prisma,
   rows,
   studyId
 }: {
+  allowMissingFolios?: boolean;
   prisma: NavigoPrismaClient | NavigoTransactionClient;
   rows: NavigoRotationImportRowInput[];
   studyId: string;
 }): Promise<NavigoRotationImportPreview> {
   const confirmations = await findConfirmationsByFolio({ prisma, rows, studyId });
+  const storedConfigurations = await findNavigoRotationFolioConfigurationsByFolio({ prisma, rows, studyId });
   const seenFolios = new Set<string>();
   const duplicateFolios = new Set<string>();
 
@@ -4492,12 +4557,16 @@ async function buildRotationImportPreview({
   const previewRows = rows.map((row, index): NavigoRotationImportPreviewRow => {
     const errors: string[] = [];
     const confirmation = row.folio ? confirmations.get(row.folio) : null;
+    const existingStoredConfiguration = row.folio ? storedConfigurations.has(row.folio) : false;
+    const participantFound = Boolean(confirmation);
 
     if (!row.folio) {
       errors.push("folio vacio");
+    } else if (!isValidNavigoImportedFolio(row.folio)) {
+      errors.push("folio invalido");
     } else if (duplicateFolios.has(row.folio)) {
       errors.push("folio duplicado dentro del archivo");
-    } else if (!confirmation) {
+    } else if (!allowMissingFolios && !confirmation) {
       errors.push("folio no encontrado");
     }
 
@@ -4524,6 +4593,9 @@ async function buildRotationImportPreview({
       ...row,
       errors,
       existingRotation,
+      existingStoredConfiguration,
+      participantFound,
+      pendingParticipant: !participantFound,
       rowNumber: index + 2,
       t0Started,
       updatable: errors.length === 0
@@ -4534,8 +4606,10 @@ async function buildRotationImportPreview({
     rows: previewRows,
     summary: {
       duplicateFolios: duplicateFolios.size,
+      existingStoredConfigurations: previewRows.filter((row) => row.existingStoredConfiguration).length,
       foundFolios: previewRows.filter((row) => row.folio && confirmations.has(row.folio)).length,
-      missingFolios: previewRows.filter((row) => row.errors.includes("folio no encontrado")).length,
+      missingFolios: previewRows.filter((row) => row.folio && !confirmations.has(row.folio)).length,
+      pendingParticipants: previewRows.filter((row) => row.pendingParticipant && row.errors.length === 0).length,
       rowsWithError: previewRows.filter((row) => row.errors.length > 0).length,
       t0Started: previewRows.filter((row) => row.t0Started).length,
       totalRows: previewRows.length,
@@ -4556,7 +4630,7 @@ async function buildRotationWorkbookImportPreview({
   rows: NavigoRotationWorkbookRowInput[];
   studyId: string;
 }): Promise<NavigoRotationWorkbookPreview> {
-  const basePreview = await buildRotationImportPreview({ prisma, rows, studyId });
+  const basePreview = await buildRotationImportPreview({ allowMissingFolios: true, prisma, rows, studyId });
   const hutPreview = await buildHutRotationWorkbookPreview({
     prisma,
     rows: hutRows ?? [],
@@ -4737,14 +4811,18 @@ async function applyRotationWorkbookRowsInTransaction({
   });
 
   for (const row of rows) {
+    await upsertNavigoRotationFolioConfiguration({
+      actorUserId,
+      filename,
+      prisma,
+      row,
+      studyId
+    });
+
     const confirmation = confirmations.get(row.folio);
 
     if (!confirmation) {
-      throw new NavigoRotationApplyError({
-        folio: row.folio,
-        message: `No se encontro confirmacion para el folio ${row.folio}.`,
-        step: "confirmation"
-      });
+      continue;
     }
 
     await upsertParticipantRotationForCodes({
@@ -4763,6 +4841,156 @@ async function applyRotationWorkbookRowsInTransaction({
       studyParticipantId: confirmation.studyParticipant.id
     });
   }
+}
+
+async function upsertNavigoRotationFolioConfiguration({
+  actorUserId,
+  filename,
+  prisma,
+  row,
+  studyId
+}: {
+  actorUserId: string;
+  filename: string;
+  prisma: NavigoTransactionClient;
+  row: NavigoRotationWorkbookRowInput;
+  studyId: string;
+}) {
+  await runNavigoRotationImportStep({
+    folio: row.folio,
+    operation: () =>
+      prisma.navigoRotationFolioConfiguration?.upsert?.({
+        create: {
+          firstFragrance: row.primeraFragancia,
+          folio: row.folio,
+          importedByUserId: actorUserId,
+          secondFragrance: row.segundaFragancia,
+          sourceFileName: filename,
+          studyId,
+          triangular1Pr1: row.triangular1Pr1,
+          triangular1Pr2: row.triangular1Pr2,
+          triangular1Pr3: row.triangular1Pr3,
+          triangular1Verify: row.triangular1Verify,
+          triangular2Pr1: row.triangular2Pr1,
+          triangular2Pr2: row.triangular2Pr2,
+          triangular2Pr3: row.triangular2Pr3,
+          triangular2Verify: row.triangular2Verify
+        },
+        update: {
+          firstFragrance: row.primeraFragancia,
+          importedAt: new Date(),
+          importedByUserId: actorUserId,
+          secondFragrance: row.segundaFragancia,
+          sourceFileName: filename,
+          triangular1Pr1: row.triangular1Pr1,
+          triangular1Pr2: row.triangular1Pr2,
+          triangular1Pr3: row.triangular1Pr3,
+          triangular1Verify: row.triangular1Verify,
+          triangular2Pr1: row.triangular2Pr1,
+          triangular2Pr2: row.triangular2Pr2,
+          triangular2Pr3: row.triangular2Pr3,
+          triangular2Verify: row.triangular2Verify
+        },
+        where: {
+          studyId_folio: {
+            folio: row.folio,
+            studyId
+          }
+        }
+      }) as Promise<unknown>,
+    step: "navigo-rotation-folio-configuration",
+    userMessage: "No se pudo guardar la configuracion oficial de rotacion por folio."
+  });
+}
+
+async function applyStoredNavigoRotationForParticipantInTransaction({
+  actorUserId,
+  participant,
+  prisma
+}: {
+  actorUserId: string;
+  participant: ParticipantRecord;
+  prisma: NavigoTransactionClient;
+}): Promise<boolean> {
+  const confirmation = participant.participantConfirmation;
+
+  if (!confirmation || participant.study.code !== NAVIGO_STUDY_CODE || participantStatus(participant) !== "APPROVED") {
+    return false;
+  }
+
+  const configuration = (await prisma.navigoRotationFolioConfiguration?.findUnique?.({
+    select: {
+      firstFragrance: true,
+      folio: true,
+      importedByUserId: true,
+      secondFragrance: true,
+      sourceFileName: true,
+      studyId: true,
+      triangular1Pr1: true,
+      triangular1Pr2: true,
+      triangular1Pr3: true,
+      triangular1Verify: true,
+      triangular2Pr1: true,
+      triangular2Pr2: true,
+      triangular2Pr3: true,
+      triangular2Verify: true
+    },
+    where: {
+      studyId_folio: {
+        folio: confirmation.folio,
+        studyId: participant.study.id
+      }
+    }
+  })) as {
+    firstFragrance: string;
+    folio: string;
+    importedByUserId: string | null;
+    secondFragrance: string;
+    sourceFileName: string | null;
+    studyId: string;
+    triangular1Pr1: string;
+    triangular1Pr2: string;
+    triangular1Pr3: string;
+    triangular1Verify: string;
+    triangular2Pr1: string;
+    triangular2Pr2: string;
+    triangular2Pr3: string;
+    triangular2Verify: string;
+  } | null | undefined;
+
+  if (!configuration) {
+    return false;
+  }
+
+  await upsertParticipantRotationForCodes({
+    actorUserId,
+    leftFragranceCode: configuration.firstFragrance,
+    participant,
+    prisma,
+    rightFragranceCode: configuration.secondFragrance
+  });
+
+  await upsertCtlTriangularRotationAssignment({
+    actorUserId: configuration.importedByUserId ?? actorUserId,
+    filename: configuration.sourceFileName ?? "ROTACIONES NAVIGO.xlsx",
+    prisma,
+    row: {
+      folio: configuration.folio,
+      primeraFragancia: configuration.firstFragrance,
+      segundaFragancia: configuration.secondFragrance,
+      triangular1Pr1: configuration.triangular1Pr1,
+      triangular1Pr2: configuration.triangular1Pr2,
+      triangular1Pr3: configuration.triangular1Pr3,
+      triangular1Verify: configuration.triangular1Verify,
+      triangular2Pr1: configuration.triangular2Pr1,
+      triangular2Pr2: configuration.triangular2Pr2,
+      triangular2Pr3: configuration.triangular2Pr3,
+      triangular2Verify: configuration.triangular2Verify
+    },
+    studyParticipantId: participant.id
+  });
+
+  return true;
 }
 
 async function applyHutRotationWorkbookRowsInBatches({
@@ -5262,6 +5490,10 @@ function hutFolioToNavigoFolio(folio: string): string | null {
   return `NAV-${match[1].padStart(3, "0")}`;
 }
 
+function isValidNavigoImportedFolio(folio: string): boolean {
+  return /^NAV-\d{3,}$/.test(normalizeNavigoFolio(folio));
+}
+
 function validateTriangularRotationRow(row: NavigoTriangularRotationLike): string[] {
   const errors: string[] = [];
   const triangular1 = [row.triangular1Pr1, row.triangular1Pr2, row.triangular1Pr3];
@@ -5335,6 +5567,83 @@ async function findConfirmationsByFolio({
   })) as ConfirmationWithParticipant[];
 
   return new Map(confirmations.map((confirmation) => [confirmation.folio, confirmation]));
+}
+
+async function findNavigoRotationFolioConfigurationsByFolio({
+  prisma,
+  rows,
+  studyId
+}: {
+  prisma: NavigoPrismaClient | NavigoTransactionClient;
+  rows: Array<{ folio: string }>;
+  studyId: string;
+}): Promise<Map<string, NavigoRotationFolioConfigurationRecord>> {
+  const folios = [...new Set(rows.map((row) => row.folio).filter(Boolean))];
+
+  if (folios.length === 0 || !prisma.navigoRotationFolioConfiguration?.findMany) {
+    return new Map();
+  }
+
+  const configurations = (await prisma.navigoRotationFolioConfiguration.findMany({
+    select: {
+      firstFragrance: true,
+      folio: true,
+      id: true,
+      importedByUserId: true,
+      secondFragrance: true,
+      sourceFileName: true,
+      studyId: true,
+      triangular1Pr1: true,
+      triangular1Pr2: true,
+      triangular1Pr3: true,
+      triangular1Verify: true,
+      triangular2Pr1: true,
+      triangular2Pr2: true,
+      triangular2Pr3: true,
+      triangular2Verify: true
+    },
+    where: {
+      folio: { in: folios },
+      studyId
+    }
+  })) as Array<{
+    firstFragrance: string;
+    folio: string;
+    id: string;
+    importedByUserId: string | null;
+    secondFragrance: string;
+    sourceFileName: string | null;
+    studyId: string;
+    triangular1Pr1: string;
+    triangular1Pr2: string;
+    triangular1Pr3: string;
+    triangular1Verify: string;
+    triangular2Pr1: string;
+    triangular2Pr2: string;
+    triangular2Pr3: string;
+    triangular2Verify: string;
+  }>;
+
+  return new Map(configurations.map((configuration) => [
+    configuration.folio,
+    {
+      folio: configuration.folio,
+      id: configuration.id,
+      importedByUserId: configuration.importedByUserId,
+      primeraFragancia: configuration.firstFragrance,
+      segundaFragancia: configuration.secondFragrance,
+      sourceFileName: configuration.sourceFileName,
+      studyId: configuration.studyId,
+      triangular1Pr1: configuration.triangular1Pr1,
+      triangular1Pr2: configuration.triangular1Pr2,
+      triangular1Pr3: configuration.triangular1Pr3,
+      triangular1Verify: configuration.triangular1Verify,
+      triangular2Pr1: configuration.triangular2Pr1,
+      triangular2Pr2: configuration.triangular2Pr2,
+      triangular2Pr3: configuration.triangular2Pr3,
+      triangular2Verify: configuration.triangular2Verify
+    }
+  ]));
 }
 
 async function findHutParticipantsByFolio({
@@ -5780,6 +6089,12 @@ async function upsertNavigoDirectParticipant({
     rowNumber,
     step: "study-participant-reload-after-confirmation",
     userMessage: "no se pudo recargar StudyParticipant despues de crear folio y codigos."
+  });
+
+  await applyStoredNavigoRotationForParticipantInTransaction({
+    actorUserId,
+    participant,
+    prisma
   });
 
   let linkToken: string | null = null;
@@ -7069,6 +7384,8 @@ function mapNavigoRotationStepToParticipantImportMessage(step: string): string {
       return "no se pudieron guardar RotationPlanArm.";
     case "participant-rotation-assignment":
       return "no se pudo crear ParticipantRotationAssignment.";
+    case "navigo-rotation-folio-configuration":
+      return "no se pudo guardar NavigoRotationFolioConfiguration.";
     case "ctl-triangular-rotation-assignment":
       return "no se pudo guardar CtlTriangularRotationAssignment.";
     case "participant-arm-left":

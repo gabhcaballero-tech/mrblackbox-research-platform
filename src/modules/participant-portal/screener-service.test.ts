@@ -24,6 +24,10 @@ import {
   saveParticipantPortalScreenerAnswer
 } from "./screener-service";
 
+vi.mock("@/modules/navigo-app/rotation-folio-application", () => ({
+  applyStoredNavigoRotationForParticipantBestEffort: vi.fn()
+}));
+
 const identity: ParticipantPortalIdentity = {
   email: "persona@example.com",
   id: "11111111-1111-4111-8111-111111111111"
@@ -253,9 +257,11 @@ function createMemoryRepository({
 
       if (attempt.participantConfirmation) {
         return {
+          actorUserId: currentStudy.createdByUserId,
           confirmation: attempt.participantConfirmation,
           created: false,
-          ok: true
+          ok: true,
+          studyParticipantId: attempt.studyParticipantId
         };
       }
 
@@ -277,9 +283,11 @@ function createMemoryRepository({
       void input.codeGenerator;
 
       return {
+        actorUserId: currentStudy.createdByUserId,
         confirmation,
         created: true,
-        ok: true
+        ok: true,
+        studyParticipantId: attempt.studyParticipantId
       };
     },
     async findCurrentParticipantConsent(input) {

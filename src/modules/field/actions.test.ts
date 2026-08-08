@@ -2,6 +2,7 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   ensureFilterOnlyConfirmation: vi.fn(),
+  applyStoredNavigoRotationForParticipantBestEffort: vi.fn(),
   findLatestOutboundTemplateMessage: vi.fn(),
   getAttempt: vi.fn(),
   sendNavigoConfirmationWhatsApp: vi.fn()
@@ -55,6 +56,10 @@ vi.mock("@/modules/participant-portal/screener-repository", () => ({
 
 vi.mock("@/modules/participant-portal/review", () => ({
   generateParticipantReferenceCode: vi.fn(() => "A7K4")
+}));
+
+vi.mock("@/modules/navigo-app/rotation-folio-application", () => ({
+  applyStoredNavigoRotationForParticipantBestEffort: mocks.applyStoredNavigoRotationForParticipantBestEffort
 }));
 
 describe("field actions public access", () => {
@@ -130,6 +135,7 @@ describe("field actions public access", () => {
       ok: true
     });
     mocks.ensureFilterOnlyConfirmation.mockResolvedValueOnce({
+      actorUserId: "admin-1",
       confirmation: {
         folio: "NAV-001",
         folioSequence: 1,
@@ -140,7 +146,8 @@ describe("field actions public access", () => {
         ]
       },
       created: true,
-      ok: true
+      ok: true,
+      studyParticipantId: "study-participant-1"
     });
     mocks.getAttempt.mockResolvedValueOnce({
       id: "attempt-public-1",
@@ -193,6 +200,7 @@ describe("field actions public access", () => {
       ok: true
     });
     mocks.ensureFilterOnlyConfirmation.mockResolvedValueOnce({
+      actorUserId: "admin-1",
       confirmation: {
         folio: "DET-001",
         folioSequence: 1,
@@ -203,7 +211,8 @@ describe("field actions public access", () => {
         ]
       },
       created: true,
-      ok: true
+      ok: true,
+      studyParticipantId: "study-participant-detergents-1"
     });
     mocks.getAttempt.mockResolvedValueOnce({
       id: "attempt-detergents-1",

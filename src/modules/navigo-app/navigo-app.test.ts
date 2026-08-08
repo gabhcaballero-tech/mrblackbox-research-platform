@@ -2305,6 +2305,70 @@ describe("navigo app MVP rules", () => {
     expect(state.hutParticipants[0]?.callEvaluations).toHaveLength(0);
   });
 
+  it("stores official workbook rotation for a future folio and applies it when the participant exists", async () => {
+    const state = createNavigoRotationImportState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const row = createRotationWorkbookRow("NAV-999", 0);
+
+    const preview = await repository.previewRotationWorkbookImport({
+      hutRows: [],
+      rows: [row],
+      studyId: state.study.id
+    });
+
+    expect(preview.ok ? preview.data.rows[0] : null).toMatchObject({
+      errors: [],
+      folio: "NAV-999",
+      participantFound: false,
+      pendingParticipant: true,
+      updatable: true
+    });
+    expect(preview.ok ? preview.data.summary.pendingParticipants : -1).toBe(1);
+
+    const applied = await repository.applyRotationWorkbookImport({
+      actorUserId: "admin-1",
+      filename: "ROTACIONES NAVIGO.xlsx",
+      hutRows: [],
+      rows: [row],
+      studyId: state.study.id
+    });
+
+    expect(applied.ok).toBe(true);
+    expect(state.navigoRotationFolioConfigurations).toMatchObject([
+      {
+        firstFragrance: "247",
+        folio: "NAV-999",
+        secondFragrance: "583",
+        triangular1Verify: "PR2-0",
+        triangular2Verify: "PR5-0"
+      }
+    ]);
+    expect(state.rotationAssignments).toHaveLength(0);
+    expect(state.ctlTriangularRotationAssignments).toHaveLength(0);
+
+    const participant = seedRotationWorkbookParticipant(state, "NAV-999");
+    const recovered = await repository.applyStoredRotationForParticipant({
+      actorUserId: "admin-1",
+      studyParticipantId: participant.id
+    });
+
+    expect(recovered.ok).toBe(true);
+    expect(state.rotationAssignments).toHaveLength(1);
+    expect(state.ctlTriangularRotationAssignments).toMatchObject([
+      {
+        studyParticipantId: participant.id,
+        triangular1Pr1: "PR1-0",
+        triangular1Pr2: "PR2-0",
+        triangular1Pr3: "PR3-0",
+        triangular1Verify: "PR2-0",
+        triangular2Pr1: "PR4-0",
+        triangular2Pr2: "PR5-0",
+        triangular2Pr3: "PR6-0",
+        triangular2Verify: "PR5-0"
+      }
+    ]);
+  });
+
   it("applies 100+ official workbook rows in multiple transactions", async () => {
     vi.stubEnv("HUT_PHASE_CODE_SECRET", "hut-phase-secret-for-tests");
     const state = createNavigoRotationImportState();
@@ -5277,6 +5341,24 @@ function createNavigoRotationImportState({
     triangular2Pr3: string;
     triangular2Verify: string;
   }> = [];
+  const navigoRotationFolioConfigurations: Array<{
+    firstFragrance: string;
+    folio: string;
+    id: string;
+    importedAt?: Date;
+    importedByUserId: string | null;
+    secondFragrance: string;
+    sourceFileName: string | null;
+    studyId: string;
+    triangular1Pr1: string;
+    triangular1Pr2: string;
+    triangular1Pr3: string;
+    triangular1Verify: string;
+    triangular2Pr1: string;
+    triangular2Pr2: string;
+    triangular2Pr3: string;
+    triangular2Verify: string;
+  }> = [];
   const hutParticipants: Array<{
     blocks: Array<{ status: string; submittedVideosCount: number }>;
     callEvaluations: Array<{ completedAt: Date | null; status: string }>;
@@ -5386,6 +5468,44 @@ function createNavigoRotationImportState({
         const record = { ...args.create, id: `ctl-triangular-${ctlTriangularRotationAssignments.length + 1}` };
         ctlTriangularRotationAssignments.push(record);
         syncCtlTriangularRotation(args.where.studyParticipantId);
+        return record;
+      }
+    },
+    navigoRotationFolioConfiguration: {
+      async findMany(args: { where: { folio: { in: string[] }; studyId: string } }) {
+        return navigoRotationFolioConfigurations.filter(
+          (configuration) =>
+            configuration.studyId === args.where.studyId &&
+            args.where.folio.in.includes(configuration.folio)
+        );
+      },
+      async findUnique(args: { where: { studyId_folio: { folio: string; studyId: string } } }) {
+        return (
+          navigoRotationFolioConfigurations.find(
+            (configuration) =>
+              configuration.studyId === args.where.studyId_folio.studyId &&
+              configuration.folio === args.where.studyId_folio.folio
+          ) ?? null
+        );
+      },
+      async upsert(args: {
+        create: Omit<(typeof navigoRotationFolioConfigurations)[number], "id">;
+        update: Partial<(typeof navigoRotationFolioConfigurations)[number]>;
+        where: { studyId_folio: { folio: string; studyId: string } };
+      }) {
+        const target = navigoRotationFolioConfigurations.find(
+          (configuration) =>
+            configuration.studyId === args.where.studyId_folio.studyId &&
+            configuration.folio === args.where.studyId_folio.folio
+        );
+
+        if (target) {
+          Object.assign(target, args.update);
+          return target;
+        }
+
+        const record = { ...args.create, id: `navigo-rotation-folio-${navigoRotationFolioConfigurations.length + 1}` };
+        navigoRotationFolioConfigurations.push(record);
         return record;
       }
     },
@@ -5632,6 +5752,17 @@ function createNavigoRotationImportState({
         return args.where.id === study.id ? study : null;
       }
     },
+    studyParticipant: {
+      async findUnique(args: { where: { id: string } }) {
+        const found = participants.find((candidate) => candidate.id === args.where.id) ?? null;
+        if (!found) {
+          return null;
+        }
+        syncParticipantRotation(found.id);
+        syncCtlTriangularRotation(found.id);
+        return found;
+      }
+    },
     studyArm: {
       async create(args: { data: Omit<(typeof arms)[number], "id"> }) {
         const record = { ...args.data, id: `arm-${arms.length + 1}` };
@@ -5709,6 +5840,7 @@ function createNavigoRotationImportState({
     hutParticipantPhaseCodes,
     hutParticipants,
     hutRegistrationSlots,
+    navigoRotationFolioConfigurations,
     participant,
     participants,
     prisma,

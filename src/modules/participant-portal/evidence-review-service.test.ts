@@ -22,6 +22,10 @@ import {
   updateParticipantEvidenceParticipant
 } from "./evidence-review-service";
 
+vi.mock("@/modules/navigo-app/rotation-folio-application", () => ({
+  applyStoredNavigoRotationForParticipantBestEffort: vi.fn()
+}));
+
 const admin = { id: "admin-1", role: "ADMIN" as const, status: "ACTIVE" as const };
 const interviewer = { id: "interviewer-1", role: "INTERVIEWER" as const, status: "ACTIVE" as const };
 
@@ -87,6 +91,7 @@ function attempt(overrides: Partial<EvidenceReviewAttemptRecord> = {}): Evidence
 function repository(currentAttempt = attempt()) {
   const repo: EvidenceReviewRepository = {
     approveEvidence: vi.fn(async () => ({
+      actorUserId: "admin-1",
       confirmation: {
         folio: "NAV-001",
         folioSequence: 1,
@@ -99,7 +104,8 @@ function repository(currentAttempt = attempt()) {
         ]
       },
       created: true,
-      ok: true as const
+      ok: true as const,
+      studyParticipantId: "study-participant-1"
     })),
     deleteTestRecord: vi.fn(async () => ({
       evidenceToDelete: [{ bucket: "participant-evidence", privateStorageKey: "private/selfie.jpg" }],

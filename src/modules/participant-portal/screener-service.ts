@@ -28,6 +28,7 @@ import {
 } from "@/modules/screener";
 import { applyStudyScreenerDefinitionOverrides } from "@/modules/screener/study-overrides";
 import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
+import { applyStoredNavigoRotationForParticipantBestEffort } from "@/modules/navigo-app/rotation-folio-application";
 import { generateParticipantReferenceCode } from "./review";
 
 export const PARTICIPANT_PORTAL_REGISTRATION_REQUIRED_MESSAGE =
@@ -359,6 +360,12 @@ export async function saveParticipantPortalScreenerAnswer({
         ok: false
       };
     }
+
+    await applyStoredNavigoRotationForParticipantBestEffort({
+      actorUserId: confirmation.actorUserId,
+      context: "participant-portal-screener",
+      studyParticipantId: confirmation.studyParticipantId
+    });
 
     return {
       data: {

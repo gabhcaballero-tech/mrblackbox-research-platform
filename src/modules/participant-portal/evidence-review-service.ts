@@ -15,6 +15,7 @@ import type {
 import { buildManualWhatsAppMessage, generateParticipantReferenceCode } from "./review";
 import { createOneuiWhatsAppRepository, sendNavigoConfirmationWhatsApp } from "@/modules/oneui-whatsapp";
 import { isQaStudyParticipant } from "@/modules/qa-participants/guards";
+import { applyStoredNavigoRotationForParticipantBestEffort } from "@/modules/navigo-app/rotation-folio-application";
 import { whatsappAutomationStatusFromMessage, type WhatsAppAutomationStatus } from "@/modules/oneui-whatsapp/templates";
 import {
   isMexicoPhone,
@@ -184,6 +185,12 @@ export async function approveParticipantEvidenceReview({
   if (!result.ok) {
     return result;
   }
+
+  await applyStoredNavigoRotationForParticipantBestEffort({
+    actorUserId: result.actorUserId,
+    context: "participant-evidence-review",
+    studyParticipantId: result.studyParticipantId
+  });
 
   return {
     data: {
