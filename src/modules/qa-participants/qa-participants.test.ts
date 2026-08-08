@@ -122,8 +122,13 @@ describe("qa participants repository", () => {
     ]);
     expect(preview.folios[0]?.relationCounts).toMatchObject({
       ctlSessions: 1,
+      participantAccessTokens: 1,
       hutPhaseCodes: 1,
-      participantActivities: 1
+      participantActivities: 1,
+      participantConfirmations: 1,
+      participantProfiles: 1,
+      screeningAnswers: 1,
+      studyParticipants: 1
     });
     expect(preview.rotationPlans).toEqual([
       expect.objectContaining({
@@ -200,7 +205,7 @@ describe("qa participants repository", () => {
     });
     const repository = createQaParticipantsRepository(prisma as never);
 
-    const result = await repository.cleanupLegacyAuthorizedFolios({
+    const result = await repository.cleanupLegacyQaParticipant({
       cleanedByUserId: "user-admin",
       folios: ["NAV-106"],
       studyId: "study-qa"

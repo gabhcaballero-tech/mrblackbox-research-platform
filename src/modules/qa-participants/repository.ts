@@ -151,6 +151,7 @@ export type CreateQaParticipantScenarioInput = {
 };
 
 export type QaParticipantsRepository = {
+  cleanupLegacyQaParticipant: (input: CleanupLegacyQaParticipantsInput) => Promise<QaParticipantActionResult<LegacyQaCleanupReport>>;
   cleanupLegacyAuthorizedFolios: (input: CleanupLegacyQaParticipantsInput) => Promise<QaParticipantActionResult<LegacyQaCleanupReport>>;
   cleanupRun: (input: CleanupQaParticipantRunInput) => Promise<QaParticipantActionResult<QaParticipantRunSummary>>;
   createEmptyRun: (input: CreateEmptyQaParticipantRunInput) => Promise<QaParticipantActionResult<QaParticipantRunSummary>>;
@@ -195,85 +196,12 @@ export function createQaParticipantsRepository(prismaClient?: QaPrismaClient): Q
       return buildLegacyQaCleanupPreview(prisma, input);
     },
 
+    async cleanupLegacyQaParticipant(input) {
+      return cleanupLegacyQaParticipants(getPrisma, input);
+    },
+
     async cleanupLegacyAuthorizedFolios(input) {
-      const normalized = normalizeLegacyQaCleanupFolios(input.folios);
-      if (normalized.blockedFolios.length > 0) {
-        return {
-          message: `Hay folios no autorizados para limpieza: ${normalized.blockedFolios.join(", ")}.`,
-          ok: false
-        };
-      }
-      if (normalized.authorizedFolios.length === 0) {
-        return {
-          message: "Selecciona al menos un folio autorizado.",
-          ok: false
-        };
-      }
-
-      const prisma = await getPrisma();
-      return prisma.$transaction(async (tx) => {
-        const preview = await buildLegacyQaCleanupPreview(tx, {
-          folios: normalized.authorizedFolios,
-          studyId: input.studyId
-        });
-        const report: LegacyQaCleanupReport = {
-          authorizedFolios: preview.authorizedFolios,
-          blockedFolios: preview.blockedFolios,
-          cleanedAt: new Date().toISOString(),
-          cleanedByUserId: input.cleanedByUserId,
-          folios: [],
-          rotationCleanup: {
-            blockedPlans: preview.rotationPlans.filter((plan) => plan.blockReasons.length > 0),
-            deleted: {},
-            plans: []
-          },
-          studyId: input.studyId
-        };
-
-        for (const item of preview.folios) {
-          if (!item.found) {
-            report.folios.push({ ...item, cleanupReport: null });
-            continue;
-          }
-
-          const cleanupReport = createEmptyQaCleanupReport({
-            hutParticipantId: item.hutParticipantId,
-            studyParticipantId: item.studyParticipantId
-          });
-          if (item.hutParticipantId) {
-            await cleanupHutParticipant(tx, cleanupReport, item.hutParticipantId);
-          }
-          if (item.studyParticipantId) {
-            await cleanupStudyParticipant(tx, cleanupReport, item.studyParticipantId);
-          }
-          report.folios.push({ ...item, cleanupReport });
-        }
-
-        await cleanupLegacyQaRotationPlans(tx, report, preview.rotationPlans);
-
-        await tx.qaParticipantRun.create?.({
-          data: {
-            cleanedAt: new Date(report.cleanedAt),
-            cleanedByUserId: input.cleanedByUserId,
-            cleanupReportJson: report,
-            createdByUserId: input.cleanedByUserId,
-            executionMode: "FAST_FORWARD",
-            folio: preview.authorizedFolios.join(", "),
-            reportJson: {
-              authorizedFolios: preview.authorizedFolios,
-              preview,
-              qa: true,
-              source: "LEGACY_AUTHORIZED_FOLIO_CLEANUP"
-            },
-            scenario: "CLT_NAVIGO_HUT",
-            status: "CLEANED",
-            studyId: input.studyId
-          },
-          select: qaRunSelect
-        });
-
-        return { data: report, ok: true };
-      });
+      return cleanupLegacyQaParticipants(getPrisma, input);
     },
 
     async cleanupRun(input) {
@@ -433,6 +361,90 @@ function toQaParticipantRunSummary(run: QaParticipantRunRecord): QaParticipantRu
     studyParticipantId: run.studyParticipantId,
     updatedAt: run.updatedAt
   };
+}
+
+async function cleanupLegacyQaParticipants(
+  getPrisma: () => Promise<QaPrismaClient>,
+  input: CleanupLegacyQaParticipantsInput
+): Promise<QaParticipantActionResult<LegacyQaCleanupReport>> {
+  const normalized = normalizeLegacyQaCleanupFolios(input.folios);
+  if (normalized.blockedFolios.length > 0) {
+    return {
+      message: `Hay folios no autorizados para limpieza: ${normalized.blockedFolios.join(", ")}.`,
+      ok: false
+    };
+  }
+  if (normalized.authorizedFolios.length === 0) {
+    return {
+      message: "Selecciona al menos un folio autorizado.",
+      ok: false
+    };
+  }
+
+  const prisma = await getPrisma();
+  return prisma.$transaction(async (tx) => {
+    const preview = await buildLegacyQaCleanupPreview(tx, {
+      folios: normalized.authorizedFolios,
+      studyId: input.studyId
+    });
+    const report: LegacyQaCleanupReport = {
+      authorizedFolios: preview.authorizedFolios,
+      blockedFolios: preview.blockedFolios,
+      cleanedAt: new Date().toISOString(),
+      cleanedByUserId: input.cleanedByUserId,
+      folios: [],
+      rotationCleanup: {
+        blockedPlans: preview.rotationPlans.filter((plan) => plan.blockReasons.length > 0),
+        deleted: {},
+        plans: []
+      },
+      studyId: input.studyId
+    };
+
+    for (const item of preview.folios) {
+      if (!item.found) {
+        report.folios.push({ ...item, cleanupReport: null });
+        continue;
+      }
+
+      const cleanupReport = createEmptyQaCleanupReport({
+        hutParticipantId: item.hutParticipantId,
+        studyParticipantId: item.studyParticipantId
+      });
+      if (item.hutParticipantId) {
+        await cleanupHutParticipant(tx, cleanupReport, item.hutParticipantId);
+      }
+      if (item.studyParticipantId) {
+        await cleanupStudyParticipant(tx, cleanupReport, item.studyParticipantId);
+      }
+      report.folios.push({ ...item, cleanupReport });
+    }
+
+    await cleanupLegacyQaRotationPlans(tx, report, preview.rotationPlans);
+
+    await tx.qaParticipantRun.create?.({
+      data: {
+        cleanedAt: new Date(report.cleanedAt),
+        cleanedByUserId: input.cleanedByUserId,
+        cleanupReportJson: report,
+        createdByUserId: input.cleanedByUserId,
+        executionMode: "FAST_FORWARD",
+        folio: preview.authorizedFolios.join(", "),
+        reportJson: {
+          authorizedFolios: preview.authorizedFolios,
+          preview,
+          qa: true,
+          source: "LEGACY_AUTHORIZED_FOLIO_CLEANUP"
+        },
+        scenario: "CLT_NAVIGO_HUT",
+        status: "CLEANED",
+        studyId: input.studyId
+      },
+      select: qaRunSelect
+    });
+
+    return { data: report, ok: true };
+  });
 }
 
 type LegacyQaConfirmationRecord = {
@@ -664,23 +676,47 @@ async function countLegacyQaRelations(
 ): Promise<Record<string, number>> {
   const counts: Record<string, number> = {};
   if (input.studyParticipantId) {
-    counts.ctlSessions = await countIfAvailable(prisma.ctlSession, { studyParticipantId: input.studyParticipantId });
-    counts.participantActivities = await countIfAvailable(prisma.participantActivity, { studyParticipantId: input.studyParticipantId });
-    counts.participantActivityEvidence = await countIfAvailable(prisma.participantActivityEvidence, { studyParticipantId: input.studyParticipantId });
+    counts.studyParticipants = await countIfAvailable(prisma.studyParticipant, { id: input.studyParticipantId });
+    counts.participantProfiles = await countIfAvailable(prisma.participantProfile, {
+      participations: { some: { id: input.studyParticipantId } }
+    });
+    counts.participantConfirmations = await countIfAvailable(prisma.participantConfirmation, { studyParticipantId: input.studyParticipantId });
+    counts.screeningAttempts = await countIfAvailable(prisma.screeningAttempt, { studyParticipantId: input.studyParticipantId });
+    counts.screeningAnswers = await countIfAvailable(prisma.screeningAnswer, { screeningAttempt: { studyParticipantId: input.studyParticipantId } });
+    counts.participantScreeningReviews = await countIfAvailable(prisma.participantScreeningReview, { studyParticipantId: input.studyParticipantId });
     counts.participantReferenceCodes = await countIfAvailable(prisma.participantReferenceCode, {
       confirmation: { studyParticipantId: input.studyParticipantId }
     });
+
+    counts.ctlSessions = await countIfAvailable(prisma.ctlSession, { studyParticipantId: input.studyParticipantId });
+    counts.ctlAnswers = await countIfAvailable(prisma.ctlAnswer, { ctlSession: { studyParticipantId: input.studyParticipantId } });
+    counts.ctlPhaseProgress = await countIfAvailable(prisma.ctlPhaseProgress, { ctlSession: { studyParticipantId: input.studyParticipantId } });
+    counts.ctlTriangularRotations = await countIfAvailable(prisma.ctlTriangularRotationAssignment, { studyParticipantId: input.studyParticipantId });
+
+    counts.participantActivities = await countIfAvailable(prisma.participantActivity, { studyParticipantId: input.studyParticipantId });
+    counts.participantActivityEvidence = await countIfAvailable(prisma.participantActivityEvidence, { studyParticipantId: input.studyParticipantId });
+    counts.participantAccessTokens = await countIfAvailable(prisma.participantAccessToken, { studyParticipantId: input.studyParticipantId });
+    counts.applicationTimeEvents = await countIfAvailable(prisma.applicationTimeEvent, { studyParticipantId: input.studyParticipantId });
+    counts.participantRotationAssignments = await countIfAvailable(prisma.participantRotationAssignment, { studyParticipantId: input.studyParticipantId });
+    counts.participantArmAssignments = await countIfAvailable(prisma.participantArmAssignment, { studyParticipantId: input.studyParticipantId });
     counts.participantEvidences = await countIfAvailable(prisma.participantEvidence, { studyParticipantId: input.studyParticipantId });
-    counts.screeningAttempts = await countIfAvailable(prisma.screeningAttempt, { studyParticipantId: input.studyParticipantId });
     counts.whatsAppMessagesNavigo = await countIfAvailable(prisma.oneuiWhatsAppMessage, {
       linkedParticipantId: input.studyParticipantId,
       sourceModule: "NAVIGO"
     });
   }
   if (input.hutParticipantId) {
+    counts.hutParticipants = await countIfAvailable(prisma.hutParticipant, { id: input.hutParticipantId });
+    counts.hutAnswers = await countIfAvailable(prisma.hutAnswer, { attempt: { participantId: input.hutParticipantId } });
+    counts.hutVisitProgress = await countIfAvailable(prisma.hutVisitProgress, { attempt: { participantId: input.hutParticipantId } });
     counts.hutQuestionnaireAttempts = await countIfAvailable(prisma.hutQuestionnaireAttempt, { participantId: input.hutParticipantId });
     counts.hutApplicationPhotos = await countIfAvailable(prisma.hutApplicationPhotoEntry, { participantId: input.hutParticipantId });
+    counts.hutApplicationEvidences = await countIfAvailable(prisma.hutApplicationEvidence, { participantId: input.hutParticipantId });
     counts.hutPhaseCodes = await countIfAvailable(prisma.hutParticipantPhaseCode, { participantId: input.hutParticipantId });
+    counts.hutBlocks = await countIfAvailable(prisma.hutBlock, { participantId: input.hutParticipantId });
+    counts.hutCallEvaluations = await countIfAvailable(prisma.hutCallEvaluation, { participantId: input.hutParticipantId });
+    counts.hutDailyChecks = await countIfAvailable(prisma.hutDailyCheck, { participantId: input.hutParticipantId });
+    counts.hutReferenceSelfies = await countIfAvailable(prisma.hutReferenceSelfie, { participantId: input.hutParticipantId });
     counts.hutVideos = await countIfAvailable(prisma.hutVideoSubmission, { participantId: input.hutParticipantId });
     counts.hutVisualVerifications = await countIfAvailable(prisma.hutVisualVerification, { participantId: input.hutParticipantId });
     counts.whatsAppMessagesHut = await countIfAvailable(prisma.oneuiWhatsAppMessage, {
@@ -1535,11 +1571,6 @@ async function cleanupStudyParticipant(tx: QaPrismaClient, report: QaParticipant
     where: { id: studyParticipantId }
   })) as { participantProfileId: string } | null;
 
-  await deleteMany(tx.ctlAnswer, report, "ctlAnswer", { ctlSession: { studyParticipantId } });
-  await deleteMany(tx.ctlPhaseProgress, report, "ctlPhaseProgress", { ctlSession: { studyParticipantId } });
-  await deleteMany(tx.ctlSession, report, "ctlSession", { studyParticipantId });
-  await deleteMany(tx.ctlTriangularRotationAssignment, report, "ctlTriangularRotationAssignment", { studyParticipantId });
-
   await deleteMany(tx.researchResponse, report, "researchResponse", { participantActivity: { studyParticipantId } });
   await deleteMany(tx.mediaEvidencePlaceholder, report, "mediaEvidencePlaceholder", { participantActivity: { studyParticipantId } });
   await deleteMany(tx.participantActivityEvidence, report, "participantActivityEvidence", { studyParticipantId });
@@ -1552,12 +1583,17 @@ async function cleanupStudyParticipant(tx: QaPrismaClient, report: QaParticipant
   await deleteMany(tx.participantArmAssignment, report, "participantArmAssignment", { studyParticipantId });
   await deleteMany(tx.participantRotationAssignment, report, "participantRotationAssignment", { studyParticipantId });
 
+  await deleteMany(tx.ctlAnswer, report, "ctlAnswer", { ctlSession: { studyParticipantId } });
+  await deleteMany(tx.ctlPhaseProgress, report, "ctlPhaseProgress", { ctlSession: { studyParticipantId } });
+  await deleteMany(tx.ctlSession, report, "ctlSession", { studyParticipantId });
+  await deleteMany(tx.ctlTriangularRotationAssignment, report, "ctlTriangularRotationAssignment", { studyParticipantId });
+
   await deleteMany(tx.participantConsent, report, "participantConsent", { studyParticipantId });
   await deleteMany(tx.participantEvidence, report, "participantEvidence", { studyParticipantId });
-  await deleteMany(tx.participantScreeningReview, report, "participantScreeningReview", { studyParticipantId });
-  await deleteMany(tx.screeningAnswer, report, "screeningAnswer", { screeningAttempt: { studyParticipantId } });
   await deleteMany(tx.participantReferenceCode, report, "participantReferenceCode", { confirmation: { studyParticipantId } });
   await deleteMany(tx.participantConfirmation, report, "participantConfirmation", { studyParticipantId });
+  await deleteMany(tx.screeningAnswer, report, "screeningAnswer", { screeningAttempt: { studyParticipantId } });
+  await deleteMany(tx.participantScreeningReview, report, "participantScreeningReview", { studyParticipantId });
   await deleteMany(tx.screeningAttempt, report, "screeningAttempt", { studyParticipantId });
   await deleteMany(tx.quotaEvaluation, report, "quotaEvaluation", { studyParticipantId });
   await deleteMany(tx.oneuiWhatsAppMessage, report, "oneuiWhatsAppMessage", {

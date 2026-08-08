@@ -67,6 +67,19 @@ export async function cleanupLegacyQaAuthorizedFoliosAction(input: {
   });
 }
 
+export async function cleanupLegacyQaParticipantAction(input: {
+  folios: string[];
+  studyId: string;
+}): Promise<QaParticipantActionResult<LegacyQaCleanupReport>> {
+  const actor = await requireCapability("admin:access");
+
+  return createQaParticipantsRepository().cleanupLegacyQaParticipant({
+    cleanedByUserId: actor.id,
+    folios: input.folios,
+    studyId: input.studyId
+  });
+}
+
 function normalizeScenario(value: unknown): QaParticipantScenario | null {
   return QA_SCENARIOS.find((scenario) => scenario === value) ?? null;
 }

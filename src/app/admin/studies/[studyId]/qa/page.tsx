@@ -6,7 +6,7 @@ import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import {
-  cleanupLegacyQaAuthorizedFoliosAction,
+  cleanupLegacyQaParticipantAction,
   cleanupQaParticipantRunAction,
   createQaParticipantScenarioAction
 } from "@/modules/qa-participants/actions";
@@ -568,7 +568,7 @@ async function cleanupLegacyQaFoliosFormAction(studyId: string, formData: FormDa
     redirect(`/admin/studies/${studyId}/qa?qaError=${encodeURIComponent("Escribe LIMPIAR FOLIOS ANTIGUOS para confirmar la limpieza.")}`);
   }
 
-  const result = await cleanupLegacyQaAuthorizedFoliosAction({
+  const result = await cleanupLegacyQaParticipantAction({
     folios,
     studyId
   });
