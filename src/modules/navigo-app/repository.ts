@@ -153,6 +153,11 @@ export type NavigoActivityListItem = NavigoActivityRecord & {
     text: string;
     value: string;
   }>;
+  latestReminder: {
+    sentAt: Date | null;
+    source: string | null;
+    status: string;
+  } | null;
   responseCount: number;
 };
 
@@ -851,6 +856,18 @@ const activitySelect = {
       questionId: true
     }
   },
+  reminders: {
+    select: {
+      id: true,
+      metadataJson: true,
+      scheduledFor: true,
+      sentAt: true,
+      status: true
+    },
+    where: {
+      channel: "INTERNAL_FOLLOWUP"
+    }
+  },
   scheduledAt: true,
   status: true
 } as const;
@@ -1190,6 +1207,13 @@ type ActivityRecord = NavigoActivityRecord & {
     storageBucket: string;
     type: "PERFUME_PHOTO" | "SELFIE_IDENTIFICATION";
     uploadedAt: Date;
+  }>;
+  reminders?: Array<{
+    id: string;
+    metadataJson: unknown;
+    scheduledFor: Date | null;
+    sentAt: Date | null;
+    status: string;
   }>;
   responses: Array<{ answerJson: unknown; questionId: string }>;
 };
@@ -4417,6 +4441,15 @@ function isNavigoEvaluationReminderLog(metadataJson: unknown, activityCode: Navi
     metadata.reminderType === NAVIGO_EVALUATION_REMINDER_TYPE ||
     metadata.source === NAVIGO_EVALUATION_REMINDER_TYPE
   );
+}
+
+function readReminderSource(metadataJson: unknown): string | null {
+  if (!metadataJson || typeof metadataJson !== "object") {
+    return null;
+  }
+
+  const metadata = metadataJson as { source?: unknown };
+  return typeof metadata.source === "string" ? metadata.source : null;
 }
 
 async function resolveNavigoMeasurementQuestionnaireVersionId({
@@ -7961,8 +7994,38 @@ async function toActivityListItem(activity: ActivityRecord, storage: EvidenceSto
     code: activity.activitySchedule.code,
     evidenceCount: getActivitySelfieCount(activity),
     existingResponses: Object.fromEntries(activity.responses.map((response) => [response.questionId, response.answerJson])),
+    latestReminder: getLatestNavigoEvaluationReminder(activity),
     readableResponses: createReadableNavigoResponses(activity.responses),
     responseCount: countNavigoMeasurementResponses(activity.responses)
+  };
+}
+
+function getLatestNavigoEvaluationReminder(activity: ActivityRecord): NavigoActivityListItem["latestReminder"] {
+  const activityCode = isSupportedNavigoActivityCode(activity.activitySchedule.code)
+    ? activity.activitySchedule.code
+    : null;
+
+  if (!activityCode) {
+    return null;
+  }
+
+  const reminders = (activity.reminders ?? [])
+    .filter((reminder) => isNavigoEvaluationReminderLog(reminder.metadataJson, activityCode))
+    .sort((left, right) => {
+      const leftTime = (left.sentAt ?? left.scheduledFor)?.getTime() ?? 0;
+      const rightTime = (right.sentAt ?? right.scheduledFor)?.getTime() ?? 0;
+      return rightTime - leftTime;
+    });
+  const latest = reminders[0] ?? null;
+
+  if (!latest) {
+    return null;
+  }
+
+  return {
+    sentAt: latest.sentAt ?? latest.scheduledFor,
+    source: readReminderSource(latest.metadataJson),
+    status: latest.status
   };
 }
 

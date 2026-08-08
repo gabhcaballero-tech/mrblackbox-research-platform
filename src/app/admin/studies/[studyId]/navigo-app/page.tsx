@@ -49,6 +49,7 @@ import {
   NavigoEvaluationLinkSendPanel,
   type NavigoEvaluationLinkPanelResult
 } from "./_components/NavigoEvaluationLinkSendPanel";
+import { NavigoEvaluationReminderSendPanel } from "./_components/NavigoEvaluationReminderSendPanel";
 import { NavigoRotationImportPanel } from "./_components/NavigoRotationImportPanel";
 import { NavigoRotationWorkbookImportPanel } from "./_components/NavigoRotationWorkbookImportPanel";
 import { NavigoParticipantOperationsPanel } from "./_components/NavigoParticipantOperationsPanel";
@@ -685,6 +686,7 @@ function ParticipantRow({
               activity={participant.activities.find((item) => item.code === code)}
               code={code as NavigoActivityListItem["code"]}
               key={code}
+              requestOrigin={requestOrigin}
               registeredSelfie={participant.registeredSelfie}
               studyId={studyId}
               timeZoneIana={timeZoneIana}
@@ -1045,17 +1047,20 @@ function ChecklistItem({
 function ActivityDetail({
   activity,
   code,
+  requestOrigin,
   registeredSelfie,
   studyId,
   timeZoneIana
 }: {
   activity?: NavigoActivityListItem;
   code: NavigoActivityListItem["code"];
+  requestOrigin: string;
   registeredSelfie: NavigoParticipantListItem["registeredSelfie"];
   studyId: string;
   timeZoneIana: string;
 }) {
   const isT0 = isInitialNavigoEvaluation(code);
+  const canSendReminder = Boolean(activity && !isT0 && activity.status !== "COMPLETED");
 
   return (
     <details className="rounded-md border border-zinc-200 bg-white p-3">
@@ -1064,7 +1069,9 @@ function ActivityDetail({
       </summary>
       <div className="mt-4 space-y-4">
         <dl className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+          <DetailItem label="Codigo" value={code} />
           <DetailItem label="Estado" value={activity ? navigoOperationalStatusLabel(activity) : "Pendiente"} />
+          <DetailItem label="Disponibilidad" value={activityAvailabilityLabel(activity, timeZoneIana)} />
           <DetailItem label="Hora esperada" value={activity ? formatDate(activity.scheduledAt, timeZoneIana) : "Pendiente"} />
           <DetailItem
             label="Hora real"
@@ -1077,6 +1084,7 @@ function ActivityDetail({
             }
           />
           <DetailItem label="Respuestas" value={`${activity?.responseCount ?? 0}/7`} />
+          <DetailItem label="Ultimo recordatorio" value={activityReminderLabel(activity, timeZoneIana)} />
         </dl>
 
         {isT0 ? (
@@ -1091,6 +1099,18 @@ function ActivityDetail({
         ) : null}
 
         <ActivityResponses activity={activity} />
+
+        {!isT0 ? (
+          <NavigoEvaluationReminderSendPanel
+            activityCode={code}
+            activityId={activity?.id ?? null}
+            canSend={canSendReminder}
+            disabledReason={resolveManualReminderDisabledReason(activity, isT0)}
+            requestOrigin={requestOrigin}
+            studyId={studyId}
+            timeZoneIana={timeZoneIana}
+          />
+        ) : null}
 
         <ActivityIdentityReview
           activity={activity}
@@ -1111,6 +1131,59 @@ function DetailItem({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 text-zinc-900">{value}</dd>
     </div>
   );
+}
+
+function activityAvailabilityLabel(activity: NavigoActivityListItem | undefined, timeZoneIana: string): string {
+  if (!activity) {
+    return "Actividad no creada";
+  }
+
+  if (activity.status === "COMPLETED") {
+    return "Completada";
+  }
+
+  if (activity.availability?.reason === "BEFORE_WINDOW") {
+    return `Disponible desde ${formatDate(activity.availableFrom, timeZoneIana)}`;
+  }
+
+  if (activity.availability?.reason === "AFTER_WINDOW") {
+    return "Fuera de ventana";
+  }
+
+  if (activity.availability?.canCapture) {
+    return "Disponible";
+  }
+
+  return "Pendiente";
+}
+
+function activityReminderLabel(activity: NavigoActivityListItem | undefined, timeZoneIana: string): string {
+  const reminder = activity?.latestReminder;
+
+  if (!reminder) {
+    return "Sin recordatorio";
+  }
+
+  const source = reminder.source === "MANUAL_ADMIN" ? "manual" : reminder.source === "CRON" ? "automatico" : "origen no definido";
+  const when = reminder.sentAt ? formatDate(reminder.sentAt, timeZoneIana) : "sin fecha";
+
+  return `${reminder.status} - ${source} - ${when}`;
+}
+
+function resolveManualReminderDisabledReason(activity: NavigoActivityListItem | undefined, isT0: boolean): string | null {
+  if (isT0) {
+    return "T0 se controla desde CTL; no requiere recordatorio manual.";
+  }
+
+  if (!activity) {
+    return "La actividad todavia no esta creada.";
+  }
+
+  if (activity.status === "COMPLETED") {
+    return "La evaluacion ya esta completada.";
+  }
+
+  return null;
 }
 
 function ActivityResponses({ activity }: { activity?: NavigoActivityListItem }) {
