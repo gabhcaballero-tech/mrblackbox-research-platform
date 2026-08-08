@@ -27,6 +27,7 @@ import {
   resolveNavigoTimelineSequence,
   type NavigoActivityListItem,
   type NavigoParticipantListItem,
+  type NavigoRotationFolioReservation,
   type NavigoStudyRotationConfiguration
 } from "@/modules/navigo-app";
 import { NAVIGO_STUDY_CODE } from "@/modules/study-templates/study-behavior";
@@ -140,6 +141,7 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
           </p>
           <NavigoParticipantOperationsPanel studyId={studyId} />
           <StudyRotationConfigurationPanel rotationConfig={result.rotationConfig} studyId={studyId} />
+          <RotationFolioReservationsPanel reservations={result.rotationFolioReservations} timeZoneIana={result.timeZoneIana} />
           <NavigoRotationCleanupPanel preview={rotationCleanupPreview} studyId={studyId} />
           <DirectParticipantRegistration studyId={studyId} />
           <BulkLinkGeneration studyId={studyId} />
@@ -314,6 +316,70 @@ function StudyRotationConfigurationPanel({
           </ul>
         </div>
       </div>
+    </section>
+  );
+}
+
+function RotationFolioReservationsPanel({
+  reservations,
+  timeZoneIana
+}: {
+  reservations: NavigoRotationFolioReservation[];
+  timeZoneIana: string;
+}) {
+  return (
+    <section className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
+      <div className="border-b border-zinc-200 px-4 py-3">
+        <h2 className="text-lg font-semibold text-zinc-950">Rotaciones reservadas por folio</h2>
+        <p className="mt-1 text-sm text-zinc-600">
+          Configuraciones oficiales guardadas por folio. Se mantienen separadas de las rotaciones ya aplicadas a participantes.
+        </p>
+      </div>
+      {reservations.length === 0 ? (
+        <p className="px-4 py-4 text-sm text-zinc-600">Sin rotaciones reservadas por folio.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="border-b border-zinc-200 bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
+              <tr>
+                <th className="px-4 py-3">Folio</th>
+                <th className="px-4 py-3">EVA1</th>
+                <th className="px-4 py-3">EVA2</th>
+                <th className="px-4 py-3">Triangular</th>
+                <th className="px-4 py-3">Estado</th>
+                <th className="px-4 py-3">Fecha de carga</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {reservations.map((reservation) => (
+                <tr key={reservation.folio}>
+                  <td className="px-4 py-3 font-mono text-xs text-zinc-950">{reservation.folio}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-zinc-900">{reservation.firstFragrance}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-zinc-900">{reservation.secondFragrance}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-zinc-700">
+                    <div>T1: {[reservation.triangular1.pr1, reservation.triangular1.pr2, reservation.triangular1.pr3].join(" / ")}</div>
+                    <div>T2: {[reservation.triangular2.pr1, reservation.triangular2.pr2, reservation.triangular2.pr3].join(" / ")}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={
+                        reservation.status === "APPLIED_TO_PARTICIPANT"
+                          ? "rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"
+                          : "rounded-full bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700"
+                      }
+                    >
+                      {reservation.status === "APPLIED_TO_PARTICIPANT" ? "Participante aplicado" : "Pendiente participante"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-zinc-700">
+                    {formatNavigoDateTimeLocal(reservation.importedAt, timeZoneIana)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }

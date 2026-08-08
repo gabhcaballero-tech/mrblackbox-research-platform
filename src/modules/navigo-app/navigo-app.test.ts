@@ -2203,7 +2203,9 @@ describe("navigo app MVP rules", () => {
     expect(panel).toContain("applyNavigoRotationWorkbookImportRowsAction");
     expect(panel).toContain("EVA1/EVA2");
     expect(panel).toContain("triangular CTL");
+    expect(panel).toContain("Configuración por folio existente");
     expect(panel).toContain("Hoja HUT");
+    expect(page).toContain("Rotaciones reservadas por folio");
   });
 
   it("applies valid rotation import rows with LEFT and RIGHT assignments", async () => {
@@ -2345,6 +2347,18 @@ describe("navigo app MVP rules", () => {
     ]);
     expect(state.rotationAssignments).toHaveLength(0);
     expect(state.ctlTriangularRotationAssignments).toHaveLength(0);
+
+    const previewAfterApply = await repository.previewRotationWorkbookImport({
+      hutRows: [],
+      rows: [row],
+      studyId: state.study.id
+    });
+
+    expect(previewAfterApply.ok ? previewAfterApply.data.rows[0] : null).toMatchObject({
+      existingStoredConfiguration: true,
+      pendingParticipant: true
+    });
+    expect(previewAfterApply.ok ? previewAfterApply.data.summary.existingStoredConfigurations : -1).toBe(1);
 
     const participant = seedRotationWorkbookParticipant(state, "NAV-999");
     const recovered = await repository.applyStoredRotationForParticipant({
@@ -5358,6 +5372,7 @@ function createNavigoRotationImportState({
     triangular2Pr2: string;
     triangular2Pr3: string;
     triangular2Verify: string;
+    updatedAt?: Date;
   }> = [];
   const hutParticipants: Array<{
     blocks: Array<{ status: string; submittedVideosCount: number }>;
@@ -5472,12 +5487,14 @@ function createNavigoRotationImportState({
       }
     },
     navigoRotationFolioConfiguration: {
-      async findMany(args: { where: { folio: { in: string[] }; studyId: string } }) {
-        return navigoRotationFolioConfigurations.filter(
-          (configuration) =>
-            configuration.studyId === args.where.studyId &&
-            args.where.folio.in.includes(configuration.folio)
-        );
+      async findMany(args: { where: { folio?: { in: string[] }; studyId: string } }) {
+        return navigoRotationFolioConfigurations
+          .filter(
+            (configuration) =>
+              configuration.studyId === args.where.studyId &&
+              (!args.where.folio || args.where.folio.in.includes(configuration.folio))
+          )
+          .sort((left, right) => left.folio.localeCompare(right.folio));
       },
       async findUnique(args: { where: { studyId_folio: { folio: string; studyId: string } } }) {
         return (
@@ -5500,11 +5517,16 @@ function createNavigoRotationImportState({
         );
 
         if (target) {
-          Object.assign(target, args.update);
+          Object.assign(target, args.update, { updatedAt: new Date("2026-08-08T12:00:00.000Z") });
           return target;
         }
 
-        const record = { ...args.create, id: `navigo-rotation-folio-${navigoRotationFolioConfigurations.length + 1}` };
+        const record = {
+          ...args.create,
+          id: `navigo-rotation-folio-${navigoRotationFolioConfigurations.length + 1}`,
+          importedAt: new Date("2026-08-08T12:00:00.000Z"),
+          updatedAt: new Date("2026-08-08T12:00:00.000Z")
+        };
         navigoRotationFolioConfigurations.push(record);
         return record;
       }

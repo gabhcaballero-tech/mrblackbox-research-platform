@@ -248,6 +248,8 @@ function PreviewTable({
                   <td className="px-2 py-2">
                     {showErrors ? (
                       <span className="text-xs font-semibold text-rose-700">{row.errors.join("; ")}</span>
+                    ) : row.existingStoredConfiguration ? (
+                      <span className="text-xs font-semibold text-sky-700">Configuración por folio existente</span>
                     ) : row.pendingParticipant ? (
                       <span className="text-xs font-semibold text-indigo-700">Guardara configuracion por folio</span>
                     ) : row.existingTriangularRotation || row.existingRotation ? (

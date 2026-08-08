@@ -41,6 +41,7 @@ export {
   type NavigoInternalActor,
   type NavigoParticipantActivitiesView,
   type NavigoParticipantListItem,
+  type NavigoRotationFolioReservation,
   type NavigoSignedActivityUpload,
   type NavigoStartT0Result,
   type NavigoStudyRotationConfiguration,

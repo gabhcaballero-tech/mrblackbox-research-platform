@@ -157,9 +157,32 @@ export type NavigoActivityListItem = NavigoActivityRecord & {
 
 export type NavigoAdminDashboard = {
   participants: NavigoParticipantListItem[];
+  rotationFolioReservations: NavigoRotationFolioReservation[];
   study: NavigoStudySummary;
   rotationConfig: NavigoStudyRotationConfiguration;
   timeZoneIana: string;
+};
+
+export type NavigoRotationFolioReservation = {
+  folio: string;
+  firstFragrance: string;
+  secondFragrance: string;
+  sourceFileName: string | null;
+  importedAt: Date;
+  status: "APPLIED_TO_PARTICIPANT" | "PENDING_PARTICIPANT";
+  studyParticipantId: string | null;
+  triangular1: {
+    pr1: string;
+    pr2: string;
+    pr3: string;
+    verify: string;
+  };
+  triangular2: {
+    pr1: string;
+    pr2: string;
+    pr3: string;
+    verify: string;
+  };
 };
 
 export type NavigoStudyRotationConfiguration = {
@@ -1815,6 +1838,7 @@ export function createNavigoAppRepository(
 
       return {
         participants: await Promise.all(participants.map((participant) => toDashboardParticipant(participant, now, storage))),
+        rotationFolioReservations: await loadNavigoRotationFolioReservations(prisma, studyId),
         rotationConfig: await loadNavigoStudyRotationConfiguration(prisma, studyId),
         study,
         timeZoneIana: resolveNavigoTimeZone(study.timeZoneIana)
@@ -6690,6 +6714,120 @@ async function loadNavigoStudyRotationConfiguration(
       rotationCode: plan.rotationCode
     }))
   };
+}
+
+async function loadNavigoRotationFolioReservations(
+  prisma: NavigoPrismaClient | NavigoTransactionClient,
+  studyId: string
+): Promise<NavigoRotationFolioReservation[]> {
+  if (!prisma.navigoRotationFolioConfiguration?.findMany) {
+    return [];
+  }
+
+  const configurations = (await prisma.navigoRotationFolioConfiguration.findMany({
+    orderBy: { folio: "asc" },
+    select: {
+      firstFragrance: true,
+      folio: true,
+      importedAt: true,
+      secondFragrance: true,
+      sourceFileName: true,
+      triangular1Pr1: true,
+      triangular1Pr2: true,
+      triangular1Pr3: true,
+      triangular1Verify: true,
+      triangular2Pr1: true,
+      triangular2Pr2: true,
+      triangular2Pr3: true,
+      triangular2Verify: true,
+    },
+    where: { studyId }
+  })) as Array<{
+    firstFragrance: string;
+    folio: string;
+    importedAt: Date;
+    secondFragrance: string;
+    sourceFileName: string | null;
+    triangular1Pr1: string;
+    triangular1Pr2: string;
+    triangular1Pr3: string;
+    triangular1Verify: string;
+    triangular2Pr1: string;
+    triangular2Pr2: string;
+    triangular2Pr3: string;
+    triangular2Verify: string;
+  }>;
+
+  if (configurations.length === 0) {
+    return [];
+  }
+
+  const confirmations = (await prisma.participantConfirmation.findMany?.({
+    select: {
+      folio: true,
+      studyParticipant: {
+        select: {
+          ctlTriangularRotationAssignment: {
+            select: {
+              id: true
+            }
+          },
+          id: true,
+          rotationAssignment: {
+            select: {
+              id: true
+            }
+          }
+        }
+      }
+    },
+    where: {
+      folio: {
+        in: configurations.map((configuration) => configuration.folio)
+      },
+      studyId
+    }
+  })) as
+    | Array<{
+        folio: string;
+        studyParticipant: {
+          ctlTriangularRotationAssignment: { id: string } | null;
+          id: string;
+          rotationAssignment: { id: string } | null;
+        };
+      }>
+    | undefined;
+
+  const confirmationByFolio = new Map((confirmations ?? []).map((confirmation) => [confirmation.folio, confirmation]));
+
+  return configurations.map((configuration) => {
+    const confirmation = confirmationByFolio.get(configuration.folio);
+    const isApplied = Boolean(
+      confirmation?.studyParticipant.rotationAssignment && confirmation.studyParticipant.ctlTriangularRotationAssignment
+    );
+
+    return {
+      firstFragrance: configuration.firstFragrance,
+      folio: configuration.folio,
+      importedAt: configuration.importedAt,
+      secondFragrance: configuration.secondFragrance,
+      sourceFileName: configuration.sourceFileName,
+      status: isApplied ? "APPLIED_TO_PARTICIPANT" : "PENDING_PARTICIPANT",
+      studyParticipantId: confirmation?.studyParticipant.id ?? null,
+      triangular1: {
+        pr1: configuration.triangular1Pr1,
+        pr2: configuration.triangular1Pr2,
+        pr3: configuration.triangular1Pr3,
+        verify: configuration.triangular1Verify
+      },
+      triangular2: {
+        pr1: configuration.triangular2Pr1,
+        pr2: configuration.triangular2Pr2,
+        pr3: configuration.triangular2Pr3,
+        verify: configuration.triangular2Verify
+      }
+    };
+  });
 }
 
 type NavigoStudyRotationPlanRecord = {
