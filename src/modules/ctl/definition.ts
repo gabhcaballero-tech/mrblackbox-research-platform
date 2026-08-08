@@ -163,7 +163,7 @@ const agreementColumns = [
 
 const yesNoColumns = [
   { label: "Sí", value: 1 },
-  { label: "No", value: 0 }
+  { label: "No", value: 2 }
 ];
 
 const fragranceAttributeRows = [
@@ -569,14 +569,15 @@ export const CTL_DEFINITION: CtlDefinition = {
         {
           code: "F2",
           label: "F2. ¿Me podría decir cuál es su edad exacta?",
-          options: [
-            { label: "29 años o menos", terminates: true, value: "1" },
-            { label: "30 a 45 años", value: "2" },
-            { label: "46 a 55 años", value: "3" },
-            { label: "55 años o más", terminates: true, value: "4" }
+          instructions: [
+            {
+              text: "Captura la edad exacta en años. El sistema derivara el rango operativo.",
+              title: "EDAD EXACTA",
+              type: "BEFORE_QUESTION"
+            }
           ],
           required: true,
-          type: "SELECT"
+          type: "SHORT_TEXT"
         },
         {
           code: "F3",

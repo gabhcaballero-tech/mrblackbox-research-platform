@@ -44,6 +44,12 @@ export type CtlAnswerDraft = {
   questionCode: string;
 };
 
+export type CtlAgeAnswerValue = {
+  exactAge: number;
+  rangeCode: "1" | "2" | "3" | "4";
+  rangeLabel: string;
+};
+
 export type CtlTriangularRotationForAnswer = {
   triangular1: {
     pr1: string;
@@ -202,6 +208,11 @@ export function isCtlTerminatingAnswer(
   answerValue: unknown,
   definition: CtlDefinition = getCtlDefinition()
 ): boolean {
+  if (questionCode === "F2") {
+    const rangeCode = resolveCtlAgeRangeCode(answerValue);
+    return rangeCode === "1" || rangeCode === "4";
+  }
+
   const question = getCtlQuestions(definition).find((candidate) => candidate.code === questionCode);
 
   if (!question || question.type !== "SELECT") {
@@ -315,6 +326,10 @@ function parseCtlAnswerForQuestion(input: CtlAnswerInput, question: CtlQuestionD
       missingQuestionCodes: string[];
       ok: false;
     } {
+  if (question.code === "F2") {
+    return parseCtlAgeAnswer(input[question.code], question.code);
+  }
+
   if (question.type === "MATRIX") {
     return parseMatrixAnswer(input[question.code], question);
   }
@@ -357,6 +372,57 @@ function parseCtlAnswerForQuestion(input: CtlAnswerInput, question: CtlQuestionD
   }
 
   return { answerValue: normalized, empty: false, ok: true };
+}
+
+function parseCtlAgeAnswer(
+  rawValue: CtlAnswerInput[string],
+  questionCode: string
+):
+  | {
+      answerValue: CtlAgeAnswerValue | string | null;
+      empty: boolean;
+      ok: true;
+    }
+  | {
+      message: string;
+      missingQuestionCodes: string[];
+      ok: false;
+    } {
+  const normalized = normalizeCtlCode(isGenericRecord(rawValue) ? rawValue.exactAge : rawValue);
+
+  if (!normalized) {
+    return { answerValue: null, empty: true, ok: true };
+  }
+
+  if (isLegacyCtlAgeRangeCode(normalized)) {
+    return { answerValue: normalized, empty: false, ok: true };
+  }
+
+  if (!/^\d{1,3}$/.test(normalized)) {
+    return {
+      message: "Captura la edad exacta con numeros.",
+      missingQuestionCodes: [questionCode],
+      ok: false
+    };
+  }
+
+  const exactAge = Number(normalized);
+  if (!Number.isInteger(exactAge) || exactAge < 1 || exactAge > 120) {
+    return {
+      message: "Captura una edad valida.",
+      missingQuestionCodes: [questionCode],
+      ok: false
+    };
+  }
+
+  return {
+    answerValue: {
+      exactAge,
+      ...deriveCtlAgeRange(exactAge)
+    },
+    empty: false,
+    ok: true
+  };
 }
 
 function parseMatrixAnswer(
@@ -422,6 +488,51 @@ function isMatrixValueRecord(value: unknown): value is Record<string, FormDataEn
 
 function isGenericRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function deriveCtlAgeRange(exactAge: number): Pick<CtlAgeAnswerValue, "rangeCode" | "rangeLabel"> {
+  if (exactAge <= 29) {
+    return { rangeCode: "1", rangeLabel: "29 años o menos" };
+  }
+
+  if (exactAge <= 45) {
+    return { rangeCode: "2", rangeLabel: "30 a 45 años" };
+  }
+
+  if (exactAge <= 55) {
+    return { rangeCode: "3", rangeLabel: "46 a 55 años" };
+  }
+
+  return { rangeCode: "4", rangeLabel: "55 años o más" };
+}
+
+function resolveCtlAgeRangeCode(answerValue: unknown): string | null {
+  if (isGenericRecord(answerValue)) {
+    const rangeCode = normalizeCtlCode(answerValue.rangeCode);
+    if (isLegacyCtlAgeRangeCode(rangeCode)) {
+      return rangeCode;
+    }
+
+    const exactAge = Number(normalizeCtlCode(answerValue.exactAge));
+    if (Number.isInteger(exactAge)) {
+      return deriveCtlAgeRange(exactAge).rangeCode;
+    }
+  }
+
+  const normalized = normalizeCtlCode(answerValue);
+  if (isLegacyCtlAgeRangeCode(normalized)) {
+    return normalized;
+  }
+
+  if (/^\d{1,3}$/.test(normalized)) {
+    return deriveCtlAgeRange(Number(normalized)).rangeCode;
+  }
+
+  return null;
+}
+
+function isLegacyCtlAgeRangeCode(value: string): value is CtlAgeAnswerValue["rangeCode"] {
+  return value === "1" || value === "2" || value === "3" || value === "4";
 }
 
 export function canAccessCtl(actor: CtlActor): boolean {

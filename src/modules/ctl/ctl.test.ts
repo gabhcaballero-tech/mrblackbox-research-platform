@@ -152,13 +152,55 @@ describe("ctl module", () => {
     ]);
   });
 
+  it("uses numeric CTL yes/no matrix values with Si=1 and No=2", () => {
+    const p9a = getCtlQuestions(getCtlDefinition()).find((question) => question.code === "P9A");
+
+    expect(p9a?.type).toBe("MATRIX");
+    if (!p9a || p9a.type !== "MATRIX") {
+      throw new Error("P9A must be a MATRIX question");
+    }
+
+    expect(p9a.columns).toEqual([
+      { label: "Sí", value: 1 },
+      { label: "No", value: 2 }
+    ]);
+  });
+
   it("marks terminating CTL filter answers as termination conditions", () => {
     expect(isCtlTerminatingAnswer("F0", "2")).toBe(true);
     expect(isCtlTerminatingAnswer("F0", "1")).toBe(false);
     expect(isCtlTerminatingAnswer("F1", "2")).toBe(true);
+    expect(isCtlTerminatingAnswer("F2", "28")).toBe(true);
+    expect(isCtlTerminatingAnswer("F2", "35")).toBe(false);
+    expect(isCtlTerminatingAnswer("F2", "58")).toBe(true);
+    expect(isCtlTerminatingAnswer("F2", { exactAge: 35, rangeCode: "2", rangeLabel: "30 a 45 años" })).toBe(false);
     expect(isCtlTerminatingAnswer("F9", "1")).toBe(true);
     expect(isCtlTerminatingAnswer("F9", "3")).toBe(false);
     expect(isCtlTerminatingAnswer("P1", "PR1")).toBe(false);
+  });
+
+  it("captures F2 as exact age and derives the operational age range", () => {
+    const parsed = parseCtlQuestionAnswer("F2", { F2: "35" });
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.ok ? parsed.answer : null).toEqual({
+      answerValue: {
+        exactAge: 35,
+        rangeCode: "2",
+        rangeLabel: "30 a 45 años"
+      },
+      questionCode: "F2"
+    });
+  });
+
+  it("keeps historical F2 range answers compatible", () => {
+    const parsed = parseCtlQuestionAnswer("F2", { F2: "2" });
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.ok ? parsed.answer : null).toEqual({
+      answerValue: "2",
+      questionCode: "F2"
+    });
   });
 
   it("skips F11a when F11 indicates no difference", () => {
@@ -1307,7 +1349,7 @@ function createValidCtlAnswerInput(): CtlAnswerInput {
   return {
     F0: "1",
     F1: "1",
-    F2: "2",
+    F2: "35",
     F3: "7",
     F4: "1",
     F5: "7",
@@ -1334,7 +1376,7 @@ function createValidCtlAnswerInput(): CtlAnswerInput {
     P8A: createMatrixAnswer("4"),
     P8B: createMatrixAnswer("5"),
     P9A: createAromaMatrixAnswer("1"),
-    P9B: createAromaMatrixAnswer("0"),
+    P9B: createAromaMatrixAnswer("2"),
     P10A: "4",
     P10B: "5",
     P11A: "3",

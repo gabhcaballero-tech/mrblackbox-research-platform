@@ -60,15 +60,29 @@ describe("CtlMobileCapture", () => {
     expect(await screen.findByText("Pregunta 2 de 3")).toBeInTheDocument();
   });
 
-  it("renders SCALE as large buttons and saves numeric value", async () => {
+  it("renders SCALE as vertical options with number and full text", async () => {
     renderMobileCapture({ answers: { Q1_SELECT: "A" } });
 
-    fireEvent.click(screen.getByRole("button", { name: "5" }));
+    expect(screen.getByRole("button", { name: "1 Muy mala" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "5 Excelente" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "5 Excelente" }));
     fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
 
     await waitFor(() => expect(saveQuestionMock).toHaveBeenCalledTimes(1));
     expect(saveQuestionMock.mock.calls[0]?.[2]).toBe("Q2_SCALE");
     expect((saveQuestionMock.mock.calls[0]?.[3] as FormData).get("Q2_SCALE")).toBe("5");
+  });
+
+  it("shows a matrix scale reminder every five randomized attributes", () => {
+    renderMobileCapture({
+      answers: { Q1_SELECT: "A", Q2_SCALE: 5 },
+      definition: matrixReminderDefinition
+    });
+
+    expect(screen.getByText("Recordatorio de escala")).toBeInTheDocument();
+    expect(screen.getByText(/1 En desacuerdo/)).toBeInTheDocument();
+    expect(screen.getByText(/2 De acuerdo/)).toBeInTheDocument();
   });
 
   it("renders MATRIX by row and saves grouped values", async () => {
@@ -270,6 +284,13 @@ const mobileDefinition: CtlDefinition = {
         },
         {
           code: "Q2_SCALE",
+          labels: {
+            1: "Muy mala",
+            2: "Mala",
+            3: "Regular",
+            4: "Buena",
+            5: "Excelente"
+          },
           label: "Califica la fragancia",
           max: 5,
           min: 1,
@@ -288,6 +309,55 @@ const mobileDefinition: CtlDefinition = {
           rows: [
             { code: "LIMPIA", label: "Limpia" },
             { code: "MASCULINA", label: "Masculina" }
+          ],
+          type: "MATRIX"
+        }
+      ],
+      title: "Seccion inicial"
+    }
+  ],
+  version: 2
+};
+
+const matrixReminderDefinition: CtlDefinition = {
+  sections: [
+    {
+      id: "INTRO",
+      questions: [
+        {
+          code: "Q1_SELECT",
+          label: "Selecciona una opcion",
+          options: [
+            { label: "Opcion A", value: "A" },
+            { label: "Opcion B", value: "B" }
+          ],
+          required: true,
+          type: "SELECT"
+        },
+        {
+          code: "Q2_SCALE",
+          label: "Califica la fragancia",
+          max: 5,
+          min: 1,
+          required: true,
+          type: "SCALE"
+        },
+        {
+          code: "Q3_MATRIX",
+          columns: [
+            { label: "En desacuerdo", value: 1 },
+            { label: "De acuerdo", value: 2 }
+          ],
+          label: "Atributos",
+          randomizeRows: true,
+          required: true,
+          rows: [
+            { code: "LIMPIA", label: "Limpia" },
+            { code: "MASCULINA", label: "Masculina" },
+            { code: "FRESCA", label: "Fresca" },
+            { code: "SEDUCTORA", label: "Seductora" },
+            { code: "ATEMPORAL", label: "Atemporal" },
+            { code: "ATRACTIVA", label: "Atractiva" }
           ],
           type: "MATRIX"
         }

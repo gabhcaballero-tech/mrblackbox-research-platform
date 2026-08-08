@@ -14,7 +14,7 @@ import {
   savePublicCtlQuestionAnswerAction,
   validatePublicCtlPhaseCodeAction
 } from "@/modules/ctl/public-actions";
-import type { CtlOperationalPhase, CtlPhaseProgressStatus } from "@/modules/ctl/service";
+import type { CtlAgeAnswerValue, CtlOperationalPhase, CtlPhaseProgressStatus } from "@/modules/ctl/service";
 
 type FlatQuestion = {
   index: number;
@@ -558,10 +558,11 @@ function renderMobileQuestionInput(
     <input
       className={textInputClass}
       disabled={readOnly}
-      inputMode="text"
+      inputMode={question.code === "F2" ? "numeric" : "text"}
       onChange={(event) => onAnswer(question.code, event.target.value)}
-      type="text"
-      value={String(answer ?? "")}
+      pattern={question.code === "F2" ? "[0-9]*" : undefined}
+      type={question.code === "F2" ? "number" : "text"}
+      value={formatTextInputAnswer(question, answer)}
     />
   );
 }
@@ -615,39 +616,34 @@ function ScaleButtons({
   const values = Array.from({ length: question.max - question.min + 1 }, (_, index) => question.min + index);
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-3 sm:grid-cols-7">
-        {values.map((value) => {
-          const isSelected = selected === String(value);
-          return (
-            <button
-              aria-pressed={isSelected}
-              className={`min-h-16 rounded-xl border px-4 py-3 text-xl font-bold transition ${
-                isSelected
-                  ? "border-teal-700 bg-teal-700 text-white"
-                  : "border-zinc-300 bg-white text-zinc-950 hover:border-teal-600"
-              }`}
-              disabled={disabled}
-              key={value}
-              onClick={() => onSelect(value)}
-              type="button"
-            >
+    <div className="grid gap-3">
+      {values.map((value) => {
+        const isSelected = selected === String(value);
+        return (
+          <button
+            aria-label={`${value} ${question.labels?.[value] ?? `Valor ${value}`}`}
+            aria-pressed={isSelected}
+            className={`flex min-h-16 items-center gap-4 rounded-xl border px-4 py-3 text-left transition ${
+              isSelected
+                ? "border-teal-700 bg-teal-700 text-white"
+                : "border-zinc-300 bg-white text-zinc-950 hover:border-teal-600"
+            }`}
+            disabled={disabled}
+            key={value}
+            onClick={() => onSelect(value)}
+            type="button"
+          >
+            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl font-bold ${
+              isSelected ? "bg-white text-teal-800" : "bg-zinc-100 text-zinc-950"
+            }`}>
               {value}
-            </button>
-          );
-        })}
-      </div>
-      {question.labels ? (
-        <div className="grid gap-2 text-sm text-zinc-600 sm:grid-cols-2">
-          {values.map((value) =>
-            question.labels?.[value] ? (
-              <p key={value}>
-                <span className="font-semibold text-zinc-900">{value}</span> {question.labels[value]}
-              </p>
-            ) : null
-          )}
-        </div>
-      ) : null}
+            </span>
+            <span className="text-base font-semibold leading-6">
+              {question.labels?.[value] ?? `Valor ${value}`}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -670,8 +666,11 @@ function MatrixBlocks({
 
   return (
     <div className="space-y-4">
-      {rows.map((row) => (
+      {rows.map((row, index) => (
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4" key={row.code}>
+          {index > 0 && index % 5 === 0 ? (
+            <ScaleReminder columns={question.columns} />
+          ) : null}
           <p className="text-base font-semibold text-zinc-950">{row.label}</p>
           <div className="mt-3 grid grid-cols-5 gap-2">
             {question.columns.map((column) => {
@@ -705,6 +704,17 @@ function MatrixBlocks({
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function ScaleReminder({ columns }: { columns: CtlMatrixQuestionDefinition["columns"] }) {
+  return (
+    <div className="mb-4 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-xs leading-5 text-teal-950">
+      <p className="font-bold">Recordatorio de escala</p>
+      <p className="mt-1">
+        {columns.map((column) => `${column.value} ${column.label}`).join(" · ")}
+      </p>
     </div>
   );
 }
@@ -836,6 +846,10 @@ export function isCtlQuestionAnswered(question: CtlQuestionDefinition, answer: u
     return true;
   }
 
+  if (question.code === "F2") {
+    return formatCtlAgeInputValue(answer).length > 0;
+  }
+
   if (question.type === "MATRIX") {
     const matrixAnswer = isRecord(answer) ? answer : {};
     return question.rows.every((row) => String(matrixAnswer[row.code] ?? "").trim().length > 0);
@@ -853,6 +867,13 @@ function validateCtlQuestionForClient(
   answer: unknown
 ): { ok: true } | { message: string; ok: false } {
   if (isCtlQuestionAnswered(question, answer)) {
+    if (question.code === "F2" && !isValidCtlAgeInput(answer)) {
+      return {
+        message: "Captura la edad exacta con numeros.",
+        ok: false
+      };
+    }
+
     return { ok: true };
   }
 
@@ -883,6 +904,11 @@ function buildAllAnswersFormData(definition: CtlDefinition, answers: Record<stri
 }
 
 function appendQuestionAnswer(formData: FormData, question: CtlQuestionDefinition, answer: unknown): void {
+  if (question.code === "F2") {
+    formData.set(question.code, formatCtlAgeInputValue(answer));
+    return;
+  }
+
   if (question.type === "SELECT" && isRecord(answer) && "selectedPosition" in answer) {
     formData.set(question.code, String(answer.selectedPosition ?? ""));
     return;
@@ -902,6 +928,27 @@ function appendQuestionAnswer(formData: FormData, question: CtlQuestionDefinitio
   if (answer !== undefined && answer !== null) {
     formData.set(question.code, String(answer));
   }
+}
+
+function formatTextInputAnswer(question: CtlQuestionDefinition, answer: unknown): string {
+  if (question.code === "F2") {
+    return formatCtlAgeInputValue(answer);
+  }
+
+  return String(answer ?? "");
+}
+
+function formatCtlAgeInputValue(answer: unknown): string {
+  if (isCtlAgeAnswerValue(answer)) {
+    return String(answer.exactAge);
+  }
+
+  return String(answer ?? "").trim();
+}
+
+function isValidCtlAgeInput(answer: unknown): boolean {
+  const value = formatCtlAgeInputValue(answer);
+  return /^\d{1,3}$/.test(value) && Number(value) >= 1 && Number(value) <= 120;
 }
 
 function buildAutomaticCtlAnswers({
@@ -1095,6 +1142,10 @@ function isTriangularQuestionCode(questionCode: string): boolean {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function isCtlAgeAnswerValue(value: unknown): value is CtlAgeAnswerValue {
+  return isRecord(value) && typeof value.exactAge === "number";
 }
 
 function toStringRecord(value: Record<string, unknown>): Record<string, string> {
