@@ -150,10 +150,21 @@ export async function sendNavigoEvaluationLinkWhatsAppAction(
   revalidatePath(`/admin/studies/${studyId}/navigo-app`);
 
   if (!result.ok) {
-    redirectWithNavigoMessage(studyId, { error: result.message });
+    redirectWithNavigoMessage(studyId, { error: result.message, participant: studyParticipantId });
   }
 
-  redirectWithNavigoMessage(studyId, { message: result.message });
+  redirectWithNavigoMessage(studyId, {
+    evaluationLink: result.data.evaluationUrl,
+    evaluationLinkGeneratedAt: result.data.generatedAt.toISOString(),
+    evaluationLinkPhone: result.data.phone,
+    evaluationLinkStatus: result.data.whatsappStatus,
+    evaluationLinkWhatsappError: result.data.whatsappError ?? undefined,
+    evaluationLinkWhatsappMessageId: result.data.whatsappMessageId ?? undefined,
+    message: result.data.whatsappStatus === "ENVIADO"
+      ? "Enlace de evaluacion enviado por WhatsApp."
+      : "Enlace generado. WhatsApp fallo; copia el enlace para compartirlo manualmente.",
+    participant: studyParticipantId
+  });
 }
 
 export async function generateNavigoParticipantLinksForStudyAction(studyId: string, formData: FormData) {
@@ -1129,6 +1140,12 @@ function redirectWithNavigoMessage(
   studyId: string,
   input: {
     error?: string;
+    evaluationLink?: string;
+    evaluationLinkGeneratedAt?: string;
+    evaluationLinkPhone?: string;
+    evaluationLinkStatus?: "ENVIADO" | "ERROR";
+    evaluationLinkWhatsappError?: string;
+    evaluationLinkWhatsappMessageId?: string;
     message?: string;
     participant?: string;
     token?: string;
@@ -1138,6 +1155,24 @@ function redirectWithNavigoMessage(
 
   if (input.error) {
     params.set("navigoError", input.error);
+  }
+  if (input.evaluationLink) {
+    params.set("evaluationLink", input.evaluationLink);
+  }
+  if (input.evaluationLinkGeneratedAt) {
+    params.set("evaluationLinkGeneratedAt", input.evaluationLinkGeneratedAt);
+  }
+  if (input.evaluationLinkPhone) {
+    params.set("evaluationLinkPhone", input.evaluationLinkPhone);
+  }
+  if (input.evaluationLinkStatus) {
+    params.set("evaluationLinkStatus", input.evaluationLinkStatus);
+  }
+  if (input.evaluationLinkWhatsappError) {
+    params.set("evaluationLinkWhatsappError", input.evaluationLinkWhatsappError);
+  }
+  if (input.evaluationLinkWhatsappMessageId) {
+    params.set("evaluationLinkWhatsappMessageId", input.evaluationLinkWhatsappMessageId);
   }
   if (input.message) {
     params.set("navigoMessage", input.message);

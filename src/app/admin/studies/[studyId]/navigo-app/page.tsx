@@ -45,6 +45,7 @@ import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { resolveRequestOrigin } from "@/shared/utils/request-origin";
 import { ParticipantLinkPanel } from "./_components/ParticipantLinkPanel";
+import { NavigoEvaluationLinkResultPanel } from "./_components/NavigoEvaluationLinkResultPanel";
 import { NavigoRotationImportPanel } from "./_components/NavigoRotationImportPanel";
 import { NavigoRotationWorkbookImportPanel } from "./_components/NavigoRotationWorkbookImportPanel";
 import { NavigoParticipantOperationsPanel } from "./_components/NavigoParticipantOperationsPanel";
@@ -59,9 +60,24 @@ type NavigoAppAdminPageProps = {
   searchParams?: Promise<{
     navigoError?: string;
     navigoMessage?: string;
+    evaluationLink?: string;
+    evaluationLinkGeneratedAt?: string;
+    evaluationLinkPhone?: string;
+    evaluationLinkStatus?: string;
+    evaluationLinkWhatsappError?: string;
+    evaluationLinkWhatsappMessageId?: string;
     participant?: string;
     token?: string;
   }>;
+};
+
+type NavigoEvaluationLinkResult = {
+  generatedAt: Date;
+  phone: string;
+  url: string;
+  whatsappError?: string | null;
+  whatsappMessageId?: string | null;
+  whatsappStatus: "ENVIADO" | "ERROR";
 };
 
 export default async function NavigoAppAdminPage({ params, searchParams }: NavigoAppAdminPageProps) {
@@ -146,6 +162,7 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
                   <ParticipantRow
                     key={participant.id}
                     canUseTestMode={actor.role === "ADMIN"}
+                    evaluationLinkResult={query?.participant === participant.id ? parseEvaluationLinkResult(query) : null}
                     navigoError={query?.participant === participant.id ? query?.navigoError : undefined}
                     navigoMessage={query?.participant === participant.id ? query?.navigoMessage : undefined}
                     participant={participant}
@@ -161,6 +178,32 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
       )}
     </AppShell>
   );
+}
+
+function parseEvaluationLinkResult(
+  query: Awaited<NonNullable<NavigoAppAdminPageProps["searchParams"]>>
+): NavigoEvaluationLinkResult | null {
+  if (!query.evaluationLink || !query.evaluationLinkGeneratedAt || !query.evaluationLinkPhone) {
+    return null;
+  }
+
+  if (query.evaluationLinkStatus !== "ENVIADO" && query.evaluationLinkStatus !== "ERROR") {
+    return null;
+  }
+
+  const generatedAt = new Date(query.evaluationLinkGeneratedAt);
+  if (Number.isNaN(generatedAt.getTime())) {
+    return null;
+  }
+
+  return {
+    generatedAt,
+    phone: query.evaluationLinkPhone,
+    url: query.evaluationLink,
+    whatsappError: query.evaluationLinkWhatsappError ?? null,
+    whatsappMessageId: query.evaluationLinkWhatsappMessageId ?? null,
+    whatsappStatus: query.evaluationLinkStatus
+  };
 }
 
 function StudyRotationConfigurationPanel({
@@ -441,6 +484,7 @@ function BulkLinkGeneration({ studyId }: { studyId: string }) {
 
 function ParticipantRow({
   canUseTestMode,
+  evaluationLinkResult,
   navigoError,
   navigoMessage,
   participant,
@@ -449,6 +493,7 @@ function ParticipantRow({
   timeZoneIana
 }: {
   canUseTestMode: boolean;
+  evaluationLinkResult?: NavigoEvaluationLinkResult | null;
   navigoError?: string;
   navigoMessage?: string;
   participant: NavigoParticipantListItem;
@@ -609,6 +654,17 @@ function ParticipantRow({
           </p>
         ) : null}
         {participantUrl ? <ParticipantLinkPanel testUrl={participantTestUrl} url={participantUrl} /> : null}
+        {evaluationLinkResult ? (
+          <NavigoEvaluationLinkResultPanel
+            folio={participant.confirmation?.folio ?? "Sin folio"}
+            generatedAtLabel={formatNavigoDateTimeLocal(evaluationLinkResult.generatedAt, timeZoneIana)}
+            phone={evaluationLinkResult.phone}
+            url={evaluationLinkResult.url}
+            whatsappError={evaluationLinkResult.whatsappError}
+            whatsappMessageId={evaluationLinkResult.whatsappMessageId}
+            whatsappStatus={evaluationLinkResult.whatsappStatus}
+          />
+        ) : null}
         <form action={sendNavigoEvaluationLinkWhatsAppAction.bind(null, studyId, participant.id)} className="space-y-2">
           <input name="requestOrigin" type="hidden" value={requestOrigin} />
           <SubmitButton disabled={!canStart || !participant.participant.phone} pendingLabel="Enviando WhatsApp...">

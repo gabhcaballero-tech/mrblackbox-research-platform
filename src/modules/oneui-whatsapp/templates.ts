@@ -16,7 +16,7 @@ export type WhatsAppTemplateSender = typeof sendOneuiWhatsAppTemplate;
 
 const NAVIGO_CONFIRMATION_TEMPLATE_NAME = "oneui_navigo_confirmation_participacion";
 const LEGACY_NAVIGO_CONFIRMATION_TEMPLATE_NAME = "oneui_navigo_confirmacion_participacion";
-const NAVIGO_EVALUATION_TEMPLATE_NAME = "navigo_evaluacion";
+const NAVIGO_EVALUATION_TEMPLATE_NAME = "navigo_acceso_evaluaciones";
 const NAVIGO_EVALUATION_REMINDER_TEMPLATE_NAME = "navigo_recordatorio_evaluacion";
 
 export function whatsappAutomationStatusFromMessage(
@@ -141,6 +141,7 @@ export function buildNavigoCodesWhatsAppBody({
 export async function sendNavigoEvaluationLinkWhatsApp(input: {
   env?: NodeJS.ProcessEnv;
   evaluationUrl: string;
+  folio: string;
   now?: Date;
   participantId: string;
   participantName: string;
@@ -155,17 +156,20 @@ export async function sendNavigoEvaluationLinkWhatsApp(input: {
     return { code: "SKIPPED", message: "Envio automatico Navigo desactivado.", ok: false };
   }
 
-  if (!input.participantName || !input.phone || !input.evaluationUrl) {
+  if (!input.participantName || !input.phone || !input.evaluationUrl || !input.folio) {
     return { code: "SKIPPED", message: "Faltan datos para enviar enlace de evaluacion Navigo.", ok: false };
   }
 
   const sender = input.sender ?? sendOneuiWhatsAppTemplate;
+  const buttonUrl = env.WHATSAPP_NAVIGO_EVALUATION_BUTTON_URL_ENABLED === "true" ? input.evaluationUrl : null;
 
   return sender({
     bodyText: buildNavigoEvaluationLinkWhatsAppBody({
       evaluationUrl: input.evaluationUrl,
+      folio: input.folio,
       participantName: input.participantName
     }),
+    buttonUrl,
     env,
     language: env.WHATSAPP_NAVIGO_EVALUATION_LANGUAGE ?? "es",
     linkedParticipantId: input.participantId,
@@ -173,7 +177,8 @@ export async function sendNavigoEvaluationLinkWhatsApp(input: {
     now: input.now,
     parameters: [
       textParameter(input.participantName),
-      textParameter(input.evaluationUrl)
+      textParameter(input.evaluationUrl),
+      textParameter(input.folio)
     ],
     profileName: input.participantName,
     repository: input.repository,
@@ -185,15 +190,19 @@ export async function sendNavigoEvaluationLinkWhatsApp(input: {
 
 export function buildNavigoEvaluationLinkWhatsAppBody({
   evaluationUrl,
+  folio,
   participantName
 }: {
   evaluationUrl: string;
+  folio: string;
   participantName: string;
 }): string {
   return [
     `Hola ${participantName}.`,
     "",
     "Tu evaluacion de fragancia ya esta disponible.",
+    "",
+    `Folio: ${folio}`,
     "",
     "Ingresa en el siguiente enlace:",
     "",

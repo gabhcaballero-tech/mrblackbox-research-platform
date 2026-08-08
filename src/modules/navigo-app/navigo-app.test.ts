@@ -989,6 +989,87 @@ describe("navigo app MVP rules", () => {
     expect(state.reminderLogs.map((log) => log.status)).toEqual(["COMPLETED", "COMPLETED"]);
   });
 
+  it("returns the same evaluation link sent by WhatsApp for operator backup", async () => {
+    const state = createNavigoParticipantImportState();
+    const whatsApp = createFakeNavigoWhatsAppRepository();
+    const repository = createNavigoAppRepository(state.prisma as never, whatsApp.repository);
+    const registered = await repository.registerDirectParticipant({
+      actorUserId: "admin-1",
+      celular: "5512345678",
+      folio: "NAV-001",
+      generateLink: false,
+      nombre: "Participante Uno",
+      studyId: state.study.id
+    });
+    vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "phone-number-id");
+    const fetcher = vi.fn(async () => ({
+      json: async () => ({ messages: [{ id: "wamid-evaluation-link", message_status: "accepted" }] }),
+      ok: true,
+      status: 200
+    }));
+    vi.stubGlobal("fetch", fetcher);
+
+    const result = registered.ok
+      ? await repository.sendEvaluationLinkWhatsApp({
+          actorUserId: "admin-1",
+          now: new Date("2026-08-08T07:45:00.000Z"),
+          requestOrigin: "https://example.test",
+          studyId: state.study.id,
+          studyParticipantId: registered.data.studyParticipantId
+        })
+      : null;
+
+    expect(result?.ok).toBe(true);
+    const evaluationUrl = result?.ok ? result.data.evaluationUrl : "";
+    const payload = whatsApp.messages[0]?.rawPayload as {
+      request?: { template?: { components?: Array<{ parameters?: Array<{ text: string }> }>; name?: string } };
+    };
+    const parameters = payload.request?.template?.components?.[0]?.parameters ?? [];
+    expect(payload.request?.template?.name).toBe("navigo_acceso_evaluaciones");
+    expect(parameters[0]?.text).toBe("PARTICIPANTE UNO");
+    expect(parameters[1]?.text).toBe(evaluationUrl);
+    expect(parameters[2]?.text).toBe("NAV-001");
+    expect(result?.ok ? result.data : null).toMatchObject({
+      folio: "NAV-001",
+      phone: "+525512345678",
+      whatsappMessageId: "wamid-evaluation-link",
+      whatsappStatus: "ENVIADO"
+    });
+  });
+
+  it("keeps the evaluation link available when WhatsApp sending fails", async () => {
+    const state = createNavigoParticipantImportState();
+    const whatsApp = createFakeNavigoWhatsAppRepository();
+    const repository = createNavigoAppRepository(state.prisma as never, whatsApp.repository);
+    const registered = await repository.registerDirectParticipant({
+      actorUserId: "admin-1",
+      celular: "5512345678",
+      folio: "NAV-001",
+      generateLink: false,
+      nombre: "Participante Uno",
+      studyId: state.study.id
+    });
+
+    const result = registered.ok
+      ? await repository.sendEvaluationLinkWhatsApp({
+          actorUserId: "admin-1",
+          now: new Date("2026-08-08T07:45:00.000Z"),
+          requestOrigin: "https://example.test",
+          studyId: state.study.id,
+          studyParticipantId: registered.data.studyParticipantId
+        })
+      : null;
+
+    expect(result?.ok).toBe(true);
+    expect(result?.ok ? result.data.evaluationUrl : "").toContain("https://example.test/p/");
+    expect(result?.ok ? result.data.whatsappStatus : "").toBe("ERROR");
+    expect(result?.ok ? result.data.whatsappError : "").toBe("Faltan variables de entorno para enviar por WhatsApp.");
+    expect(whatsApp.messages[0]).toMatchObject({
+      status: "failed"
+    });
+  });
+
   it("does not treat T0 as completed only because an application time exists", () => {
     const repository = readWorkspaceFile("src", "modules", "navigo-app", "repository.ts");
     const participantPage = readWorkspaceFile("src", "app", "p", "[token]", "activities", "page.tsx");

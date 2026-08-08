@@ -323,7 +323,7 @@ describe("ONEUI WhatsApp template sending", () => {
     });
   });
 
-  it("arma payload de plantilla Navigo evaluacion con nombre y enlace", async () => {
+  it("arma payload de plantilla Navigo acceso con nombre, enlace y folio", async () => {
     const repository = createFakeRepository();
     const fetcher = viFetch({
       contacts: [{ wa_id: "5215512345678" }],
@@ -332,6 +332,7 @@ describe("ONEUI WhatsApp template sending", () => {
     const result = await sendNavigoEvaluationLinkWhatsApp({
       env: whatsappEnv(),
       evaluationUrl: "https://example.test/p/token/activities",
+      folio: "NAV-001",
       participantId: "participant-1",
       participantName: "ANA",
       phone: "5512345678",
@@ -346,17 +347,63 @@ describe("ONEUI WhatsApp template sending", () => {
         {
           parameters: [
             { text: "ANA", type: "text" },
-            { text: "https://example.test/p/token/activities", type: "text" }
+            { text: "https://example.test/p/token/activities", type: "text" },
+            { text: "NAV-001", type: "text" }
           ],
           type: "body"
         }
       ],
-      name: "navigo_evaluacion"
+      name: "navigo_acceso_evaluaciones"
     });
     expect(repository.messages[0]).toMatchObject({
       messageType: "template",
       metaMessageId: "wamid.navigo-eval-1",
       status: "accepted"
+    });
+  });
+
+  it("permite configurar boton dinamico para la plantilla de acceso Navigo", async () => {
+    const repository = createFakeRepository();
+    const fetcher = viFetch({
+      contacts: [{ wa_id: "5215512345678" }],
+      messages: [{ id: "wamid.navigo-eval-button-1", message_status: "accepted" }]
+    });
+    const result = await sendNavigoEvaluationLinkWhatsApp({
+      env: {
+        ...whatsappEnv(),
+        WHATSAPP_NAVIGO_EVALUATION_BUTTON_URL_ENABLED: "true"
+      },
+      evaluationUrl: "https://example.test/p/token/activities",
+      folio: "NAV-001",
+      participantId: "participant-1",
+      participantName: "ANA",
+      phone: "5512345678",
+      repository,
+      sender: (input) => sendOneuiWhatsAppTemplate({ ...input, fetcher }),
+      studyId: "study-1"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(JSON.parse(fetcher.calls[0]?.init.body ?? "{}").template).toMatchObject({
+      components: [
+        {
+          parameters: [
+            { text: "ANA", type: "text" },
+            { text: "https://example.test/p/token/activities", type: "text" },
+            { text: "NAV-001", type: "text" }
+          ],
+          type: "body"
+        },
+        {
+          index: "0",
+          parameters: [
+            { text: "https://example.test/p/token/activities", type: "text" }
+          ],
+          sub_type: "url",
+          type: "button"
+        }
+      ],
+      name: "navigo_acceso_evaluaciones"
     });
   });
 

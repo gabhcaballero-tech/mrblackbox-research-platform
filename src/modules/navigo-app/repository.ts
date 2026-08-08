@@ -228,6 +228,16 @@ export type NavigoEvaluationReminderProcessingResult = {
   }>;
 };
 
+export type NavigoEvaluationLinkWhatsAppSendResult = {
+  evaluationUrl: string;
+  folio: string | null;
+  generatedAt: Date;
+  phone: string;
+  whatsappError: string | null;
+  whatsappMessageId: string | null;
+  whatsappStatus: "ERROR" | "ENVIADO";
+};
+
 export type NavigoConfigureRotationInput = {
   actorUserId: string;
   leftFragranceCode: string;
@@ -591,7 +601,7 @@ export type NavigoAppRepository = {
     requestOrigin: string;
     studyId: string;
     studyParticipantId: string;
-  }) => Promise<NavigoMaintenanceResult>;
+  }) => Promise<NavigoActionResult<NavigoEvaluationLinkWhatsAppSendResult>>;
   processEvaluationWhatsAppReminders: (input: {
     now?: Date;
     requestOrigin: string;
@@ -2707,6 +2717,12 @@ export function createNavigoAppRepository(
           return { message: "El participante no tiene telefono capturado.", ok: false };
         }
 
+        const folio = participant.participantConfirmation?.folio ?? null;
+
+        if (!folio) {
+          return { message: "El participante no tiene folio capturado.", ok: false };
+        }
+
         const linkToken = await ensureParticipantAccessToken({
           actorUserId: input.actorUserId,
           now,
@@ -2716,6 +2732,7 @@ export function createNavigoAppRepository(
         const evaluationUrl = new URL(`/p/${encodeURIComponent(linkToken)}/activities`, input.requestOrigin).toString();
         const result = await sendNavigoEvaluationLinkWhatsApp({
           evaluationUrl,
+          folio,
           now,
           participantId: participant.id,
           participantName: participant.participantProfile.name,
@@ -2724,12 +2741,18 @@ export function createNavigoAppRepository(
           studyId: participant.study.id
         });
 
-        if (!result.ok) {
-          return { message: result.message, ok: false };
-        }
+        const data: NavigoEvaluationLinkWhatsAppSendResult = {
+          evaluationUrl,
+          folio,
+          generatedAt: now,
+          phone: participant.participantProfile.phone,
+          whatsappError: result.ok ? null : result.message,
+          whatsappMessageId: result.ok ? result.data.metaMessageId : "data" in result ? result.data?.metaMessageId ?? null : null,
+          whatsappStatus: result.ok ? "ENVIADO" : "ERROR"
+        };
 
         return {
-          message: "Enlace de evaluacion enviado por WhatsApp.",
+          data,
           ok: true
         };
       });
