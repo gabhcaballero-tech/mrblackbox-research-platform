@@ -33,7 +33,10 @@ const SUSPECT_ROTATION_CODES = [
   "FM-B"
 ] as const;
 
-const OFFICIAL_ROTATION_PAIRS = new Set(["247->583", "583->247"]);
+const OFFICIAL_ROTATION_PLAN_PAIRS = new Map([
+  ["ROTACION1", "247->583"],
+  ["ROTACION2", "583->247"]
+]);
 
 type Delegate = {
   create?: (args: unknown) => Promise<unknown>;
@@ -340,7 +343,8 @@ function buildRotationCleanupPreview(
 function toRotationCleanupPlanPreview(plan: RotationPlanRecord): NavigoRotationCleanupPlanPreview {
   const orderedArms = [...plan.arms].sort((left, right) => left.applicationOrder - right.applicationOrder);
   const pair = orderedArms.map((arm) => normalizeRotationCleanupCode(arm.studyProduct.internalCode)).join("->");
-  const isOfficialRotation = OFFICIAL_ROTATION_PAIRS.has(pair);
+  const expectedOfficialPair = getOfficialRotationPair(plan);
+  const isOfficialRotation = Boolean(expectedOfficialPair && expectedOfficialPair === pair);
   const isSuspectTestConfig = isSuspectRotationPlan(plan);
   const assignedParticipants = plan.assignments.map((assignment) => {
     const folio = normalizeRotationCleanupCode(assignment.studyParticipant.participantConfirmation?.folio);
@@ -356,7 +360,7 @@ function toRotationCleanupPlanPreview(plan: RotationPlanRecord): NavigoRotationC
   const blockReasons: string[] = [];
 
   if (isOfficialRotation) {
-    blockReasons.push("Rotacion oficial conservada.");
+    blockReasons.push("Oficial real protegido.");
   }
   if (realParticipants.length > 0) {
     blockReasons.push(`Tiene participantes reales asociados: ${realParticipants.map((participant) => participant.folio ?? participant.studyParticipantId).join(", ")}.`);
@@ -398,6 +402,25 @@ function isSuspectRotationPlan(plan: RotationPlanRecord): boolean {
 
 function normalizeRotationCleanupCode(value: unknown): string {
   return String(value ?? "").trim().toUpperCase();
+}
+
+function normalizeOfficialRotationLabel(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Z0-9]/gi, "")
+    .toUpperCase();
+}
+
+function getOfficialRotationPair(plan: Pick<RotationPlanRecord, "name" | "rotationCode">): string | null {
+  const candidates = [plan.rotationCode, plan.name].map(normalizeOfficialRotationLabel);
+  for (const candidate of candidates) {
+    const pair = OFFICIAL_ROTATION_PLAN_PAIRS.get(candidate);
+    if (pair) {
+      return pair;
+    }
+  }
+  return null;
 }
 
 async function cleanupLegacyQaStudyParticipant(

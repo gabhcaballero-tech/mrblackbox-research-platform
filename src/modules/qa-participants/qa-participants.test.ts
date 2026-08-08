@@ -285,7 +285,7 @@ describe("qa participants repository", () => {
     ]);
     expect(result.ok ? result.data.rotationCleanup.blockedPlans : null).toEqual([
       expect.objectContaining({
-        blockReasons: ["Rotacion oficial conservada."],
+        blockReasons: ["Oficial real protegido."],
         rotationCode: "ROTACION_1"
       })
     ]);
@@ -576,6 +576,7 @@ function createQaPrisma() {
           studyParticipantId: assignment.studyParticipantId
         })),
         id: input.id,
+        name: input.name ?? input.rotationCode,
         rotationCode: input.rotationCode
       });
     },
@@ -840,6 +841,7 @@ type FakeLegacyRotationPlan = {
     studyParticipantId: string;
   }>;
   id: string;
+  name: string;
   rotationCode: string;
 };
 
@@ -853,6 +855,7 @@ type FakeLegacyRotationPlanInput = {
     studyParticipantId: string;
   }>;
   id: string;
+  name?: string;
   rotationCode: string;
 };
 

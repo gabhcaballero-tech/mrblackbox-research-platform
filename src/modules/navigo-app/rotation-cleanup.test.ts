@@ -10,13 +10,51 @@ describe("Navigo test rotation cleanup", () => {
     prisma.seedPlan({
       arms: ["247", "583"],
       id: "official-1",
+      name: "Rotacion 1",
       rotationCode: "ROTACION_1"
+    });
+    prisma.seedPlan({
+      arms: ["583", "247"],
+      id: "official-2",
+      name: "Rotacion 2",
+      rotationCode: "ROTACION_2"
     });
 
     const preview = await previewNavigoTestRotationCleanup("study-1", prisma as never);
 
-    expect(preview.officialPlanIds).toEqual(["official-1"]);
+    expect(preview.officialPlanIds).toEqual(["official-1", "official-2"]);
     expect(preview.deleteablePlanIds).toEqual([]);
+  });
+
+  it("does not protect historical NAV plans just because they use official fragrance pairs", async () => {
+    const prisma = createRotationCleanupPrisma();
+    prisma.seedPlan({
+      arms: ["583", "247"],
+      id: "historical-nav-104",
+      name: "NAV-104__583__247",
+      rotationCode: "NAV-104__583__247"
+    });
+    prisma.seedPlan({
+      arms: ["247", "583"],
+      id: "historical-nav-106",
+      name: "NAV-106__247__583",
+      rotationCode: "NAV-106__247__583"
+    });
+
+    const preview = await previewNavigoTestRotationCleanup("study-1", prisma as never);
+
+    expect(preview.officialPlanIds).toEqual([]);
+    expect(preview.deleteablePlanIds).toEqual(["historical-nav-104", "historical-nav-106"]);
+    expect(preview.plans).toEqual([
+      expect.objectContaining({
+        isOfficialRotation: false,
+        rotationCode: "NAV-104__583__247"
+      }),
+      expect.objectContaining({
+        isOfficialRotation: false,
+        rotationCode: "NAV-106__247__583"
+      })
+    ]);
   });
 
   it("blocks suspect cleanup when a real participant is associated", async () => {
@@ -65,6 +103,7 @@ describe("Navigo test rotation cleanup", () => {
     prisma.seedPlan({
       arms: ["247", "583"],
       id: "official-1",
+      name: "Rotacion 1",
       rotationCode: "ROTACION_1"
     });
 
@@ -234,6 +273,7 @@ function createRotationCleanupPrisma() {
       arms: string[];
       assignments?: FakeAssignmentInput[];
       id: string;
+      name?: string;
       rotationCode: string;
     }) => void;
     studyParticipant: ReturnType<typeof deleteDelegate>;
@@ -246,6 +286,7 @@ function createRotationCleanupPrisma() {
       arms: string[];
       assignments?: FakeAssignmentInput[];
       id: string;
+      name?: string;
       rotationCode: string;
     }) {
       plans.push({
@@ -265,7 +306,7 @@ function createRotationCleanupPrisma() {
           studyParticipantId: assignment.studyParticipantId
         })),
         id: input.id,
-        name: input.rotationCode,
+        name: input.name ?? input.rotationCode,
         rotationCode: input.rotationCode,
         status: "ACTIVE"
       });

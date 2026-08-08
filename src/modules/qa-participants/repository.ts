@@ -43,7 +43,10 @@ type Delegate = {
 };
 
 const LEGACY_QA_CLEANUP_AUTHORIZED_FOLIOS = ["NAV-104", "NAV-106", "NAV-110", "NAV-115", "NAV-117"] as const;
-const OFFICIAL_NAVIGO_ROTATION_PAIRS = new Set(["247->583", "583->247"]);
+const OFFICIAL_NAVIGO_ROTATION_PLAN_PAIRS = new Map([
+  ["ROTACION1", "247->583"],
+  ["ROTACION2", "583->247"]
+]);
 
 type QaPrismaClient = {
   $transaction: <T>(callback: (tx: QaPrismaClient) => Promise<T>) => Promise<T>;
@@ -627,7 +630,8 @@ async function loadLegacyQaRotationPlans(
 function toLegacyQaRotationPlanPreview(plan: LegacyQaRotationPlanRecord, authorizedFolios: string[]): LegacyQaRotationPlanPreview {
   const orderedArms = [...plan.arms].sort((left, right) => left.applicationOrder - right.applicationOrder);
   const pair = orderedArms.map((arm) => normalizeLegacyQaRotationCode(arm.studyProduct.internalCode)).join("->");
-  const isOfficialRotation = OFFICIAL_NAVIGO_ROTATION_PAIRS.has(pair);
+  const expectedOfficialPair = getLegacyQaOfficialRotationPair(plan);
+  const isOfficialRotation = Boolean(expectedOfficialPair && expectedOfficialPair === pair);
   const assignedParticipants = plan.assignments.map((assignment) => {
     const folio = normalizeLegacyQaRotationCode(assignment.studyParticipant.participantConfirmation?.folio);
     return {
@@ -642,7 +646,7 @@ function toLegacyQaRotationPlanPreview(plan: LegacyQaRotationPlanRecord, authori
   const blockReasons: string[] = [];
 
   if (isOfficialRotation) {
-    blockReasons.push("Rotacion oficial conservada.");
+    blockReasons.push("Oficial real protegido.");
   }
   if (realParticipants.length > 0) {
     blockReasons.push(`Tiene participantes reales asociados: ${realParticipants.map((participant) => participant.folio ?? participant.studyParticipantId).join(", ")}.`);
@@ -665,6 +669,25 @@ function toLegacyQaRotationPlanPreview(plan: LegacyQaRotationPlanRecord, authori
 
 function normalizeLegacyQaRotationCode(value: unknown): string {
   return String(value ?? "").trim().toUpperCase();
+}
+
+function normalizeLegacyQaOfficialRotationLabel(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Z0-9]/gi, "")
+    .toUpperCase();
+}
+
+function getLegacyQaOfficialRotationPair(plan: Pick<LegacyQaRotationPlanRecord, "name" | "rotationCode">): string | null {
+  const candidates = [plan.rotationCode, plan.name].map(normalizeLegacyQaOfficialRotationLabel);
+  for (const candidate of candidates) {
+    const pair = OFFICIAL_NAVIGO_ROTATION_PLAN_PAIRS.get(candidate);
+    if (pair) {
+      return pair;
+    }
+  }
+  return null;
 }
 
 async function countLegacyQaRelations(
