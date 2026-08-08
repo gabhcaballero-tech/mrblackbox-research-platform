@@ -701,8 +701,10 @@ async function countLegacyQaRelations(
     counts.participantArmAssignments = await countIfAvailable(prisma.participantArmAssignment, { studyParticipantId: input.studyParticipantId });
     counts.participantEvidences = await countIfAvailable(prisma.participantEvidence, { studyParticipantId: input.studyParticipantId });
     counts.whatsAppMessagesNavigo = await countIfAvailable(prisma.oneuiWhatsAppMessage, {
-      linkedParticipantId: input.studyParticipantId,
-      sourceModule: "NAVIGO"
+      conversation: {
+        linkedParticipantId: input.studyParticipantId,
+        sourceModule: "NAVIGO"
+      }
     });
   }
   if (input.hutParticipantId) {
@@ -720,8 +722,10 @@ async function countLegacyQaRelations(
     counts.hutVideos = await countIfAvailable(prisma.hutVideoSubmission, { participantId: input.hutParticipantId });
     counts.hutVisualVerifications = await countIfAvailable(prisma.hutVisualVerification, { participantId: input.hutParticipantId });
     counts.whatsAppMessagesHut = await countIfAvailable(prisma.oneuiWhatsAppMessage, {
-      linkedParticipantId: input.hutParticipantId,
-      sourceModule: "HUT"
+      conversation: {
+        linkedParticipantId: input.hutParticipantId,
+        sourceModule: "HUT"
+      }
     });
   }
   return counts;
@@ -1559,8 +1563,10 @@ async function cleanupHutParticipant(tx: QaPrismaClient, report: QaParticipantCl
     status: "AVAILABLE"
   });
   await deleteMany(tx.oneuiWhatsAppMessage, report, "oneuiWhatsAppMessage", {
-    linkedParticipantId: hutParticipantId,
-    sourceModule: "HUT"
+    conversation: {
+      linkedParticipantId: hutParticipantId,
+      sourceModule: "HUT"
+    }
   });
   await deleteMany(tx.hutParticipant, report, "hutParticipant", { id: hutParticipantId });
 }
@@ -1597,8 +1603,10 @@ async function cleanupStudyParticipant(tx: QaPrismaClient, report: QaParticipant
   await deleteMany(tx.screeningAttempt, report, "screeningAttempt", { studyParticipantId });
   await deleteMany(tx.quotaEvaluation, report, "quotaEvaluation", { studyParticipantId });
   await deleteMany(tx.oneuiWhatsAppMessage, report, "oneuiWhatsAppMessage", {
-    linkedParticipantId: studyParticipantId,
-    sourceModule: "NAVIGO"
+    conversation: {
+      linkedParticipantId: studyParticipantId,
+      sourceModule: "NAVIGO"
+    }
   });
 
   await deleteMany(tx.studyParticipant, report, "studyParticipant", { id: studyParticipantId });

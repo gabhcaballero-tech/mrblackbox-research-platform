@@ -88,6 +88,18 @@ describe("Navigo test rotation cleanup", () => {
         where: { id: { in: ["plan-test"] } }
       })
     );
+    expect(prisma.calls).toContainEqual(
+      expect.objectContaining({
+        modelName: "oneuiWhatsAppMessage",
+        operation: "deleteMany",
+        where: {
+          conversation: {
+            linkedParticipantId: "participant-test",
+            sourceModule: "NAVIGO"
+          }
+        }
+      })
+    );
     expect(prisma.createdReports).toHaveLength(1);
     expect(prisma.createdReports[0]?.cleanupReportJson).toMatchObject({
       plans: [expect.objectContaining({ rotationCode: "NAV-106__AAA__BBB" })],

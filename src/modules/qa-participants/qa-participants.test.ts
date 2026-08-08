@@ -128,8 +128,34 @@ describe("qa participants repository", () => {
       participantConfirmations: 1,
       participantProfiles: 1,
       screeningAnswers: 1,
-      studyParticipants: 1
+      studyParticipants: 1,
+      whatsAppMessagesHut: 1,
+      whatsAppMessagesNavigo: 1
     });
+    expect(prisma.calls).toContainEqual(
+      expect.objectContaining({
+        modelName: "oneuiWhatsAppMessage",
+        operation: "count",
+        where: {
+          conversation: {
+            linkedParticipantId: "study-participant-nav-104",
+            sourceModule: "NAVIGO"
+          }
+        }
+      })
+    );
+    expect(prisma.calls).toContainEqual(
+      expect.objectContaining({
+        modelName: "oneuiWhatsAppMessage",
+        operation: "count",
+        where: {
+          conversation: {
+            linkedParticipantId: "hut-nav-104",
+            sourceModule: "HUT"
+          }
+        }
+      })
+    );
     expect(preview.rotationPlans).toEqual([
       expect.objectContaining({
         rotationCode: "NAV-104__AAA__BBB",
@@ -228,6 +254,30 @@ describe("qa participants repository", () => {
         modelName: "hutParticipant",
         operation: "deleteMany",
         where: { id: "hut-nav-106" }
+      })
+    );
+    expect(prisma.calls).toContainEqual(
+      expect.objectContaining({
+        modelName: "oneuiWhatsAppMessage",
+        operation: "deleteMany",
+        where: {
+          conversation: {
+            linkedParticipantId: "study-participant-nav-106",
+            sourceModule: "NAVIGO"
+          }
+        }
+      })
+    );
+    expect(prisma.calls).toContainEqual(
+      expect.objectContaining({
+        modelName: "oneuiWhatsAppMessage",
+        operation: "deleteMany",
+        where: {
+          conversation: {
+            linkedParticipantId: "hut-nav-106",
+            sourceModule: "HUT"
+          }
+        }
       })
     );
     expect(result.ok ? result.data.rotationCleanup.plans : null).toEqual([

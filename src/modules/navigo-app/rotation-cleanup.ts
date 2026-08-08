@@ -431,8 +431,10 @@ async function cleanupLegacyQaStudyParticipant(
   await deleteMany(tx.screeningAttempt, deleted, "screeningAttempt", { studyParticipantId });
   await deleteMany(tx.quotaEvaluation, deleted, "quotaEvaluation", { studyParticipantId });
   await deleteMany(tx.oneuiWhatsAppMessage, deleted, "oneuiWhatsAppMessage", {
-    linkedParticipantId: studyParticipantId,
-    sourceModule: "NAVIGO"
+    conversation: {
+      linkedParticipantId: studyParticipantId,
+      sourceModule: "NAVIGO"
+    }
   });
   await deleteMany(tx.studyParticipant, deleted, "studyParticipant", { id: studyParticipantId });
 }
