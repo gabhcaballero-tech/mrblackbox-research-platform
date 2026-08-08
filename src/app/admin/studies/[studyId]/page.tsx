@@ -150,6 +150,14 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
               Diagnostico por folio
             </Link>
           ) : null}
+          {config.study.code === NAVIGO_STUDY_CODE ? (
+            <Link
+              className="text-sm font-semibold text-zinc-700 transition hover:text-zinc-950"
+              href={`/admin/studies/${studyId}/clt-ops`}
+            >
+              Operacion CLT
+            </Link>
+          ) : null}
           <Link
             className="text-sm font-semibold text-zinc-700 transition hover:text-zinc-950"
             href={`/admin/studies/${studyId}/hut`}

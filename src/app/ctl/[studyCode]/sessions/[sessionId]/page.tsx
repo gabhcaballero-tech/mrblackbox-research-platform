@@ -41,7 +41,6 @@ export default async function CtlPublicCapturePage({ params, searchParams }: Ctl
   const participantUrl = session.participant.participantLinkToken
     ? new URL(`/p/${encodeURIComponent(session.participant.participantLinkToken)}/activities`, requestOrigin).toString()
     : null;
-  const showLegacyNavigoCompletionPanel = false;
 
   return (
     <main className="min-h-screen bg-zinc-50 px-4 py-6 text-zinc-950 sm:py-8">
@@ -97,37 +96,6 @@ export default async function CtlPublicCapturePage({ params, searchParams }: Ctl
             studyCode={studyCode}
             t0Label={formatCtlDateTime(session.participant.navigo.applicationStartedAt)}
           />
-        ) : null}
-
-        {showLegacyNavigoCompletionPanel && session.status === "COMPLETED" ? (
-          <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Siguiente paso</p>
-            <h2 className="mt-2 text-xl font-bold text-emerald-950">
-              Evaluación sensorial concluida.
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-emerald-900">
-              Continúe en Navigo con las evaluaciones posteriores.
-            </p>
-            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
-              <Detail label="Participante" value={session.participant.name} />
-              <Detail label="Folio" value={session.participant.folio} />
-              <Detail label="Hora inicio" value={startedAtLabel ?? "Sin registro"} />
-              <Detail label="Hora termino" value={completedAtLabel ?? "Sin registro"} />
-              <Detail label="Estado CTL" value={ctlStatusLabel(session.status)} />
-            </dl>
-            {session.participant.participantLinkToken ? (
-              <Link
-                className="mt-5 inline-flex min-h-12 items-center justify-center rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-teal-800"
-                href={`/p/${encodeURIComponent(session.participant.participantLinkToken)}/activities`}
-              >
-                Continuar en Navigo
-              </Link>
-            ) : (
-              <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                El enlace de Navigo aun no esta disponible. Revisa la liberacion desde Administracion.
-              </p>
-            )}
-          </section>
         ) : null}
 
         <CtlMobileCapture
