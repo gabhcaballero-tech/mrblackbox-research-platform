@@ -11,6 +11,35 @@ export type QaParticipantCleanupReport = {
   studyParticipantId: string | null;
 };
 
+export type LegacyQaCleanupAuthorizedFolio = "NAV-106" | "NAV-110" | "NAV-115" | "NAV-117" | "PRUEBA";
+
+export type LegacyQaCleanupFolioPreview = {
+  folio: string;
+  found: boolean;
+  hutParticipantId: string | null;
+  participantName: string | null;
+  relationCounts: Record<string, number>;
+  studyParticipantId: string | null;
+};
+
+export type LegacyQaCleanupPreview = {
+  authorizedFolios: string[];
+  blockedFolios: string[];
+  folios: LegacyQaCleanupFolioPreview[];
+  studyId: string;
+};
+
+export type LegacyQaCleanupReport = {
+  authorizedFolios: string[];
+  blockedFolios: string[];
+  cleanedAt: string;
+  cleanedByUserId: string;
+  folios: Array<LegacyQaCleanupFolioPreview & {
+    cleanupReport: QaParticipantCleanupReport | null;
+  }>;
+  studyId: string;
+};
+
 export type QaParticipantRunSummary = {
   cleanupReportJson: unknown | null;
   cleanedAt: Date | null;

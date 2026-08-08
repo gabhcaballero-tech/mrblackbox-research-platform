@@ -20,6 +20,8 @@ import type {
   QaParticipantActionResult,
   QaParticipantCleanupReport,
   QaParticipantExecutionMode,
+  LegacyQaCleanupPreview,
+  LegacyQaCleanupReport,
   QaParticipantScenarioReport,
   QaParticipantRunStatus,
   QaParticipantRunSummary,
@@ -27,6 +29,7 @@ import type {
 } from "./types";
 
 type Delegate = {
+  count?: (args: unknown) => Promise<number>;
   create?: (args: unknown) => Promise<unknown>;
   createMany?: (args: unknown) => Promise<{ count: number }>;
   delete?: (args: unknown) => Promise<unknown>;
@@ -38,6 +41,8 @@ type Delegate = {
   updateMany?: (args: unknown) => Promise<{ count: number }>;
   upsert?: (args: unknown) => Promise<unknown>;
 };
+
+const LEGACY_QA_CLEANUP_AUTHORIZED_FOLIOS = ["NAV-106", "NAV-110", "NAV-115", "NAV-117", "PRUEBA"] as const;
 
 type QaPrismaClient = {
   $transaction: <T>(callback: (tx: QaPrismaClient) => Promise<T>) => Promise<T>;
@@ -124,6 +129,15 @@ export type CleanupQaParticipantRunInput = {
   runId: string;
 };
 
+export type PreviewLegacyQaCleanupInput = {
+  folios: string[];
+  studyId: string;
+};
+
+export type CleanupLegacyQaParticipantsInput = PreviewLegacyQaCleanupInput & {
+  cleanedByUserId: string;
+};
+
 export type CreateQaParticipantScenarioInput = {
   baseUrl?: string;
   createdByUserId: string;
@@ -135,11 +149,13 @@ export type CreateQaParticipantScenarioInput = {
 };
 
 export type QaParticipantsRepository = {
+  cleanupLegacyAuthorizedFolios: (input: CleanupLegacyQaParticipantsInput) => Promise<QaParticipantActionResult<LegacyQaCleanupReport>>;
   cleanupRun: (input: CleanupQaParticipantRunInput) => Promise<QaParticipantActionResult<QaParticipantRunSummary>>;
   createEmptyRun: (input: CreateEmptyQaParticipantRunInput) => Promise<QaParticipantActionResult<QaParticipantRunSummary>>;
   createScenario: (input: CreateQaParticipantScenarioInput) => Promise<QaParticipantActionResult<QaParticipantRunSummary>>;
   getRun: (runId: string) => Promise<QaParticipantRunSummary | null>;
   listRuns: (input: ListQaParticipantRunsInput) => Promise<QaParticipantRunSummary[]>;
+  previewLegacyCleanup: (input: PreviewLegacyQaCleanupInput) => Promise<LegacyQaCleanupPreview>;
 };
 
 const qaRunSelect = {
@@ -172,6 +188,85 @@ export function createQaParticipantsRepository(prismaClient?: QaPrismaClient): Q
   }
 
   return {
+    async previewLegacyCleanup(input) {
+      const prisma = await getPrisma();
+      return buildLegacyQaCleanupPreview(prisma, input);
+    },
+
+    async cleanupLegacyAuthorizedFolios(input) {
+      const normalized = normalizeLegacyQaCleanupFolios(input.folios);
+      if (normalized.blockedFolios.length > 0) {
+        return {
+          message: `Hay folios no autorizados para limpieza: ${normalized.blockedFolios.join(", ")}.`,
+          ok: false
+        };
+      }
+      if (normalized.authorizedFolios.length === 0) {
+        return {
+          message: "Selecciona al menos un folio autorizado.",
+          ok: false
+        };
+      }
+
+      const prisma = await getPrisma();
+      return prisma.$transaction(async (tx) => {
+        const preview = await buildLegacyQaCleanupPreview(tx, {
+          folios: normalized.authorizedFolios,
+          studyId: input.studyId
+        });
+        const report: LegacyQaCleanupReport = {
+          authorizedFolios: preview.authorizedFolios,
+          blockedFolios: preview.blockedFolios,
+          cleanedAt: new Date().toISOString(),
+          cleanedByUserId: input.cleanedByUserId,
+          folios: [],
+          studyId: input.studyId
+        };
+
+        for (const item of preview.folios) {
+          if (!item.found) {
+            report.folios.push({ ...item, cleanupReport: null });
+            continue;
+          }
+
+          const cleanupReport = createEmptyQaCleanupReport({
+            hutParticipantId: item.hutParticipantId,
+            studyParticipantId: item.studyParticipantId
+          });
+          if (item.hutParticipantId) {
+            await cleanupHutParticipant(tx, cleanupReport, item.hutParticipantId);
+          }
+          if (item.studyParticipantId) {
+            await cleanupStudyParticipant(tx, cleanupReport, item.studyParticipantId);
+          }
+          report.folios.push({ ...item, cleanupReport });
+        }
+
+        await tx.qaParticipantRun.create?.({
+          data: {
+            cleanedAt: new Date(report.cleanedAt),
+            cleanedByUserId: input.cleanedByUserId,
+            cleanupReportJson: report,
+            createdByUserId: input.cleanedByUserId,
+            executionMode: "FAST_FORWARD",
+            folio: preview.authorizedFolios.join(", "),
+            reportJson: {
+              authorizedFolios: preview.authorizedFolios,
+              preview,
+              qa: true,
+              source: "LEGACY_AUTHORIZED_FOLIO_CLEANUP"
+            },
+            scenario: "CLT_NAVIGO_HUT",
+            status: "CLEANED",
+            studyId: input.studyId
+          },
+          select: qaRunSelect
+        });
+
+        return { data: report, ok: true };
+      });
+    },
+
     async cleanupRun(input) {
       const prisma = await getPrisma();
 
@@ -329,6 +424,141 @@ function toQaParticipantRunSummary(run: QaParticipantRunRecord): QaParticipantRu
     studyParticipantId: run.studyParticipantId,
     updatedAt: run.updatedAt
   };
+}
+
+type LegacyQaConfirmationRecord = {
+  folio: string;
+  studyParticipant?: {
+    hutParticipant?: { id: string } | null;
+    participantProfile?: { name: string | null } | null;
+  } | null;
+  studyParticipantId: string;
+};
+
+type LegacyQaHutParticipantRecord = {
+  folio: string | null;
+  id: string;
+  name: string | null;
+  studyParticipantId: string | null;
+};
+
+function normalizeLegacyQaCleanupFolios(folios: string[]): {
+  authorizedFolios: string[];
+  blockedFolios: string[];
+} {
+  const requested = [...new Set(folios.map((folio) => normalizeQaParticipantFolio(folio)).filter(Boolean) as string[])];
+  const authorized = new Set<string>(LEGACY_QA_CLEANUP_AUTHORIZED_FOLIOS);
+  return {
+    authorizedFolios: requested.filter((folio) => authorized.has(folio)),
+    blockedFolios: requested.filter((folio) => !authorized.has(folio))
+  };
+}
+
+async function buildLegacyQaCleanupPreview(
+  prisma: QaPrismaClient,
+  input: PreviewLegacyQaCleanupInput
+): Promise<LegacyQaCleanupPreview> {
+  const normalized = normalizeLegacyQaCleanupFolios(input.folios);
+  const confirmations = ((await prisma.participantConfirmation.findMany?.({
+    select: {
+      folio: true,
+      studyParticipant: {
+        select: {
+          hutParticipant: {
+            select: { id: true }
+          },
+          participantProfile: {
+            select: { name: true }
+          }
+        }
+      },
+      studyParticipantId: true
+    },
+    where: {
+      folio: { in: normalized.authorizedFolios },
+      studyId: input.studyId
+    }
+  })) as LegacyQaConfirmationRecord[] | undefined) ?? [];
+  const hutParticipants = ((await prisma.hutParticipant.findMany?.({
+    select: {
+      folio: true,
+      id: true,
+      name: true,
+      studyParticipantId: true
+    },
+    where: {
+      folio: { in: normalized.authorizedFolios },
+      studyId: input.studyId
+    }
+  })) as LegacyQaHutParticipantRecord[] | undefined) ?? [];
+  const confirmationsByFolio = new Map(confirmations.map((confirmation) => [confirmation.folio, confirmation]));
+  const hutByFolio = new Map(hutParticipants.filter((participant) => participant.folio).map((participant) => [participant.folio!, participant]));
+
+  return {
+    authorizedFolios: normalized.authorizedFolios,
+    blockedFolios: normalized.blockedFolios,
+    folios: await Promise.all(normalized.authorizedFolios.map(async (folio) => {
+      const confirmation = confirmationsByFolio.get(folio) ?? null;
+      const hutParticipant = hutByFolio.get(folio) ?? null;
+      const studyParticipantId = confirmation?.studyParticipantId ?? hutParticipant?.studyParticipantId ?? null;
+      const hutParticipantId = confirmation?.studyParticipant?.hutParticipant?.id ?? hutParticipant?.id ?? null;
+      return {
+        folio,
+        found: Boolean(studyParticipantId || hutParticipantId),
+        hutParticipantId,
+        participantName: confirmation?.studyParticipant?.participantProfile?.name ?? hutParticipant?.name ?? null,
+        relationCounts: await countLegacyQaRelations(prisma, {
+          hutParticipantId,
+          studyParticipantId
+        }),
+        studyParticipantId
+      };
+    })),
+    studyId: input.studyId
+  };
+}
+
+async function countLegacyQaRelations(
+  prisma: QaPrismaClient,
+  input: {
+    hutParticipantId: string | null;
+    studyParticipantId: string | null;
+  }
+): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  if (input.studyParticipantId) {
+    counts.ctlSessions = await countIfAvailable(prisma.ctlSession, { studyParticipantId: input.studyParticipantId });
+    counts.participantActivities = await countIfAvailable(prisma.participantActivity, { studyParticipantId: input.studyParticipantId });
+    counts.participantActivityEvidence = await countIfAvailable(prisma.participantActivityEvidence, { studyParticipantId: input.studyParticipantId });
+    counts.participantReferenceCodes = await countIfAvailable(prisma.participantReferenceCode, {
+      confirmation: { studyParticipantId: input.studyParticipantId }
+    });
+    counts.participantEvidences = await countIfAvailable(prisma.participantEvidence, { studyParticipantId: input.studyParticipantId });
+    counts.screeningAttempts = await countIfAvailable(prisma.screeningAttempt, { studyParticipantId: input.studyParticipantId });
+    counts.whatsAppMessagesNavigo = await countIfAvailable(prisma.oneuiWhatsAppMessage, {
+      linkedParticipantId: input.studyParticipantId,
+      sourceModule: "NAVIGO"
+    });
+  }
+  if (input.hutParticipantId) {
+    counts.hutQuestionnaireAttempts = await countIfAvailable(prisma.hutQuestionnaireAttempt, { participantId: input.hutParticipantId });
+    counts.hutApplicationPhotos = await countIfAvailable(prisma.hutApplicationPhotoEntry, { participantId: input.hutParticipantId });
+    counts.hutPhaseCodes = await countIfAvailable(prisma.hutParticipantPhaseCode, { participantId: input.hutParticipantId });
+    counts.hutVideos = await countIfAvailable(prisma.hutVideoSubmission, { participantId: input.hutParticipantId });
+    counts.hutVisualVerifications = await countIfAvailable(prisma.hutVisualVerification, { participantId: input.hutParticipantId });
+    counts.whatsAppMessagesHut = await countIfAvailable(prisma.oneuiWhatsAppMessage, {
+      linkedParticipantId: input.hutParticipantId,
+      sourceModule: "HUT"
+    });
+  }
+  return counts;
+}
+
+async function countIfAvailable(delegate: Delegate, where: unknown): Promise<number> {
+  if (!delegate.count) {
+    return 0;
+  }
+  return delegate.count({ where });
 }
 
 type QaScenarioDataInput = CreateQaParticipantScenarioInput & {

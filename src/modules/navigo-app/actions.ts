@@ -35,6 +35,7 @@ import {
 } from "./rotation-workbook";
 import type { NavigoParticipantImportActionState } from "./participant-import-state";
 import type { EvidenceUploadMetadata } from "@/modules/participant-portal/evidence-storage";
+import { cleanupNavigoTestRotations } from "./rotation-cleanup";
 
 export async function startNavigoT0Action(studyId: string, studyParticipantId: string, formData: FormData) {
   const actor = await requireCapability("application-time:record");
@@ -336,6 +337,29 @@ export async function clearNavigoParticipantRotationAction(studyId: string, stud
   redirectWithNavigoMessage(studyId, {
     message: result.message,
     participant: studyParticipantId
+  });
+}
+
+export async function cleanupNavigoTestRotationsAction(studyId: string, formData: FormData) {
+  const actor = await requireCapability("rotation:register");
+  const confirmation = String(formData.get("confirmation") ?? "").trim();
+
+  if (confirmation !== "LIMPIAR ROTACIONES DE PRUEBA") {
+    redirectWithNavigoMessage(studyId, { error: "Escribe LIMPIAR ROTACIONES DE PRUEBA para confirmar." });
+  }
+
+  const result = await cleanupNavigoTestRotations({
+    actorUserId: actor.id,
+    studyId
+  });
+
+  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+  if (!result.ok) {
+    redirectWithNavigoMessage(studyId, { error: result.message });
+  }
+
+  redirectWithNavigoMessage(studyId, {
+    message: `Rotaciones de prueba limpiadas. RotationPlan eliminados: ${result.data.deleted.rotationPlan ?? 0}.`
   });
 }
 

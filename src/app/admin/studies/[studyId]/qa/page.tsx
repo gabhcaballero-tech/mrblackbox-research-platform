@@ -6,6 +6,7 @@ import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import {
+  cleanupLegacyQaAuthorizedFoliosAction,
   cleanupQaParticipantRunAction,
   createQaParticipantScenarioAction
 } from "@/modules/qa-participants/actions";
@@ -36,10 +37,14 @@ type QaAdminPageProps = {
   params: Promise<{ studyId: string }>;
   searchParams?: Promise<{
     diagnosticRunId?: string;
+    legacyFolios?: string | string[];
+    legacyPreview?: string;
     qaError?: string;
     qaMessage?: string;
   }>;
 };
+
+const LEGACY_QA_CLEANUP_FOLIOS = ["NAV-106", "NAV-110", "NAV-115", "NAV-117", "PRUEBA"] as const;
 
 export default async function QaAdminPage({ params, searchParams }: QaAdminPageProps) {
   const { studyId } = await params;
@@ -49,6 +54,13 @@ export default async function QaAdminPage({ params, searchParams }: QaAdminPageP
     includeCleaned: true,
     studyId
   });
+  const legacySelectedFolios = query.legacyPreview === "1" ? normalizeLegacyFolioSelection(query.legacyFolios) : [];
+  const legacyPreview = legacySelectedFolios.length > 0
+    ? await createQaParticipantsRepository().previewLegacyCleanup({
+        folios: legacySelectedFolios,
+        studyId
+      })
+    : null;
   const diagnosticReport = query.diagnosticRunId
     ? await validateQaE2eRun({
         runId: query.diagnosticRunId,
@@ -93,9 +105,125 @@ export default async function QaAdminPage({ params, searchParams }: QaAdminPageP
         ) : null}
 
         <CreateQaParticipantSection studyId={studyId} />
+        <LegacyQaCleanupSection preview={legacyPreview} selectedFolios={legacySelectedFolios} studyId={studyId} />
         <QaRunsSection diagnosticReport={diagnosticReport} runs={runs} studyId={studyId} />
       </div>
     </AppShell>
+  );
+}
+
+function LegacyQaCleanupSection({
+  preview,
+  selectedFolios,
+  studyId
+}: {
+  preview: Awaited<ReturnType<ReturnType<typeof createQaParticipantsRepository>["previewLegacyCleanup"]>> | null;
+  selectedFolios: string[];
+  studyId: string;
+}) {
+  return (
+    <section className="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
+      <div>
+        <h2 className="text-lg font-semibold text-amber-950">Limpieza temporal de participantes antiguos</h2>
+        <p className="mt-1 text-sm leading-6 text-amber-900">
+          Herramienta temporal para folios de prueba creados antes de QaParticipantRun. Solo acepta la lista autorizada y exige vista previa antes de limpiar.
+        </p>
+      </div>
+
+      <form className="mt-5 grid gap-3" method="get">
+        <input name="legacyPreview" type="hidden" value="1" />
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          {LEGACY_QA_CLEANUP_FOLIOS.map((folio) => (
+            <label className="flex items-center gap-2 rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-900" key={folio}>
+              <input
+                defaultChecked={selectedFolios.includes(folio)}
+                name="legacyFolios"
+                type="checkbox"
+                value={folio}
+              />
+              {folio}
+            </label>
+          ))}
+        </div>
+        <div>
+          <button className="rounded-md bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-800" type="submit">
+            Ver resumen de relaciones
+          </button>
+        </div>
+      </form>
+
+      {preview ? (
+        <div className="mt-5 rounded-lg border border-amber-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-zinc-950">Resumen previo</h3>
+          {preview.blockedFolios.length > 0 ? (
+            <p className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+              Folios bloqueados por no estar autorizados: {preview.blockedFolios.join(", ")}
+            </p>
+          ) : null}
+          <div className="mt-4 grid gap-3">
+            {preview.folios.map((item) => (
+              <article className="rounded-md border border-zinc-200 bg-zinc-50 p-3" key={item.folio}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-mono text-sm font-bold text-zinc-950">{item.folio}</p>
+                    <p className="text-sm text-zinc-600">{item.participantName ?? "Sin nombre encontrado"}</p>
+                  </div>
+                  <span className={item.found ? "rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800" : "rounded-full bg-zinc-200 px-2 py-1 text-xs font-semibold text-zinc-700"}>
+                    {item.found ? "Encontrado" : "No encontrado"}
+                  </span>
+                </div>
+                <dl className="mt-3 grid gap-2 text-xs text-zinc-700 sm:grid-cols-2">
+                  <div>
+                    <dt className="font-semibold text-zinc-500">StudyParticipant</dt>
+                    <dd className="font-mono">{item.studyParticipantId ?? "-"}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold text-zinc-500">HutParticipant</dt>
+                    <dd className="font-mono">{item.hutParticipantId ?? "-"}</dd>
+                  </div>
+                </dl>
+                <RelationCounts counts={item.relationCounts} />
+              </article>
+            ))}
+          </div>
+
+          <form action={cleanupLegacyQaFoliosFormAction.bind(null, studyId)} className="mt-5 rounded-md border border-rose-200 bg-rose-50 p-3">
+            <p className="text-sm font-semibold text-rose-900">Confirmar limpieza transaccional</p>
+            <p className="mt-1 text-xs leading-5 text-rose-800">
+              Escribe LIMPIAR FOLIOS ANTIGUOS para borrar solo los folios seleccionados. Se guardara reporte en QaParticipantRun.
+            </p>
+            {preview.authorizedFolios.map((folio) => (
+              <input key={folio} name="legacyFolios" type="hidden" value={folio} />
+            ))}
+            <input
+              className="mt-2 w-full rounded-md border border-rose-200 px-3 py-2 text-sm text-zinc-950"
+              name="confirmation"
+              placeholder="LIMPIAR FOLIOS ANTIGUOS"
+            />
+            <button className="mt-2 rounded-md bg-rose-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-800" type="submit">
+              Limpiar folios seleccionados
+            </button>
+          </form>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function RelationCounts({ counts }: { counts: Record<string, number> }) {
+  const entries = Object.entries(counts);
+  if (entries.length === 0) {
+    return <p className="mt-3 text-xs text-zinc-500">Sin conteos disponibles.</p>;
+  }
+  return (
+    <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
+      {entries.map(([label, value]) => (
+        <div className="rounded-md bg-white px-2 py-1" key={label}>
+          <dt className="font-semibold text-zinc-500">{label}</dt>
+          <dd className="font-mono text-zinc-950">{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -397,6 +525,33 @@ async function cleanupQaParticipantFormAction(studyId: string, runId: string, fo
     redirect(`/admin/studies/${studyId}/qa?qaError=${encodeURIComponent(result.message)}`);
   }
   redirect(`/admin/studies/${studyId}/qa?qaMessage=${encodeURIComponent("Run QA limpiado correctamente.")}`);
+}
+
+async function cleanupLegacyQaFoliosFormAction(studyId: string, formData: FormData) {
+  "use server";
+
+  const confirmation = String(formData.get("confirmation") ?? "").trim();
+  const folios = formData.getAll("legacyFolios").map(String);
+  if (confirmation !== "LIMPIAR FOLIOS ANTIGUOS") {
+    redirect(`/admin/studies/${studyId}/qa?qaError=${encodeURIComponent("Escribe LIMPIAR FOLIOS ANTIGUOS para confirmar la limpieza.")}`);
+  }
+
+  const result = await cleanupLegacyQaAuthorizedFoliosAction({
+    folios,
+    studyId
+  });
+  revalidatePath(`/admin/studies/${studyId}/qa`);
+  if (!result.ok) {
+    redirect(`/admin/studies/${studyId}/qa?qaError=${encodeURIComponent(result.message)}`);
+  }
+  const cleaned = result.data.folios.filter((item) => item.cleanupReport).map((item) => item.folio);
+  redirect(`/admin/studies/${studyId}/qa?qaMessage=${encodeURIComponent(`Limpieza antigua completada: ${cleaned.join(", ") || "sin registros encontrados"}.`)}`);
+}
+
+function normalizeLegacyFolioSelection(value: string | string[] | undefined): string[] {
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  const allowed = new Set<string>(LEGACY_QA_CLEANUP_FOLIOS);
+  return [...new Set(values.map((item) => item.trim().toUpperCase()).filter((item) => allowed.has(item)))];
 }
 
 function parseScenarioReport(value: unknown): QaParticipantScenarioReport | null {

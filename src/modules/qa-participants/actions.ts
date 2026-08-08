@@ -3,6 +3,8 @@
 import { requireCapability } from "@/shared/auth/session";
 import { createQaParticipantsRepository } from "./repository";
 import type {
+  LegacyQaCleanupPreview,
+  LegacyQaCleanupReport,
   QaParticipantActionResult,
   QaParticipantExecutionMode,
   QaParticipantRunSummary,
@@ -40,6 +42,28 @@ export async function cleanupQaParticipantRunAction(
   return createQaParticipantsRepository().cleanupRun({
     cleanedByUserId: actor.id,
     runId
+  });
+}
+
+export async function previewLegacyQaCleanupAction(input: {
+  folios: string[];
+  studyId: string;
+}): Promise<LegacyQaCleanupPreview> {
+  await requireCapability("admin:access");
+
+  return createQaParticipantsRepository().previewLegacyCleanup(input);
+}
+
+export async function cleanupLegacyQaAuthorizedFoliosAction(input: {
+  folios: string[];
+  studyId: string;
+}): Promise<QaParticipantActionResult<LegacyQaCleanupReport>> {
+  const actor = await requireCapability("admin:access");
+
+  return createQaParticipantsRepository().cleanupLegacyAuthorizedFolios({
+    cleanedByUserId: actor.id,
+    folios: input.folios,
+    studyId: input.studyId
   });
 }
 

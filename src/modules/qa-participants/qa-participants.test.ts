@@ -81,6 +81,91 @@ describe("qa participants repository", () => {
     );
   });
 
+  it("previsualiza relaciones para folios antiguos autorizados sin usar prefijos", async () => {
+    const prisma = createQaPrisma();
+    prisma.seedLegacyParticipant({
+      folio: "NAV-106",
+      hutParticipantId: "hut-nav-106",
+      name: "Participante antiguo",
+      studyParticipantId: "study-participant-nav-106"
+    });
+    const repository = createQaParticipantsRepository(prisma as never);
+
+    const preview = await repository.previewLegacyCleanup({
+      folios: ["NAV-106"],
+      studyId: "study-qa"
+    });
+
+    expect(preview.blockedFolios).toEqual([]);
+    expect(preview.folios).toEqual([
+      expect.objectContaining({
+        folio: "NAV-106",
+        found: true,
+        hutParticipantId: "hut-nav-106",
+        participantName: "Participante antiguo",
+        studyParticipantId: "study-participant-nav-106"
+      })
+    ]);
+    expect(preview.folios[0]?.relationCounts).toMatchObject({
+      ctlSessions: 1,
+      hutPhaseCodes: 1,
+      participantActivities: 1
+    });
+  });
+
+  it("bloquea limpieza temporal si la lista incluye folios no autorizados", async () => {
+    const prisma = createQaPrisma();
+    const repository = createQaParticipantsRepository(prisma as never);
+
+    const result = await repository.cleanupLegacyAuthorizedFolios({
+      cleanedByUserId: "user-admin",
+      folios: ["NAV-106", "NAV-REAL"],
+      studyId: "study-qa"
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.message).toContain("NAV-REAL");
+    expect(prisma.calls).not.toContainEqual(expect.objectContaining({ operation: "deleteMany" }));
+  });
+
+  it("limpia folios antiguos autorizados y guarda reporte de limpieza", async () => {
+    const prisma = createQaPrisma();
+    prisma.seedLegacyParticipant({
+      folio: "NAV-106",
+      hutParticipantId: "hut-nav-106",
+      name: "Participante antiguo",
+      studyParticipantId: "study-participant-nav-106"
+    });
+    const repository = createQaParticipantsRepository(prisma as never);
+
+    const result = await repository.cleanupLegacyAuthorizedFolios({
+      cleanedByUserId: "user-admin",
+      folios: ["NAV-106"],
+      studyId: "study-qa"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.folios[0]?.cleanupReport : null).toMatchObject({
+      hutParticipantId: "hut-nav-106",
+      studyParticipantId: "study-participant-nav-106"
+    });
+    expect(prisma.calls).toContainEqual(
+      expect.objectContaining({
+        modelName: "studyParticipant",
+        operation: "deleteMany",
+        where: { id: "study-participant-nav-106" }
+      })
+    );
+    expect(prisma.calls).toContainEqual(
+      expect.objectContaining({
+        modelName: "hutParticipant",
+        operation: "deleteMany",
+        where: { id: "hut-nav-106" }
+      })
+    );
+    expect(prisma.runs.some((run: FakeQaRun) => run.status === "CLEANED" && run.cleanupReportJson)).toBe(true);
+  });
+
   it("crea escenario CLT_ONLY listo para reclamar CTL sin crear link Navigo", async () => {
     const prisma = createQaPrisma();
     const repository = createQaParticipantsRepository(prisma as never);
@@ -221,10 +306,16 @@ type FakeQaRun = {
 function createQaPrisma() {
   const runs: FakeQaRun[] = [];
   const calls: FakePrismaCall[] = [];
+  const legacyConfirmations: FakeLegacyConfirmation[] = [];
+  const legacyHutParticipants: FakeLegacyHutParticipant[] = [];
   const now = new Date("2026-08-08T12:00:00.000Z");
   let idSequence = 1;
 
   const deleteDelegate = (modelName: string) => ({
+    count: async (args: { where: unknown }) => {
+      calls.push({ modelName, operation: "count", where: args.where });
+      return 1;
+    },
     deleteMany: async (args: { where: unknown }) => {
       calls.push({ modelName, operation: "deleteMany", where: args.where });
       return { count: 1 };
@@ -247,12 +338,33 @@ function createQaPrisma() {
   type FakeQaPrisma = {
     $transaction: <T>(callback: (tx: FakeQaPrisma) => Promise<T>) => Promise<T>;
     calls: FakePrismaCall[];
+    runs: FakeQaRun[];
+    seedLegacyParticipant: (input: FakeLegacyParticipantInput) => void;
     seedRun: (input: Partial<FakeQaRun>) => FakeQaRun;
     [key: string]: unknown;
   };
 
   const prisma: FakeQaPrisma = {
     calls,
+    runs,
+    seedLegacyParticipant(input: FakeLegacyParticipantInput) {
+      legacyConfirmations.push({
+        folio: input.folio,
+        studyParticipant: {
+          hutParticipant: input.hutParticipantId ? { id: input.hutParticipantId } : null,
+          participantProfile: { name: input.name }
+        },
+        studyParticipantId: input.studyParticipantId
+      });
+      if (input.hutParticipantId) {
+        legacyHutParticipants.push({
+          folio: input.folio,
+          id: input.hutParticipantId,
+          name: input.name,
+          studyParticipantId: input.studyParticipantId
+        });
+      }
+    },
     seedRun(input: Partial<FakeQaRun>) {
       const run: FakeQaRun = {
         cleanupReportJson: null,
@@ -306,7 +418,9 @@ function createQaPrisma() {
     hutDailyCheck: deleteDelegate("hutDailyCheck"),
     hutParticipant: {
       ...createDelegate("hutParticipant"),
-      ...deleteDelegate("hutParticipant")
+      ...deleteDelegate("hutParticipant"),
+      findMany: async (args: { where: { folio: { in: string[] }; studyId: string } }) =>
+        legacyHutParticipants.filter((participant) => participant.folio && args.where.folio.in.includes(participant.folio))
     },
     hutParticipantPhaseCode: {
       ...createDelegate("hutParticipantPhaseCode"),
@@ -342,7 +456,9 @@ function createQaPrisma() {
     participantAttributeOrder: deleteDelegate("participantAttributeOrder"),
     participantConfirmation: {
       ...createDelegate("participantConfirmation"),
-      ...deleteDelegate("participantConfirmation")
+      ...deleteDelegate("participantConfirmation"),
+      findMany: async (args: { where: { folio: { in: string[] }; studyId: string } }) =>
+        legacyConfirmations.filter((confirmation) => args.where.folio.in.includes(confirmation.folio))
     },
     participantConsent: deleteDelegate("participantConsent"),
     participantEvidence: deleteDelegate("participantEvidence"),
@@ -447,6 +563,29 @@ type FakePrismaCall = {
   modelName: string;
   operation: string;
   where: unknown;
+};
+
+type FakeLegacyParticipantInput = {
+  folio: string;
+  hutParticipantId: string | null;
+  name: string;
+  studyParticipantId: string;
+};
+
+type FakeLegacyConfirmation = {
+  folio: string;
+  studyParticipant: {
+    hutParticipant: { id: string } | null;
+    participantProfile: { name: string };
+  };
+  studyParticipantId: string;
+};
+
+type FakeLegacyHutParticipant = {
+  folio: string;
+  id: string;
+  name: string;
+  studyParticipantId: string;
 };
 
 function selectFakeRecord(record: Record<string, unknown>, select?: Record<string, boolean>) {

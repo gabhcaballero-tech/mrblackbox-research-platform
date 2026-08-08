@@ -2,6 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
+  cleanupNavigoTestRotationsAction,
   configureNavigoStudyRotationAction,
   clearNavigoParticipantRotationAction,
   deleteNavigoParticipantAction,
@@ -15,6 +16,10 @@ import {
   startNavigoT0Action,
   updateNavigoVisualVerificationModeAction
 } from "@/modules/navigo-app/actions";
+import {
+  previewNavigoTestRotationCleanup,
+  type NavigoRotationCleanupPreview
+} from "@/modules/navigo-app/rotation-cleanup";
 import {
   createNavigoAppRepository,
   formatNavigoDateTimeLocal,
@@ -67,6 +72,7 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
   const actor = await requireCapability("screening:review");
   await ensureNavigoAppFoundation({ actorUserId: actor.id });
   const result = await createNavigoAppRepository().getAdminDashboard(studyId);
+  const rotationCleanupPreview = await previewNavigoTestRotationCleanup(studyId);
 
   if (!result) {
     notFound();
@@ -117,6 +123,7 @@ export default async function NavigoAppAdminPage({ params, searchParams }: Navig
           </p>
           <NavigoParticipantOperationsPanel studyId={studyId} />
           <StudyRotationConfigurationPanel rotationConfig={result.rotationConfig} studyId={studyId} />
+          <NavigoRotationCleanupPanel preview={rotationCleanupPreview} studyId={studyId} />
           <DirectParticipantRegistration studyId={studyId} />
           <BulkLinkGeneration studyId={studyId} />
           <NavigoRotationWorkbookImportPanel studyId={studyId} />
@@ -229,6 +236,116 @@ function StudyRotationConfigurationPanel({
         </div>
       </div>
     </section>
+  );
+}
+
+function NavigoRotationCleanupPanel({
+  preview,
+  studyId
+}: {
+  preview: NavigoRotationCleanupPreview;
+  studyId: string;
+}) {
+  const suspectPlans = preview.plans.filter((plan) => plan.isSuspectTestConfig || plan.isOfficialRotation);
+  const blockedPlans = suspectPlans.filter((plan) => plan.isSuspectTestConfig && plan.blockReasons.some((reason) => !reason.includes("oficial")));
+  const canClean = preview.deleteablePlanIds.length > 0 && blockedPlans.length === 0;
+
+  return (
+    <details className="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
+      <summary className="cursor-pointer text-lg font-semibold text-amber-950">Limpieza temporal de rotaciones de prueba</summary>
+      <div className="mt-4 space-y-4">
+        <p className="text-sm leading-6 text-amber-900">
+          Conserva las rotaciones oficiales 247 -&gt; 583 y 583 -&gt; 247. Solo limpia configuraciones de prueba detectadas por los folios/codigos autorizados.
+        </p>
+        <div className="grid gap-3 text-sm md:grid-cols-3">
+          <InfoTile label="Planes sospechosos" value={String(suspectPlans.filter((plan) => plan.isSuspectTestConfig).length)} />
+          <InfoTile label="Planes eliminables" value={String(preview.deleteablePlanIds.length)} />
+          <InfoTile label="Planes oficiales protegidos" value={String(preview.officialPlanIds.length)} />
+        </div>
+
+        {suspectPlans.length === 0 ? (
+          <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            No se encontraron configuraciones de prueba de rotacion.
+          </p>
+        ) : (
+          <div className="grid gap-3">
+            {suspectPlans.map((plan) => (
+              <article className="rounded-md border border-amber-200 bg-white p-3" key={plan.id}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-mono text-sm font-bold text-zinc-950">{plan.rotationCode}</p>
+                    <p className="text-sm text-zinc-600">{plan.name}</p>
+                    <p className="mt-1 font-mono text-xs text-zinc-500">
+                      {plan.arms.map((arm) => `${arm.applicationOrder}: ${arm.sampleKey}`).join(" / ") || "Sin brazos"}
+                    </p>
+                  </div>
+                  <span className={plan.isOfficialRotation ? "rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800" : preview.deleteablePlanIds.includes(plan.id) ? "rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800" : "rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-800"}>
+                    {plan.isOfficialRotation ? "Oficial protegido" : preview.deleteablePlanIds.includes(plan.id) ? "Eliminable" : "Bloqueado"}
+                  </span>
+                </div>
+                <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+                  <InfoTile label="RotationPlanArm" value={String(plan.relationCounts.rotationPlanArms)} />
+                  <InfoTile label="ParticipantRotationAssignment" value={String(plan.relationCounts.participantRotationAssignments)} />
+                  <InfoTile label="ParticipantArmAssignment estimado" value={String(plan.relationCounts.participantArmAssignments)} />
+                </dl>
+                {plan.assignedParticipants.length > 0 ? (
+                  <div className="mt-3 rounded-md bg-zinc-50 p-3 text-xs">
+                    <p className="font-semibold text-zinc-700">Participantes asociados</p>
+                    <ul className="mt-2 space-y-1">
+                      {plan.assignedParticipants.map((participant) => (
+                        <li key={participant.studyParticipantId}>
+                          <span className="font-mono">{participant.folio ?? participant.studyParticipantId}</span>{" "}
+                          {participant.name ? <span>{participant.name}</span> : null}{" "}
+                          <span className={participant.isAuthorizedTestFolio || participant.isQaRun ? "text-emerald-700" : "text-rose-700"}>
+                            {participant.isQaRun ? "QA formal" : participant.isAuthorizedTestFolio ? "folio autorizado" : "posible real"}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {plan.blockReasons.length > 0 ? (
+                  <ul className="mt-3 space-y-1 text-xs text-rose-800">
+                    {plan.blockReasons.map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        )}
+
+        <form action={cleanupNavigoTestRotationsAction.bind(null, studyId)} className="rounded-md border border-rose-200 bg-rose-50 p-3">
+          <p className="text-sm font-semibold text-rose-900">Confirmacion requerida</p>
+          <p className="mt-1 text-xs leading-5 text-rose-800">
+            Escribe LIMPIAR ROTACIONES DE PRUEBA. Si existe participante real asociado, la accion se bloquea antes de borrar.
+          </p>
+          <input
+            className="mt-2 w-full rounded-md border border-rose-200 px-3 py-2 text-sm text-zinc-950 disabled:bg-zinc-100"
+            disabled={!canClean}
+            name="confirmation"
+            placeholder="LIMPIAR ROTACIONES DE PRUEBA"
+          />
+          <button
+            className="mt-2 rounded-md bg-rose-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+            disabled={!canClean}
+            type="submit"
+          >
+            Limpiar rotaciones de prueba
+          </button>
+        </form>
+      </div>
+    </details>
+  );
+}
+
+function InfoTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-zinc-200 bg-white px-3 py-2">
+      <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{label}</dt>
+      <dd className="mt-1 font-mono text-sm text-zinc-950">{value}</dd>
+    </div>
   );
 }
 
