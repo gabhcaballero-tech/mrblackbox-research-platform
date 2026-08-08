@@ -1176,6 +1176,60 @@ describe("HUT module foundation", () => {
     });
   });
 
+  it("syncs linked NAV contact data automatically when assigning a HUT slot", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      name: "HUT temporal",
+      phone: null,
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    await repository.createRegistrationSlot({
+      firstFragranceLeftArm: "247",
+      folio: "HUT-111",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    participant.studyParticipantId = "study-participant-nav-111";
+    participant.studyParticipant = {
+      participantProfile: {
+        email: "martin@example.test",
+        name: "Martin Valerio Gonzalez",
+        phone: "5569613589"
+      }
+    };
+    participant.phaseCodes = [
+      {
+        codeHash: "hash-1",
+        encryptedCode: "encrypted-1",
+        id: "phase-1",
+        participantId: participant.id,
+        phase: "COLOCACION",
+        slot: 1,
+        status: "GENERATED"
+      }
+    ];
+    const assigned = await repository.assignParticipantRotation({
+      participantId: participant.id,
+      slotId: prisma.state.registrationSlots[0]!.id,
+      studyId: "study-hut"
+    });
+
+    expect(assigned.ok).toBe(true);
+    expect(participant).toMatchObject({
+      email: "martin@example.test",
+      firstFragranceLeftArm: "247",
+      folio: "HUT-111",
+      name: "Martin Valerio Gonzalez",
+      phone: "5569613589",
+      secondFragranceRightArm: "583"
+    });
+    expect(participant.phaseCodes).toHaveLength(1);
+  });
+
   it("creates an admin participant directly with an available HUT slot", async () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);

@@ -2013,27 +2013,23 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           return { message: "No encontramos el participante HUT.", ok: false };
         }
 
-        const profile = participant.studyParticipant?.participantProfile ?? null;
+        const profileData = linkedNavProfileData(participant);
 
-        if (!participant.studyParticipantId || !profile) {
+        if (!profileData) {
           return { message: "Este HUT no tiene un participante NAV vinculado.", ok: false };
         }
 
         await tx.hutParticipant.update?.({
-          data: {
-            email: profile.email,
-            name: profile.name,
-            phone: profile.phone
-          },
+          data: profileData,
           where: { id: participant.id }
         });
 
         return {
           data: {
-            email: profile.email,
-            name: profile.name,
+            email: profileData.email,
+            name: profileData.name,
             participantId: participant.id,
-            phone: profile.phone
+            phone: profileData.phone
           },
           message: "Datos HUT sincronizados desde el participante NAV vinculado.",
           ok: true
@@ -2097,11 +2093,14 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           return { message: "Ya existe un participante HUT con ese folio.", ok: false };
         }
 
+        const profileData = linkedNavProfileData(participant);
+
         await releaseParticipantRegistrationSlot(tx, participant.id);
         await tx.hutParticipant.update?.({
           data: {
             firstFragranceLeftArm: rotation.firstFragranceLeftArm,
             folio: rotation.folio,
+            ...(profileData ?? {}),
             secondFragranceRightArm: rotation.secondFragranceRightArm
           },
           where: { id: participant.id }
@@ -4536,6 +4535,21 @@ function isLegacyVideoProtocol(participant: Pick<HutParticipantRecord, "protocol
 
 function participantOrigin(participant: Pick<HutParticipantRecord, "origin" | "studyId"> & { studyParticipantId?: string | null }): "CLT_HUT" | "HUT_DIRECTO" {
   return participant.origin ?? (participant.studyParticipantId ? "CLT_HUT" : "HUT_DIRECTO");
+}
+
+function linkedNavProfileData(
+  participant: Pick<HutParticipantRecord, "studyParticipant" | "studyParticipantId">
+): { email: string | null; name: string; phone: string | null } | null {
+  const profile = participant.studyParticipant?.participantProfile ?? null;
+  if (!participant.studyParticipantId || !profile) {
+    return null;
+  }
+
+  return {
+    email: profile.email,
+    name: profile.name,
+    phone: profile.phone
+  };
 }
 
 function applicationEvidenceSummary(participant: HutParticipantRecord): HutPortalView["applicationEvidence"] {
