@@ -14,6 +14,7 @@ import {
   createNavigoAppRepository,
   type NavigoActionResult,
   type NavigoEvaluationLinkWhatsAppSendResult,
+  type NavigoEvaluationReminderManualSendResult,
   type NavigoSignedActivityUpload
 } from "./repository";
 import type { NavigoFaceVerificationClientResult } from "./face-verification-contract";
@@ -147,6 +148,19 @@ export type NavigoEvaluationLinkWhatsAppActionResult =
       ok: false;
     };
 
+export type NavigoEvaluationReminderNowActionResult =
+  | {
+      data: Omit<NavigoEvaluationReminderManualSendResult, "generatedAt"> & {
+        generatedAtIso: string;
+        message: string;
+      };
+      ok: true;
+    }
+  | {
+      message: string;
+      ok: false;
+    };
+
 export async function sendNavigoEvaluationLinkWhatsAppAction(
   studyId: string,
   studyParticipantId: string,
@@ -178,6 +192,47 @@ export async function sendNavigoEvaluationLinkWhatsAppAction(
       message: result.data.whatsappStatus === "ENVIADO"
         ? "Enlace de evaluacion enviado por WhatsApp."
         : "Enlace generado. WhatsApp fallo; copia el enlace para compartirlo manualmente.",
+      phone: result.data.phone,
+      whatsappError: result.data.whatsappError,
+      whatsappMessageId: result.data.whatsappMessageId,
+      whatsappStatus: result.data.whatsappStatus
+    },
+    ok: true
+  };
+}
+
+export async function sendNavigoEvaluationReminderNowAction(
+  studyId: string,
+  participantActivityId: string,
+  requestOrigin: string
+): Promise<NavigoEvaluationReminderNowActionResult> {
+  const actor = await requireCapability("screening:review");
+  const result = await createNavigoAppRepository().sendEvaluationReminderNow({
+    actorUserId: actor.id,
+    participantActivityId,
+    requestOrigin,
+    studyId
+  });
+
+  if (!result.ok) {
+    return { message: result.message, ok: false };
+  }
+
+  try {
+    revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+  } catch {
+    // El recordatorio ya fue auditado; no ocultamos el resultado por una actualizacion secundaria.
+  }
+
+  return {
+    data: {
+      activityCode: result.data.activityCode,
+      evaluationUrl: result.data.evaluationUrl,
+      folio: result.data.folio,
+      generatedAtIso: result.data.generatedAt.toISOString(),
+      message: result.data.whatsappStatus === "ENVIADO"
+        ? "Recordatorio enviado por WhatsApp."
+        : "Recordatorio registrado. WhatsApp fallo; revisa la auditoria.",
       phone: result.data.phone,
       whatsappError: result.data.whatsappError,
       whatsappMessageId: result.data.whatsappMessageId,

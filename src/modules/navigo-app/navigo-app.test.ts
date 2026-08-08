@@ -985,10 +985,11 @@ describe("navigo app MVP rules", () => {
     expect(state.reminderLogs).toHaveLength(1);
   });
 
-  it("envia recordatorios WhatsApp para T4.5 y T6 cuando corresponden", async () => {
+  it("envia solo la siguiente evaluacion pendiente cuando T3, T4.5 y T6 estan disponibles", async () => {
     const state = createNavigoParticipantImportState();
     const whatsApp = createFakeNavigoWhatsAppRepository();
     const repository = createNavigoAppRepository(state.prisma as never, whatsApp.repository);
+    seedDueNavigoReminderActivity(state, "T3_HORAS", new Date("2026-08-08T09:00:00.000Z"));
     seedDueNavigoReminderActivity(state, "T4_5_HORAS", new Date("2026-08-08T10:30:00.000Z"));
     seedDueNavigoReminderActivity(state, "T6_HORAS", new Date("2026-08-08T12:00:00.000Z"));
     vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
@@ -1007,9 +1008,102 @@ describe("navigo app MVP rules", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.ok ? result.data.sent : 0).toBe(2);
-    expect(result.ok ? result.data.results.map((item) => item.activityCode) : []).toEqual(["T4_5_HORAS", "T6_HORAS"]);
-    expect(state.reminderLogs.map((log) => log.status)).toEqual(["COMPLETED", "COMPLETED"]);
+    expect(result.ok ? result.data.scanned : 0).toBe(3);
+    expect(result.ok ? result.data.sent : 0).toBe(1);
+    expect(result.ok ? result.data.results.map((item) => item.activityCode) : []).toEqual(["T3_HORAS"]);
+    expect(state.reminderLogs.map((log) => log.status)).toEqual(["COMPLETED"]);
+  });
+
+  it("permite recordatorio T4.5 cuando T3 esta completada", async () => {
+    const state = createNavigoParticipantImportState();
+    const whatsApp = createFakeNavigoWhatsAppRepository();
+    const repository = createNavigoAppRepository(state.prisma as never, whatsApp.repository);
+    seedDueNavigoReminderActivity(state, "T3_HORAS", new Date("2026-08-08T09:00:00.000Z"), "COMPLETED");
+    seedDueNavigoReminderActivity(state, "T4_5_HORAS", new Date("2026-08-08T10:30:00.000Z"));
+    seedDueNavigoReminderActivity(state, "T6_HORAS", new Date("2026-08-08T12:00:00.000Z"));
+    vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "phone-number-id");
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      json: async () => ({ messages: [{ id: "wamid-t45", message_status: "accepted" }] }),
+      ok: true,
+      status: 200
+    })));
+
+    const result = await repository.processEvaluationWhatsAppReminders({
+      now: new Date("2026-08-08T12:00:00.000Z"),
+      requestOrigin: "https://example.test",
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.sent : 0).toBe(1);
+    expect(result.ok ? result.data.results.map((item) => item.activityCode) : []).toEqual(["T4_5_HORAS"]);
+  });
+
+  it("permite recordatorio T6 cuando T4.5 esta completada", async () => {
+    const state = createNavigoParticipantImportState();
+    const whatsApp = createFakeNavigoWhatsAppRepository();
+    const repository = createNavigoAppRepository(state.prisma as never, whatsApp.repository);
+    seedDueNavigoReminderActivity(state, "T3_HORAS", new Date("2026-08-08T09:00:00.000Z"), "COMPLETED");
+    seedDueNavigoReminderActivity(state, "T4_5_HORAS", new Date("2026-08-08T10:30:00.000Z"), "COMPLETED");
+    seedDueNavigoReminderActivity(state, "T6_HORAS", new Date("2026-08-08T12:00:00.000Z"));
+    vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "phone-number-id");
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      json: async () => ({ messages: [{ id: "wamid-t6", message_status: "accepted" }] }),
+      ok: true,
+      status: 200
+    })));
+
+    const result = await repository.processEvaluationWhatsAppReminders({
+      now: new Date("2026-08-08T12:00:00.000Z"),
+      requestOrigin: "https://example.test",
+      studyId: state.study.id
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.sent : 0).toBe(1);
+    expect(result.ok ? result.data.results.map((item) => item.activityCode) : []).toEqual(["T6_HORAS"]);
+  });
+
+  it("no duplica entre recordatorio manual admin y cron", async () => {
+    const state = createNavigoParticipantImportState();
+    const whatsApp = createFakeNavigoWhatsAppRepository();
+    const repository = createNavigoAppRepository(state.prisma as never, whatsApp.repository);
+    seedDueNavigoReminderActivity(state, "T3_HORAS", new Date("2026-08-08T09:00:00.000Z"));
+    vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "phone-number-id");
+    const fetcher = vi.fn(async () => ({
+      json: async () => ({ messages: [{ id: "wamid-manual", message_status: "accepted" }] }),
+      ok: true,
+      status: 200
+    }));
+    vi.stubGlobal("fetch", fetcher);
+
+    const manualResult = await repository.sendEvaluationReminderNow({
+      actorUserId: "admin-1",
+      now: new Date("2026-08-08T09:00:00.000Z"),
+      participantActivityId: "activity-T3_HORAS",
+      requestOrigin: "https://example.test",
+      studyId: state.study.id
+    });
+    const cronResult = await repository.processEvaluationWhatsAppReminders({
+      now: new Date("2026-08-08T09:01:00.000Z"),
+      requestOrigin: "https://example.test",
+      studyId: state.study.id
+    });
+
+    expect(manualResult.ok).toBe(true);
+    expect(cronResult.ok).toBe(true);
+    expect(cronResult.ok ? cronResult.data.sent : -1).toBe(0);
+    expect(cronResult.ok ? cronResult.data.skipped : 0).toBe(1);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(state.reminderLogs).toHaveLength(1);
+    expect(state.reminderLogs[0]?.metadataJson).toMatchObject({
+      adminUserId: "admin-1",
+      reminderType: "NAVIGO_WHATSAPP_EVALUATION_REMINDER",
+      source: "MANUAL_ADMIN"
+    });
   });
 
   it("returns the same evaluation link sent by WhatsApp for operator backup", async () => {
@@ -4193,7 +4287,7 @@ function createNavigoParticipantImportState(
     id: string;
     occurrenceKey: string;
     scheduledAt: Date;
-    status: "AVAILABLE";
+    status: "AVAILABLE" | "COMPLETED";
     studyParticipantId: string;
   }> = [];
   const participantActivityEvidence: Array<{ id: string; participantActivityId: string; studyParticipantId: string }> = [];
@@ -4442,8 +4536,9 @@ function createNavigoParticipantImportState(
         where: {
           activitySchedule?: { code?: { in: readonly string[] }; status?: string };
           availableFrom?: { lte: Date };
+          id?: string;
           status?: { not: string };
-          studyParticipant?: { studyId?: string };
+          studyParticipant?: { qaParticipantRun?: { is: null }; studyId?: string };
           studyParticipantId?: string;
         };
       }) {
@@ -4463,6 +4558,7 @@ function createNavigoParticipantImportState(
                 args.where.activitySchedule.code.in.includes(schedule!.code)) &&
               (args.where.activitySchedule?.status === undefined || schedule!.status === args.where.activitySchedule.status) &&
               (args.where.availableFrom === undefined || activity.availableFrom.getTime() <= args.where.availableFrom.lte.getTime()) &&
+              (args.where.id === undefined || activity.id === args.where.id) &&
               (args.where.status === undefined || activity.status !== args.where.status.not) &&
               (args.where.studyParticipant?.studyId === undefined || participant!.studyId === args.where.studyParticipant.studyId)
             );
@@ -4487,6 +4583,14 @@ function createNavigoParticipantImportState(
               status: activity.status,
               studyParticipant: {
                 accessTokens: participant.accessTokens,
+                activities: participant.activities.map((item) => ({
+                  activitySchedule: {
+                    code: item.activitySchedule.code
+                  },
+                  availableFrom: item.availableFrom,
+                  id: item.id,
+                  status: item.status
+                })),
                 id: participant.id,
                 participantConfirmation: participant.participantConfirmation
                   ? { folio: participant.participantConfirmation.folio }
@@ -5019,7 +5123,8 @@ function createNavigoParticipantImportState(
 function seedDueNavigoReminderActivity(
   state: ReturnType<typeof createNavigoParticipantImportState>,
   activityCode: "T3_HORAS" | "T4_5_HORAS" | "T6_HORAS",
-  availableFrom: Date
+  availableFrom: Date,
+  status: "AVAILABLE" | "COMPLETED" = "AVAILABLE"
 ) {
   const participantId = state.studyParticipants[0]?.id ?? seedApprovedFieldParticipantForNavigo(state);
   const schedule = {
@@ -5054,7 +5159,7 @@ function seedDueNavigoReminderActivity(
     id: `activity-${activityCode}`,
     occurrenceKey: "DEFAULT",
     scheduledAt: availableFrom,
-    status: "AVAILABLE",
+    status,
     studyParticipantId: participantId
   });
 }
