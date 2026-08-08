@@ -425,7 +425,72 @@ describe("qa participants repository", () => {
     )).toBe(true);
   });
 
-  it("conserva ParticipantProfile sin StudyParticipant si tiene relacion HUT o WhatsApp por telefono", async () => {
+  it("permite eliminar ParticipantProfile sin participaciones aunque tenga WhatsApp historico", async () => {
+    const prisma = createQaPrisma();
+    prisma.seedOrphanProfile({
+      email: "whatsapp-only@example.test",
+      id: "profile-whatsapp-only",
+      name: "Perfil con WhatsApp historico",
+      phone: "+525554443333"
+    });
+    prisma.seedWhatsAppConversation({ phoneNumber: "525554443333" });
+    const repository = createQaParticipantsRepository(prisma as never);
+
+    const preview = await repository.previewOrphanParticipantProfiles();
+
+    expect(preview.candidateCount).toBe(1);
+    expect(preview.candidates[0]).toMatchObject({
+      id: "profile-whatsapp-only",
+      reason: "Sin participaciones ni relaciones operativas; conserva solo WhatsApp historico/dangling.",
+      relationCounts: {
+        oneuiWhatsAppConversations: 1,
+        oneuiWhatsAppMessages: 1
+      }
+    });
+
+    const result = await repository.cleanupOrphanParticipantProfiles({
+      cleanedByUserId: "user-admin",
+      studyId: "study-qa"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.deleted : null).toEqual([
+      expect.objectContaining({ id: "profile-whatsapp-only" })
+    ]);
+    expect(prisma.calls).not.toContainEqual(expect.objectContaining({
+      modelName: "oneuiWhatsAppMessage",
+      operation: "deleteMany"
+    }));
+  });
+
+  it("conserva ParticipantProfile con StudyParticipant y no lo lista como huerfano", async () => {
+    const prisma = createQaPrisma();
+    prisma.seedParticipantProfileWithParticipation({
+      id: "profile-with-study-participant",
+      name: "Perfil real",
+      studyParticipantId: "study-participant-real"
+    });
+    const repository = createQaParticipantsRepository(prisma as never);
+
+    const preview = await repository.previewOrphanParticipantProfiles();
+    const result = await repository.cleanupOrphanParticipantProfiles({
+      cleanedByUserId: "user-admin",
+      studyId: "study-qa"
+    });
+
+    expect(preview.candidates).not.toContainEqual(expect.objectContaining({ id: "profile-with-study-participant" }));
+    expect(result.ok ? result.data.deleted : null).not.toContainEqual(expect.objectContaining({ id: "profile-with-study-participant" }));
+    expect(prisma.calls).not.toContainEqual(expect.objectContaining({
+      modelName: "participantProfile",
+      operation: "deleteMany",
+      where: {
+        id: "profile-with-study-participant",
+        participations: { none: {} }
+      }
+    }));
+  });
+
+  it("conserva ParticipantProfile sin StudyParticipant si tiene relacion HUT por telefono", async () => {
     const prisma = createQaPrisma();
     prisma.seedOrphanProfile({
       email: "preserve@example.test",
@@ -434,7 +499,6 @@ describe("qa participants repository", () => {
       phone: "+525554443333"
     });
     prisma.seedExternalHutParticipant({ email: null, phone: "+525554443333" });
-    prisma.seedWhatsAppConversation({ phoneNumber: "525554443333" });
     const repository = createQaParticipantsRepository(prisma as never);
 
     const preview = await repository.previewOrphanParticipantProfiles();
@@ -677,6 +741,7 @@ function createQaPrisma() {
     seedLegacyRotationPlan: (input: FakeLegacyRotationPlanInput) => void;
     seedExternalHutParticipant: (input: { email: string | null; phone: string | null }) => void;
     seedOrphanProfile: (input: { email: string | null; id: string; name: string; phone: string | null }) => void;
+    seedParticipantProfileWithParticipation: (input: { id: string; name: string; studyParticipantId: string }) => void;
     seedRun: (input: Partial<FakeQaRun>) => FakeQaRun;
     seedWhatsAppConversation: (input: { phoneNumber: string | null }) => void;
     setProfileParticipationCount: (profileId: string, count: number) => void;
@@ -754,6 +819,19 @@ function createQaPrisma() {
         status: "ACTIVE",
         updatedAt: now
       });
+    },
+    seedParticipantProfileWithParticipation(input: { id: string; name: string; studyParticipantId: string }) {
+      participantProfiles.set(input.id, {
+        createdAt: now,
+        email: `${input.id}@example.test`,
+        id: input.id,
+        name: input.name,
+        participationCount: 1,
+        phone: "5550001111",
+        status: "ACTIVE",
+        updatedAt: now
+      });
+      studyParticipantProfiles.set(input.studyParticipantId, input.id);
     },
     seedWhatsAppConversation(input: { phoneNumber: string | null }) {
       whatsappConversations.push(input);

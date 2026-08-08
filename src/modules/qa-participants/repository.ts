@@ -442,14 +442,17 @@ async function buildOrphanParticipantProfilePreviewItem(
   profile: OrphanParticipantProfileRecord
 ): Promise<OrphanParticipantProfilePreviewItem | OrphanParticipantProfileConservedItem> {
   const relationCounts = await countOrphanParticipantProfileRelations(prisma, profile);
-  const blockingRelations = Object.entries(relationCounts).filter(([, count]) => count > 0);
+  const blockingRelations = Object.entries(relationCounts).filter(([name, count]) => isBlockingOrphanParticipantProfileRelation(name) && count > 0);
+  const whatsappCount = (relationCounts.oneuiWhatsAppConversations ?? 0) + (relationCounts.oneuiWhatsAppMessages ?? 0);
   const base: OrphanParticipantProfilePreviewItem = {
     createdAt: profile.createdAt,
     email: profile.email,
     id: profile.id,
     name: profile.name,
     phone: profile.phone,
-    reason: "Sin StudyParticipant ni relaciones historicas detectadas.",
+    reason: whatsappCount > 0
+      ? "Sin participaciones ni relaciones operativas; conserva solo WhatsApp historico/dangling."
+      : "Sin StudyParticipant ni relaciones historicas detectadas.",
     relationCounts,
     status: profile.status,
     updatedAt: profile.updatedAt
@@ -463,6 +466,10 @@ async function buildOrphanParticipantProfilePreviewItem(
   }
 
   return base;
+}
+
+function isBlockingOrphanParticipantProfileRelation(name: string): boolean {
+  return name !== "oneuiWhatsAppConversations" && name !== "oneuiWhatsAppMessages";
 }
 
 async function countOrphanParticipantProfileRelations(
@@ -510,10 +517,12 @@ async function countOrphanParticipantProfileRelations(
 
 async function countQaRunsForParticipantProfile(prisma: QaPrismaClient, participantProfileId: string): Promise<number> {
   const filters = [
-    { reportJson: { path: ["objects", "participantProfileId"], equals: participantProfileId } },
-    { cleanupReportJson: { path: ["participantProfile", "id"], equals: participantProfileId } }
+    { reportJson: { path: ["objects", "participantProfileId"], equals: participantProfileId } }
   ];
-  return countIfAvailable(prisma.qaParticipantRun, { OR: filters });
+  return countIfAvailable(prisma.qaParticipantRun, {
+    OR: filters,
+    status: { not: "CLEANED" }
+  });
 }
 
 function buildParticipantProfilePhoneFilters(phone: string | null, field: "phone" | "phoneNumber"): Array<Record<string, unknown>> {
