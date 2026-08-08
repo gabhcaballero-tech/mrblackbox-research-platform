@@ -353,6 +353,7 @@ describe("ONEUI WhatsApp template sending", () => {
           type: "body"
         }
       ],
+      language: { code: "es_MX" },
       name: "navigo_acceso_evaluaciones"
     });
     expect(repository.messages[0]).toMatchObject({
@@ -403,6 +404,7 @@ describe("ONEUI WhatsApp template sending", () => {
           type: "button"
         }
       ],
+      language: { code: "es_MX" },
       name: "navigo_acceso_evaluaciones"
     });
   });
@@ -437,6 +439,7 @@ describe("ONEUI WhatsApp template sending", () => {
           type: "button"
         }
       ],
+      language: { code: "es_MX" },
       name: "navigo_recordatorio_evaluacion"
     });
     expect(repository.messages[0]).toMatchObject({

@@ -672,6 +672,16 @@ describe("navigo app MVP rules", () => {
 
   it("builds participant links as absolute URLs in the admin panel", () => {
     const adminPage = readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "page.tsx");
+    const evaluationLinkSendPanel = readWorkspaceFile(
+      "src",
+      "app",
+      "admin",
+      "studies",
+      "[studyId]",
+      "navigo-app",
+      "_components",
+      "NavigoEvaluationLinkSendPanel.tsx"
+    );
     const linkPanel = readWorkspaceFile(
       "src",
       "app",
@@ -687,7 +697,8 @@ describe("navigo app MVP rules", () => {
     expect(adminPage).toContain("participant.participantLinkToken");
     expect(adminPage).toContain("new URL(`/p/${encodeURIComponent(participant.participantLinkToken)}/activities`, requestOrigin).toString()");
     expect(adminPage).not.toContain("Guardar aplicacion inicial");
-    expect(adminPage).toContain("Enviar enlace de evaluacion al panelista");
+    expect(adminPage).toContain("NavigoEvaluationLinkSendPanel");
+    expect(evaluationLinkSendPanel).toContain("Enviar enlace de evaluacion al panelista");
     expect(adminPage).toContain("Generar link participante");
     expect(adminPage).toContain("Regenerar link participante");
     expect(adminPage).toContain("Aplicacion inicial registrada en CTL");
@@ -856,6 +867,16 @@ describe("navigo app MVP rules", () => {
 
   it("keeps destructive correction actions separated after moving application start to CLT", () => {
     const adminPage = readWorkspaceFile("src", "app", "admin", "studies", "[studyId]", "navigo-app", "page.tsx");
+    const evaluationLinkSendPanel = readWorkspaceFile(
+      "src",
+      "app",
+      "admin",
+      "studies",
+      "[studyId]",
+      "navigo-app",
+      "_components",
+      "NavigoEvaluationLinkSendPanel.tsx"
+    );
     const actions = readWorkspaceFile("src", "modules", "navigo-app", "actions.ts");
     const repository = readWorkspaceFile("src", "modules", "navigo-app", "repository.ts");
 
@@ -863,7 +884,9 @@ describe("navigo app MVP rules", () => {
     expect(adminPage).not.toContain("Guardar aplicacion inicial");
     expect(adminPage).not.toContain("Guardando aplicacion inicial...");
     expect(adminPage).toContain("Aplicacion inicial registrada en CTL");
-    expect(adminPage).toContain("sendNavigoEvaluationLinkWhatsAppAction");
+    expect(adminPage).toContain("NavigoEvaluationLinkSendPanel");
+    expect(evaluationLinkSendPanel).toContain("sendNavigoEvaluationLinkWhatsAppAction");
+    expect(evaluationLinkSendPanel).toContain("✓ Enlace enviado");
     expect(adminPage).toContain("Acciones de correccion");
     expect(adminPage).toContain("REINICIAR APP");
     expect(adminPage).toContain("ELIMINAR ETAPAS");
@@ -1035,6 +1058,81 @@ describe("navigo app MVP rules", () => {
       phone: "+525512345678",
       whatsappMessageId: "wamid-evaluation-link",
       whatsappStatus: "ENVIADO"
+    });
+  });
+
+  it("sends evaluation WhatsApp outside the Prisma transaction and keeps audit records", async () => {
+    const state = createNavigoParticipantImportState();
+    const whatsApp = createFakeNavigoWhatsAppRepository();
+    let insideTransaction = false;
+    const originalTransaction = state.prisma.$transaction.bind(state.prisma);
+    state.prisma.$transaction = (async (callback: unknown) => {
+      insideTransaction = true;
+      try {
+        return await originalTransaction(callback as never);
+      } finally {
+        insideTransaction = false;
+      }
+    }) as typeof state.prisma.$transaction;
+    const assertOutsideTransaction = () => {
+      if (insideTransaction) {
+        throw new Error("WhatsApp audit should not run inside the participant link transaction");
+      }
+    };
+    const guardedWhatsAppRepository = {
+      ...whatsApp.repository,
+      async createOutboundMessage(input: Parameters<typeof whatsApp.repository.createOutboundMessage>[0]) {
+        assertOutsideTransaction();
+        return whatsApp.repository.createOutboundMessage(input);
+      },
+      async markOutboundMessageAccepted(input: Parameters<typeof whatsApp.repository.markOutboundMessageAccepted>[0]) {
+        assertOutsideTransaction();
+        return whatsApp.repository.markOutboundMessageAccepted(input);
+      },
+      async markOutboundMessageFailed(input: Parameters<typeof whatsApp.repository.markOutboundMessageFailed>[0]) {
+        assertOutsideTransaction();
+        return whatsApp.repository.markOutboundMessageFailed(input);
+      },
+      async upsertOutboundConversation(input: Parameters<typeof whatsApp.repository.upsertOutboundConversation>[0]) {
+        assertOutsideTransaction();
+        return whatsApp.repository.upsertOutboundConversation(input);
+      }
+    };
+    const repository = createNavigoAppRepository(state.prisma as never, guardedWhatsAppRepository);
+    const registered = await repository.registerDirectParticipant({
+      actorUserId: "admin-1",
+      celular: "5512345678",
+      folio: "NAV-001",
+      generateLink: false,
+      nombre: "Participante Uno",
+      studyId: state.study.id
+    });
+    vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "phone-number-id");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        json: async () => ({ messages: [{ id: "wamid-evaluation-link", message_status: "accepted" }] }),
+        ok: true,
+        status: 200
+      }))
+    );
+
+    const result = registered.ok
+      ? await repository.sendEvaluationLinkWhatsApp({
+          actorUserId: "admin-1",
+          now: new Date("2026-08-08T07:45:00.000Z"),
+          requestOrigin: "https://example.test",
+          studyId: state.study.id,
+          studyParticipantId: registered.data.studyParticipantId
+        })
+      : null;
+
+    expect(result?.ok).toBe(true);
+    expect(whatsApp.conversations).toHaveLength(1);
+    expect(whatsApp.messages[0]).toMatchObject({
+      metaMessageId: "wamid-evaluation-link",
+      status: "accepted"
     });
   });
 

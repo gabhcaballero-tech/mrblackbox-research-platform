@@ -13,7 +13,6 @@ import {
   releaseNavigoAfterCtlAction,
   resetNavigoParticipantAppAction,
   reviewNavigoActivityIdentityAction,
-  sendNavigoEvaluationLinkWhatsAppAction,
   updateNavigoVisualVerificationModeAction
 } from "@/modules/navigo-app/actions";
 import {
@@ -45,7 +44,10 @@ import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { resolveRequestOrigin } from "@/shared/utils/request-origin";
 import { ParticipantLinkPanel } from "./_components/ParticipantLinkPanel";
-import { NavigoEvaluationLinkResultPanel } from "./_components/NavigoEvaluationLinkResultPanel";
+import {
+  NavigoEvaluationLinkSendPanel,
+  type NavigoEvaluationLinkPanelResult
+} from "./_components/NavigoEvaluationLinkSendPanel";
 import { NavigoRotationImportPanel } from "./_components/NavigoRotationImportPanel";
 import { NavigoRotationWorkbookImportPanel } from "./_components/NavigoRotationWorkbookImportPanel";
 import { NavigoParticipantOperationsPanel } from "./_components/NavigoParticipantOperationsPanel";
@@ -204,6 +206,41 @@ function parseEvaluationLinkResult(
     whatsappMessageId: query.evaluationLinkWhatsappMessageId ?? null,
     whatsappStatus: query.evaluationLinkStatus
   };
+}
+
+function toEvaluationLinkPanelResult(
+  result: NavigoEvaluationLinkResult,
+  participant: NavigoParticipantListItem
+): NavigoEvaluationLinkPanelResult {
+  return {
+    folio: participant.confirmation?.folio ?? "Sin folio",
+    generatedAtIso: result.generatedAt.toISOString(),
+    phone: result.phone,
+    url: result.url,
+    whatsappError: result.whatsappError,
+    whatsappMessageId: result.whatsappMessageId,
+    whatsappStatus: result.whatsappStatus
+  };
+}
+
+function resolveEvaluationLinkDisabledReason({
+  canStart,
+  hasPhone,
+  pendingMessage
+}: {
+  canStart: boolean;
+  hasPhone: boolean;
+  pendingMessage: string | null;
+}): string | null {
+  if (!hasPhone) {
+    return "Captura telefono para enviar WhatsApp.";
+  }
+
+  if (!canStart) {
+    return pendingMessage ?? "Pendiente para enviar enlace: configuracion de rotacion.";
+  }
+
+  return null;
 }
 
 function StudyRotationConfigurationPanel({
@@ -501,7 +538,7 @@ function ParticipantRow({
   studyId: string;
   timeZoneIana: string;
 }) {
-  const canStart = participant.status === "APPROVED" && participant.confirmation && participant.ctl.completed && participant.rotationReady;
+  const canStart = Boolean(participant.status === "APPROVED" && participant.confirmation && participant.ctl.completed && participant.rotationReady);
   const pendingMessage = !participant.ctl.completed
     ? "Pendiente para iniciar T0: completar CTL presencial."
     : participant.rotation.startPendingMessage;
@@ -654,26 +691,19 @@ function ParticipantRow({
           </p>
         ) : null}
         {participantUrl ? <ParticipantLinkPanel testUrl={participantTestUrl} url={participantUrl} /> : null}
-        {evaluationLinkResult ? (
-          <NavigoEvaluationLinkResultPanel
-            folio={participant.confirmation?.folio ?? "Sin folio"}
-            generatedAtLabel={formatNavigoDateTimeLocal(evaluationLinkResult.generatedAt, timeZoneIana)}
-            phone={evaluationLinkResult.phone}
-            url={evaluationLinkResult.url}
-            whatsappError={evaluationLinkResult.whatsappError}
-            whatsappMessageId={evaluationLinkResult.whatsappMessageId}
-            whatsappStatus={evaluationLinkResult.whatsappStatus}
-          />
-        ) : null}
-        <form action={sendNavigoEvaluationLinkWhatsAppAction.bind(null, studyId, participant.id)} className="space-y-2">
-          <input name="requestOrigin" type="hidden" value={requestOrigin} />
-          <SubmitButton disabled={!canStart || !participant.participant.phone} pendingLabel="Enviando WhatsApp...">
-            Enviar enlace de evaluacion al panelista
-          </SubmitButton>
-          {!participant.participant.phone ? (
-            <p className="text-xs text-amber-700">Captura telefono para enviar WhatsApp.</p>
-          ) : null}
-        </form>
+        <NavigoEvaluationLinkSendPanel
+          canSend={canStart && Boolean(participant.participant.phone)}
+          disabledReason={resolveEvaluationLinkDisabledReason({
+            canStart,
+            hasPhone: Boolean(participant.participant.phone),
+            pendingMessage
+          })}
+          initialResult={evaluationLinkResult ? toEvaluationLinkPanelResult(evaluationLinkResult, participant) : null}
+          participantId={participant.id}
+          requestOrigin={requestOrigin}
+          studyId={studyId}
+          timeZoneIana={timeZoneIana}
+        />
         <form action={generateNavigoParticipantLinkAction.bind(null, studyId, participant.id, Boolean(participantUrl))}>
           <SubmitButton disabled={!canStart} pendingLabel="Generando link...">
             {participantUrl ? "Regenerar link participante" : "Generar link participante"}

@@ -13,6 +13,7 @@ import {
 import {
   createNavigoAppRepository,
   type NavigoActionResult,
+  type NavigoEvaluationLinkWhatsAppSendResult,
   type NavigoSignedActivityUpload
 } from "./repository";
 import type { NavigoFaceVerificationClientResult } from "./face-verification-contract";
@@ -133,13 +134,25 @@ export async function registerNavigoDirectParticipantAction(studyId: string, for
   });
 }
 
+export type NavigoEvaluationLinkWhatsAppActionResult =
+  | {
+      data: Omit<NavigoEvaluationLinkWhatsAppSendResult, "generatedAt"> & {
+        generatedAtIso: string;
+        message: string;
+      };
+      ok: true;
+    }
+  | {
+      message: string;
+      ok: false;
+    };
+
 export async function sendNavigoEvaluationLinkWhatsAppAction(
   studyId: string,
   studyParticipantId: string,
-  formData: FormData
-) {
+  requestOrigin: string
+): Promise<NavigoEvaluationLinkWhatsAppActionResult> {
   const actor = await requireCapability("screening:review");
-  const requestOrigin = String(formData.get("requestOrigin") ?? "");
   const result = await createNavigoAppRepository().sendEvaluationLinkWhatsApp({
     actorUserId: actor.id,
     requestOrigin,
@@ -147,24 +160,31 @@ export async function sendNavigoEvaluationLinkWhatsAppAction(
     studyParticipantId
   });
 
-  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
-
   if (!result.ok) {
-    redirectWithNavigoMessage(studyId, { error: result.message, participant: studyParticipantId });
+    return { message: result.message, ok: false };
   }
 
-  redirectWithNavigoMessage(studyId, {
-    evaluationLink: result.data.evaluationUrl,
-    evaluationLinkGeneratedAt: result.data.generatedAt.toISOString(),
-    evaluationLinkPhone: result.data.phone,
-    evaluationLinkStatus: result.data.whatsappStatus,
-    evaluationLinkWhatsappError: result.data.whatsappError ?? undefined,
-    evaluationLinkWhatsappMessageId: result.data.whatsappMessageId ?? undefined,
-    message: result.data.whatsappStatus === "ENVIADO"
-      ? "Enlace de evaluacion enviado por WhatsApp."
-      : "Enlace generado. WhatsApp fallo; copia el enlace para compartirlo manualmente.",
-    participant: studyParticipantId
-  });
+  try {
+    revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+  } catch {
+    // El envio y el enlace ya quedaron resueltos; no ocultamos el exito por una actualizacion secundaria.
+  }
+
+  return {
+    data: {
+      evaluationUrl: result.data.evaluationUrl,
+      folio: result.data.folio,
+      generatedAtIso: result.data.generatedAt.toISOString(),
+      message: result.data.whatsappStatus === "ENVIADO"
+        ? "Enlace de evaluacion enviado por WhatsApp."
+        : "Enlace generado. WhatsApp fallo; copia el enlace para compartirlo manualmente.",
+      phone: result.data.phone,
+      whatsappError: result.data.whatsappError,
+      whatsappMessageId: result.data.whatsappMessageId,
+      whatsappStatus: result.data.whatsappStatus
+    },
+    ok: true
+  };
 }
 
 export async function generateNavigoParticipantLinksForStudyAction(studyId: string, formData: FormData) {

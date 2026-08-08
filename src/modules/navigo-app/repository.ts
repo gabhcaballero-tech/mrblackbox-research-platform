@@ -2703,24 +2703,31 @@ export function createNavigoAppRepository(
       const prisma = await getPrisma();
       const now = input.now ?? new Date();
 
-      return prisma.$transaction(async (tx) => {
+      const prepared: NavigoActionResult<{
+        evaluationUrl: string;
+        folio: string;
+        participantId: string;
+        participantName: string;
+        phone: string;
+        studyId: string;
+      }> = await prisma.$transaction(async (tx) => {
         const participant = (await tx.studyParticipant.findUnique?.({
           select: participantWithActivitiesSelect,
           where: { id: input.studyParticipantId }
         })) as ParticipantRecord | null;
 
         if (!participant || participant.study.id !== input.studyId) {
-          return { message: "No encontramos el participante en este estudio.", ok: false };
+          return { message: "No encontramos el participante en este estudio.", ok: false as const };
         }
 
         if (!participant.participantProfile.phone) {
-          return { message: "El participante no tiene telefono capturado.", ok: false };
+          return { message: "El participante no tiene telefono capturado.", ok: false as const };
         }
 
         const folio = participant.participantConfirmation?.folio ?? null;
 
         if (!folio) {
-          return { message: "El participante no tiene folio capturado.", ok: false };
+          return { message: "El participante no tiene folio capturado.", ok: false as const };
         }
 
         const linkToken = await ensureParticipantAccessToken({
@@ -2730,32 +2737,49 @@ export function createNavigoAppRepository(
           prisma: tx
         });
         const evaluationUrl = new URL(`/p/${encodeURIComponent(linkToken)}/activities`, input.requestOrigin).toString();
-        const result = await sendNavigoEvaluationLinkWhatsApp({
-          evaluationUrl,
-          folio,
-          now,
-          participantId: participant.id,
-          participantName: participant.participantProfile.name,
-          phone: participant.participantProfile.phone,
-          repository: getWhatsAppRepository(),
-          studyId: participant.study.id
-        });
-
-        const data: NavigoEvaluationLinkWhatsAppSendResult = {
-          evaluationUrl,
-          folio,
-          generatedAt: now,
-          phone: participant.participantProfile.phone,
-          whatsappError: result.ok ? null : result.message,
-          whatsappMessageId: result.ok ? result.data.metaMessageId : "data" in result ? result.data?.metaMessageId ?? null : null,
-          whatsappStatus: result.ok ? "ENVIADO" : "ERROR"
-        };
 
         return {
-          data,
-          ok: true
+          data: {
+            evaluationUrl,
+            folio,
+            participantId: participant.id,
+            participantName: participant.participantProfile.name,
+            phone: participant.participantProfile.phone,
+            studyId: participant.study.id
+          },
+          ok: true as const
         };
       });
+
+      if (!prepared.ok) {
+        return { message: prepared.message, ok: false };
+      }
+
+      const result = await sendNavigoEvaluationLinkWhatsApp({
+        evaluationUrl: prepared.data.evaluationUrl,
+        folio: prepared.data.folio,
+        now,
+        participantId: prepared.data.participantId,
+        participantName: prepared.data.participantName,
+        phone: prepared.data.phone,
+        repository: getWhatsAppRepository(),
+        studyId: prepared.data.studyId
+      });
+
+      const data: NavigoEvaluationLinkWhatsAppSendResult = {
+        evaluationUrl: prepared.data.evaluationUrl,
+        folio: prepared.data.folio,
+        generatedAt: now,
+        phone: prepared.data.phone,
+        whatsappError: result.ok ? null : result.message,
+        whatsappMessageId: result.ok ? result.data.metaMessageId : "data" in result ? result.data?.metaMessageId ?? null : null,
+        whatsappStatus: result.ok ? "ENVIADO" : "ERROR"
+      };
+
+      return {
+        data,
+        ok: true
+      };
     },
 
     async processEvaluationWhatsAppReminders(input) {
