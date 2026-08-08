@@ -45,6 +45,8 @@ export type {
   HutAdminParticipant,
   HutApplicationPhotoDailyAvailability,
   HutApplicationPhotoEntrySummary,
+  HutFieldPhotoSummary,
+  HutFieldQuestionnaireWorkspace,
   HutPhaseCodeSummary,
   HutQuestionnaireAttemptSummary,
   HutQuestionnaireProgressSummary,

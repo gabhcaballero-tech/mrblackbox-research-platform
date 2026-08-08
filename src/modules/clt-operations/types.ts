@@ -47,6 +47,7 @@ export type CltOperationsRotationSummary = {
 export type CltOperationsHutSummary = {
   applicationPhotoCount: number;
   currentSection: string | null;
+  folio: string | null;
   id: string | null;
   origin: string | null;
   protocolVersion: string | null;

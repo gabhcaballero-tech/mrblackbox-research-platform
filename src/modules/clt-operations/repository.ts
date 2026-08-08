@@ -33,6 +33,7 @@ type CltOperationsRepositoryOptions = {
 export type CltOperationsRepository = {
   getDashboard: (input: {
     detailSessionId?: string | null;
+    interviewerUserId?: string | null;
     studyId: string;
   }) => Promise<CltOperationsDashboard | null>;
 };
@@ -68,6 +69,7 @@ export function createCltOperationsRepository(
         ],
         select: sessionSelect,
         where: {
+          ...(input.interviewerUserId ? { interviewerId: input.interviewerUserId } : {}),
           studyId: input.studyId,
           ...(options.includeQa ? {} : { studyParticipant: { qaParticipantRun: { is: null } } })
         }
@@ -110,6 +112,7 @@ const sessionSelect = {
   id: true,
   interviewer: {
     select: {
+      id: true,
       name: true
     }
   },
@@ -192,6 +195,7 @@ const sessionSelect = {
           applicationPhotoEntries: {
             select: { id: true }
           },
+          folio: true,
           id: true,
           origin: true,
           protocolVersion: true,
@@ -248,7 +252,7 @@ type SessionRecord = {
   completedAt: Date | null;
   ctlInterviewerCode: { label: string } | null;
   id: string;
-  interviewer: { name: string } | null;
+  interviewer: { id: string; name: string } | null;
   phaseProgress: Array<{
     completedAt: Date | null;
     phase: string;
@@ -295,9 +299,10 @@ type SessionRecord = {
         internalCode: string;
       };
     }>;
-    hutParticipant: {
-      applicationPhotoEntries: Array<{ id: string }>;
-      id: string;
+      hutParticipant: {
+        applicationPhotoEntries: Array<{ id: string }>;
+        folio: string | null;
+        id: string;
       origin: string;
       protocolVersion: string;
       questionnaireAttempt: {
@@ -391,6 +396,7 @@ function toHut(session: SessionRecord): CltOperationsHutSummary {
     return {
       applicationPhotoCount: 0,
       currentSection: null,
+      folio: null,
       id: null,
       origin: null,
       protocolVersion: null,
@@ -404,6 +410,7 @@ function toHut(session: SessionRecord): CltOperationsHutSummary {
   return {
     applicationPhotoCount: hut.applicationPhotoEntries.length,
     currentSection: activeVisit?.section ?? null,
+    folio: hut.folio,
     id: hut.id,
     origin: hut.origin,
     protocolVersion: hut.protocolVersion,

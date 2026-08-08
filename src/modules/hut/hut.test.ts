@@ -813,7 +813,7 @@ describe("HUT module foundation", () => {
     expect(result.ok ? "" : result.message).toContain("Slot 1 esta asociado a REGRESO_2");
   });
 
-  it("requires and validates the current HUT phase code before application photo uploads", async () => {
+  it("requires phase code before application photo uploads without questionnaire prerequisite", async () => {
     vi.stubEnv("HUT_PHASE_CODE_SECRET", "hut-phase-secret-for-tests");
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
@@ -851,7 +851,6 @@ describe("HUT module foundation", () => {
       phase: "COLOCACION",
       token: participant.token
     });
-    await savePlacementQuestionnaireAnswers(repository, participant.id);
     const viewAfter = await repository.getPortalView(participant.token);
     const upload = await repository.requestApplicationPhotoUpload({
       metadata: selfieMetadata(),
@@ -894,6 +893,33 @@ describe("HUT module foundation", () => {
       status: "USED"
     });
     expect(prisma.state.participants[0]?.applicationEvidence).toHaveLength(1);
+  });
+
+  it("does not allow the participant token portal to save HUT questionnaire answers", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      folio: "HUT-201",
+      firstFragranceLeftArm: "247",
+      name: "Participante Solo Fotos",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+
+    const result = await repository.saveQuestionnaireAnswerByToken({
+      answerInput: { HUT_DG_NOMBRE: "Respuesta publica" },
+      questionCode: "HUT_DG_NOMBRE",
+      token: participant.token
+    });
+
+    expect(result).toMatchObject({
+      message: "El cuestionario HUT debe ser capturado por un encuestador autorizado.",
+      ok: false
+    });
+    expect(prisma.state.answers).toHaveLength(0);
+    expect(prisma.state.questionnaireAttempts).toHaveLength(0);
   });
 
   it("lets admin recover, revoke and regenerate HUT phase codes without storing plain text", async () => {
@@ -2628,21 +2654,6 @@ async function uploadNextVideo(
   expect(confirmed.ok).toBe(true);
 }
 
-async function savePlacementQuestionnaireAnswers(repository: ReturnType<typeof createHutRepository>, participantId: string) {
-  const base = {
-    participantId,
-    studyId: "study-hut"
-  };
-
-  await repository.saveQuestionnaireAnswer({ ...base, answerInput: { HUT_DG_NOMBRE: "Participante HUT" }, questionCode: "HUT_DG_NOMBRE" });
-  await repository.saveQuestionnaireAnswer({ ...base, answerInput: { HUT_DG_FOLIO: "NAV-004" }, questionCode: "HUT_DG_FOLIO" });
-  await repository.saveQuestionnaireAnswer({ ...base, answerInput: { HUT_PARTICIPO_CLT: "NO" }, questionCode: "HUT_PARTICIPO_CLT" });
-  await repository.saveQuestionnaireAnswer({ ...base, answerInput: { HUT_F1_GENERO: "HOMBRE" }, questionCode: "HUT_F1_GENERO" });
-  await repository.saveQuestionnaireAnswer({ ...base, answerInput: { HUT_F2_EDAD: "35" }, questionCode: "HUT_F2_EDAD" });
-  await repository.saveQuestionnaireAnswer({ ...base, answerInput: { HUT_F3_USO_PERFUME: "MARCA A" }, questionCode: "HUT_F3_USO_PERFUME" });
-  await repository.saveQuestionnaireAnswer({ ...base, answerInput: { HUT_V1_CONFIRMACION_ENTREGA: "SI" }, questionCode: "HUT_V1_CONFIRMACION_ENTREGA" });
-}
-
 function createFakeHutPrisma() {
   const state = {
     applicationPhotoEntries: [] as FakeApplicationPhotoEntry[],
@@ -2740,18 +2751,27 @@ function createFakeHutPrisma() {
         state.participants.push(participant);
         return { id: participant.id };
       },
-      async findFirst(args: { where: { OR?: Array<{ email?: string; phone?: string }>; folio?: string; studyId: string } }) {
+      async findFirst(args: { where: { OR?: Array<{ email?: string; phone?: string }>; folio?: string; studyId?: string; studyParticipantId?: string } }) {
+        if (args.where.studyParticipantId) {
+          return (
+            state.participants.find(
+              (participant) =>
+                participant.studyParticipantId === args.where.studyParticipantId &&
+                (!args.where.studyId || participant.studyId === args.where.studyId)
+            ) ?? null
+          );
+        }
         if (args.where.folio) {
           return (
             state.participants.find(
-              (participant) => participant.studyId === args.where.studyId && participant.folio === args.where.folio
+              (participant) => (!args.where.studyId || participant.studyId === args.where.studyId) && participant.folio === args.where.folio
             ) ?? null
           );
         }
         return (
           state.participants.find(
             (participant) =>
-              participant.studyId === args.where.studyId &&
+              (!args.where.studyId || participant.studyId === args.where.studyId) &&
               args.where.OR?.some((condition) =>
                 condition.email ? condition.email === participant.email : condition.phone === participant.phone
               )

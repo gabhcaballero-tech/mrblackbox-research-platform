@@ -256,6 +256,38 @@ export type HutApplicationPhotoDailyAvailability = {
   reason: "AVAILABLE" | "LEGACY_PROTOCOL" | "PHOTO_ALREADY_CAPTURED_TODAY";
 };
 
+export type HutFieldPhotoSummary = {
+  capturedAt: Date;
+  capturedLocalDate: string | null;
+  phase: HutPhase | null;
+  productCode: string | null;
+  signedUrl: string | null;
+  source: "DAILY_ENTRY" | "PHASE_EVIDENCE";
+  useDayNumber: number | null;
+};
+
+export type HutFieldQuestionnaireWorkspace = {
+  participant: {
+    email: string | null;
+    hutFolio: string | null;
+    id: string;
+    name: string;
+    navFolio: string | null;
+    origin: "CLT_HUT" | "HUT_DIRECTO";
+    phone: string | null;
+    protocolVersion: "APPLICATION_PHOTO" | "LEGACY_VIDEO";
+    status: HutParticipantStatus;
+    studyId: string;
+  };
+  phaseCodes: HutPhaseCodeAdmin[];
+  photos: HutFieldPhotoSummary[];
+  questionnaire: HutQuestionnaireState;
+  rotation: {
+    eva1: string | null;
+    eva2: string | null;
+  };
+};
+
 export type HutVideoSummary = {
   sequenceNumber: number;
   signedUrl: string | null;
@@ -665,6 +697,10 @@ export type HutRepository = {
     now?: Date;
     token: string;
   }) => Promise<HutActionResult<HutApplicationPhotoDailyAvailability>>;
+  getFieldQuestionnaireWorkspace: (input: {
+    folio: string;
+    storage?: HutStorageClient;
+  }) => Promise<HutActionResult<HutFieldQuestionnaireWorkspace>>;
   recordApplicationPhotoEntry: (input: {
     extension: string;
     mimeType: string;
@@ -743,6 +779,10 @@ type HutParticipantRecord = {
   study: HutStudySummary;
   studyId: string;
   studyParticipant?: {
+    id?: string;
+    participantConfirmation?: {
+      folio: string;
+    } | null;
     participantProfile: {
       email: string | null;
       name: string;
@@ -1077,6 +1117,12 @@ const participantSelect = {
   studyId: true,
   studyParticipant: {
     select: {
+      id: true,
+      participantConfirmation: {
+        select: {
+          folio: true
+        }
+      },
       participantProfile: {
         select: {
           email: true,
@@ -1702,38 +1748,8 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
     },
 
     async saveQuestionnaireAnswerByToken(input) {
-      const prisma = await getPrisma();
-      const participant = await findParticipantByToken(prisma, input.token);
-
-      if (!participant) {
-        return { message: "Este enlace HUT no es valido.", ok: false };
-      }
-      if (!isApplicationPhotoProtocol(participant)) {
-        return { message: "Este participante conserva el flujo HUT historico.", ok: false };
-      }
-
-      const phaseGate = currentHutPhaseGate(participant);
-      if (phaseGate?.required) {
-        return { message: `Captura el codigo de ${phaseGate.label} antes de continuar.`, ok: false };
-      }
-
-      const phase = expectedApplicationPhotoPhase(participant);
-      if (!phase) {
-        return { message: "No hay cuestionario HUT pendiente.", ok: false };
-      }
-
-      const question = getHutQuestions().find((candidate) => candidate.code === input.questionCode);
-      if (!question || !hutQuestionnaireSectionsForPhase(phase).includes(question.section)) {
-        return { message: "Esta pregunta HUT no corresponde a la fase actual.", ok: false };
-      }
-
-      return createHutRepository(prisma, getWhatsAppRepository()).saveQuestionnaireAnswer({
-        answerInput: input.answerInput,
-        now: input.now,
-        participantId: participant.id,
-        questionCode: input.questionCode,
-        studyId: participant.studyId
-      });
+      void input;
+      return { message: "El cuestionario HUT debe ser capturado por un encuestador autorizado.", ok: false };
     },
 
     async getQuestionnaireState(input) {
@@ -1797,6 +1813,51 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         participantId: participant.id,
         studyId: participant.studyId
       });
+    },
+
+    async getFieldQuestionnaireWorkspace(input) {
+      const prisma = await getPrisma();
+      const participant = await findParticipantForFieldHutCapture(prisma, input.folio);
+
+      if (!participant) {
+        return { message: "No encontramos un participante HUT con ese folio.", ok: false };
+      }
+      if (!isApplicationPhotoProtocol(participant)) {
+        return { message: "Este participante conserva el flujo HUT historico.", ok: false };
+      }
+
+      const questionnaire = await createHutRepository(prisma, getWhatsAppRepository()).getQuestionnaireState({
+        participantId: participant.id,
+        studyId: participant.studyId
+      });
+      if (!questionnaire.ok) {
+        return { message: questionnaire.message, ok: false };
+      }
+
+      return {
+        data: {
+          participant: {
+            email: participant.email,
+            hutFolio: participant.folio,
+            id: participant.id,
+            name: hutParticipantDisplayName(participant),
+            navFolio: participant.studyParticipant?.participantConfirmation?.folio ?? null,
+            origin: participantOrigin(participant),
+            phone: participant.phone,
+            protocolVersion: participant.protocolVersion ?? "LEGACY_VIDEO",
+            status: participant.status,
+            studyId: participant.studyId
+          },
+          phaseCodes: toAdminPhaseCodes(participant),
+          photos: await toFieldPhotoSummaries(participant, input.storage),
+          questionnaire: questionnaire.data,
+          rotation: {
+            eva1: participant.firstFragranceLeftArm,
+            eva2: participant.secondFragranceRightArm
+          }
+        },
+        ok: true
+      };
     },
 
     async getApplicationPhotoDailyAvailability(input) {
@@ -3061,11 +3122,6 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         return { message: phaseBlock, ok: false };
       }
 
-      const questionnaireReady = await hutQuestionnaireReadyForPhase(prisma, participant, phase);
-      if (!questionnaireReady.ok) {
-        return { message: questionnaireReady.message, ok: false };
-      }
-
       const capturedLocalDate = hutLocalDateKey(new Date());
       const existingDailyPhoto = (await prisma.hutApplicationPhotoEntry.findFirst?.({
         select: hutApplicationPhotoEntrySelect,
@@ -3121,11 +3177,6 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         const phaseBlock = pendingHutPhaseMessage(participant);
         if (phaseBlock) {
           return { message: phaseBlock, ok: false };
-        }
-
-        const questionnaireReady = await hutQuestionnaireReadyForPhase(tx, participant, phase);
-        if (!questionnaireReady.ok) {
-          return { message: questionnaireReady.message, ok: false };
         }
 
         const capturedLocalDate = hutLocalDateKey(now);
@@ -4549,6 +4600,86 @@ function hutParticipantRotation(participant: HutParticipantRecord): HutPortalVie
   };
 }
 
+async function findParticipantForFieldHutCapture(
+  prisma: HutPrismaClient,
+  folio: string
+): Promise<HutParticipantRecord | null> {
+  const normalized = normalizeHutText(folio);
+  if (!normalized) {
+    return null;
+  }
+
+  const hutFolio = normalized.startsWith("HUT-") ? normalized : navFolioToReservedHutFolio(normalized);
+  if (hutFolio) {
+    const participant = (await prisma.hutParticipant.findFirst?.({
+      select: participantSelect,
+      where: {
+        folio: hutFolio,
+        qaParticipantRun: { is: null }
+      }
+    })) as HutParticipantRecord | null;
+    if (participant) {
+      return participant;
+    }
+  }
+
+  const navFolio = normalized.startsWith("NAV-") ? normalized : hutFolioToReservedNavFolio(normalized);
+  if (!navFolio) {
+    return null;
+  }
+
+  const confirmation = (await prisma.participantConfirmation.findFirst?.({
+    select: {
+      studyParticipant: {
+        select: { id: true }
+      }
+    },
+    where: { folio: navFolio }
+  })) as { studyParticipant?: { id: string } | null } | null;
+  const studyParticipantId = confirmation?.studyParticipant?.id ?? null;
+  if (!studyParticipantId) {
+    return null;
+  }
+
+  return (await prisma.hutParticipant.findFirst?.({
+    select: participantSelect,
+    where: {
+      qaParticipantRun: { is: null },
+      studyParticipantId
+    }
+  })) as HutParticipantRecord | null;
+}
+
+async function toFieldPhotoSummaries(
+  participant: HutParticipantRecord,
+  storage?: HutStorageClient
+): Promise<HutFieldPhotoSummary[]> {
+  const phasePhotos = await Promise.all(
+    (participant.applicationEvidence ?? []).map(async (evidence) => ({
+      capturedAt: evidence.capturedAt,
+      capturedLocalDate: null,
+      phase: evidence.phase,
+      productCode: evidence.productCode,
+      signedUrl: await signedStorageUrl(evidence.privateStorageKey, evidence.storageBucket, storage),
+      source: "PHASE_EVIDENCE" as const,
+      useDayNumber: null
+    }))
+  );
+  const dailyPhotos = await Promise.all(
+    (participant.applicationPhotoEntries ?? []).map(async (entry) => ({
+      capturedAt: entry.capturedAt,
+      capturedLocalDate: entry.capturedLocalDate,
+      phase: null,
+      productCode: entry.productCode,
+      signedUrl: await signedStorageUrl(entry.privateStorageKey, entry.storageBucket, storage),
+      source: "DAILY_ENTRY" as const,
+      useDayNumber: entry.useDayNumber
+    }))
+  );
+
+  return [...phasePhotos, ...dailyPhotos].sort((left, right) => left.capturedAt.getTime() - right.capturedAt.getTime());
+}
+
 function currentHutPhaseGate(participant: HutParticipantRecord): HutPortalView["phaseGate"] {
   if (!isApplicationPhotoProtocol(participant)) {
     return null;
@@ -4613,49 +4744,6 @@ function hutProductCodeForPhase(participant: HutParticipantRecord, phase: HutPha
   }
 
   return participant.secondFragranceRightArm;
-}
-
-function hutQuestionnaireSectionsForPhase(phase: HutPhase): HutQuestionnaireSectionId[] {
-  if (phase === "COLOCACION") {
-    return ["DATOS_GENERALES", "FILTROS", "PRIMERA_VISITA"];
-  }
-  if (phase === "REGRESO_1") {
-    return ["EVALUACION_PRIMER_PERFUME", "SEGUNDA_VISITA"];
-  }
-
-  return ["EVALUACION_SEGUNDO_PERFUME", "COMPARATIVA"];
-}
-
-async function hutQuestionnaireReadyForPhase(
-  prisma: HutPrismaClient,
-  participant: HutParticipantRecord,
-  phase: HutPhase
-): Promise<{ ok: true } | { message: string; ok: false }> {
-  const attempt = (await prisma.hutQuestionnaireAttempt.findUnique?.({
-    select: hutQuestionnaireStateSelect,
-    where: { participantId: participant.id }
-  })) as HutQuestionnaireAttemptRecord | null;
-
-  if (!attempt) {
-    return { message: "Completa el cuestionario HUT antes de registrar la foto de aplicacion.", ok: false };
-  }
-
-  const answers = Object.fromEntries((attempt.answers ?? []).map((answer) => [answer.questionCode, answer.answerJson]));
-  const sections = new Set(hutQuestionnaireSectionsForPhase(phase));
-  const pending = getHutApplicableQuestions({
-    answers,
-    context: { participantOrigin: participantOrigin(participant) },
-    definition: getHutV5Definition()
-  }).filter((question) => sections.has(question.section) && question.required && !(question.code in answers));
-
-  if (pending.length > 0) {
-    return {
-      message: "Completa el cuestionario HUT antes de registrar la foto de aplicacion.",
-      ok: false
-    };
-  }
-
-  return { ok: true };
 }
 
 function nextLocalDateKey(dateKey: string): string {

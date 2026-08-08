@@ -146,10 +146,14 @@ describe("HutParticipantPage", () => {
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
     expect(screen.getByText("Foto de aplicacion COLOCACION 247")).toBeInTheDocument();
+    expect(screen.getByText("Evidencia fotografica HUT")).toBeInTheDocument();
     expect(screen.queryByText("Codigo requerido")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Validar codigo" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Cuestionario HUT v5")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Guardar y continuar" })).not.toBeInTheDocument();
     expect(screen.queryByText("Formulario HUT")).not.toBeInTheDocument();
     expect(screen.queryByText(/selfie/i)).not.toBeInTheDocument();
+    expect(getQuestionnaireStateByTokenMock).not.toHaveBeenCalled();
   });
 
   it("muestra nombre real, folio y rotacion HUT en protocolo nuevo", async () => {
@@ -203,7 +207,7 @@ describe("HutParticipantPage", () => {
     expect(screen.queryByRole("heading", { name: "HUT-111" })).not.toBeInTheDocument();
   });
 
-  it("muestra pregunta pendiente de HUT_DIRECTO antes de la foto", async () => {
+  it("no muestra cuestionario HUT_DIRECTO en el portal participante", async () => {
     getPortalViewMock.mockResolvedValue({
       data: createPortalView({
         availableApplicationPhoto: {
@@ -232,12 +236,12 @@ describe("HutParticipantPage", () => {
 
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
-    expect(screen.getByText("Genero")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Guardar y continuar" })).toBeInTheDocument();
-    expect(screen.queryByText(/Foto de aplicacion COLOCACION/)).not.toBeInTheDocument();
+    expect(screen.getByText("Foto de aplicacion COLOCACION 247")).toBeInTheDocument();
+    expect(screen.queryByText("Genero")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Guardar y continuar" })).not.toBeInTheDocument();
   });
 
-  it("omite filtros repetidos para CLT_HUT y continua con primera visita", async () => {
+  it("no muestra filtros ni visita HUT en el portal participante CLT_HUT", async () => {
     getPortalViewMock.mockResolvedValue({
       data: createPortalView({
         availableApplicationPhoto: {
@@ -277,8 +281,10 @@ describe("HutParticipantPage", () => {
 
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
-    expect(screen.getByText("Confirmar entrega del primer perfume")).toBeInTheDocument();
+    expect(screen.getByText("Foto de aplicacion COLOCACION 247")).toBeInTheDocument();
+    expect(screen.queryByText("Confirmar entrega del primer perfume")).not.toBeInTheDocument();
     expect(screen.queryByText("Genero")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Guardar y continuar" })).not.toBeInTheDocument();
   });
 
   it("bloquea foto diaria cuando ya existe captura del dia", async () => {

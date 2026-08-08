@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createHutRepository, hutFormDataToAnswerInput, type HutActionResult } from "./";
+import type { HutQuestionnaireSectionId } from "./definition";
 import type { HutPhase } from "./phase-codes";
 import type {
   HutApplicationPhotoUploadMetadata,
@@ -409,6 +410,38 @@ export async function saveHutQuestionnaireAnswerAction(token: string, questionCo
   redirect(`/hut/p/${encodeURIComponent(token)}?${params.toString()}`);
 }
 
+export async function saveHutQuestionnaireAnswerForFieldAction(
+  folio: string,
+  participantId: string,
+  studyId: string,
+  questionCode: string,
+  formData: FormData
+) {
+  await requireCapability("field:access");
+  const result = await createHutRepository().saveQuestionnaireAnswer({
+    answerInput: hutFormDataToAnswerInput(formData),
+    participantId,
+    questionCode,
+    studyId
+  });
+  redirectToFieldHut(folio, result.ok ? "Guardado correctamente" : null, result.ok ? null : result.message);
+}
+
+export async function completeHutQuestionnaireSectionForFieldAction(
+  folio: string,
+  participantId: string,
+  studyId: string,
+  section: HutQuestionnaireSectionId
+) {
+  await requireCapability("field:access");
+  const result = await createHutRepository().completeQuestionnaireSection({
+    participantId,
+    section,
+    studyId
+  });
+  redirectToFieldHut(folio, result.ok ? result.message ?? "Seccion HUT completada correctamente." : null, result.ok ? null : result.message);
+}
+
 export async function requestHutRegistrationSelfieUploadAction(
   token: string,
   metadata: HutSelfieUploadMetadata
@@ -540,6 +573,19 @@ function redirectWithHutMessage(
   }
 
   redirect(`/admin/studies/${studyId}/hut?${params.toString()}`);
+}
+
+function redirectToFieldHut(folio: string, message: string | null, error: string | null): never {
+  revalidatePath("/field/hut");
+  const params = new URLSearchParams({ folio });
+  if (message) {
+    params.set("hutMessage", message);
+  }
+  if (error) {
+    params.set("hutError", error);
+  }
+
+  redirect(`/field/hut?${params.toString()}`);
 }
 
 function parseOptionalDate(value: FormDataEntryValue | null): Date | null {

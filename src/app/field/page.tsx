@@ -1,4 +1,5 @@
 import { requireCapability } from "@/shared/auth/session";
+import Link from "next/link";
 import { AppShell } from "@/shared/ui/AppShell";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { PageHeader } from "@/shared/ui/PageHeader";
@@ -23,7 +24,23 @@ export default async function FieldPage() {
   return (
     <AppShell>
       <PageHeader
-        actions={<StatusBadge status="ready">Screeners publicados</StatusBadge>}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Link
+              className="inline-flex items-center justify-center rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50"
+              href="/field/operations"
+            >
+              Seguimiento participantes
+            </Link>
+            <Link
+              className="inline-flex items-center justify-center rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50"
+              href="/field/hut"
+            >
+              Captura HUT
+            </Link>
+            <StatusBadge status="ready">Screeners publicados</StatusBadge>
+          </div>
+        }
         description="Selecciona un estudio activo para aplicar su cuestionario de filtro publicado."
         eyebrow="Campo"
         title="Aplicación de filtros"
