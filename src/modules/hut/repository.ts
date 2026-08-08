@@ -278,6 +278,7 @@ export type HutFieldQuestionnaireWorkspace = {
     protocolVersion: "APPLICATION_PHOTO" | "LEGACY_VIDEO";
     status: HutParticipantStatus;
     studyId: string;
+    testMode: boolean;
   };
   phaseCodes: HutPhaseCodeAdmin[];
   photos: HutFieldPhotoSummary[];
@@ -1846,7 +1847,8 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
             phone: participant.phone,
             protocolVersion: participant.protocolVersion ?? "LEGACY_VIDEO",
             status: participant.status,
-            studyId: participant.studyId
+            studyId: participant.studyId,
+            testMode: participant.testMode
           },
           phaseCodes: toAdminPhaseCodes(participant),
           photos: await toFieldPhotoSummaries(participant, input.storage),
@@ -1892,11 +1894,11 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
       return {
         data: {
-          available: !existing,
+          available: participant.testMode || !existing,
           capturedLocalDate,
           existingEntry: existing ? toApplicationPhotoEntrySummary(existing) : null,
-          nextAvailableLocalDate: existing ? nextLocalDateKey(capturedLocalDate) : null,
-          reason: existing ? "PHOTO_ALREADY_CAPTURED_TODAY" : "AVAILABLE"
+          nextAvailableLocalDate: existing && !participant.testMode ? nextLocalDateKey(capturedLocalDate) : null,
+          reason: existing && !participant.testMode ? "PHOTO_ALREADY_CAPTURED_TODAY" : "AVAILABLE"
         },
         ok: true
       };
@@ -1940,7 +1942,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           }
         })) as HutApplicationPhotoEntryRecord | null;
 
-        if (existing) {
+        if (existing && !participant.testMode) {
           return {
             message: "Ya existe una foto de aplicacion registrada para el dia de hoy.",
             ok: false
@@ -3130,7 +3132,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           participantId: participant.id
         }
       })) as HutApplicationPhotoEntryRecord | null;
-      if (existingDailyPhoto) {
+      if (existingDailyPhoto && !participant.testMode) {
         return { message: "Ya existe una foto de aplicacion registrada para el dia de hoy.", ok: false };
       }
 
@@ -3187,7 +3189,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
             participantId: participant.id
           }
         })) as HutApplicationPhotoEntryRecord | null;
-        if (existingDailyPhoto) {
+        if (existingDailyPhoto && !participant.testMode) {
           return { message: "Ya existe una foto de aplicacion registrada para el dia de hoy.", ok: false };
         }
 

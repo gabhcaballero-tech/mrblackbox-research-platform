@@ -32,6 +32,7 @@ type CltOperationsRepositoryOptions = {
 
 export type CltOperationsRepository = {
   getDashboard: (input: {
+    ctlInterviewerCodeId?: string | null;
     detailSessionId?: string | null;
     interviewerUserId?: string | null;
     studyId: string;
@@ -69,7 +70,11 @@ export function createCltOperationsRepository(
         ],
         select: sessionSelect,
         where: {
-          ...(input.interviewerUserId ? { interviewerId: input.interviewerUserId } : {}),
+          ...(input.ctlInterviewerCodeId
+            ? { ctlInterviewerCodeId: input.ctlInterviewerCodeId }
+            : input.interviewerUserId
+              ? { interviewerId: input.interviewerUserId }
+              : {}),
           studyId: input.studyId,
           ...(options.includeQa ? {} : { studyParticipant: { qaParticipantRun: { is: null } } })
         }

@@ -69,9 +69,12 @@ describe("FieldHutPage", () => {
     expect(screen.getByRole("heading", { name: /Que tanto le gusto el primer perfume/i })).toBeInTheDocument();
     expect(screen.getByText("Primer perfume HUT:")).toBeInTheDocument();
     expect(screen.getAllByText("247").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Modo prueba activo: este HUT puede avanzar sin esperar días reales.")).toBeInTheDocument();
     expect(screen.getByText("Me disgusta muchisimo")).toBeInTheDocument();
     expect(screen.getByText("Me gusta mucho")).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /Me gusta mucho/i })).toBeChecked();
+    const selectedScaleOption = screen.getByRole("radio", { name: /Me gusta mucho/i });
+    expect(selectedScaleOption).toBeChecked();
+    expect(selectedScaleOption.closest("div")).toHaveClass("space-y-3");
     expect(screen.getByRole("link", { name: "Continuar" })).toHaveAttribute(
       "href",
       "/field/hut?folio=HUT-121&questionCode=HUT_EVA1_ATRIBUTOS"
@@ -93,7 +96,8 @@ function createWorkspace() {
       phone: "5512345678",
       protocolVersion: "APPLICATION_PHOTO",
       status: "BLOCK_1_CALL_PENDING",
-      studyId: "study-hut"
+      studyId: "study-hut",
+      testMode: false
     },
     phaseCodes: [
       {
@@ -154,10 +158,15 @@ function createWorkspace() {
 }
 
 function createScaleWorkspace() {
+  const workspace = createWorkspace();
   return {
-    ...createWorkspace(),
+    ...workspace,
+    participant: {
+      ...workspace.participant,
+      testMode: true
+    },
     questionnaire: {
-      ...createWorkspace().questionnaire,
+      ...workspace.questionnaire,
       answers: {
         HUT_DG_FECHA: "08/08/2026",
         HUT_DG_FOLIO: "NAV-121",

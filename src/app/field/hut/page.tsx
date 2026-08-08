@@ -114,6 +114,11 @@ function FieldHutWorkspace({
   return (
     <div className="space-y-6">
       <section className="sticky top-0 z-10 rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+        {workspace.participant.testMode ? (
+          <p className="mb-4 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900">
+            Modo prueba activo: este HUT puede avanzar sin esperar días reales.
+          </p>
+        ) : null}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
@@ -135,6 +140,7 @@ function FieldHutWorkspace({
           <Fact label="EVA2" value={workspace.rotation.eva2 ?? "No asignada"} />
           <Fact label="Sección actual" value={nextQuestion ? sectionTitle(nextQuestion.section) : "Sin preguntas pendientes"} />
           <Fact label="Estado HUT" value={statusLabel(workspace.participant.status)} />
+          <Fact label="Modo prueba" value={workspace.participant.testMode ? "Activo" : "Inactivo"} />
         </div>
       </section>
 
@@ -423,7 +429,7 @@ function HutQuestionInput({
   if (question.type === "SCALE") {
     const selectedValue = answer == null ? "" : String(answer);
     return (
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="space-y-3">
         {Array.from({ length: question.max - question.min + 1 }, (_, index) => question.min + index).map((value) => (
           <label className="block" key={value}>
             <input
@@ -454,7 +460,7 @@ function HutQuestionInput({
       {question.rows.map((row) => (
         <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3" key={row.code}>
           <p className="text-sm font-semibold text-zinc-900">{resolveHutQuestionText(row.label, workspace)}</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div className="mt-3 space-y-2">
             {question.columns.map((column) => (
               <label className="block" key={`${row.code}-${column.value}`}>
                 <input

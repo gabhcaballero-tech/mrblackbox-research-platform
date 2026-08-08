@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { createFieldOperationsRepository } from "@/modules/field-operations";
+import { createFieldOperationsRepository, type FieldOperationsDashboard } from "@/modules/field-operations";
 import { sendFieldNavigoEvaluationReminderNowAction } from "@/modules/field-operations/actions";
 import { formatOperationsDateTime } from "@/modules/clt-operations";
 import type { CltOperationsDetail } from "@/modules/clt-operations";
@@ -17,6 +17,9 @@ type FieldOperationsPageProps = {
   searchParams?: Promise<{
     fieldOpsError?: string;
     fieldOpsMessage?: string;
+    interviewerCode?: string;
+    interviewerCodeId?: string;
+    mode?: string;
     sessionId?: string;
     studyId?: string;
   }>;
@@ -26,10 +29,15 @@ export default async function FieldOperationsPage({ searchParams }: FieldOperati
   const actor = await requireCapability("field:access");
   const query = await searchParams;
   const requestOrigin = resolveRequestOrigin(await headers());
+  const isAdminMode = actor.role === "ADMIN" && query?.mode === "admin";
   const dashboard = await createFieldOperationsRepository().getDashboard({
     actorName: actor.name,
+    actorRole: actor.role,
     detailSessionId: query?.sessionId,
+    interviewerCode: query?.interviewerCode,
+    interviewerCodeId: query?.interviewerCodeId,
     interviewerUserId: actor.id,
+    mode: isAdminMode ? "ADMIN" : "INTERVIEWER_CODE",
     studyId: query?.studyId
   });
   const selectedStudy = dashboard.studies.find((study) => study.id === dashboard.selectedStudyId) ?? null;
@@ -37,7 +45,7 @@ export default async function FieldOperationsPage({ searchParams }: FieldOperati
   return (
     <AppShell>
       <PageHeader
-        actions={<StatusBadge status="ready">Encuestador</StatusBadge>}
+        actions={<StatusBadge status="ready">{dashboard.viewer.mode === "ADMIN" ? "Administrador" : "Encuestador"}</StatusBadge>}
         description="Seguimiento de tus participantes CLT, Navigo y HUT."
         eyebrow="Field Operations"
         title="Seguimiento de participantes"
@@ -63,16 +71,27 @@ export default async function FieldOperationsPage({ searchParams }: FieldOperati
         </p>
       ) : null}
 
-      {dashboard.studies.length === 0 ? (
+      {dashboard.viewer.mode === "CODE_REQUIRED" ? (
+        <InterviewerCodeGate error={dashboard.viewer.error} isAdmin={actor.role === "ADMIN"} />
+      ) : dashboard.studies.length === 0 ? (
         <EmptyState
           title="Aun no tienes participantes asignados."
           description="Cuando completes o reclames entrevistas CLT con tu usuario, apareceran aqui para seguimiento."
         />
       ) : (
         <div className="space-y-6">
-          <StudySelector selectedStudyId={dashboard.selectedStudyId} studies={dashboard.studies} />
+          <ViewerIdentity dashboard={dashboard} />
+          <StudySelector dashboard={dashboard} selectedStudyId={dashboard.selectedStudyId} studies={dashboard.studies} />
+          {dashboard.viewer.mode === "ADMIN" ? (
+            <AdminInterviewerFilter
+              interviewerCodes={dashboard.interviewerCodes}
+              selectedInterviewerCodeId={dashboard.viewer.filterInterviewerCodeId}
+              selectedStudyId={dashboard.selectedStudyId}
+            />
+          ) : null}
           <OperationsList
             participants={dashboard.participants}
+            dashboard={dashboard}
             selectedSessionId={query?.sessionId ?? null}
             selectedStudyId={dashboard.selectedStudyId}
             timeZoneIana={selectedStudy?.timeZoneIana ?? "America/Mexico_City"}
@@ -82,6 +101,7 @@ export default async function FieldOperationsPage({ searchParams }: FieldOperati
               detail={dashboard.detail}
               requestOrigin={requestOrigin}
               returnTo={returnPath({
+                dashboard,
                 sessionId: dashboard.detail.id,
                 studyId: dashboard.selectedStudyId
               })}
@@ -100,10 +120,67 @@ export default async function FieldOperationsPage({ searchParams }: FieldOperati
   );
 }
 
+function InterviewerCodeGate({ error, isAdmin }: { error: string | null; isAdmin: boolean }) {
+  return (
+    <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+      <h2 className="text-xl font-semibold text-zinc-950">Selecciona tu encuestador</h2>
+      <p className="mt-2 text-sm text-zinc-600">
+        Ingresa tu código personal para ver únicamente los participantes asignados a tu captura.
+      </p>
+      {error ? (
+        <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}</p>
+      ) : null}
+      <form className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+        <label className="flex flex-col gap-2 text-sm font-semibold text-zinc-800">
+          Código de encuestador
+          <input
+            className="min-h-12 rounded-md border border-zinc-300 px-4 py-3 text-base uppercase"
+            name="interviewerCode"
+            placeholder="JES26"
+            required
+          />
+        </label>
+        <button className="self-end rounded-md bg-teal-700 px-5 py-3 text-sm font-semibold text-white" type="submit">
+          Ingresar
+        </button>
+      </form>
+      {isAdmin ? (
+        <a className="mt-4 inline-block text-sm font-semibold text-teal-700 hover:text-teal-800" href="/field/dashboard?mode=admin">
+          Entrar en modo administrador
+        </a>
+      ) : null}
+    </section>
+  );
+}
+
+function ViewerIdentity({ dashboard }: { dashboard: FieldOperationsDashboard }) {
+  if (dashboard.viewer.mode === "ADMIN") {
+    return (
+      <section className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
+        <p className="font-semibold">Modo administrador</p>
+        <p className="mt-1">Puedes ver todos los encuestadores, filtrar participantes y abrir cualquier detalle operativo.</p>
+      </section>
+    );
+  }
+
+  if (dashboard.viewer.mode !== "INTERVIEWER_CODE") {
+    return null;
+  }
+
+  return (
+    <section className="grid gap-3 rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm sm:grid-cols-2">
+      <Fact label="Encuestador" value={dashboard.viewer.label} />
+      <Fact label="Código" value={dashboard.viewer.code} />
+    </section>
+  );
+}
+
 function StudySelector({
+  dashboard,
   selectedStudyId,
   studies
 }: {
+  dashboard: FieldOperationsDashboard;
   selectedStudyId: string | null;
   studies: Array<{ code: string; id: string; name: string }>;
 }) {
@@ -118,7 +195,7 @@ function StudySelector({
                 ? "border-teal-700 bg-teal-50 text-teal-800"
                 : "border-zinc-200 text-zinc-700 hover:bg-zinc-50"
             }`}
-            href={`/field/dashboard?studyId=${study.id}`}
+            href={returnPath({ dashboard, studyId: study.id })}
             key={study.id}
           >
             {study.code}
@@ -129,12 +206,52 @@ function StudySelector({
   );
 }
 
+function AdminInterviewerFilter({
+  interviewerCodes,
+  selectedInterviewerCodeId,
+  selectedStudyId
+}: {
+  interviewerCodes: Array<{ id: string; label: string; status: string }>;
+  selectedInterviewerCodeId: string | null;
+  selectedStudyId: string | null;
+}) {
+  return (
+    <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+      <p className="text-sm font-semibold text-zinc-950">Filtro por encuestador</p>
+      <form className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
+        <input name="mode" type="hidden" value="admin" />
+        {selectedStudyId ? <input name="studyId" type="hidden" value={selectedStudyId} /> : null}
+        <label className="flex flex-col gap-2 text-sm font-semibold text-zinc-800">
+          Encuestador
+          <select
+            className="min-h-11 rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            defaultValue={selectedInterviewerCodeId ?? ""}
+            name="interviewerCodeId"
+          >
+            <option value="">Todos los encuestadores</option>
+            {interviewerCodes.map((code) => (
+              <option key={code.id} value={code.id}>
+                {code.label} · {interviewerCodeStatusLabel(code.status)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button className="self-end rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800" type="submit">
+          Aplicar filtro
+        </button>
+      </form>
+    </section>
+  );
+}
+
 function OperationsList({
+  dashboard,
   participants,
   selectedSessionId,
   selectedStudyId,
   timeZoneIana
 }: {
+  dashboard: FieldOperationsDashboard;
   participants: CltOperationsDetail[];
   selectedSessionId: string | null;
   selectedStudyId: string | null;
@@ -174,7 +291,7 @@ function OperationsList({
                 <td className="px-4 py-3 text-zinc-700">{hutSummary(participant)}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-2">
-                    <Link className={linkClass} href={returnPath({ sessionId: participant.id, studyId: selectedStudyId })}>
+                    <Link className={linkClass} href={returnPath({ dashboard, sessionId: participant.id, studyId: selectedStudyId })}>
                       Detalle
                     </Link>
                     {participant.hut.folio ? (
@@ -237,6 +354,9 @@ function OperationsDetail({
       </div>
 
       <div className="mt-5 grid gap-3 text-sm md:grid-cols-4">
+        <Fact label="Encargado" value={detail.interviewer ?? "Sin asignar"} />
+        <Fact label="Folio NAV" value={detail.folio} />
+        <Fact label="Folio HUT" value={detail.hut.folio ?? "Sin HUT"} />
         <Fact label="Estado CLT" value={detail.cltStatus} />
         <Fact label="Fecha CLT" value={formatOperationsDateTime(detail.cltCompletedAt ?? detail.cltStartedAt, timeZoneIana) || "-"} />
         <Fact label="T0" value={formatOperationsDateTime(detail.t0, timeZoneIana) || "-"} />
@@ -343,8 +463,31 @@ function reminderLabel(detail: CltOperationsDetail, activityCode: string): strin
   return latest ? `${latest.status}${latest.sentAt ? ` · ${latest.sentAt.toLocaleString("es-MX")}` : ""}` : "sin recordatorio";
 }
 
-function returnPath(input: { sessionId?: string | null; studyId?: string | null }): string {
+function interviewerCodeStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    ACTIVE: "Activo",
+    DISABLED: "Desactivado",
+    EXPIRED: "Expirado"
+  };
+
+  return labels[status] ?? status;
+}
+
+function returnPath(input: {
+  dashboard?: FieldOperationsDashboard;
+  sessionId?: string | null;
+  studyId?: string | null;
+}): string {
   const params = new URLSearchParams();
+  if (input.dashboard?.viewer.mode === "ADMIN") {
+    params.set("mode", "admin");
+    if (input.dashboard.viewer.filterInterviewerCodeId) {
+      params.set("interviewerCodeId", input.dashboard.viewer.filterInterviewerCodeId);
+    }
+  }
+  if (input.dashboard?.viewer.mode === "INTERVIEWER_CODE") {
+    params.set("interviewerCode", input.dashboard.viewer.code);
+  }
   if (input.studyId) {
     params.set("studyId", input.studyId);
   }

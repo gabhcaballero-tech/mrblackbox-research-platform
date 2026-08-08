@@ -25,29 +25,107 @@ describe("FieldOperationsPage", () => {
     vi.clearAllMocks();
     vi.mocked(requireCapability).mockResolvedValue({
       id: "interviewer-1",
-      name: "Encuestadora Uno"
+      name: "Encuestadora Uno",
+      role: "INTERVIEWER"
     } as never);
     getDashboardMock.mockResolvedValue(createDashboard());
   });
 
-  it("muestra seguimiento operativo del encuestador autenticado", async () => {
-    render(await FieldOperationsPage({ searchParams: Promise.resolve({ studyId: "study-1", sessionId: "ctl-1" }) }));
+  it("muestra seguimiento operativo del encuestador validado por codigo", async () => {
+    render(await FieldOperationsPage({
+      searchParams: Promise.resolve({
+        interviewerCode: "JES26",
+        sessionId: "ctl-1",
+        studyId: "study-1"
+      })
+    }));
 
     expect(requireCapability).toHaveBeenCalledWith("field:access");
     expect(createFieldOperationsRepository).toHaveBeenCalled();
     expect(getDashboardMock).toHaveBeenCalledWith({
       actorName: "Encuestadora Uno",
+      actorRole: "INTERVIEWER",
       detailSessionId: "ctl-1",
+      interviewerCode: "JES26",
+      interviewerCodeId: undefined,
       interviewerUserId: "interviewer-1",
+      mode: "INTERVIEWER_CODE",
       studyId: "study-1"
     });
     expect(screen.getByRole("heading", { name: "Seguimiento de participantes" })).toBeInTheDocument();
-    expect(screen.getByText("NAV-121")).toBeInTheDocument();
+    expect(screen.getAllByText("Encuestador").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("JES26")).toBeInTheDocument();
+    expect(screen.getAllByText("NAV-121").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("HUT-121").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Encargado")).toBeInTheDocument();
     expect(screen.getByText("Participante Seguimiento")).toBeInTheDocument();
     expect(screen.getByText(/link enviado/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Abrir captura HUT" })).toHaveAttribute("href", "/field/hut?folio=HUT-121");
     expect(screen.getAllByRole("button", { name: "Enviar recordatorio ahora" }).length).toBeGreaterThan(0);
+  });
+
+  it("bloquea el dashboard cuando falta codigo de encuestador", async () => {
+    getDashboardMock.mockResolvedValue({
+      ...createDashboard(),
+      detail: null,
+      participants: [],
+      selectedStudyId: null,
+      studies: [],
+      viewer: {
+        error: null,
+        mode: "CODE_REQUIRED"
+      }
+    });
+
+    render(await FieldOperationsPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole("heading", { name: "Selecciona tu encuestador" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Código de encuestador")).toBeInTheDocument();
+    expect(screen.queryByText("NAV-121")).not.toBeInTheDocument();
+  });
+
+  it("muestra error si el codigo de encuestador no es valido", async () => {
+    getDashboardMock.mockResolvedValue({
+      ...createDashboard(),
+      detail: null,
+      participants: [],
+      selectedStudyId: null,
+      studies: [],
+      viewer: {
+        error: "El código de encuestador no es válido.",
+        mode: "CODE_REQUIRED"
+      }
+    });
+
+    render(await FieldOperationsPage({ searchParams: Promise.resolve({ interviewerCode: "BAD26" }) }));
+
+    expect(screen.getByText("El código de encuestador no es válido.")).toBeInTheDocument();
+    expect(screen.queryByText("Participante Seguimiento")).not.toBeInTheDocument();
+  });
+
+  it("permite a administrador ver todos y filtrar por encuestador", async () => {
+    vi.mocked(requireCapability).mockResolvedValue({
+      id: "admin-1",
+      name: "Admin Uno",
+      role: "ADMIN"
+    } as never);
+    getDashboardMock.mockResolvedValue({
+      ...createDashboard(),
+      viewer: {
+        filterInterviewerCodeId: null,
+        mode: "ADMIN"
+      }
+    });
+
+    render(await FieldOperationsPage({ searchParams: Promise.resolve({ mode: "admin", studyId: "study-1" }) }));
+
+    expect(getDashboardMock).toHaveBeenCalledWith(expect.objectContaining({
+      actorRole: "ADMIN",
+      mode: "ADMIN"
+    }));
+    expect(screen.getByText("Modo administrador")).toBeInTheDocument();
+    expect(screen.getByLabelText("Encuestador")).toBeInTheDocument();
+    expect(screen.getByText("Participante Seguimiento")).toBeInTheDocument();
   });
 });
 
@@ -121,6 +199,13 @@ function createDashboard() {
   return {
     actorName: "Encuestadora Uno",
     detail,
+    interviewerCodes: [
+      {
+        id: "ctl-code-jesus",
+        label: "Jesus",
+        status: "ACTIVE"
+      }
+    ],
     participants: [detail],
     selectedStudyId: "study-1",
     studies: [
@@ -130,6 +215,12 @@ function createDashboard() {
         name: "Navigo Homme",
         timeZoneIana: "America/Mexico_City"
       }
-    ]
+    ],
+    viewer: {
+      code: "JES26",
+      id: "ctl-code-jesus",
+      label: "Jesus",
+      mode: "INTERVIEWER_CODE"
+    }
   };
 }

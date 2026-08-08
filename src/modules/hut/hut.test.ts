@@ -706,6 +706,130 @@ describe("HUT module foundation", () => {
     });
   });
 
+  it("test mode allows application photos on the same day without affecting normal HUT participants", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const testParticipant = await repository.createParticipant({
+      email: "test-photo@example.test",
+      firstFragranceLeftArm: "247",
+      folio: "HUT-TESTMODE",
+      name: "Participante Foto Test",
+      phone: "5511111111",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const normalParticipant = await repository.createParticipant({
+      email: "normal-photo@example.test",
+      firstFragranceLeftArm: "247",
+      folio: "HUT-NORMAL",
+      name: "Participante Foto Normal",
+      phone: "5522222222",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const testParticipantId = testParticipant.ok ? testParticipant.data.participantId : "";
+    const normalParticipantId = normalParticipant.ok ? normalParticipant.data.participantId : "";
+    const now = new Date("2026-08-07T15:00:00.000Z");
+
+    await repository.setTestMode({
+      enabled: true,
+      participantId: testParticipantId,
+      studyId: "study-hut"
+    });
+    await repository.recordApplicationPhotoEntry({
+      extension: "jpg",
+      mimeType: "image/jpeg",
+      now,
+      participantId: testParticipantId,
+      privateStorageKey: "hut/application-photo/test-photo-1.jpg",
+      productCode: "247",
+      sizeBytes: 1234,
+      storageBucket: "participant-evidence",
+      studyId: "study-hut",
+      useDayNumber: 1
+    });
+    await repository.recordApplicationPhotoEntry({
+      extension: "jpg",
+      mimeType: "image/jpeg",
+      now,
+      participantId: normalParticipantId,
+      privateStorageKey: "hut/application-photo/normal-photo-1.jpg",
+      productCode: "247",
+      sizeBytes: 1234,
+      storageBucket: "participant-evidence",
+      studyId: "study-hut",
+      useDayNumber: 1
+    });
+
+    const testAvailability = await repository.getApplicationPhotoDailyAvailability({
+      now,
+      participantId: testParticipantId,
+      studyId: "study-hut"
+    });
+    const normalAvailability = await repository.getApplicationPhotoDailyAvailability({
+      now,
+      participantId: normalParticipantId,
+      studyId: "study-hut"
+    });
+    const testDuplicate = await repository.recordApplicationPhotoEntry({
+      extension: "jpg",
+      mimeType: "image/jpeg",
+      now: new Date("2026-08-07T23:30:00.000Z"),
+      participantId: testParticipantId,
+      privateStorageKey: "hut/application-photo/test-photo-2.jpg",
+      productCode: "583",
+      sizeBytes: 1234,
+      storageBucket: "participant-evidence",
+      studyId: "study-hut",
+      useDayNumber: 2
+    });
+    const normalDuplicate = await repository.recordApplicationPhotoEntry({
+      extension: "jpg",
+      mimeType: "image/jpeg",
+      now: new Date("2026-08-07T23:30:00.000Z"),
+      participantId: normalParticipantId,
+      privateStorageKey: "hut/application-photo/normal-photo-2.jpg",
+      productCode: "583",
+      sizeBytes: 1234,
+      storageBucket: "participant-evidence",
+      studyId: "study-hut",
+      useDayNumber: 2
+    });
+
+    expect(testAvailability).toMatchObject({
+      data: {
+        available: true,
+        existingEntry: expect.objectContaining({ productCode: "247" }),
+        reason: "AVAILABLE"
+      },
+      ok: true
+    });
+    expect(normalAvailability).toMatchObject({
+      data: {
+        available: false,
+        reason: "PHOTO_ALREADY_CAPTURED_TODAY"
+      },
+      ok: true
+    });
+    expect(testDuplicate).toMatchObject({
+      data: {
+        productCode: "583",
+        useDayNumber: 2
+      },
+      ok: true
+    });
+    expect(normalDuplicate).toMatchObject({
+      message: "Ya existe una foto de aplicacion registrada para el dia de hoy.",
+      ok: false
+    });
+    expect(prisma.state.participants.find((participant) => participant.id === testParticipantId)?.testMode).toBe(true);
+    expect(prisma.state.participants.find((participant) => participant.id === normalParticipantId)?.testMode).toBe(false);
+  });
+
   it("syncs HUT phase codes from participant reference codes without overwriting existing records", async () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
