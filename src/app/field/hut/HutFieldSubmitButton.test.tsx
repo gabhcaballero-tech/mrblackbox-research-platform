@@ -35,6 +35,6 @@ describe("HutFieldSubmitButton", () => {
 
     render(<HutFieldSubmitButton />);
 
-    expect(screen.getByRole("button", { name: "Guardar respuesta" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Guardar y continuar" })).toBeEnabled();
   });
 });

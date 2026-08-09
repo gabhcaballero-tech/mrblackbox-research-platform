@@ -8278,9 +8278,25 @@ function getAssignedArm(participant: ParticipantRecord, code: "LEFT" | "RIGHT", 
 }
 
 function resolveParticipantVisualVerificationMode(
-  participant: Pick<ParticipantRecord, "visualVerificationMode">
+  participant: Pick<ParticipantRecord, "study" | "visualVerificationMode">
 ): NavigoVisualVerificationMode {
-  return resolveNavigoVisualVerificationMode(participant.visualVerificationMode ?? process.env.NAVIGO_VISUAL_VERIFICATION_MODE);
+  if (participant.visualVerificationMode) {
+    return resolveNavigoVisualVerificationMode(participant.visualVerificationMode);
+  }
+
+  if (!resolveNavigoFaceVerificationRequiredForStudy(participant.study)) {
+    return "disabled";
+  }
+
+  return resolveNavigoVisualVerificationMode(process.env.NAVIGO_VISUAL_VERIFICATION_MODE);
+}
+
+function resolveNavigoFaceVerificationRequiredForStudy(study: Pick<NavigoStudySummary, "code">): boolean {
+  if (study.code === NAVIGO_STUDY_CODE) {
+    return false;
+  }
+
+  return true;
 }
 
 function hasRegisteredSelfie(participant: Pick<ParticipantRecord, "participantEvidence">): boolean {

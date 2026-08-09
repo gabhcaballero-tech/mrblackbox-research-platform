@@ -447,6 +447,7 @@ export async function saveHutQuestionnaireAnswerForFieldAction(
 ) {
   await requireCapability("field:access");
   const returnQuestionCode = String(formData.get("returnQuestionCode") ?? questionCode).trim();
+  const nextQuestionCode = returnQuestionCode === "__HUT_SUMMARY__" ? null : returnQuestionCode || questionCode;
   const result = await createHutRepository().saveQuestionnaireAnswer({
     answerInput: hutFormDataToAnswerInput(formData),
     participantId,
@@ -455,9 +456,9 @@ export async function saveHutQuestionnaireAnswerForFieldAction(
   });
   redirectToFieldHut(
     folio,
-    result.ok ? "Guardado correctamente" : null,
+    result.ok ? (nextQuestionCode ? "Guardado correctamente" : "Evaluacion completada") : null,
     result.ok ? null : result.message,
-    returnQuestionCode || questionCode
+    result.ok ? nextQuestionCode : questionCode
   );
 }
 

@@ -61,13 +61,17 @@ describe("FieldHutPage", () => {
     expect(screen.queryByText("REGRESO_2")).not.toBeInTheDocument();
     expect(screen.getByText("Respuestas existentes")).toBeInTheDocument();
     expect(screen.getByText(/Participo anteriormente en CLT/)).toBeInTheDocument();
-    expect(screen.getByText("Confirmar entrega del primer perfume")).toBeInTheDocument();
-    expect(screen.getByText("Primer perfume HUT:")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Iniciar evaluacion" })).toHaveAttribute(
+      "href",
+      "/field/hut?folio=HUT-121&questionCode=HUT_V1_CONFIRMACION_ENTREGA"
+    );
+    expect(screen.queryByText("Confirmar entrega del primer perfume")).not.toBeInTheDocument();
+    expect(screen.queryByText("Primer perfume HUT:")).not.toBeInTheDocument();
     expect(screen.queryByText("HUT_EVA1")).not.toBeInTheDocument();
     expect(screen.queryByText("HUT_EVA2")).not.toBeInTheDocument();
     expect(screen.getByText("Preguntas contestadas")).toBeInTheDocument();
-    expect(screen.getByText(/Pregunta \d+ de \d+/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Guardar respuesta" })).toBeInTheDocument();
+    expect(screen.queryByText(/Pregunta \d+ de \d+/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Guardar y continuar" })).not.toBeInTheDocument();
   });
 
   it("resuelve rotacion, muestra etiquetas de escala y recupera seleccion guardada", async () => {
@@ -86,16 +90,15 @@ describe("FieldHutPage", () => {
     expect(screen.getByRole("heading", { name: /Que tanto le gusto el primer perfume/i })).toBeInTheDocument();
     expect(screen.getByText("Primer perfume HUT:")).toBeInTheDocument();
     expect(screen.getAllByText("247").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Modo prueba activo: este HUT puede avanzar sin esperar días reales.")).toBeInTheDocument();
+    expect(screen.getByText(/Modo prueba activo/)).toBeInTheDocument();
     expect(screen.getByText("Me disgusta muchisimo")).toBeInTheDocument();
     expect(screen.getByText("Me gusta mucho")).toBeInTheDocument();
     const selectedScaleOption = screen.getByRole("radio", { name: /Me gusta mucho/i });
     expect(selectedScaleOption).toBeChecked();
     expect(selectedScaleOption.closest("div")).toHaveClass("space-y-3");
-    expect(screen.getByRole("link", { name: "Continuar" })).toHaveAttribute(
-      "href",
-      "/field/hut?folio=HUT-121&questionCode=HUT_EVA1_ATRIBUTOS"
-    );
+    expect(screen.getByRole("button", { name: "Guardar y continuar" })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("HUT_EVA1_ATRIBUTOS")).toHaveAttribute("name", "returnQuestionCode");
+    expect(screen.queryByText("Respuestas existentes")).not.toBeInTheDocument();
     expect(screen.queryByText("HUT_EVA1")).not.toBeInTheDocument();
     expect(screen.queryByText("HUT_EVA2")).not.toBeInTheDocument();
   });

@@ -115,11 +115,13 @@ function FieldHutWorkspace({
     ?? requiredQuestions.find((question) => !(question.code in workspace.questionnaire.answers))
     ?? questions.find((question) => !(question.code in workspace.questionnaire.answers))
     ?? null;
+  const captureQuestion = selectedQuestionCode ? selectedQuestion : null;
   const answeredRequired = requiredQuestions.filter((question) => question.code in workspace.questionnaire.answers).length;
   const progress = requiredQuestions.length > 0 ? Math.round((answeredRequired / requiredQuestions.length) * 100) : 100;
   const hutTimeline = buildFieldPhotoTimeline(workspace);
   const photoTimelineSlots = hutTimeline.filter((slot) => slot.participantTask);
   const evaluationTimelineSlots = hutTimeline.filter((slot) => slot.interviewerTask);
+  const currentEvaluationQuestion = captureQuestion ?? nextQuestion;
 
   return (
     <div className="space-y-6">
@@ -138,6 +140,10 @@ function FieldHutWorkspace({
         </div>
       </section>
 
+      {captureQuestion ? (
+        <QuestionnaireForm question={captureQuestion} searchedFolio={searchedFolio} workspace={workspace} />
+      ) : (
+        <>
       <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm" data-testid="field-hut-secondary-details">
         {workspace.participant.testMode ? (
           <p className="mb-4 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900">
@@ -163,6 +169,8 @@ function FieldHutWorkspace({
           <Fact label="Correo" value={workspace.participant.email ?? "No disponible"} />
           <Fact label="Estado HUT" value={resolveHutOperationalStatusLabel(workspace.participant.status)} />
           <Fact label="Modo prueba" value={workspace.participant.testMode ? "Activo" : "Inactivo"} />
+          <Fact label="Evaluacion actual" value={currentEvaluationQuestion ? sectionTitle(currentEvaluationQuestion.section) : "Evaluacion completada"} />
+          <Fact label="Producto" value={currentEvaluationQuestion ? productLabelForQuestion(currentEvaluationQuestion, workspace) : "Sin pendiente"} />
         </div>
       </section>
 
@@ -265,17 +273,26 @@ function FieldHutWorkspace({
         <div className="mt-2 h-2 rounded-full bg-zinc-100">
           <div className="h-2 rounded-full bg-teal-600" style={{ width: `${progress}%` }} />
         </div>
+        {nextQuestion ? (
+          <div className="mt-5 rounded-md border border-teal-200 bg-teal-50 p-4">
+            <p className="text-sm font-semibold text-teal-950">Siguiente evaluacion</p>
+            <p className="mt-1 text-lg font-semibold text-zinc-950">{sectionTitle(nextQuestion.section)}</p>
+            <p className="mt-1 text-sm text-zinc-700">Producto: {productLabelForQuestion(nextQuestion, workspace)}</p>
+            <a
+              className="mt-4 inline-flex min-h-12 items-center justify-center rounded-md bg-teal-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-800"
+              href={`/field/hut?folio=${encodeURIComponent(searchedFolio)}&questionCode=${encodeURIComponent(nextQuestion.code)}`}
+            >
+              Iniciar evaluacion
+            </a>
+          </div>
+        ) : (
+          <div className="mt-5 rounded-md border border-emerald-200 bg-emerald-50 p-4">
+            <p className="text-lg font-semibold text-emerald-950">Evaluacion completada</p>
+            <p className="mt-1 text-sm text-emerald-900">No hay preguntas pendientes para este participante.</p>
+          </div>
+        )}
         <SectionProgressControls searchedFolio={searchedFolio} workspace={workspace} />
       </section>
-
-      {nextQuestion ? (
-        <QuestionnaireForm question={nextQuestion} searchedFolio={searchedFolio} workspace={workspace} />
-      ) : (
-        <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
-          <h3 className="text-lg font-semibold text-emerald-950">Cuestionario sin preguntas pendientes</h3>
-          <p className="mt-2 text-sm text-emerald-900">Revisa las secciones pendientes de cerrar antes de dar por terminada la evaluación.</p>
-        </section>
-      )}
 
       <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
         <h3 className="text-lg font-semibold text-zinc-950">Respuestas existentes</h3>
@@ -296,6 +313,8 @@ function FieldHutWorkspace({
           <p className="mt-3 text-sm text-zinc-600">Todavía no hay respuestas guardadas.</p>
         )}
       </section>
+        </>
+      )}
     </div>
   );
 }
@@ -366,9 +385,15 @@ function QuestionnaireForm({
     currentCode: question.code,
     questions
   });
+  const progress = questions.length > 0 ? Math.round(((questionIndex >= 0 ? questionIndex + 1 : 1) / questions.length) * 100) : 100;
 
   return (
     <section className="rounded-lg border border-teal-200 bg-white p-5 shadow-sm">
+      {workspace.participant.testMode ? (
+        <p className="mb-4 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900">
+          Modo prueba activo: este HUT puede avanzar sin esperar dias reales.
+        </p>
+      ) : null}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">
           {sectionTitle(question.section)}
@@ -376,6 +401,10 @@ function QuestionnaireForm({
         <p className="text-sm font-semibold text-zinc-600">
           Pregunta {questionIndex >= 0 ? questionIndex + 1 : "-"} de {questions.length}
         </p>
+      </div>
+      <p className="mt-2 text-sm font-semibold text-zinc-700">Producto: {productLabelForQuestion(question, workspace)}</p>
+      <div className="mt-3 h-2 rounded-full bg-zinc-100" aria-label="Progreso de evaluacion">
+        <div className="h-2 rounded-full bg-teal-600" style={{ width: `${progress}%` }} />
       </div>
       <SectionInstructions question={question} workspace={workspace} />
       <h3 className="mt-3 text-xl font-semibold text-zinc-950">{resolveHutQuestionText(question.label, workspace)}</h3>
@@ -404,26 +433,13 @@ function QuestionnaireForm({
         )}
         className="mt-5 space-y-4"
       >
-        <input name="returnQuestionCode" type="hidden" value={question.code} />
+        <input name="returnQuestionCode" type="hidden" value={nextQuestion?.code ?? "__HUT_SUMMARY__"} />
         <HutQuestionInput answer={savedAnswer} question={question} workspace={workspace} />
         <HutFieldSubmitButton />
       </form>
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        {savedAnswer == null ? (
-          <p className="text-sm text-zinc-600">Guarda la respuesta para habilitar Continuar.</p>
-        ) : nextQuestion ? (
-          <a
-            className="inline-flex min-h-12 items-center justify-center rounded-md border border-teal-700 px-4 py-3 text-sm font-semibold text-teal-800 transition hover:bg-teal-50"
-            href={`/field/hut?folio=${encodeURIComponent(searchedFolio)}&questionCode=${encodeURIComponent(nextQuestion.code)}`}
-          >
-            Continuar
-          </a>
-        ) : (
-          <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
-            No hay preguntas pendientes. Revisa y cierra las secciones completadas.
-          </p>
-        )}
-      </div>
+      <p className="mt-4 text-sm text-zinc-600">
+        {nextQuestion ? "Al guardar avanzaras automaticamente a la siguiente pregunta." : "Al guardar volveras al resumen de HUT."}
+      </p>
     </section>
   );
 }
@@ -593,6 +609,20 @@ function applicableQuestions(workspace: HutFieldQuestionnaireWorkspace) {
 
 function sectionTitle(section: HutQuestionnaireSectionId) {
   return getHutV5Definition().sections.find((candidate) => candidate.id === section)?.title ?? section;
+}
+
+function productLabelForQuestion(question: HutQuestionDefinition, workspace: HutFieldQuestionnaireWorkspace): string {
+  if (question.section === "EVALUACION_PRIMER_PERFUME" || question.section === "PRIMERA_VISITA") {
+    return workspace.rotation.eva1 ?? "EVA1 no asignado";
+  }
+  if (question.section === "EVALUACION_SEGUNDO_PERFUME" || question.section === "SEGUNDA_VISITA") {
+    return workspace.rotation.eva2 ?? "EVA2 no asignado";
+  }
+  if (question.section === "COMPARATIVA") {
+    return `EVA1 ${workspace.rotation.eva1 ?? "No asignada"} / EVA2 ${workspace.rotation.eva2 ?? "No asignada"}`;
+  }
+
+  return "No aplica";
 }
 
 function answerLabel(code: string, workspace: HutFieldQuestionnaireWorkspace): string {

@@ -3184,6 +3184,7 @@ describe("navigo app MVP rules", () => {
     const state = createNavigoParticipantActivityState();
     const repository = createNavigoAppRepository(state.prisma as never);
     const t4 = state.activities.find((activity) => activity.id === "activity-T4_HORAS");
+    state.participant.visualVerificationMode = "required";
 
     t4?.participantActivityEvidence.push(
       createActivitySelfieEvidence({
@@ -3256,6 +3257,47 @@ describe("navigo app MVP rules", () => {
     }
   });
 
+  it("permite iniciar evaluacion Navigo Homme sin selfie cuando el estudio no requiere verificacion facial", async () => {
+    const state = createNavigoParticipantActivityState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    state.participant.visualVerificationMode = null;
+    state.participant.participantEvidence = [];
+    state.activities.find((activity) => activity.id === "activity-T4_HORAS")!.participantActivityEvidence = [];
+
+    const view = await repository.getActivityCaptureView({
+      activityId: "activity-T4_HORAS",
+      testMode: true,
+      token: "token-1"
+    });
+    const saved = await repository.submitActivityResponses({
+      activityId: "activity-T4_HORAS",
+      answers: completeNavigoAnswers(),
+      testMode: true,
+      token: "token-1"
+    });
+
+    expect(view.ok).toBe(true);
+    expect(view.ok ? view.data.requiresSelfie : true).toBe(false);
+    expect(view.ok ? view.data.visualVerificationMode : "required").toBe("disabled");
+    expect(saved.ok).toBe(true);
+  });
+
+  it("mantiene funcionando Navigo Homme cuando el participante si tiene selfie", async () => {
+    const state = createNavigoParticipantActivityState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    state.participant.visualVerificationMode = null;
+
+    const view = await repository.getActivityCaptureView({
+      activityId: "activity-T4_HORAS",
+      testMode: true,
+      token: "token-1"
+    });
+
+    expect(view.ok).toBe(true);
+    expect(view.ok ? view.data.requiresSelfie : true).toBe(false);
+    expect(state.participant.participantEvidence).toHaveLength(1);
+  });
+
   it("uses the global visual verification mode only when the participant has no override", async () => {
     const state = createNavigoParticipantActivityState();
     const repository = createNavigoAppRepository(state.prisma as never);
@@ -3321,6 +3363,7 @@ describe("navigo app MVP rules", () => {
   it("creates a reference selfie at T0 without running activity face comparison", async () => {
     const state = createNavigoParticipantActivityState();
     const repository = createNavigoAppRepository(state.prisma as never);
+    state.participant.visualVerificationMode = "required";
     state.participant.participantEvidence = [];
 
     const request = await repository.requestActivitySelfieUpload({
@@ -3491,6 +3534,7 @@ describe("navigo app MVP rules", () => {
   it("blocks later activities when visual verification is required and reference selfie is missing", async () => {
     const state = createNavigoParticipantActivityState();
     const repository = createNavigoAppRepository(state.prisma as never);
+    state.participant.visualVerificationMode = "required";
     state.participant.participantEvidence = [];
 
     const view = await repository.getActivityCaptureView({
