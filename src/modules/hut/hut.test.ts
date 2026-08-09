@@ -1075,6 +1075,16 @@ describe("HUT module foundation", () => {
     });
     prisma.state.confirmations.push(confirmationWithCodes("NAV-004"));
     const participant = prisma.state.participants[0]!;
+    participant.applicationPhotoEntries.push({
+      capturedAt: new Date("2026-08-07T10:00:00.000Z"),
+      capturedLocalDate: "2026-08-07",
+      capturedLocalTimezone: "America/Mexico_City",
+      id: "delivery-entry-1",
+      participantId: participant.id,
+      privateStorageKey: "hut/delivery.jpg",
+      productCode: null,
+      useDayNumber: 0
+    });
 
     await repository.ensureHutPhaseCodesForParticipant({
       participantId: participant.id,
@@ -1085,6 +1095,7 @@ describe("HUT module foundation", () => {
     const viewBefore = await repository.getPortalView(participant.token);
     const upload = await repository.requestApplicationPhotoUpload({
       metadata: selfieMetadata(),
+      slotId: "PRODUCT_1_DAY_1",
       storage,
       token: participant.token
     });
@@ -1105,6 +1116,7 @@ describe("HUT module foundation", () => {
         privateStorageKey: upload.ok ? upload.data.privateStorageKey : "",
         storageBucket: upload.ok ? upload.data.storageBucket : ""
       },
+      slotId: "PRODUCT_1_DAY_1",
       token: participant.token
     });
 
@@ -1125,7 +1137,7 @@ describe("HUT module foundation", () => {
     expect(prisma.state.participants[0]?.applicationEvidence).toHaveLength(1);
   });
 
-  it("allows application after historical delivery evidence without exposing a phase gate", async () => {
+  it("keeps delivery independent when historical COLOCACION evidence already exists", async () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
@@ -1171,12 +1183,13 @@ describe("HUT module foundation", () => {
 
     expect(view.ok ? view.data.phaseGate : null).toBeNull();
     expect(view.ok ? view.data.availableApplicationPhoto : null).toMatchObject({
-      phase: "REGRESO_1",
-      productCode: "583"
+      phase: "COLOCACION",
+      productCode: null,
+      slotId: "DELIVERY"
     });
     expect(upload.ok ? upload.data : null).toMatchObject({
-      phase: "REGRESO_1",
-      productCode: "583"
+      phase: "COLOCACION",
+      productCode: null
     });
   });
 

@@ -66,7 +66,10 @@ export {
 } from "./phase-codes";
 export {
   buildHutPhotoTimeline,
+  getHutPhotoTimelineSlotDefinition,
+  getNextHutPhotoTimelineSlot,
   formatHutPhotoTimelineSlotTitle,
+  HUT_PHOTO_TIME_ZONE,
   resolveHutPhaseCodeSlotTimelineLabel,
   resolveHutPhotoTimelinePhaseLabel,
   resolveHutPhotoTimelineUseDayLabel,
@@ -78,7 +81,9 @@ export type {
 } from "./phase-codes";
 export type {
   HutPhotoTimelinePhoto,
-  HutPhotoTimelineSlot
+  HutPhotoTimelineSlot,
+  HutPhotoTimelineSlotId,
+  HutPhotoTimelineSlotStatus
 } from "./photo-timeline";
 export type {
   HutSignedVideoUpload,

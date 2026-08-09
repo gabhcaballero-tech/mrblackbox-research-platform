@@ -4,13 +4,11 @@ import {
   createHutRepository,
   formatHutPhotoTimelineSlotTitle,
   resolveHutOperationalStatusLabel,
-  type HutApplicationPhotoDailyAvailability,
   type HutPhotoTimelineSlot,
   type HutPortalView
 } from "@/modules/hut";
 import { validateHutPhaseCodeAction } from "@/modules/hut/actions";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
-import { HutApplicationPhotoUploadForm } from "./HutApplicationPhotoUploadForm";
 import { HutVideoUploadForm } from "./HutVideoUploadForm";
 
 export const dynamic = "force-dynamic";
@@ -36,10 +34,6 @@ export default async function HutParticipantPage({ params, searchParams }: HutPa
   }
 
   const view = result.data;
-  const photoAvailability =
-    view.protocolVersion === "APPLICATION_PHOTO" && view.status !== "COMPLETED" && !view.phaseGate?.required && view.availableApplicationPhoto
-      ? await loadApplicationPhotoAvailability(repository, token)
-      : null;
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -96,18 +90,6 @@ export default async function HutParticipantPage({ params, searchParams }: HutPa
           <ApplicationPhotoInstructions />
         ) : null}
 
-        {photoAvailability && !photoAvailability.available ? (
-          <ApplicationPhotoBlockedMessage availability={photoAvailability} />
-        ) : null}
-
-        {photoAvailability?.available && view.availableApplicationPhoto ? (
-          <HutApplicationPhotoUploadForm
-            phase={view.availableApplicationPhoto.phase}
-            productCode={view.availableApplicationPhoto.productCode}
-            token={view.token}
-          />
-        ) : null}
-
         {view.protocolVersion === "LEGACY_VIDEO" && view.status !== "COMPLETED" && !view.phaseGate?.required && view.availability.reason === "AVAILABLE_FOR_SELFIE" ? (
           <HutVideoUploadForm
             blockNumber={view.availability.blockNumber ?? view.availableUpload?.blockNumber ?? 1}
@@ -126,7 +108,7 @@ export default async function HutParticipantPage({ params, searchParams }: HutPa
           />
         ) : null}
 
-        {view.status !== "COMPLETED" && !view.phaseGate?.required && !photoAvailability && !view.availableApplicationPhoto && !view.availableUpload && view.availability.reason !== "AVAILABLE_FOR_SELFIE" ? (
+        {view.protocolVersion !== "APPLICATION_PHOTO" && view.status !== "COMPLETED" && !view.phaseGate?.required && !view.availableApplicationPhoto && !view.availableUpload && view.availability.reason !== "AVAILABLE_FOR_SELFIE" ? (
           <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-zinc-950">Actividad no disponible</h2>
             <p className="mt-2 text-sm leading-6 text-zinc-600">{availabilityMessage(view.availability.reason, view.availability.nextAvailableAt)}</p>
@@ -137,14 +119,6 @@ export default async function HutParticipantPage({ params, searchParams }: HutPa
   );
 }
 
-async function loadApplicationPhotoAvailability(
-  repository: ReturnType<typeof createHutRepository>,
-  token: string
-): Promise<HutApplicationPhotoDailyAvailability | null> {
-  const result = await repository.getApplicationPhotoDailyAvailabilityByToken({ token });
-  return result.ok ? result.data : null;
-}
-
 function ApplicationPhotoInstructions() {
   return (
     <section className="rounded-lg border border-teal-200 bg-teal-50 p-5 shadow-sm">
@@ -153,17 +127,6 @@ function ApplicationPhotoInstructions() {
       <p className="mt-3 text-sm leading-6 text-teal-900">
         Este portal es exclusivo para cargar evidencias fotograficas del producto. Las evaluaciones y preguntas del estudio
         las captura el encuestador autorizado.
-      </p>
-    </section>
-  );
-}
-
-function ApplicationPhotoBlockedMessage({ availability }: { availability: HutApplicationPhotoDailyAvailability }) {
-  return (
-    <section className="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-amber-950">Foto diaria ya registrada</h2>
-      <p className="mt-2 text-sm leading-6 text-amber-900">
-        Ya existe una foto de aplicacion registrada hoy. La siguiente foto estara disponible el {availability.nextAvailableLocalDate ?? "siguiente dia"}.
       </p>
     </section>
   );
@@ -215,7 +178,11 @@ function currentHutPhaseLabel(view: HutPortalView): string {
   }
 
   if (view.availableApplicationPhoto) {
-    return photoSlotTitleForPhase(view.availableApplicationPhoto.phase);
+    return formatHutPhotoTimelineSlotTitle({
+      dayLabel: "",
+      id: view.availableApplicationPhoto.slotId,
+      title: ""
+    });
   }
 
   return view.status === "COMPLETED" ? "Completado" : "Sin fase pendiente";
@@ -235,7 +202,7 @@ function CompletionMessage() {
 
 function ProgressSummary({ view }: { view: HutPortalView }) {
   if (view.protocolVersion === "APPLICATION_PHOTO") {
-    const slots = buildPortalPhotoTimeline(view).filter((slot) => slot.participantTask || slot.evidence);
+    const slots = buildPortalPhotoTimeline(view).filter((slot) => slot.participantTask);
     return (
       <section className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -256,10 +223,18 @@ function ProgressSummary({ view }: { view: HutPortalView }) {
                   {slot.evidence?.capturedAt ? <p className="mt-1 text-zinc-600">Fecha: {slot.evidence.capturedAt.toLocaleString("es-MX")}</p> : null}
                   {slot.availableDate ? <p className="mt-1 text-zinc-600">Fecha disponible: {slot.availableDate}</p> : null}
                 </div>
-                <StatusBadge status={slot.status === "COMPLETED" ? "ready" : slot.status === "CURRENT" ? "planned" : "blocked"}>
+                <StatusBadge status={slot.status === "COMPLETED" ? "ready" : slot.status === "AVAILABLE" ? "planned" : "blocked"}>
                   {photoTimelineStatusLabel(slot)}
                 </StatusBadge>
               </div>
+              {slot.status === "AVAILABLE" ? (
+                <a
+                  className="mt-3 inline-flex min-h-11 items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white"
+                  href={`/hut/p/${encodeURIComponent(view.token)}/photo/${encodeURIComponent(slot.id)}`}
+                >
+                  Capturar foto
+                </a>
+              ) : null}
             </div>
           ))}
         </div>
@@ -288,7 +263,8 @@ function BlockSummary({ label, missed, videos }: { label: string; missed: number
 function buildPortalPhotoTimeline(view: HutPortalView): HutPhotoTimelineSlot[] {
   return buildHutPhotoTimeline({
     applicationEvidence: view.applicationEvidence,
-    availablePhase: view.availableApplicationPhoto?.phase ?? null,
+    dailyEntries: view.applicationPhotoEntries,
+    availableSlotId: view.availableApplicationPhoto?.slotId ?? null,
     currentPhase: view.phaseGate?.phase ?? null,
     nextAvailableAt: view.availability.nextAvailableAt,
     rotation: {
@@ -301,8 +277,8 @@ function buildPortalPhotoTimeline(view: HutPortalView): HutPhotoTimelineSlot[] {
 function photoSlotTitleForPhase(phase: string): string {
   const labels: Record<string, string> = {
     COLOCACION: "Entrega del producto",
-    REGRESO_1: "Aplicacion / Evaluacion 1",
-    REGRESO_2: "Evaluacion 2"
+    REGRESO_1: "Producto 1 - Dia 3 manana",
+    REGRESO_2: "Producto 2 - Dia 3 manana"
   };
   return labels[phase] ?? phase;
 }
@@ -324,7 +300,7 @@ function participantSlotDescription(slot: HutPhotoTimelineSlot): string {
   if (slot.status === "COMPLETED") {
     return "Actividad completada.";
   }
-  if (slot.status === "CURRENT") {
+  if (slot.status === "AVAILABLE") {
     return slot.participantTask ? `${slot.participantTask} requerida.` : "Actividad disponible.";
   }
   return slot.isCapturableWithCurrentModel ? "Proxima actividad programada." : "Cuando llegue el momento recibiras instrucciones.";
@@ -334,7 +310,7 @@ function photoTimelineStatusLabel(slot: HutPhotoTimelineSlot): string {
   if (slot.status === "COMPLETED") {
     return "Foto registrada";
   }
-  if (slot.status === "CURRENT") {
+  if (slot.status === "AVAILABLE") {
     return "Disponible";
   }
   return slot.isCapturableWithCurrentModel ? "Pendiente" : "Programada";

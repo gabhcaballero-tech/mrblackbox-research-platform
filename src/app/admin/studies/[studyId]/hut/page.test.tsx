@@ -18,11 +18,15 @@ vi.mock("@/shared/utils/request-origin", () => ({
   resolveRequestOrigin: vi.fn(() => "https://example.com")
 }));
 
-vi.mock("@/modules/hut", () => ({
-  createHutRepository: vi.fn(() => ({
-    getAdminDashboard: getAdminDashboardMock
-  }))
-}));
+vi.mock("@/modules/hut", async () => {
+  const actual = await vi.importActual<typeof import("@/modules/hut")>("@/modules/hut");
+  return {
+    ...actual,
+    createHutRepository: vi.fn(() => ({
+      getAdminDashboard: getAdminDashboardMock
+    }))
+  };
+});
 
 vi.mock("@/modules/hut/actions", () => {
   const action = vi.fn(async () => undefined);
@@ -218,10 +222,11 @@ describe("HutAdminPage", () => {
     expect(screen.getByText("Guarda la selfie de registro para habilitar el inicio del HUT.")).toBeInTheDocument();
     expect(screen.getByText("Identidad diaria: Pendiente")).toBeInTheDocument();
     expect(screen.getByText("Códigos por fase HUT")).toBeInTheDocument();
-    expect(screen.getByText("Colocación")).toBeInTheDocument();
-    expect(screen.getByText("Regreso 1")).toBeInTheDocument();
-    expect(screen.getByText("Regreso 2")).toBeInTheDocument();
+    expect(screen.queryByText("Regreso 1")).not.toBeInTheDocument();
+    expect(screen.queryByText("Regreso 2")).not.toBeInTheDocument();
     expect(screen.getByTestId("hut-phase-code-controls-COLOCACION")).toBeInTheDocument();
+    expect(screen.getByTestId("hut-phase-code-controls-REGRESO_1")).toBeInTheDocument();
+    expect(screen.getByTestId("hut-phase-code-controls-REGRESO_2")).toBeInTheDocument();
     expect(screen.getByText("Ver revisión de identidad")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Activar modo prueba" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tomar selfie de registro" })).toBeEnabled();

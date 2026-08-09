@@ -8,10 +8,12 @@ import { createBrowserSupabaseClient } from "@/shared/auth/supabase/browser";
 import { HutApplicationPhotoUploadForm } from "./HutApplicationPhotoUploadForm";
 
 const refreshMock = vi.fn();
+const pushMock = vi.fn();
 const uploadToSignedUrl = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
+    push: pushMock,
     refresh: refreshMock
   })
 }));
@@ -58,7 +60,7 @@ describe("HutApplicationPhotoUploadForm", () => {
   });
 
   it("uploads application evidence without selfie, video or biometric verification", async () => {
-    render(<HutApplicationPhotoUploadForm phase="COLOCACION" productCode="247" token="hut-token" />);
+    render(<HutApplicationPhotoUploadForm phase="COLOCACION" productCode="247" slotId="PRODUCT_1_DAY_1" token="hut-token" />);
 
     const file = new File(["photo"], "aplicacion.jpg", { type: "image/jpeg" });
     fireEvent.change(screen.getByLabelText("Fotografia"), {
@@ -67,14 +69,17 @@ describe("HutApplicationPhotoUploadForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Guardar foto de aplicacion" }));
 
     await waitFor(() => {
-      expect(requestHutApplicationPhotoUploadAction).toHaveBeenCalledWith("hut-token", {
+      expect(requestHutApplicationPhotoUploadAction).toHaveBeenCalledWith("hut-token", "PRODUCT_1_DAY_1", {
         mimeType: "image/jpeg",
         originalFilename: "aplicacion.jpg",
         sizeBytes: file.size
       });
       expect(createBrowserSupabaseClient).toHaveBeenCalled();
       expect(uploadToSignedUrl).toHaveBeenCalled();
-      expect(confirmHutApplicationPhotoUploadAction).toHaveBeenCalled();
+      expect(confirmHutApplicationPhotoUploadAction).toHaveBeenCalledWith("hut-token", "PRODUCT_1_DAY_1", expect.objectContaining({
+        privateStorageKey: "studies/study-hut/hut-participants/participant-1/application-photos/COLOCACION/photo.jpg"
+      }));
+      expect(pushMock).toHaveBeenCalledWith("/hut/p/hut-token?hutMessage=Foto registrada correctamente");
       expect(refreshMock).toHaveBeenCalled();
     });
 

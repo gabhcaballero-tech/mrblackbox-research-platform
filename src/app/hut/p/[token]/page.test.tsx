@@ -23,12 +23,6 @@ vi.mock("./HutVideoUploadForm", () => ({
   HutVideoUploadForm: () => <div>Formulario HUT</div>
 }));
 
-vi.mock("./HutApplicationPhotoUploadForm", () => ({
-  HutApplicationPhotoUploadForm: ({ productCode }: { phase: string; productCode: string | null }) => (
-    <div>{`Formulario de foto ${productCode ?? ""}`}</div>
-  )
-}));
-
 describe("HutParticipantPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -113,7 +107,8 @@ describe("HutParticipantPage", () => {
         applicationEvidence: [],
         availableApplicationPhoto: {
           phase: "COLOCACION",
-          productCode: "247"
+          productCode: null,
+          slotId: "DELIVERY"
         },
         availability: {
           nextAvailableAt: null,
@@ -145,11 +140,10 @@ describe("HutParticipantPage", () => {
 
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
-    expect(screen.getByText("Formulario de foto 247")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Capturar foto" })).toHaveAttribute("href", "/hut/p/token-1/photo/DELIVERY");
     expect(screen.getAllByText("Seguimiento fotografico").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Entrega del producto").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Colocacion")).toBeInTheDocument();
-    expect(screen.getByText("Producto 1 - Dia 1")).toBeInTheDocument();
+    expect(screen.getByText("Producto 1 - Dia 1 (Colocacion)")).toBeInTheDocument();
     expect(screen.getByText("Producto 1 - Dia 3 manana")).toBeInTheDocument();
     expect(screen.getByText("Producto 2 - Dia 3 manana")).toBeInTheDocument();
     expect(screen.queryByText(/Evaluacion 1/)).not.toBeInTheDocument();
@@ -169,7 +163,8 @@ describe("HutParticipantPage", () => {
         applicationEvidence: [],
         availableApplicationPhoto: {
           phase: "COLOCACION",
-          productCode: "247"
+          productCode: null,
+          slotId: "DELIVERY"
         },
         availability: {
           nextAvailableAt: null,
@@ -219,7 +214,8 @@ describe("HutParticipantPage", () => {
       data: createPortalView({
         availableApplicationPhoto: {
           phase: "COLOCACION",
-          productCode: "247"
+          productCode: null,
+          slotId: "DELIVERY"
         },
         availability: {
           nextAvailableAt: null,
@@ -243,7 +239,7 @@ describe("HutParticipantPage", () => {
 
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
-    expect(screen.getByText("Formulario de foto 247")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Capturar foto" })).toHaveAttribute("href", "/hut/p/token-1/photo/DELIVERY");
     expect(screen.queryByText("Genero")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Guardar y continuar" })).not.toBeInTheDocument();
   });
@@ -253,7 +249,8 @@ describe("HutParticipantPage", () => {
       data: createPortalView({
         availableApplicationPhoto: {
           phase: "COLOCACION",
-          productCode: "247"
+          productCode: null,
+          slotId: "DELIVERY"
         },
         availability: {
           nextAvailableAt: null,
@@ -288,13 +285,13 @@ describe("HutParticipantPage", () => {
 
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
-    expect(screen.getByText("Formulario de foto 247")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Capturar foto" })).toHaveAttribute("href", "/hut/p/token-1/photo/DELIVERY");
     expect(screen.queryByText("Confirmar entrega del primer perfume")).not.toBeInTheDocument();
     expect(screen.queryByText("Genero")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Guardar y continuar" })).not.toBeInTheDocument();
   });
 
-  it("muestra evidencia COLOCACION historica como entrega del producto", async () => {
+  it("muestra evidencia COLOCACION historica como Producto 1 Dia 1", async () => {
     getPortalViewMock.mockResolvedValue({
       data: createPortalView({
         applicationEvidence: [
@@ -305,8 +302,9 @@ describe("HutParticipantPage", () => {
           }
         ],
         availableApplicationPhoto: {
-          phase: "REGRESO_1",
-          productCode: "583"
+          phase: "COLOCACION",
+          productCode: null,
+          slotId: "DELIVERY"
         },
         availability: {
           nextAvailableAt: null,
@@ -324,8 +322,8 @@ describe("HutParticipantPage", () => {
     expect(screen.getAllByText("Entrega del producto").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Foto registrada").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Producto: 247").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Producto 1 - Dia 3 manana").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Formulario de foto 583")).toBeInTheDocument();
+    expect(screen.getAllByText("Producto 1 - Dia 1 (Colocacion)").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("link", { name: "Capturar foto" })).toHaveAttribute("href", "/hut/p/token-1/photo/DELIVERY");
     expect(screen.queryByText("Llamada pendiente")).not.toBeInTheDocument();
     expect(screen.queryByText("BLOCK_1_CALL_PENDING")).not.toBeInTheDocument();
     expect(screen.queryByText("Codigo requerido")).not.toBeInTheDocument();
@@ -349,8 +347,7 @@ describe("HutParticipantPage", () => {
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
     expect(screen.getByText("Entrega del producto")).toBeInTheDocument();
-    expect(screen.getByText("Colocacion")).toBeInTheDocument();
-    expect(screen.getByText("Producto 1 - Dia 1")).toBeInTheDocument();
+    expect(screen.getByText("Producto 1 - Dia 1 (Colocacion)")).toBeInTheDocument();
     expect(screen.getByText("Producto 1 - Dia 2")).toBeInTheDocument();
     expect(screen.getByText("Producto 1 - Dia 3 manana")).toBeInTheDocument();
     expect(screen.getByText("Producto 2 - Dia 1")).toBeInTheDocument();
@@ -367,7 +364,8 @@ describe("HutParticipantPage", () => {
       data: createPortalView({
         availableApplicationPhoto: {
           phase: "COLOCACION",
-          productCode: "247"
+          productCode: null,
+          slotId: "DELIVERY"
         },
         availability: {
           nextAvailableAt: null,
@@ -403,8 +401,7 @@ describe("HutParticipantPage", () => {
 
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
-    expect(screen.getByText("Foto diaria ya registrada")).toBeInTheDocument();
-    expect(screen.getByText(/2026-08-08/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Capturar foto" })).toHaveAttribute("href", "/hut/p/token-1/photo/DELIVERY");
     expect(screen.queryByText(/Formulario de foto/)).not.toBeInTheDocument();
   });
 });
@@ -413,6 +410,7 @@ function createPortalView(overrides: Partial<PortalViewForTest> = {}): PortalVie
   return {
     availableUpload: null,
     applicationEvidence: [],
+    applicationPhotoEntries: [],
     availability: {
       nextAvailableAt: null,
       reason: "BLOCK_NOT_ACTIVE"
@@ -455,7 +453,8 @@ function createPortalView(overrides: Partial<PortalViewForTest> = {}): PortalVie
 
 type PortalViewForTest = {
   applicationEvidence: Array<{ capturedAt: Date; phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2"; productCode: string | null }>;
-  availableApplicationPhoto: { phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2"; productCode: string | null } | null;
+  applicationPhotoEntries: Array<{ capturedAt: Date; capturedLocalDate: string; productCode: string | null; useDayNumber: number }>;
+  availableApplicationPhoto: { phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2"; productCode: string | null; slotId: "DELIVERY" | "PRODUCT_1_DAY_1" | "PRODUCT_1_DAY_2" | "PRODUCT_1_DAY_3_MORNING" | "PRODUCT_2_DAY_1" | "PRODUCT_2_DAY_2" | "PRODUCT_2_DAY_3_MORNING" } | null;
   availableUpload: { blockNumber: number; sequenceNumber: number } | null;
   availability: {
     blockNumber?: number;

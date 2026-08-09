@@ -117,10 +117,28 @@ function FieldHutWorkspace({
     ?? null;
   const answeredRequired = requiredQuestions.filter((question) => question.code in workspace.questionnaire.answers).length;
   const progress = requiredQuestions.length > 0 ? Math.round((answeredRequired / requiredQuestions.length) * 100) : 100;
+  const hutTimeline = buildFieldPhotoTimeline(workspace);
+  const photoTimelineSlots = hutTimeline.filter((slot) => slot.participantTask);
+  const evaluationTimelineSlots = hutTimeline.filter((slot) => slot.interviewerTask);
 
   return (
     <div className="space-y-6">
-      <section className="sticky top-0 z-10 rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+      <section
+        className="sticky top-0 z-10 rounded-md border border-zinc-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur"
+        data-testid="field-hut-compact-header"
+      >
+        <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-zinc-950">
+          <span>{workspace.participant.hutFolio ?? "HUT sin folio"}</span>
+          <span className="text-zinc-300">|</span>
+          <span>{workspace.participant.navFolio ?? "Sin NAV"}</span>
+          <span className="text-zinc-300">|</span>
+          <span>EVA1 {workspace.rotation.eva1 ?? "No asignada"}</span>
+          <span className="text-zinc-300">|</span>
+          <span>EVA2 {workspace.rotation.eva2 ?? "No asignada"}</span>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm" data-testid="field-hut-secondary-details">
         {workspace.participant.testMode ? (
           <p className="mb-4 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900">
             Modo prueba activo: este HUT puede avanzar sin esperar días reales.
@@ -143,18 +161,15 @@ function FieldHutWorkspace({
         <div className="mt-5 grid gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm sm:grid-cols-3">
           <Fact label="Teléfono" value={workspace.participant.phone ?? "No disponible"} />
           <Fact label="Correo" value={workspace.participant.email ?? "No disponible"} />
-          <Fact label="EVA1" value={workspace.rotation.eva1 ?? "No asignada"} />
-          <Fact label="EVA2" value={workspace.rotation.eva2 ?? "No asignada"} />
-          <Fact label="Sección actual" value={nextQuestion ? sectionTitle(nextQuestion.section) : "Sin preguntas pendientes"} />
           <Fact label="Estado HUT" value={resolveHutOperationalStatusLabel(workspace.participant.status)} />
           <Fact label="Modo prueba" value={workspace.participant.testMode ? "Activo" : "Inactivo"} />
         </div>
       </section>
 
       <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-        <h3 className="text-lg font-semibold text-zinc-950">Cronograma HUT</h3>
+        <h3 className="text-lg font-semibold text-zinc-950">Evidencia fotografica</h3>
         <div className="mt-4 grid gap-3">
-          {buildFieldPhotoTimeline(workspace).map((slot) => (
+          {photoTimelineSlots.map((slot) => (
             <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={slot.id}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -167,8 +182,34 @@ function FieldHutWorkspace({
                   {slot.evidence?.capturedAt ? <p className="mt-1 text-zinc-600">Foto: {slot.evidence.capturedAt.toLocaleString("es-MX")}</p> : null}
                   {!slot.isCapturableWithCurrentModel && !slot.evidence ? <p className="mt-1 text-zinc-600">Proxima actividad programada</p> : null}
                 </div>
-                <StatusBadge status={slot.status === "COMPLETED" ? "ready" : slot.status === "CURRENT" ? "planned" : "blocked"}>
+                <StatusBadge status={slot.status === "COMPLETED" ? "ready" : slot.status === "AVAILABLE" ? "planned" : "blocked"}>
                   {fieldTimelineStatusLabel(slot)}
+                </StatusBadge>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+        <h3 className="text-lg font-semibold text-zinc-950">Evaluaciones</h3>
+        <div className="mt-4 grid gap-3">
+          {evaluationTimelineSlots.map((slot) => (
+            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={slot.id}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{slot.dayLabel}</p>
+                  <p className="mt-1 font-semibold text-zinc-950">{formatHutPhotoTimelineSlotTitle(slot)}</p>
+                  <p className="mt-1 text-zinc-600">Encuestador: {slot.interviewerTask}</p>
+                  <p className="mt-1 text-zinc-600">Producto: {slot.productCode ?? "No asignado"}</p>
+                  {slot.evidence?.capturedAt ? (
+                    <p className="mt-1 text-zinc-600">Registro historico: {slot.evidence.capturedAt.toLocaleString("es-MX")}</p>
+                  ) : (
+                    <p className="mt-1 text-zinc-600">Visita pendiente</p>
+                  )}
+                </div>
+                <StatusBadge status={slot.status === "COMPLETED" ? "ready" : "planned"}>
+                  {slot.status === "COMPLETED" ? "Registrada" : "Pendiente"}
                 </StatusBadge>
               </div>
             </div>
@@ -318,17 +359,24 @@ function QuestionnaireForm({
   workspace: HutFieldQuestionnaireWorkspace;
 }) {
   const savedAnswer = workspace.questionnaire.answers[question.code];
+  const questions = applicableQuestions(workspace);
+  const questionIndex = questions.findIndex((candidate) => candidate.code === question.code);
   const nextQuestion = nextQuestionAfterCurrent({
     answers: workspace.questionnaire.answers,
     currentCode: question.code,
-    questions: applicableQuestions(workspace)
+    questions
   });
 
   return (
     <section className="rounded-lg border border-teal-200 bg-white p-5 shadow-sm">
-      <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">
-        {sectionTitle(question.section)}
-      </p>
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">
+          {sectionTitle(question.section)}
+        </p>
+        <p className="text-sm font-semibold text-zinc-600">
+          Pregunta {questionIndex >= 0 ? questionIndex + 1 : "-"} de {questions.length}
+        </p>
+      </div>
       <SectionInstructions question={question} workspace={workspace} />
       <h3 className="mt-3 text-xl font-semibold text-zinc-950">{resolveHutQuestionText(question.label, workspace)}</h3>
       {question.displayTemplate ? (
@@ -606,7 +654,7 @@ function fieldTimelineStatusLabel(slot: HutPhotoTimelineSlot): string {
   if (slot.status === "COMPLETED") {
     return "Completado";
   }
-  if (slot.status === "CURRENT") {
+  if (slot.status === "AVAILABLE") {
     return "Disponible";
   }
   return slot.isCapturableWithCurrentModel ? "Pendiente" : "Programado";

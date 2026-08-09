@@ -229,8 +229,8 @@ function OperationsDetail({
                     <p className="text-zinc-600">{slot.isCapturableWithCurrentModel ? "Pendiente" : "Proxima actividad programada"}</p>
                   )}
                 </div>
-                <StatusBadge status={slot.status === "COMPLETED" ? "ready" : slot.status === "CURRENT" ? "planned" : "blocked"}>
-                  {slot.status === "COMPLETED" ? "Completado" : slot.status === "CURRENT" ? "Disponible" : slot.isCapturableWithCurrentModel ? "Pendiente" : "Programado"}
+                <StatusBadge status={slot.status === "COMPLETED" ? "ready" : slot.status === "AVAILABLE" ? "planned" : "blocked"}>
+                  {slot.status === "COMPLETED" ? "Completado" : slot.status === "AVAILABLE" ? "Disponible" : slot.isCapturableWithCurrentModel ? "Pendiente" : "Programado"}
                 </StatusBadge>
               </div>
             </div>

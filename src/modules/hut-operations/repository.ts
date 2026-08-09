@@ -317,13 +317,12 @@ function resolveCurrentPhase(participant: HutParticipantRecord): string {
 
   if (pendingPhase) {
     const timeline = buildHutPhotoTimeline({
-      availablePhase: pendingPhase.phase as "COLOCACION" | "REGRESO_1" | "REGRESO_2",
       rotation: {
         eva1: participant.firstFragranceLeftArm,
         eva2: participant.secondFragranceRightArm
       }
     });
-    return timeline.find((slot) => slot.status === "CURRENT")?.title ?? pendingPhase.phase;
+    return timeline.find((slot) => slot.status === "AVAILABLE")?.title ?? resolveHutOperationalStatusLabel(participant.status);
   }
 
   const activeVisit = participant.questionnaireAttempt?.visits.find((visit) => visit.status !== "COMPLETED");

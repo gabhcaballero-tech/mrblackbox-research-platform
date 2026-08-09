@@ -8,14 +8,25 @@ import {
 } from "@/modules/hut/actions";
 import { createBrowserSupabaseClient } from "@/shared/auth/supabase/browser";
 import type { HutPhase } from "@/modules/hut/phase-codes";
+import type { HutPhotoTimelineSlotId } from "@/modules/hut/photo-timeline";
 
 type HutApplicationPhotoUploadFormProps = {
+  instructions?: string | null;
   phase: HutPhase;
   productCode: string | null;
+  slotId?: HutPhotoTimelineSlotId | null;
+  title?: string | null;
   token: string;
 };
 
-export function HutApplicationPhotoUploadForm({ phase, productCode, token }: HutApplicationPhotoUploadFormProps) {
+export function HutApplicationPhotoUploadForm({
+  instructions,
+  phase,
+  productCode,
+  slotId = null,
+  title,
+  token
+}: HutApplicationPhotoUploadFormProps) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +49,7 @@ export function HutApplicationPhotoUploadForm({ phase, productCode, token }: Hut
         originalFilename: selectedFile.name,
         sizeBytes: selectedFile.size
       };
-      const signed = await requestHutApplicationPhotoUploadAction(token, metadata);
+      const signed = await requestHutApplicationPhotoUploadAction(token, slotId, metadata);
 
       if (!signed.ok) {
         setError(signed.message);
@@ -60,7 +71,7 @@ export function HutApplicationPhotoUploadForm({ phase, productCode, token }: Hut
         return;
       }
 
-      const confirmed = await confirmHutApplicationPhotoUploadAction(token, {
+      const confirmed = await confirmHutApplicationPhotoUploadAction(token, slotId, {
         ...metadata,
         privateStorageKey: signed.data.privateStorageKey,
         storageBucket: signed.data.storageBucket
@@ -74,6 +85,7 @@ export function HutApplicationPhotoUploadForm({ phase, productCode, token }: Hut
 
       setFile(null);
       setMessage("Foto registrada correctamente.");
+      router.push(`/hut/p/${encodeURIComponent(token)}?hutMessage=Foto registrada correctamente`);
       router.refresh();
     });
   }
@@ -81,9 +93,9 @@ export function HutApplicationPhotoUploadForm({ phase, productCode, token }: Hut
   return (
     <section className="rounded-lg border border-teal-200 bg-white p-5 shadow-sm">
       <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">{phaseLabel(phase)}</p>
-      <h2 className="mt-2 text-xl font-semibold text-zinc-950">Foto de aplicacion de perfume</h2>
+      <h2 className="mt-2 text-xl font-semibold text-zinc-950">{title ?? "Foto de aplicacion de perfume"}</h2>
       <p className="mt-2 text-sm leading-6 text-zinc-600">
-        Registra una fotografia clara de la aplicacion del producto{productCode ? ` ${productCode}` : ""}. No se requiere selfie ni video.
+        {instructions ?? `Registra una fotografia clara de la actividad indicada${productCode ? ` para el producto ${productCode}` : ""}. No se requiere selfie ni video.`}
       </p>
       <label className="mt-4 flex flex-col gap-2 text-sm font-semibold text-zinc-800">
         Fotografia
@@ -117,9 +129,9 @@ export function HutApplicationPhotoUploadForm({ phase, productCode, token }: Hut
 
 function phaseLabel(phase: HutPhase): string {
   const labels: Record<HutPhase, string> = {
-    COLOCACION: "Colocacion / entrega 1",
-    REGRESO_1: "Regreso 1 / evaluacion 1",
-    REGRESO_2: "Regreso 2 / evaluacion 2"
+    COLOCACION: "Seguimiento Producto 1",
+    REGRESO_1: "Evaluacion 1",
+    REGRESO_2: "Seguimiento Producto 2"
   };
   return labels[phase];
 }

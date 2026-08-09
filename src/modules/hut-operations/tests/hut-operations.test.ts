@@ -35,10 +35,16 @@ describe("hut operations", () => {
     });
     expect(dashboard?.detail?.photoTimeline[0]).toMatchObject({
       dayLabel: "Entrega",
-      status: "COMPLETED",
+      status: "AVAILABLE",
       title: "Entrega del producto"
     });
-    expect(dashboard?.detail?.photoTimeline.some((slot) => slot.id === "PLACEMENT")).toBe(true);
+    expect(dashboard?.detail?.photoTimeline[1]).toMatchObject({
+      dayLabel: "Producto 1 - Dia 1",
+      status: "COMPLETED",
+      title: "Colocacion / aplicacion del producto 1"
+    });
+    expect(dashboard?.detail?.photoTimeline.some((slot) => String(slot.id) === "PLACEMENT")).toBe(false);
+    expect(dashboard?.detail?.photoTimeline.some((slot) => slot.id === "PRODUCT_1_DAY_1")).toBe(true);
     expect(dashboard?.detail?.photoTimeline.some((slot) => slot.title === "Evaluacion 1" && slot.interviewerTask)).toBe(true);
     expect(dashboard?.detail?.photoTimeline.some((slot) => slot.title === "Evaluacion 2" && slot.interviewerTask)).toBe(true);
     expect(dashboard?.detail?.answerGroups.some((group) => group.answers.some((answer) => answer.code === "HUT_PARTICIPO_CLT"))).toBe(true);

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import FieldHutPage from "./page";
 import { createHutRepository } from "@/modules/hut";
@@ -37,16 +37,24 @@ describe("FieldHutPage", () => {
     expect(requireCapability).toHaveBeenCalledWith("field:access");
     expect(createHutRepository).toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: "Participante HUT 121" })).toBeInTheDocument();
-    expect(screen.getByText("HUT-121")).toBeInTheDocument();
-    expect(screen.getByText("NAV-121")).toBeInTheDocument();
-    expect(screen.getByText("EVA1")).toBeInTheDocument();
+    const compactHeader = screen.getByTestId("field-hut-compact-header");
+    expect(within(compactHeader).getByText("HUT-121")).toBeInTheDocument();
+    expect(within(compactHeader).getByText("NAV-121")).toBeInTheDocument();
+    expect(within(compactHeader).getByText("EVA1 247")).toBeInTheDocument();
+    expect(within(compactHeader).getByText("EVA2 583")).toBeInTheDocument();
+    expect(within(compactHeader).queryByText("5512345678")).not.toBeInTheDocument();
+    expect(within(compactHeader).queryByText("participante@example.test")).not.toBeInTheDocument();
+    expect(screen.getByTestId("field-hut-secondary-details")).toBeInTheDocument();
     expect(screen.getAllByText("247").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Cronograma HUT")).toBeInTheDocument();
+    expect(screen.getByText("Evidencia fotografica")).toBeInTheDocument();
+    expect(screen.getByText("Evaluaciones")).toBeInTheDocument();
     expect(screen.getByText("Fotos recibidas")).toBeInTheDocument();
     expect(screen.getAllByText("Entrega del producto").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Colocacion").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Producto 1 - Dia 1 (Colocacion)").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Producto 1 - Dia 3 tarde - Evaluacion 1")).toBeInTheDocument();
     expect(screen.getByText("Producto 2 - Dia 3 tarde - Evaluacion 2")).toBeInTheDocument();
+    expect(screen.queryByText("Regreso 1")).not.toBeInTheDocument();
+    expect(screen.queryByText("Regreso 2")).not.toBeInTheDocument();
     expect(screen.getAllByText("Producto: 247").length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText("COLOCACION")).not.toBeInTheDocument();
     expect(screen.queryByText("REGRESO_1")).not.toBeInTheDocument();
@@ -58,6 +66,7 @@ describe("FieldHutPage", () => {
     expect(screen.queryByText("HUT_EVA1")).not.toBeInTheDocument();
     expect(screen.queryByText("HUT_EVA2")).not.toBeInTheDocument();
     expect(screen.getByText("Preguntas contestadas")).toBeInTheDocument();
+    expect(screen.getByText(/Pregunta \d+ de \d+/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Guardar respuesta" })).toBeInTheDocument();
   });
 

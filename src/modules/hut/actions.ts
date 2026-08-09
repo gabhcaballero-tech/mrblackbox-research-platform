@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createHutRepository, hutFormDataToAnswerInput, type HutActionResult } from "./";
 import type { HutQuestionnaireSectionId } from "./definition";
 import type { HutPhase } from "./phase-codes";
+import type { HutPhotoTimelineSlotId } from "./photo-timeline";
 import type {
   HutApplicationPhotoUploadMetadata,
   HutSelfieUploadMetadata,
@@ -528,16 +529,19 @@ export async function requestHutDailySelfieUploadAction(
 
 export async function requestHutApplicationPhotoUploadAction(
   token: string,
+  slotId: HutPhotoTimelineSlotId | null,
   metadata: HutApplicationPhotoUploadMetadata
 ): Promise<HutActionResult<HutSignedApplicationPhotoUpload & { phase: HutPhase; productCode: string | null }>> {
   return createHutRepository().requestApplicationPhotoUpload({
     metadata,
+    slotId,
     token
   });
 }
 
 export async function confirmHutApplicationPhotoUploadAction(
   token: string,
+  slotId: HutPhotoTimelineSlotId | null,
   metadata: HutApplicationPhotoUploadMetadata & {
     privateStorageKey: string;
     storageBucket: string;
@@ -545,10 +549,14 @@ export async function confirmHutApplicationPhotoUploadAction(
 ): Promise<HutActionResult<{ phase: HutPhase }>> {
   const result = await createHutRepository().confirmApplicationPhotoUpload({
     metadata,
+    slotId,
     token
   });
 
   revalidatePath(`/hut/p/${encodeURIComponent(token)}`);
+  if (slotId) {
+    revalidatePath(`/hut/p/${encodeURIComponent(token)}/photo/${encodeURIComponent(slotId)}`);
+  }
 
   return result;
 }

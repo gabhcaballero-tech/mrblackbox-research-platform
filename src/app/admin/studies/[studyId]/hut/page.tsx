@@ -24,7 +24,10 @@ import {
   syncHutParticipantProfileFromNavAction
 } from "@/modules/hut/actions";
 import {
+  buildHutPhotoTimeline,
   createHutRepository,
+  formatHutPhotoTimelineSlotTitle,
+  resolveHutPhaseCodeSlotTimelineLabel,
   type HutAdminParticipant,
   type HutRegistrationSlotAdmin,
   type HutReservedNavReconciliationPreview
@@ -787,7 +790,7 @@ function HutPhaseCodesCard({
       <div>
         <h4 className="text-sm font-semibold text-zinc-950">Códigos por fase HUT</h4>
         <p className="mt-1 text-xs leading-5 text-zinc-600">
-          Cada código controla el acceso de la fase correspondiente: colocación / entrega 1, evaluación 1 / entrega 2 y evaluación 2.
+          Cada codigo conserva la trazabilidad operativa de entrega, evaluacion 1 y evaluacion 2.
         </p>
       </div>
       <div className="mt-3 space-y-3">
@@ -795,7 +798,7 @@ function HutPhaseCodesCard({
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3" key={phaseCode.phase}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-zinc-950">{phaseCode.label}</p>
+                <p className="text-sm font-semibold text-zinc-950">{resolveHutPhaseCodeSlotTimelineLabel(phaseCode.slot)}</p>
                 <p className="mt-1 text-xs text-zinc-600">{`Slot ${phaseCode.slot} · Estado: ${hutPhaseCodeStatusLabel(phaseCode.status)}`}</p>
               </div>
               <StatusBadge status={hutPhaseCodeStatusBadge(phaseCode.status)}>{hutPhaseCodeStatusLabel(phaseCode.status)}</StatusBadge>
@@ -839,6 +842,25 @@ function ApplicationPhotoProtocolCard({
   studyTimeZone: string;
 }) {
   const applicationEvidence = participant.applicationEvidence ?? [];
+  const hutTimeline = buildHutPhotoTimeline({
+    applicationEvidence: applicationEvidence.map((evidence) => ({
+      capturedAt: evidence.capturedAt,
+      phase: evidence.phase,
+      productCode: evidence.productCode
+    })),
+    dailyEntries: participant.applicationPhotoEntries.map((entry) => ({
+      capturedAt: entry.capturedAt,
+      capturedLocalDate: entry.capturedLocalDate,
+      productCode: entry.productCode,
+      useDayNumber: entry.useDayNumber
+    })),
+    rotation: {
+      eva1: participant.firstFragranceLeftArm,
+      eva2: participant.secondFragranceRightArm
+    }
+  });
+  const photoSlots = hutTimeline.filter((slot) => slot.participantTask);
+  const evaluationSlots = hutTimeline.filter((slot) => slot.interviewerTask);
   const phaseLabel = applicationPhotoCurrentPhaseLabel(participant);
 
   return (
@@ -856,29 +878,50 @@ function ApplicationPhotoProtocolCard({
         <Field label="EVA1 / primera fragancia" value={participant.firstFragranceLeftArm ?? "No asignada"} />
         <Field label="EVA2 / segunda fragancia" value={participant.secondFragranceRightArm ?? "No asignada"} />
       </div>
-      <div className="mt-3 space-y-3">
-        {(["COLOCACION", "REGRESO_1", "REGRESO_2"] as const).map((phase) => {
-          const evidence = applicationEvidence.find((item) => item.phase === phase);
-          return (
-            <div className="rounded-md border border-emerald-200 bg-white p-3" key={phase}>
+      <div className="mt-4">
+        <h5 className="text-sm font-semibold text-emerald-950">Evidencia fotografica</h5>
+        <div className="mt-3 space-y-3">
+          {photoSlots.map((slot) => (
+            <div className="rounded-md border border-emerald-200 bg-white p-3" key={slot.id}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-zinc-950">{hutPhaseLabel(phase)}</p>
-                  <p className="mt-1 text-xs text-zinc-600">Producto: {evidence?.productCode ?? productCodeForAdminPhase(participant, phase) ?? "No asignado"}</p>
+                  <p className="text-sm font-semibold text-zinc-950">{formatHutPhotoTimelineSlotTitle(slot)}</p>
+                  <p className="mt-1 text-xs text-zinc-600">Producto: {slot.productCode ?? "No asignado"}</p>
                   <p className="mt-1 text-xs text-zinc-600">
-                    {evidence ? `Capturada: ${formatDateTime(evidence.capturedAt, studyTimeZone)}` : "Foto pendiente"}
+                    {slot.evidence ? `Capturada: ${formatDateTime(slot.evidence.capturedAt, studyTimeZone)}` : "Foto pendiente"}
                   </p>
                 </div>
-                <StatusBadge status={evidence ? "ready" : "planned"}>{evidence ? "Registrada" : "Pendiente"}</StatusBadge>
+                <StatusBadge status={slot.evidence ? "ready" : "planned"}>{slot.evidence ? "Registrada" : "Pendiente"}</StatusBadge>
               </div>
-              {evidence?.signedUrl ? (
-                <a className="mt-3 inline-flex text-sm font-semibold text-teal-700 hover:text-teal-800" href={evidence.signedUrl} rel="noreferrer" target="_blank">
-                  Ver foto
-                </a>
+              {slot.evidence?.source === "PHASE_EVIDENCE" ? (
+                <AdminPhaseEvidenceLink evidence={applicationEvidence.find((item) => item.phase === slot.evidence?.phase) ?? null} />
               ) : null}
             </div>
-          );
-        })}
+          ))}
+        </div>
+      </div>
+      <div className="mt-4">
+        <h5 className="text-sm font-semibold text-emerald-950">Evaluaciones</h5>
+        <div className="mt-3 space-y-3">
+          {evaluationSlots.map((slot) => (
+            <div className="rounded-md border border-emerald-200 bg-white p-3" key={slot.id}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-zinc-950">{formatHutPhotoTimelineSlotTitle(slot)}</p>
+                  <p className="mt-1 text-xs text-zinc-600">Encuestador: {slot.interviewerTask}</p>
+                  <p className="mt-1 text-xs text-zinc-600">Producto: {slot.productCode ?? "No asignado"}</p>
+                  <p className="mt-1 text-xs text-zinc-600">
+                    {slot.evidence ? `Registro historico: ${formatDateTime(slot.evidence.capturedAt, studyTimeZone)}` : "Visita pendiente"}
+                  </p>
+                </div>
+                <StatusBadge status={slot.evidence ? "ready" : "planned"}>{slot.evidence ? "Registrada" : "Pendiente"}</StatusBadge>
+              </div>
+              {slot.evidence?.source === "PHASE_EVIDENCE" ? (
+                <AdminPhaseEvidenceLink evidence={applicationEvidence.find((item) => item.phase === slot.evidence?.phase) ?? null} />
+              ) : null}
+            </div>
+          ))}
+        </div>
       </div>
       {showAdminResetTools ? (
         <details className="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3">
@@ -890,9 +933,9 @@ function ApplicationPhotoProtocolCard({
             <label className="flex flex-col gap-1 text-xs font-semibold text-rose-950">
               Fase
               <select className={inputClass} name="phase" required>
-                <option value="COLOCACION">Colocacion / entrega 1</option>
-                <option value="REGRESO_1">Regreso 1 / evaluacion 1 / entrega 2</option>
-                <option value="REGRESO_2">Regreso 2 / evaluacion 2</option>
+                <option value="COLOCACION">Producto 1 - Dia 1 (Colocacion)</option>
+                <option value="REGRESO_1">Evaluacion 1 - registro historico</option>
+                <option value="REGRESO_2">Evaluacion 2 - registro historico</option>
               </select>
             </label>
             <textarea className={inputClass} name="reason" placeholder="Motivo obligatorio" required rows={2} />
@@ -902,6 +945,22 @@ function ApplicationPhotoProtocolCard({
         </details>
       ) : null}
     </section>
+  );
+}
+
+function AdminPhaseEvidenceLink({
+  evidence
+}: {
+  evidence: HutAdminParticipant["applicationEvidence"][number] | null;
+}) {
+  if (!evidence?.signedUrl) {
+    return null;
+  }
+
+  return (
+    <a className="mt-3 inline-flex text-sm font-semibold text-teal-700 hover:text-teal-800" href={evidence.signedUrl} rel="noreferrer" target="_blank">
+      Ver registro
+    </a>
   );
 }
 
@@ -1027,13 +1086,6 @@ function ApplicationPhotoQuestionnaireCard({
   );
 }
 
-function productCodeForAdminPhase(participant: HutAdminParticipant, phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2") {
-  if (phase === "COLOCACION") {
-    return participant.firstFragranceLeftArm;
-  }
-  return participant.secondFragranceRightArm;
-}
-
 function applicationPhotoCurrentPhaseLabel(participant: HutAdminParticipant): string {
   const currentPhase = applicationPhotoCurrentPhase(participant);
   return currentPhase === "COMPLETED" ? "Completado" : hutPhaseLabel(currentPhase);
@@ -1051,9 +1103,9 @@ function applicationPhotoCurrentPhase(participant: HutAdminParticipant): "COLOCA
 
 function hutPhaseLabel(phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2") {
   const labels = {
-    COLOCACION: "Colocacion / entrega 1",
-    REGRESO_1: "Regreso 1 / evaluacion 1",
-    REGRESO_2: "Regreso 2 / evaluacion 2"
+    COLOCACION: "Producto 1 - Dia 1 (Colocacion)",
+    REGRESO_1: "Evaluacion 1",
+    REGRESO_2: "Evaluacion 2"
   } as const;
   return labels[phase];
 }
