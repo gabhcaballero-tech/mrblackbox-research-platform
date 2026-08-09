@@ -6,6 +6,11 @@ import {
   createHutOperationsRepository,
   formatHutOperationsDateTime
 } from "@/modules/hut-operations";
+import {
+  formatHutPhotoTimelineSlotTitle,
+  resolveHutPhotoTimelinePhaseLabel,
+  resolveHutPhotoTimelineUseDayLabel
+} from "@/modules/hut";
 import type { HutOperationsDetail, HutOperationsListItem } from "@/modules/hut-operations";
 import { requireCapability } from "@/shared/auth/session";
 import { AppShell } from "@/shared/ui/AppShell";
@@ -205,11 +210,38 @@ function OperationsDetail({
         </div>
       </DetailSection>
 
+      <DetailSection title="Cronograma HUT">
+        <div className="grid gap-2">
+          {detail.photoTimeline.map((slot) => (
+            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={slot.id}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{slot.dayLabel}</p>
+                  <p className="font-semibold text-zinc-950">{formatHutPhotoTimelineSlotTitle(slot)}</p>
+                  <p className="text-zinc-600">
+                    Participante: {slot.participantTask ?? "Sin captura fotografica"}{slot.interviewerTask ? ` / Encuestador: ${slot.interviewerTask}` : ""}
+                  </p>
+                  <p className="text-zinc-600">Producto: {slot.productCode ?? "No asignado"}</p>
+                  {slot.evidence ? (
+                    <p className="text-zinc-600">Foto: {formatHutOperationsDateTime(slot.evidence.capturedAt, timeZoneIana)}</p>
+                  ) : (
+                    <p className="text-zinc-600">{slot.isCapturableWithCurrentModel ? "Pendiente" : "Proxima actividad programada"}</p>
+                  )}
+                </div>
+                <StatusBadge status={slot.status === "COMPLETED" ? "ready" : slot.status === "CURRENT" ? "planned" : "blocked"}>
+                  {slot.status === "COMPLETED" ? "Completado" : slot.status === "CURRENT" ? "Disponible" : slot.isCapturableWithCurrentModel ? "Pendiente" : "Programado"}
+                </StatusBadge>
+              </div>
+            </div>
+          ))}
+        </div>
+      </DetailSection>
+
       <DetailSection title="Fases y codigos HUT">
         <div className="grid gap-2">
           {detail.phaseCodes.map((code) => (
             <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={`${code.phase}-${code.slot}`}>
-              <p className="font-semibold text-zinc-950">{code.phase} / slot {code.slot} / {code.status}</p>
+              <p className="font-semibold text-zinc-950">{resolveHutPhotoTimelinePhaseLabel(code.phase)} / slot {code.slot} / {code.status}</p>
               <p className="text-zinc-600">
                 Enviado: {formatHutOperationsDateTime(code.sentAt, timeZoneIana) || "-"} / Validado:{" "}
                 {formatHutOperationsDateTime(code.validatedAt, timeZoneIana) || "-"} / Usado:{" "}
@@ -236,13 +268,17 @@ function OperationsDetail({
         </div>
       </DetailSection>
 
-      <DetailSection title="Fotos de aplicacion">
+      <DetailSection title="Fotos recibidas">
         <div className="grid gap-2 sm:grid-cols-2">
           {detail.photos.map((photo) => (
-            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={`${photo.capturedLocalDate}-${photo.useDayNumber}`}>
-              <p className="font-semibold text-zinc-950">Dia {photo.useDayNumber} / {photo.productCode ?? "sin producto"}</p>
+            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={`${photo.source}-${photo.phase ?? photo.capturedLocalDate}-${photo.useDayNumber}-${photo.capturedAt.toISOString()}`}>
+              <p className="font-semibold text-zinc-950">
+                {photo.source === "PHASE_EVIDENCE"
+                  ? resolveHutPhotoTimelinePhaseLabel(photo.phase)
+                  : resolveHutPhotoTimelineUseDayLabel(photo.useDayNumber)} / {photo.productCode ?? "sin producto"}
+              </p>
               <p className="text-zinc-600">
-                {photo.capturedLocalDate} / {formatHutOperationsDateTime(photo.capturedAt, timeZoneIana)}
+                {photo.capturedLocalDate || "Evidencia de fase"} / {formatHutOperationsDateTime(photo.capturedAt, timeZoneIana)}
               </p>
             </div>
           ))}

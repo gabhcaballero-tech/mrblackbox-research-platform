@@ -33,6 +33,11 @@ describe("hut operations", () => {
       hutEva2: "583",
       navigoRotationCode: "ROT-1"
     });
+    expect(dashboard?.detail?.photoTimeline[0]).toMatchObject({
+      dayLabel: "Dia 0",
+      status: "COMPLETED",
+      title: "Entrega del producto"
+    });
     expect(dashboard?.detail?.answerGroups.some((group) => group.answers.some((answer) => answer.code === "HUT_PARTICIPO_CLT"))).toBe(true);
     expect(dashboard?.detail?.timeline.length).toBeGreaterThan(0);
   });
@@ -76,6 +81,13 @@ function createFakePrisma(): Parameters<typeof createHutOperationsRepository>[0]
           capturedLocalDate: "2026-08-08",
           productCode: "247",
           useDayNumber: 1
+        }
+      ],
+      applicationEvidence: [
+        {
+          capturedAt: new Date("2026-08-08T06:40:00.000Z"),
+          phase: "COLOCACION",
+          productCode: "247"
         }
       ],
       createdAt: new Date("2026-08-08T06:00:00.000Z"),

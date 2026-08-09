@@ -1060,7 +1060,7 @@ describe("HUT module foundation", () => {
     expect(result.ok ? "" : result.message).toContain("Slot 1 esta asociado a REGRESO_2");
   });
 
-  it("requires phase code before application photo uploads without questionnaire prerequisite", async () => {
+  it("keeps phase codes auditable without blocking application photo uploads", async () => {
     vi.stubEnv("HUT_PHASE_CODE_SECRET", "hut-phase-secret-for-tests");
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
@@ -1083,7 +1083,7 @@ describe("HUT module foundation", () => {
     });
 
     const viewBefore = await repository.getPortalView(participant.token);
-    const blockedUpload = await repository.requestApplicationPhotoUpload({
+    const upload = await repository.requestApplicationPhotoUpload({
       metadata: selfieMetadata(),
       storage,
       token: participant.token
@@ -1099,11 +1099,6 @@ describe("HUT module foundation", () => {
       token: participant.token
     });
     const viewAfter = await repository.getPortalView(participant.token);
-    const upload = await repository.requestApplicationPhotoUpload({
-      metadata: selfieMetadata(),
-      storage,
-      token: participant.token
-    });
     await repository.confirmApplicationPhotoUpload({
       metadata: {
         ...selfieMetadata(),
@@ -1113,15 +1108,8 @@ describe("HUT module foundation", () => {
       token: participant.token
     });
 
-    expect(viewBefore.ok ? viewBefore.data.phaseGate : null).toMatchObject({
-      phase: "COLOCACION",
-      required: true,
-      status: "GENERATED"
-    });
-    expect(blockedUpload).toMatchObject({
-      message: "Captura el codigo de Colocacion / Entrega 1 antes de continuar.",
-      ok: false
-    });
+    expect(viewBefore.ok ? viewBefore.data.phaseGate : null).toBeNull();
+    expect(upload.ok).toBe(true);
     expect(invalid).toMatchObject({
       message: "El codigo HUT no es correcto.",
       ok: false
@@ -1130,16 +1118,66 @@ describe("HUT module foundation", () => {
       data: { phase: "COLOCACION" },
       ok: true
     });
-    expect(viewAfter.ok ? viewAfter.data.phaseGate : null).toMatchObject({
-      phase: "COLOCACION",
-      required: false,
-      status: "VALIDATED"
-    });
-    expect(upload.ok).toBe(true);
+    expect(viewAfter.ok ? viewAfter.data.phaseGate : null).toBeNull();
     expect(prisma.state.phaseCodes.find((code) => code.phase === "COLOCACION")).toMatchObject({
       status: "USED"
     });
     expect(prisma.state.participants[0]?.applicationEvidence).toHaveLength(1);
+  });
+
+  it("allows application after historical delivery evidence without exposing a phase gate", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      folio: "NAV-005",
+      firstFragranceLeftArm: "247",
+      name: "Participante Entrega Historica",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      startDate: new Date("2026-07-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    participant.status = "BLOCK_1_CALL_PENDING";
+    participant.phaseCodes.push({
+      codeHash: "hash-regreso-1",
+      encryptedCode: "encrypted-regreso-1",
+      id: "phase-regreso-1",
+      participantId: participant.id,
+      phase: "REGRESO_1",
+      slot: 2,
+      status: "GENERATED"
+    });
+    participant.applicationEvidence.push({
+      capturedAt: new Date("2026-08-07T12:00:00.000Z"),
+      extension: "jpg",
+      id: "delivery-evidence-1",
+      mimeType: "image/jpeg",
+      originalFilename: "entrega.jpg",
+      participantId: participant.id,
+      phase: "COLOCACION",
+      privateStorageKey: "hut/delivery.jpg",
+      productCode: "247",
+      sizeBytes: 1024,
+      storageBucket: "participant-evidence"
+    });
+
+    const view = await repository.getPortalView(participant.token);
+    const upload = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      storage,
+      token: participant.token
+    });
+
+    expect(view.ok ? view.data.phaseGate : null).toBeNull();
+    expect(view.ok ? view.data.availableApplicationPhoto : null).toMatchObject({
+      phase: "REGRESO_1",
+      productCode: "583"
+    });
+    expect(upload.ok ? upload.data : null).toMatchObject({
+      phase: "REGRESO_1",
+      productCode: "583"
+    });
   });
 
   it("does not allow the participant token portal to save HUT questionnaire answers", async () => {

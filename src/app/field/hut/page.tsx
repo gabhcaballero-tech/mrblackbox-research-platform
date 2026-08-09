@@ -1,8 +1,14 @@
 import {
+  buildHutPhotoTimeline,
   createHutRepository,
+  formatHutPhotoTimelineSlotTitle,
   getHutQuestions,
   getHutV5Definition,
+  resolveHutPhotoTimelinePhaseLabel,
+  resolveHutPhotoTimelineUseDayLabel,
+  resolveHutOperationalStatusLabel,
   type HutFieldQuestionnaireWorkspace,
+  type HutPhotoTimelineSlot,
   type HutQuestionDefinition,
   type HutQuestionnaireSectionId
 } from "@/modules/hut";
@@ -139,19 +145,46 @@ function FieldHutWorkspace({
           <Fact label="EVA1" value={workspace.rotation.eva1 ?? "No asignada"} />
           <Fact label="EVA2" value={workspace.rotation.eva2 ?? "No asignada"} />
           <Fact label="Sección actual" value={nextQuestion ? sectionTitle(nextQuestion.section) : "Sin preguntas pendientes"} />
-          <Fact label="Estado HUT" value={statusLabel(workspace.participant.status)} />
+          <Fact label="Estado HUT" value={resolveHutOperationalStatusLabel(workspace.participant.status)} />
           <Fact label="Modo prueba" value={workspace.participant.testMode ? "Activo" : "Inactivo"} />
         </div>
       </section>
 
       <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-        <h3 className="text-lg font-semibold text-zinc-950">Evidencias fotográficas</h3>
+        <h3 className="text-lg font-semibold text-zinc-950">Cronograma HUT</h3>
+        <div className="mt-4 grid gap-3">
+          {buildFieldPhotoTimeline(workspace).map((slot) => (
+            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={slot.id}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{slot.dayLabel}</p>
+                  <p className="mt-1 font-semibold text-zinc-950">{formatHutPhotoTimelineSlotTitle(slot)}</p>
+                  <p className="mt-1 text-zinc-600">
+                    Participante: {slot.participantTask ?? "Sin captura fotografica"}{slot.interviewerTask ? ` / Encuestador: ${slot.interviewerTask}` : ""}
+                  </p>
+                  <p className="mt-1 text-zinc-600">Producto: {slot.productCode ?? "No asignado"}</p>
+                  {slot.evidence?.capturedAt ? <p className="mt-1 text-zinc-600">Foto: {slot.evidence.capturedAt.toLocaleString("es-MX")}</p> : null}
+                  {!slot.isCapturableWithCurrentModel && !slot.evidence ? <p className="mt-1 text-zinc-600">Proxima actividad programada</p> : null}
+                </div>
+                <StatusBadge status={slot.status === "COMPLETED" ? "ready" : slot.status === "CURRENT" ? "planned" : "blocked"}>
+                  {fieldTimelineStatusLabel(slot)}
+                </StatusBadge>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+        <h3 className="text-lg font-semibold text-zinc-950">Fotos recibidas</h3>
         {workspace.photos.length ? (
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {workspace.photos.map((photo, index) => (
               <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={`${photo.source}-${photo.capturedAt.toISOString()}-${index}`}>
                 <p className="font-semibold text-zinc-950">
-                  {photo.phase ?? `Día ${photo.useDayNumber ?? "-"}`}
+                  {photo.source === "PHASE_EVIDENCE"
+                    ? resolveHutPhotoTimelinePhaseLabel(photo.phase)
+                    : resolveHutPhotoTimelineUseDayLabel(photo.useDayNumber)}
                 </p>
                 <p className="mt-1 text-zinc-600">Producto: {photo.productCode ?? "No asignado"}</p>
                 <p className="text-zinc-600">Fecha: {photo.capturedAt.toLocaleString("es-MX")}</p>
@@ -173,7 +206,7 @@ function FieldHutWorkspace({
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {workspace.phaseCodes.map((phaseCode) => (
             <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={phaseCode.phase}>
-              <p className="font-semibold text-zinc-950">{phaseCode.label}</p>
+              <p className="font-semibold text-zinc-950">{resolveHutPhotoTimelinePhaseLabel(phaseCode.phase)}</p>
               <p className="mt-1 text-zinc-600">Estado: {statusLabel(phaseCode.status)}</p>
             </div>
           ))}
@@ -542,6 +575,40 @@ function resolveHutQuestionText(text: string, workspace: HutFieldQuestionnaireWo
 
 function resolveHutReference(source: string, workspace: HutFieldQuestionnaireWorkspace): string {
   return resolveHutQuestionText(source, workspace);
+}
+
+function buildFieldPhotoTimeline(workspace: HutFieldQuestionnaireWorkspace): HutPhotoTimelineSlot[] {
+  return buildHutPhotoTimeline({
+    applicationEvidence: workspace.photos
+      .filter((photo) => photo.source === "PHASE_EVIDENCE" && photo.phase)
+      .map((photo) => ({
+        capturedAt: photo.capturedAt,
+        phase: photo.phase!,
+        productCode: photo.productCode
+      })),
+    dailyEntries: workspace.photos
+      .filter((photo) => photo.source === "DAILY_ENTRY")
+      .map((photo) => ({
+        capturedAt: photo.capturedAt,
+        capturedLocalDate: photo.capturedLocalDate,
+        productCode: photo.productCode,
+        useDayNumber: photo.useDayNumber
+      })),
+    rotation: {
+      eva1: workspace.rotation.eva1,
+      eva2: workspace.rotation.eva2
+    }
+  });
+}
+
+function fieldTimelineStatusLabel(slot: HutPhotoTimelineSlot): string {
+  if (slot.status === "COMPLETED") {
+    return "Completado";
+  }
+  if (slot.status === "CURRENT") {
+    return "Disponible";
+  }
+  return slot.isCapturableWithCurrentModel ? "Pendiente" : "Programado";
 }
 
 function scaleLabel(question: Extract<HutQuestionDefinition, { type: "SCALE" }>, value: number): string {

@@ -148,11 +148,10 @@ describe("HutParticipantPage", () => {
     expect(screen.getByText("Formulario de foto 247")).toBeInTheDocument();
     expect(screen.getAllByText("Seguimiento fotografico").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Entrega del producto").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Colocacion")).toBeInTheDocument();
-    expect(screen.getByText("Evaluacion 1 - Dia 1")).toBeInTheDocument();
-    expect(screen.getByText("Evaluacion 1 - Dia 2")).toBeInTheDocument();
-    expect(screen.getByText("Evaluacion 1 - Dia 3")).toBeInTheDocument();
-    expect(screen.getByText("Evaluacion 2 - Dia 1")).toBeInTheDocument();
+    expect(screen.getByText("Aplicacion / Evaluacion 1")).toBeInTheDocument();
+    expect(screen.getAllByText("Seguimiento HUT").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByText("Evaluacion 2")).toBeInTheDocument();
+    expect(screen.getByText("Regreso final")).toBeInTheDocument();
     expect(screen.queryByText("Codigo requerido")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Validar codigo" })).not.toBeInTheDocument();
     expect(screen.queryByText("Cuestionario HUT v5")).not.toBeInTheDocument();
@@ -319,12 +318,15 @@ describe("HutParticipantPage", () => {
 
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
+    expect(screen.getByText("En seguimiento")).toBeInTheDocument();
     expect(screen.getAllByText("Entrega del producto").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Foto registrada").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Producto: 247").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Colocacion")).toBeInTheDocument();
-    expect(screen.getAllByText("Evaluacion 1 - Dia 1").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Aplicacion / Evaluacion 1").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Formulario de foto 583")).toBeInTheDocument();
+    expect(screen.queryByText("Llamada pendiente")).not.toBeInTheDocument();
+    expect(screen.queryByText("BLOCK_1_CALL_PENDING")).not.toBeInTheDocument();
+    expect(screen.queryByText("Codigo requerido")).not.toBeInTheDocument();
   });
 
   it("muestra todos los slots fotograficos aunque no tengan evidencia", async () => {
@@ -345,11 +347,10 @@ describe("HutParticipantPage", () => {
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
     expect(screen.getByText("Entrega del producto")).toBeInTheDocument();
-    expect(screen.getByText("Colocacion")).toBeInTheDocument();
-    expect(screen.getByText("Evaluacion 1 - Dia 1")).toBeInTheDocument();
-    expect(screen.getByText("Evaluacion 1 - Dia 2")).toBeInTheDocument();
-    expect(screen.getByText("Evaluacion 1 - Dia 3")).toBeInTheDocument();
-    expect(screen.getByText("Evaluacion 2 - Dia 1")).toBeInTheDocument();
+    expect(screen.getByText("Aplicacion / Evaluacion 1")).toBeInTheDocument();
+    expect(screen.getAllByText("Seguimiento HUT").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByText("Evaluacion 2")).toBeInTheDocument();
+    expect(screen.getByText("Regreso final")).toBeInTheDocument();
     expect(screen.getAllByText("Pendiente").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Tu proxima actividad estara disponible/)).toBeInTheDocument();
   });

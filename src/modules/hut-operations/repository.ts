@@ -1,5 +1,9 @@
 import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
 import {
+  buildHutPhotoTimeline,
+  resolveHutOperationalStatusLabel
+} from "@/modules/hut";
+import {
   buildHutAnswerGroups,
   getHutQuestionCount,
   latestTimelineDate,
@@ -77,6 +81,16 @@ export function createHutOperationsRepository(prismaClient?: HutOperationsPrisma
 }
 
 const hutParticipantSelect = {
+  applicationEvidence: {
+    orderBy: [
+      { capturedAt: "asc" }
+    ],
+    select: {
+      capturedAt: true,
+      phase: true,
+      productCode: true
+    }
+  },
   applicationPhotoEntries: {
     orderBy: [
       { capturedAt: "desc" }
@@ -177,6 +191,11 @@ type StudyRecord = {
 };
 
 type HutParticipantRecord = {
+  applicationEvidence: Array<{
+    capturedAt: Date;
+    phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2";
+    productCode: string | null;
+  }>;
   applicationPhotoEntries: Array<{
     capturedAt: Date;
     capturedLocalDate: string;
@@ -252,6 +271,14 @@ function toDetail(participant: HutParticipantRecord): HutOperationsDetail {
     status: visit.status
   })) ?? [];
   const photos = toPhotos(participant);
+  const photoTimeline = buildHutPhotoTimeline({
+    applicationEvidence: participant.applicationEvidence,
+    dailyEntries: participant.applicationPhotoEntries,
+    rotation: {
+      eva1: participant.firstFragranceLeftArm,
+      eva2: participant.secondFragranceRightArm
+    }
+  });
   const timeline = buildTimeline(participant);
   const rotation = toRotation(participant);
 
@@ -273,7 +300,8 @@ function toDetail(participant: HutParticipantRecord): HutOperationsDetail {
       phone: participant.phone
     },
     phaseCodes: participant.phaseCodes,
-    photoCount: photos.length,
+    photoTimeline,
+    photoCount: photoTimeline.filter((slot) => slot.evidence).length,
     photos,
     protocolVersion: participant.protocolVersion,
     questionnaireProgressLabel: resolveHutQuestionnaireProgress(answerCount, questionCount),
@@ -288,7 +316,14 @@ function resolveCurrentPhase(participant: HutParticipantRecord): string {
   const pendingPhase = participant.phaseCodes.find((code) => !["USED", "VALIDATED"].includes(code.status));
 
   if (pendingPhase) {
-    return pendingPhase.phase;
+    const timeline = buildHutPhotoTimeline({
+      availablePhase: pendingPhase.phase as "COLOCACION" | "REGRESO_1" | "REGRESO_2",
+      rotation: {
+        eva1: participant.firstFragranceLeftArm,
+        eva2: participant.secondFragranceRightArm
+      }
+    });
+    return timeline.find((slot) => slot.status === "CURRENT")?.title ?? pendingPhase.phase;
   }
 
   const activeVisit = participant.questionnaireAttempt?.visits.find((visit) => visit.status !== "COMPLETED");
@@ -296,7 +331,7 @@ function resolveCurrentPhase(participant: HutParticipantRecord): string {
     return activeVisit.section;
   }
 
-  return participant.questionnaireAttempt?.status === "COMPLETED" ? "COMPLETADO" : participant.status;
+  return participant.questionnaireAttempt?.status === "COMPLETED" ? "COMPLETADO" : resolveHutOperationalStatusLabel(participant.status);
 }
 
 function toRotation(participant: HutParticipantRecord): HutOperationsRotationSummary {
@@ -308,12 +343,24 @@ function toRotation(participant: HutParticipantRecord): HutOperationsRotationSum
 }
 
 function toPhotos(participant: HutParticipantRecord): HutOperationsPhotoSummary[] {
-  return participant.applicationPhotoEntries.map((photo) => ({
+  const phasePhotos = participant.applicationEvidence.map((photo) => ({
+    capturedAt: photo.capturedAt,
+    capturedLocalDate: "",
+    phase: photo.phase,
+    productCode: photo.productCode,
+    source: "PHASE_EVIDENCE" as const,
+    useDayNumber: 0
+  }));
+  const dailyPhotos = participant.applicationPhotoEntries.map((photo) => ({
     capturedAt: photo.capturedAt,
     capturedLocalDate: photo.capturedLocalDate,
+    phase: null,
     productCode: photo.productCode,
+    source: "DAILY_ENTRY" as const,
     useDayNumber: photo.useDayNumber
   }));
+
+  return [...phasePhotos, ...dailyPhotos].sort((left, right) => left.capturedAt.getTime() - right.capturedAt.getTime());
 }
 
 function buildTimeline(participant: HutParticipantRecord): HutOperationsTimelineItem[] {

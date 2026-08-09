@@ -64,10 +64,21 @@ export {
   normalizeHutPhaseCode,
   resolveHutPhaseCodeSecret
 } from "./phase-codes";
+export {
+  buildHutPhotoTimeline,
+  formatHutPhotoTimelineSlotTitle,
+  resolveHutPhotoTimelinePhaseLabel,
+  resolveHutPhotoTimelineUseDayLabel,
+  resolveHutOperationalStatusLabel
+} from "./photo-timeline";
 export type {
   HutPhase,
   HutPhaseCodeStatus
 } from "./phase-codes";
+export type {
+  HutPhotoTimelinePhoto,
+  HutPhotoTimelineSlot
+} from "./photo-timeline";
 export type {
   HutSignedVideoUpload,
   HutVideoUploadMetadata

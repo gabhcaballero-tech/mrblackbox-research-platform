@@ -4734,10 +4734,9 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
 }
 
 function toApplicationPhotoPortalView(participant: HutParticipantRecord): HutPortalView {
-  const phaseGate = currentHutPhaseGate(participant);
   const nextPhase = expectedApplicationPhotoPhase(participant);
   const evidence = applicationEvidenceSummary(participant);
-  const availableApplicationPhoto = nextPhase && !phaseGate?.required
+  const availableApplicationPhoto = nextPhase
     ? {
         phase: nextPhase,
         productCode: hutProductCodeForPhase(participant, nextPhase)
@@ -4758,7 +4757,7 @@ function toApplicationPhotoPortalView(participant: HutParticipantRecord): HutPor
     message: applicationPhotoPortalMessage(participant),
     name: hutParticipantDisplayName(participant),
     origin: participantOrigin(participant),
-    phaseGate,
+    phaseGate: null,
     participantId: participant.id,
     protocolVersion: "APPLICATION_PHOTO",
     rotation: hutParticipantRotation(participant),
@@ -4861,24 +4860,10 @@ async function toFieldPhotoSummaries(
 }
 
 function currentHutPhaseGate(participant: HutParticipantRecord): HutPortalView["phaseGate"] {
-  if (!isApplicationPhotoProtocol(participant)) {
-    return null;
-  }
-
-  const phase = expectedApplicationPhotoPhase(participant);
-  const phaseCode = phase ? participant.phaseCodes?.find((code) => code.phase === phase) ?? null : null;
-
-  if (!phase) {
-    return null;
-  }
-
-  return {
-    label: hutPhaseLabel(phase),
-    phase,
-    required: !phaseCode || (phaseCode.status !== "USED" && phaseCode.status !== "VALIDATED"),
-    status: phaseCode?.status ?? "MISSING"
-  };
+  void participant;
+  return null;
 }
+
 
 function expectedHutPhaseForParticipant(participant: HutParticipantRecord): HutPhase | null {
   if (isApplicationPhotoProtocol(participant)) {

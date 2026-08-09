@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 import {
+  buildHutPhotoTimeline,
   createHutRepository,
+  resolveHutOperationalStatusLabel,
   type HutApplicationPhotoDailyAvailability,
+  type HutPhotoTimelineSlot,
   type HutPortalView
 } from "@/modules/hut";
 import { validateHutPhaseCodeAction } from "@/modules/hut/actions";
@@ -59,7 +62,7 @@ export default async function HutParticipantPage({ params, searchParams }: HutPa
               <p className="mt-3 text-sm leading-6 text-zinc-600">{portalIntroMessage(view)}</p>
             </div>
             <StatusBadge status={view.status === "DISQUALIFIED" ? "blocked" : "ready"}>
-              {hutParticipantStatusLabel(view.status)}
+              {hutParticipantStatusLabel(view)}
             </StatusBadge>
           </div>
           <div className="mt-5 grid gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm sm:grid-cols-2">
@@ -231,7 +234,7 @@ function CompletionMessage() {
 
 function ProgressSummary({ view }: { view: HutPortalView }) {
   if (view.protocolVersion === "APPLICATION_PHOTO") {
-    const slots = buildPhotoSlots(view);
+    const slots = buildPortalPhotoTimeline(view);
     return (
       <section className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -247,13 +250,13 @@ function ProgressSummary({ view }: { view: HutPortalView }) {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="font-semibold text-zinc-950">{slot.title}</p>
-                  <p className="mt-1 text-zinc-600">{slot.description}</p>
+                  <p className="mt-1 text-zinc-600">{participantSlotDescription(slot)}</p>
                   {slot.productCode ? <p className="mt-1 text-zinc-600">Producto: {slot.productCode}</p> : null}
-                  {slot.capturedAt ? <p className="mt-1 text-zinc-600">Fecha: {slot.capturedAt.toLocaleString("es-MX")}</p> : null}
+                  {slot.evidence?.capturedAt ? <p className="mt-1 text-zinc-600">Fecha: {slot.evidence.capturedAt.toLocaleString("es-MX")}</p> : null}
                   {slot.availableDate ? <p className="mt-1 text-zinc-600">Fecha disponible: {slot.availableDate}</p> : null}
                 </div>
                 <StatusBadge status={slot.status === "COMPLETED" ? "ready" : slot.status === "CURRENT" ? "planned" : "blocked"}>
-                  {slot.status === "COMPLETED" ? "Foto registrada" : slot.status === "CURRENT" ? "Disponible" : "Pendiente"}
+                  {photoTimelineStatusLabel(slot)}
                 </StatusBadge>
               </div>
             </div>
@@ -281,87 +284,24 @@ function BlockSummary({ label, missed, videos }: { label: string; missed: number
   );
 }
 
-type PhotoTrackingSlot = {
-  availableDate: string | null;
-  capturedAt: Date | null;
-  description: string;
-  id: string;
-  productCode: string | null;
-  status: "COMPLETED" | "CURRENT" | "PENDING";
-  title: string;
-};
-
-function buildPhotoSlots(view: HutPortalView): PhotoTrackingSlot[] {
-  const evidenceByPhase = new Map(view.applicationEvidence.map((item) => [item.phase, item]));
-  const currentPhase = view.phaseGate?.phase ?? view.availableApplicationPhoto?.phase ?? null;
-  const nextAvailableDate = view.availability.nextAvailableAt?.toLocaleDateString("es-MX") ?? null;
-  const deliveryEvidence = evidenceByPhase.get("COLOCACION") ?? null;
-  const evaluation1Evidence = evidenceByPhase.get("REGRESO_1") ?? null;
-  const evaluation2Evidence = evidenceByPhase.get("REGRESO_2") ?? null;
-
-  return [
-    {
-      availableDate: null,
-      capturedAt: deliveryEvidence?.capturedAt ?? null,
-      description: "Foto requerida para confirmar que recibiste el producto.",
-      id: "ENTREGA",
-      productCode: deliveryEvidence?.productCode ?? view.rotation.firstFragranceLeftArm,
-      status: deliveryEvidence ? "COMPLETED" : currentPhase === "COLOCACION" ? "CURRENT" : "PENDING",
-      title: "Entrega del producto"
-    },
-    {
-      availableDate: null,
-      capturedAt: null,
-      description: "Foto pendiente de aplicacion o colocacion cuando el equipo lo indique.",
-      id: "COLOCACION_VISUAL",
-      productCode: view.rotation.firstFragranceLeftArm,
-      status: "PENDING",
-      title: "Colocacion"
-    },
-    {
-      availableDate: nextAvailableDate,
-      capturedAt: evaluation1Evidence?.capturedAt ?? null,
-      description: "Slot fotografico de seguimiento.",
-      id: "EVALUACION_1_DIA_1",
-      productCode: evaluation1Evidence?.productCode ?? view.rotation.secondFragranceRightArm,
-      status: evaluation1Evidence ? "COMPLETED" : currentPhase === "REGRESO_1" ? "CURRENT" : "PENDING",
-      title: "Evaluacion 1 - Dia 1"
-    },
-    {
-      availableDate: null,
-      capturedAt: null,
-      description: "Cuando llegue el momento recibiras instrucciones.",
-      id: "EVALUACION_1_DIA_2",
-      productCode: view.rotation.secondFragranceRightArm,
-      status: "PENDING",
-      title: "Evaluacion 1 - Dia 2"
-    },
-    {
-      availableDate: null,
-      capturedAt: null,
-      description: "Cuando llegue el momento recibiras instrucciones.",
-      id: "EVALUACION_1_DIA_3",
-      productCode: view.rotation.secondFragranceRightArm,
-      status: "PENDING",
-      title: "Evaluacion 1 - Dia 3"
-    },
-    {
-      availableDate: nextAvailableDate,
-      capturedAt: evaluation2Evidence?.capturedAt ?? null,
-      description: "Slot fotografico de seguimiento.",
-      id: "EVALUACION_2_DIA_1",
-      productCode: evaluation2Evidence?.productCode ?? view.rotation.secondFragranceRightArm,
-      status: evaluation2Evidence ? "COMPLETED" : currentPhase === "REGRESO_2" ? "CURRENT" : "PENDING",
-      title: "Evaluacion 2 - Dia 1"
+function buildPortalPhotoTimeline(view: HutPortalView): HutPhotoTimelineSlot[] {
+  return buildHutPhotoTimeline({
+    applicationEvidence: view.applicationEvidence,
+    availablePhase: view.availableApplicationPhoto?.phase ?? null,
+    currentPhase: view.phaseGate?.phase ?? null,
+    nextAvailableAt: view.availability.nextAvailableAt,
+    rotation: {
+      eva1: view.rotation.firstFragranceLeftArm,
+      eva2: view.rotation.secondFragranceRightArm
     }
-  ];
+  });
 }
 
 function photoSlotTitleForPhase(phase: string): string {
   const labels: Record<string, string> = {
     COLOCACION: "Entrega del producto",
-    REGRESO_1: "Evaluacion 1 - Dia 1",
-    REGRESO_2: "Evaluacion 2 - Dia 1"
+    REGRESO_1: "Aplicacion / Evaluacion 1",
+    REGRESO_2: "Evaluacion 2"
   };
   return labels[phase] ?? phase;
 }
@@ -379,6 +319,26 @@ function nextPhotoActivityMessage(view: HutPortalView): string {
   return "Cuando llegue el momento recibiras instrucciones.";
 }
 
+function participantSlotDescription(slot: HutPhotoTimelineSlot): string {
+  if (slot.status === "COMPLETED") {
+    return "Actividad completada.";
+  }
+  if (slot.status === "CURRENT") {
+    return slot.participantTask ? `${slot.participantTask} requerida.` : "Actividad disponible.";
+  }
+  return slot.isCapturableWithCurrentModel ? "Proxima actividad programada." : "Cuando llegue el momento recibiras instrucciones.";
+}
+
+function photoTimelineStatusLabel(slot: HutPhotoTimelineSlot): string {
+  if (slot.status === "COMPLETED") {
+    return "Foto registrada";
+  }
+  if (slot.status === "CURRENT") {
+    return "Disponible";
+  }
+  return slot.isCapturableWithCurrentModel ? "Pendiente" : "Programada";
+}
+
 function portalIntroMessage(view: HutPortalView): string {
   if (view.protocolVersion !== "APPLICATION_PHOTO") {
     return view.message;
@@ -389,17 +349,20 @@ function portalIntroMessage(view: HutPortalView): string {
   return "Este portal es exclusivo para registrar fotografias. Revisa tus actividades pendientes y sigue las instrucciones del equipo.";
 }
 
-function hutParticipantStatusLabel(status: string) {
+function hutParticipantStatusLabel(view: HutPortalView) {
+  if (view.protocolVersion === "APPLICATION_PHOTO") {
+    return resolveHutOperationalStatusLabel(view.status);
+  }
   const labels: Record<string, string> = {
-    BLOCK_1_CALL_PENDING: "Llamada pendiente",
+    BLOCK_1_CALL_PENDING: "En seguimiento",
     BLOCK_1_IN_PROGRESS: "Bloque 1",
-    BLOCK_2_CALL_PENDING: "Llamada final pendiente",
+    BLOCK_2_CALL_PENDING: "En seguimiento",
     BLOCK_2_IN_PROGRESS: "Bloque 2",
     COMPLETED: "Completado",
     DISQUALIFIED: "No apto",
     NOT_STARTED: "No iniciado"
   };
-  return labels[status] ?? status;
+  return labels[view.status] ?? view.status;
 }
 
 function availabilityMessage(reason: string, nextAvailableAt: Date | null) {

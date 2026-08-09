@@ -1,3 +1,5 @@
+import type { HutPhotoTimelineSlot } from "../hut/photo-timeline";
+
 export type HutOperationsStudy = {
   code: string;
   id: string;
@@ -25,7 +27,9 @@ export type HutOperationsVisitSummary = {
 export type HutOperationsPhotoSummary = {
   capturedAt: Date;
   capturedLocalDate: string;
+  phase: string | null;
   productCode: string | null;
+  source: "DAILY_ENTRY" | "PHASE_EVIDENCE";
   useDayNumber: number;
 };
 
@@ -79,6 +83,7 @@ export type HutOperationsDetail = HutOperationsListItem & {
   answerGroups: HutOperationsAnswerGroup[];
   navigo: HutOperationsNavigoSummary;
   phaseCodes: HutOperationsPhaseCodeSummary[];
+  photoTimeline: HutPhotoTimelineSlot[];
   photos: HutOperationsPhotoSummary[];
   rotation: HutOperationsRotationSummary;
   timeline: HutOperationsTimelineItem[];

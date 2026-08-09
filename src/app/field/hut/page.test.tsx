@@ -41,8 +41,14 @@ describe("FieldHutPage", () => {
     expect(screen.getByText("NAV-121")).toBeInTheDocument();
     expect(screen.getByText("EVA1")).toBeInTheDocument();
     expect(screen.getAllByText("247").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Evidencias fotográficas")).toBeInTheDocument();
-    expect(screen.getByText("Producto: 247")).toBeInTheDocument();
+    expect(screen.getByText("Cronograma HUT")).toBeInTheDocument();
+    expect(screen.getByText("Fotos recibidas")).toBeInTheDocument();
+    expect(screen.getByText("Dia 0")).toBeInTheDocument();
+    expect(screen.getAllByText("Dia 0 Entrega").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Producto: 247").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("COLOCACION")).not.toBeInTheDocument();
+    expect(screen.queryByText("REGRESO_1")).not.toBeInTheDocument();
+    expect(screen.queryByText("REGRESO_2")).not.toBeInTheDocument();
     expect(screen.getByText("Respuestas existentes")).toBeInTheDocument();
     expect(screen.getByText(/Participo anteriormente en CLT/)).toBeInTheDocument();
     expect(screen.getByText("Confirmar entrega del primer perfume")).toBeInTheDocument();
