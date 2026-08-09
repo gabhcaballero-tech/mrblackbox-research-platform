@@ -1680,6 +1680,89 @@ describe("HUT module foundation", () => {
     });
   });
 
+  it("allows product 1 day 1 capture when the existing day 1 entry is only a mirrored legacy delivery photo", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      folio: "NAV-006",
+      firstFragranceLeftArm: "247",
+      name: "Participante Espejo Historico",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      startDate: new Date("2026-07-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    participant.origin = "CLT_HUT";
+    participant.applicationEvidence.push({
+      capturedAt: new Date("2026-08-07T12:00:00.000Z"),
+      extension: "jpg",
+      id: "legacy-placement-evidence",
+      mimeType: "image/jpeg",
+      originalFilename: "entrega.jpg",
+      participantId: participant.id,
+      phase: "COLOCACION",
+      privateStorageKey: "hut/legacy-placement.jpg",
+      productCode: "247",
+      sizeBytes: 1024,
+      storageBucket: "participant-evidence"
+    });
+    participant.applicationPhotoEntries.push({
+      capturedAt: new Date("2026-08-07T12:00:00.000Z"),
+      capturedLocalDate: "2026-08-07",
+      capturedLocalTimezone: "America/Mexico_City",
+      id: "legacy-placement-entry",
+      participantId: participant.id,
+      privateStorageKey: "hut/legacy-placement.jpg",
+      productCode: "247",
+      useDayNumber: 1
+    });
+
+    const view = await repository.getPortalView(participant.token);
+    const upload = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      slotId: "PRODUCT_1_DAY_1",
+      storage,
+      token: participant.token
+    });
+    const confirmed = await repository.confirmApplicationPhotoUpload({
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: upload.ok ? upload.data.privateStorageKey : "",
+        storageBucket: upload.ok ? upload.data.storageBucket : ""
+      },
+      slotId: "PRODUCT_1_DAY_1",
+      token: participant.token
+    });
+    const duplicate = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      slotId: "PRODUCT_1_DAY_1",
+      storage,
+      token: participant.token
+    });
+
+    expect(view.ok ? view.data.legacyMirroredPlacementPhoto : false).toBe(true);
+    expect(view.ok ? view.data.availableApplicationPhoto : null).toMatchObject({
+      phase: "COLOCACION",
+      productCode: "247",
+      slotId: "PRODUCT_1_DAY_1"
+    });
+    expect(upload.ok).toBe(true);
+    expect(confirmed.ok).toBe(true);
+    expect(participant.applicationEvidence.filter((evidence) => evidence.phase === "COLOCACION")).toHaveLength(1);
+    expect(participant.applicationEvidence[0]?.privateStorageKey).toBe("hut/legacy-placement.jpg");
+    expect(participant.applicationPhotoEntries.filter((entry) => entry.useDayNumber === 1)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ privateStorageKey: "hut/legacy-placement.jpg" }),
+        expect.objectContaining({ privateStorageKey: upload.ok ? upload.data.privateStorageKey : "" })
+      ])
+    );
+    expect(duplicate).toMatchObject({
+      message: "Esta foto HUT ya fue registrada.",
+      ok: false
+    });
+  });
+
   it("does not allow the participant token portal to save HUT questionnaire answers", async () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);

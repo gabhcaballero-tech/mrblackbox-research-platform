@@ -854,6 +854,7 @@ function ApplicationPhotoProtocolCard({
       productCode: entry.productCode,
       useDayNumber: entry.useDayNumber
     })),
+    legacyMirroredPlacementPhoto: participant.legacyMirroredPlacementPhoto,
     rotation: {
       eva1: participant.firstFragranceLeftArm,
       eva2: participant.secondFragranceRightArm

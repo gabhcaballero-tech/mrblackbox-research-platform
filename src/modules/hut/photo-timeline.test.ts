@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildHutPhotoTimeline,
   formatHutPhotoTimelineSlotTitle,
+  isLegacyMirroredPlacementPhoto,
   resolveHutPhotoTimelinePhotoLabel,
   resolveHutPhotoTimelinePhaseLabel,
   resolveHutPhotoTimelineUseDayLabel,
@@ -16,6 +17,7 @@ describe("HutPhotoTimeline", () => {
         {
           capturedAt,
           phase: "COLOCACION",
+          privateStorageKey: "hut/legacy-placement.jpg",
           productCode: "247"
         }
       ],
@@ -99,6 +101,7 @@ describe("HutPhotoTimeline", () => {
         {
           capturedAt,
           capturedLocalDate: "2026-08-08",
+          privateStorageKey: "hut/legacy-placement.jpg",
           productCode: "247",
           useDayNumber: 1
         }
@@ -115,6 +118,62 @@ describe("HutPhotoTimeline", () => {
       status: "AVAILABLE"
     });
     expect(timeline.filter((slot) => slot.evidence?.capturedAt.getTime() === capturedAt.getTime())).toHaveLength(1);
+  });
+
+  it("detects a mirrored legacy placement photo only when the stored file, date, product and missing delivery match", () => {
+    const capturedAt = new Date("2026-08-08T06:30:00.000Z");
+
+    expect(
+      isLegacyMirroredPlacementPhoto({
+        colocacionEvidence: {
+          capturedAt,
+          phase: "COLOCACION",
+          privateStorageKey: "hut/legacy-placement.jpg",
+          productCode: "247"
+        },
+        day1Entry: {
+          capturedAt,
+          privateStorageKey: "hut/legacy-placement.jpg",
+          productCode: "247",
+          useDayNumber: 1
+        },
+        deliveryEntry: null
+      })
+    ).toBe(true);
+    expect(
+      isLegacyMirroredPlacementPhoto({
+        colocacionEvidence: {
+          capturedAt,
+          phase: "COLOCACION",
+          privateStorageKey: "hut/legacy-placement.jpg",
+          productCode: "247"
+        },
+        day1Entry: {
+          capturedAt,
+          privateStorageKey: "hut/real-placement.jpg",
+          productCode: "247",
+          useDayNumber: 1
+        },
+        deliveryEntry: null
+      })
+    ).toBe(false);
+    expect(
+      isLegacyMirroredPlacementPhoto({
+        colocacionEvidence: {
+          capturedAt,
+          phase: "COLOCACION",
+          privateStorageKey: "hut/legacy-placement.jpg",
+          productCode: "247"
+        },
+        day1Entry: {
+          capturedAt,
+          privateStorageKey: "hut/legacy-placement.jpg",
+          productCode: "247",
+          useDayNumber: 1
+        },
+        deliveryEntry: { useDayNumber: 0 }
+      })
+    ).toBe(false);
   });
 
   it("falls back to the next missing slot when an explicit available slot is already completed", () => {

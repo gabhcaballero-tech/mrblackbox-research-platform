@@ -6,6 +6,7 @@ export type HutPhotoTimelinePhoto = {
   capturedAt: Date;
   capturedLocalDate?: string | null;
   phase?: HutPhase | null;
+  privateStorageKey?: string | null;
   productCode: string | null;
   source: "DAILY_ENTRY" | "PHASE_EVIDENCE";
   useDayNumber?: number | null;
@@ -44,6 +45,7 @@ export type HutPhotoTimelineInput = {
   applicationEvidence?: Array<{
     capturedAt: Date;
     phase: HutPhase;
+    privateStorageKey?: string | null;
     productCode: string | null;
   }>;
   availableSlotId?: HutPhotoTimelineSlotId | null;
@@ -51,9 +53,11 @@ export type HutPhotoTimelineInput = {
   dailyEntries?: Array<{
     capturedAt: Date;
     capturedLocalDate?: string | null;
+    privateStorageKey?: string | null;
     productCode: string | null;
     useDayNumber?: number | null;
   }>;
+  legacyMirroredPlacementPhoto?: boolean;
   nextAvailableAt?: Date | null;
   photoCaptureBlocked?: boolean;
   now?: Date;
@@ -189,7 +193,23 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
       }
     ])
   );
-  const dailyEntries = dedupeDailyEntries(input.dailyEntries ?? [], phaseEvidence);
+  const rawDailyByUseDay = new Map<number, HutPhotoTimelinePhoto>();
+  for (const entry of input.dailyEntries ?? []) {
+    if (typeof entry.useDayNumber !== "number") {
+      continue;
+    }
+    rawDailyByUseDay.set(entry.useDayNumber, {
+      ...entry,
+      phase: null,
+      source: "DAILY_ENTRY" as const
+    });
+  }
+  const legacyMirroredPlacementPhoto = input.legacyMirroredPlacementPhoto ?? isLegacyMirroredPlacementPhoto({
+    colocacionEvidence: phaseEvidence.get("COLOCACION") ?? null,
+    day1Entry: rawDailyByUseDay.get(1) ?? null,
+    deliveryEntry: rawDailyByUseDay.get(0) ?? null
+  });
+  const dailyEntries = dedupeDailyEntries(input.dailyEntries ?? [], phaseEvidence, legacyMirroredPlacementPhoto);
   const dailyByUseDay = new Map<number, HutPhotoTimelinePhoto>();
   for (const entry of dailyEntries) {
     if (typeof entry.useDayNumber !== "number") {
@@ -204,7 +224,7 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
   const explicitAvailableSlotId = input.availableSlotId ?? null;
   const nextAvailableDate = input.nextAvailableAt ? formatHutTimelineDate(input.nextAvailableAt) : null;
   const preliminarySlots = HUT_PHOTO_TIMELINE_DEFINITIONS.map((definition) => {
-    const evidence = resolveEvidenceForDefinition(definition, phaseEvidence, dailyByUseDay);
+    const evidence = resolveEvidenceForDefinition(definition, phaseEvidence, dailyByUseDay, legacyMirroredPlacementPhoto);
     return buildTimelineSlot({
       availableDate: nextAvailableDate,
       definition,
@@ -350,6 +370,40 @@ export function formatHutTimelineDate(date: Date): string {
   }).format(date);
 }
 
+export function isLegacyMirroredPlacementPhoto(input: {
+  colocacionEvidence?: {
+    capturedAt: Date;
+    phase?: HutPhase | null;
+    privateStorageKey?: string | null;
+    productCode: string | null;
+  } | null;
+  day1Entry?: {
+    capturedAt: Date;
+    privateStorageKey?: string | null;
+    productCode: string | null;
+    useDayNumber?: number | null;
+  } | null;
+  deliveryEntry?: {
+    useDayNumber?: number | null;
+  } | null;
+}): boolean {
+  const evidence = input.colocacionEvidence ?? null;
+  const day1Entry = input.day1Entry ?? null;
+  if (!evidence || !day1Entry || input.deliveryEntry) {
+    return false;
+  }
+  if (evidence.phase !== "COLOCACION" || day1Entry.useDayNumber !== 1) {
+    return false;
+  }
+  if (!evidence.privateStorageKey || !day1Entry.privateStorageKey) {
+    return false;
+  }
+
+  return evidence.privateStorageKey === day1Entry.privateStorageKey
+    && evidence.capturedAt.getTime() === day1Entry.capturedAt.getTime()
+    && evidence.productCode === day1Entry.productCode;
+}
+
 function buildTimelineSlot(input: {
   availableDate: string | null;
   definition: HutPhotoTimelineSlotDefinition;
@@ -359,7 +413,7 @@ function buildTimelineSlot(input: {
   return {
     availableDate: input.availableDate,
     dayLabel: input.definition.dayLabel,
-    evidence: input.evidence,
+    evidence: sanitizeTimelinePhoto(input.evidence),
     id: input.definition.id,
     interviewerTask: input.definition.interviewerTask,
     isCapturableWithCurrentModel: Boolean(input.definition.participantTask),
@@ -373,10 +427,20 @@ function buildTimelineSlot(input: {
   };
 }
 
+function sanitizeTimelinePhoto(photo: HutPhotoTimelinePhoto | null): HutPhotoTimelinePhoto | null {
+  if (!photo) {
+    return null;
+  }
+  const safePhoto = { ...photo };
+  delete safePhoto.privateStorageKey;
+  return safePhoto;
+}
+
 function resolveEvidenceForDefinition(
   definition: HutPhotoTimelineSlotDefinition,
   phaseEvidence: Map<HutPhase, HutPhotoTimelinePhoto>,
-  dailyByUseDay: Map<number, HutPhotoTimelinePhoto>
+  dailyByUseDay: Map<number, HutPhotoTimelinePhoto>,
+  legacyMirroredPlacementPhoto: boolean
 ): HutPhotoTimelinePhoto | null {
   const colocacionEvidence = phaseEvidence.get("COLOCACION") ?? null;
   const deliveryEvidence = dailyByUseDay.get(0) ?? null;
@@ -385,6 +449,9 @@ function resolveEvidenceForDefinition(
     return deliveryEvidence ?? colocacionEvidence;
   }
   if (definition.sourcePhase === "COLOCACION") {
+    if (legacyMirroredPlacementPhoto) {
+      return dailyByUseDay.get(1) ?? null;
+    }
     return deliveryEvidence ? colocacionEvidence ?? dailyByUseDay.get(1) ?? null : dailyByUseDay.get(1) ?? null;
   }
   if (typeof definition.useDayNumber === "number") {
@@ -410,11 +477,19 @@ function resolveProductCode(
 
 function dedupeDailyEntries(
   entries: NonNullable<HutPhotoTimelineInput["dailyEntries"]>,
-  phaseEvidence: Map<HutPhase, HutPhotoTimelinePhoto>
+  phaseEvidence: Map<HutPhase, HutPhotoTimelinePhoto>,
+  legacyMirroredPlacementPhoto: boolean
 ) {
   return entries.filter((entry) => {
+    if (legacyMirroredPlacementPhoto && entry.useDayNumber === 1) {
+      const colocacionEvidence = phaseEvidence.get("COLOCACION") ?? null;
+      if (colocacionEvidence && entry.capturedAt.getTime() === colocacionEvidence.capturedAt.getTime() && entry.productCode === colocacionEvidence.productCode) {
+        return false;
+      }
+    }
     for (const evidence of phaseEvidence.values()) {
-      if (entry.capturedAt.getTime() === evidence.capturedAt.getTime() && entry.productCode === evidence.productCode) {
+      const sameStoredFile = !entry.privateStorageKey || !evidence.privateStorageKey || entry.privateStorageKey === evidence.privateStorageKey;
+      if (sameStoredFile && entry.capturedAt.getTime() === evidence.capturedAt.getTime() && entry.productCode === evidence.productCode) {
         return false;
       }
     }

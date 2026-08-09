@@ -72,6 +72,7 @@ import {
 import {
   buildHutPhotoTimeline,
   getNextHutPhotoTimelineSlot,
+  isLegacyMirroredPlacementPhoto,
   type HutPhotoTimelineSlotId
 } from "./photo-timeline";
 
@@ -126,6 +127,7 @@ export type HutAdminParticipant = {
   id: string;
   identityReview: HutIdentityReviewSummary;
   link: string;
+  legacyMirroredPlacementPhoto: boolean;
   name: string;
   phone: string | null;
   origin: "CLT_HUT" | "HUT_DIRECTO";
@@ -251,6 +253,7 @@ export type HutApplicationPhotoEntrySummary = {
   capturedLocalDate: string;
   capturedLocalTimezone: string;
   id: string;
+  privateStorageKey?: string | null;
   productCode: string | null;
   useDayNumber: number;
 };
@@ -291,6 +294,7 @@ export type HutFieldQuestionnaireWorkspace = {
   phaseCodes: HutPhaseCodeAdmin[];
   photos: HutFieldPhotoSummary[];
   questionnaire: HutQuestionnaireState;
+  legacyMirroredPlacementPhoto: boolean;
   rotation: {
     eva1: string | null;
     eva2: string | null;
@@ -409,6 +413,7 @@ export type HutPortalView = {
   folio: string | null;
   message: string;
   name: string;
+  legacyMirroredPlacementPhoto: boolean;
   phaseGate: {
     label: string;
     phase: HutPhase;
@@ -1972,6 +1977,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           phaseCodes: toAdminPhaseCodes(participant),
           photos: await toFieldPhotoSummaries(participant, input.storage),
           questionnaire: questionnaire.data,
+          legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
           rotation: {
             eva1: participant.firstFragranceLeftArm,
             eva2: participant.secondFragranceRightArm
@@ -3440,18 +3446,12 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
       if (slot.useDayNumber !== null) {
         const capturedLocalDate = hutLocalDateKey(new Date());
-        const existingDailyPhoto = (await prisma.hutApplicationPhotoEntry.findFirst?.({
-          select: hutApplicationPhotoEntrySelect,
-          where: {
-            capturedLocalDate,
-            participantId: participant.id
-          }
-        })) as HutApplicationPhotoEntryRecord | null;
+        const existingDailyPhoto = blockingApplicationPhotoEntryByLocalDate(participant, capturedLocalDate, slot.useDayNumber);
         if (existingDailyPhoto && !participant.testMode) {
           return { message: "Ya existe una foto de aplicacion registrada para el dia de hoy.", ok: false };
         }
 
-        const existingSlotPhoto = await findApplicationPhotoEntryByUseDayNumber(prisma, participant.id, slot.useDayNumber);
+        const existingSlotPhoto = blockingApplicationPhotoEntryByUseDayNumber(participant, slot.useDayNumber);
         if (existingSlotPhoto) {
           return { message: "Esta foto HUT ya fue registrada.", ok: false };
         }
@@ -3512,18 +3512,12 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         });
 
         if (slot.useDayNumber !== null) {
-          const existingDailyPhoto = (await tx.hutApplicationPhotoEntry.findFirst?.({
-            select: hutApplicationPhotoEntrySelect,
-            where: {
-              capturedLocalDate: hutLocalDateKey(now),
-              participantId: participant.id
-            }
-          })) as HutApplicationPhotoEntryRecord | null;
+          const existingDailyPhoto = blockingApplicationPhotoEntryByLocalDate(participant, hutLocalDateKey(now), slot.useDayNumber);
           if (existingDailyPhoto && !participant.testMode) {
             return { message: "Ya existe una foto de aplicacion registrada para el dia de hoy.", ok: false };
           }
 
-          const existingSlotPhoto = await findApplicationPhotoEntryByUseDayNumber(tx, participant.id, slot.useDayNumber);
+          const existingSlotPhoto = blockingApplicationPhotoEntryByUseDayNumber(participant, slot.useDayNumber);
           if (existingSlotPhoto) {
             return { message: "Esta foto HUT ya fue registrada.", ok: false };
           }
@@ -3543,7 +3537,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           return { message: error instanceof Error ? error.message : "No fue posible validar la foto de aplicacion.", ok: false };
         }
 
-        if (slot.id === "PRODUCT_1_DAY_1") {
+        const storeProduct1Day1AsDailyEntry = slot.id === "PRODUCT_1_DAY_1" && hasLegacyMirroredPlacementPhoto(participant);
+
+        if (slot.id === "PRODUCT_1_DAY_1" && !storeProduct1Day1AsDailyEntry) {
           await tx.hutApplicationEvidence.create?.({
             data: {
               capturedAt: now,
@@ -4628,6 +4624,7 @@ async function toAdminParticipant(
     id: participant.id,
     identityReview,
     link: participantLink(requestOrigin, participant.token),
+    legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
     name: participant.name,
     origin: participantOrigin(participant),
     phaseCodes: toAdminPhaseCodes(participant),
@@ -4888,6 +4885,7 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
       block1: block1 ? toBasicBlockSummary(block1) : null,
       block2: block2 ? toBasicBlockSummary(block2) : null,
       folio: participant.folio,
+      legacyMirroredPlacementPhoto: false,
       message:
         "Gracias por tu participacion. Por las reglas del estudio, no es posible continuar con esta etapa. El equipo podra contactarte si requiere informacion adicional.",
       name: hutParticipantDisplayName(participant),
@@ -4924,6 +4922,7 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
     block1: block1 ? toBasicBlockSummary(block1) : null,
     block2: block2 ? toBasicBlockSummary(block2) : null,
     folio: participant.folio,
+    legacyMirroredPlacementPhoto: false,
     message: hutPortalMessage(participant),
     name: hutParticipantDisplayName(participant),
     origin: participantOrigin(participant),
@@ -4942,6 +4941,7 @@ function toApplicationPhotoPortalView(participant: HutParticipantRecord): HutPor
   const evidence = applicationEvidenceSummary(participant);
   const entries = applicationPhotoEntrySummary(participant);
   const filterBlocksPhotoCapture = participantOrigin(participant) === "HUT_DIRECTO" && hutFilterStatusFromParticipant(participant) !== "COMPLETED";
+  const legacyMirroredPlacementPhoto = hasLegacyMirroredPlacementPhoto(participant);
   const nextSlot = filterBlocksPhotoCapture ? null : expectedApplicationPhotoSlot(participant);
   const availableApplicationPhoto = nextSlot
     ? {
@@ -4963,6 +4963,7 @@ function toApplicationPhotoPortalView(participant: HutParticipantRecord): HutPor
     block1: null,
     block2: null,
     folio: participant.folio,
+    legacyMirroredPlacementPhoto,
     message: applicationPhotoPortalMessage(participant),
     name: hutParticipantDisplayName(participant),
     origin: participantOrigin(participant),
@@ -5105,6 +5106,7 @@ function expectedApplicationPhotoSlot(participant: HutParticipantRecord) {
   return getNextHutPhotoTimelineSlot({
     applicationEvidence: applicationEvidenceSummary(participant),
     dailyEntries: applicationPhotoEntrySummary(participant),
+    legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
     rotation: {
       eva1: participant.firstFragranceLeftArm,
       eva2: participant.secondFragranceRightArm
@@ -5122,6 +5124,7 @@ function resolveRequestedApplicationPhotoSlot(
   const timeline = buildHutPhotoTimeline({
     applicationEvidence: applicationEvidenceSummary(participant),
     dailyEntries: applicationPhotoEntrySummary(participant),
+    legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
     rotation: {
       eva1: participant.firstFragranceLeftArm,
       eva2: participant.secondFragranceRightArm
@@ -5181,6 +5184,56 @@ function applicationPhotoCapturedLocalDate({
   }
 
   return offsetLocalDateKey(capturedLocalDate, Math.max(0, useDayNumber));
+}
+
+function hasLegacyMirroredPlacementPhoto(participant: HutParticipantRecord): boolean {
+  const colocacionEvidence = participant.applicationEvidence?.find((evidence) => evidence.phase === "COLOCACION") ?? null;
+  const deliveryEntry = participant.applicationPhotoEntries?.find((entry) => entry.useDayNumber === 0) ?? null;
+  const day1Entry = participant.applicationPhotoEntries?.find((entry) =>
+    isLegacyMirroredPlacementPhoto({
+      colocacionEvidence,
+      day1Entry: entry,
+      deliveryEntry
+    })
+  ) ?? null;
+
+  return Boolean(day1Entry);
+}
+
+function isLegacyMirroredPlacementEntry(
+  participant: HutParticipantRecord,
+  entry: HutApplicationPhotoEntryRecord | null | undefined
+): boolean {
+  if (!entry) {
+    return false;
+  }
+  const colocacionEvidence = participant.applicationEvidence?.find((evidence) => evidence.phase === "COLOCACION") ?? null;
+  const deliveryEntry = participant.applicationPhotoEntries?.find((candidate) => candidate.useDayNumber === 0) ?? null;
+
+  return isLegacyMirroredPlacementPhoto({
+    colocacionEvidence,
+    day1Entry: entry,
+    deliveryEntry
+  });
+}
+
+function blockingApplicationPhotoEntryByUseDayNumber(
+  participant: HutParticipantRecord,
+  useDayNumber: number
+): HutApplicationPhotoEntryRecord | null {
+  return participant.applicationPhotoEntries?.find((entry) =>
+    entry.useDayNumber === useDayNumber && !(useDayNumber === 1 && isLegacyMirroredPlacementEntry(participant, entry))
+  ) ?? null;
+}
+
+function blockingApplicationPhotoEntryByLocalDate(
+  participant: HutParticipantRecord,
+  capturedLocalDate: string,
+  useDayNumber: number | null
+): HutApplicationPhotoEntryRecord | null {
+  return participant.applicationPhotoEntries?.find((entry) =>
+    entry.capturedLocalDate === capturedLocalDate && !(useDayNumber === 1 && isLegacyMirroredPlacementEntry(participant, entry))
+  ) ?? null;
 }
 
 async function findApplicationPhotoEntryByUseDayNumber(

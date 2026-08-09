@@ -2,6 +2,7 @@ import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
 import {
   buildHutPhotoTimeline,
   buildHutQuestionnaireProgress,
+  isLegacyMirroredPlacementPhoto,
   resolveHutOperationalStatusLabel
 } from "@/modules/hut";
 import {
@@ -88,6 +89,7 @@ const hutParticipantSelect = {
     select: {
       capturedAt: true,
       phase: true,
+      privateStorageKey: true,
       productCode: true
     }
   },
@@ -98,6 +100,7 @@ const hutParticipantSelect = {
     select: {
       capturedAt: true,
       capturedLocalDate: true,
+      privateStorageKey: true,
       productCode: true,
       useDayNumber: true
     }
@@ -195,11 +198,13 @@ type HutParticipantRecord = {
   applicationEvidence: Array<{
     capturedAt: Date;
     phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2";
+    privateStorageKey?: string | null;
     productCode: string | null;
   }>;
   applicationPhotoEntries: Array<{
     capturedAt: Date;
     capturedLocalDate: string;
+    privateStorageKey?: string | null;
     productCode: string | null;
     useDayNumber: number;
   }>;
@@ -279,6 +284,7 @@ function toDetail(participant: HutParticipantRecord): HutOperationsDetail {
   const photoTimeline = buildHutPhotoTimeline({
     applicationEvidence: participant.applicationEvidence,
     dailyEntries: participant.applicationPhotoEntries,
+    legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
     rotation: {
       eva1: participant.firstFragranceLeftArm,
       eva2: participant.secondFragranceRightArm
@@ -346,6 +352,19 @@ function toRotation(participant: HutParticipantRecord): HutOperationsRotationSum
     hutEva2: participant.secondFragranceRightArm,
     navigoRotationCode: participant.studyParticipant?.rotationAssignment?.rotationCode ?? null
   };
+}
+
+function hasLegacyMirroredPlacementPhoto(participant: HutParticipantRecord): boolean {
+  const colocacionEvidence = participant.applicationEvidence.find((evidence) => evidence.phase === "COLOCACION") ?? null;
+  const deliveryEntry = participant.applicationPhotoEntries.find((entry) => entry.useDayNumber === 0) ?? null;
+
+  return participant.applicationPhotoEntries.some((entry) =>
+    isLegacyMirroredPlacementPhoto({
+      colocacionEvidence,
+      day1Entry: entry,
+      deliveryEntry
+    })
+  );
 }
 
 function toPhotos(participant: HutParticipantRecord): HutOperationsPhotoSummary[] {

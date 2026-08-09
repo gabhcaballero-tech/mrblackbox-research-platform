@@ -72,6 +72,7 @@ export {
   getNextHutPhotoTimelineSlot,
   formatHutPhotoTimelineSlotTitle,
   HUT_PHOTO_TIME_ZONE,
+  isLegacyMirroredPlacementPhoto,
   resolveHutPhaseCodeSlotTimelineLabel,
   resolveHutPhotoTimelinePhotoLabel,
   resolveHutPhotoTimelinePhaseLabel,
