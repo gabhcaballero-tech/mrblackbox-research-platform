@@ -8,6 +8,7 @@ import {
 } from "@/modules/hut-operations";
 import {
   formatHutPhotoTimelineSlotTitle,
+  resolveHutPhaseCodeSlotTimelineLabel,
   resolveHutPhotoTimelinePhaseLabel,
   resolveHutPhotoTimelineUseDayLabel
 } from "@/modules/hut";
@@ -241,7 +242,7 @@ function OperationsDetail({
         <div className="grid gap-2">
           {detail.phaseCodes.map((code) => (
             <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={`${code.phase}-${code.slot}`}>
-              <p className="font-semibold text-zinc-950">{resolveHutPhotoTimelinePhaseLabel(code.phase)} / slot {code.slot} / {code.status}</p>
+              <p className="font-semibold text-zinc-950">{resolveHutPhaseCodeSlotTimelineLabel(code.slot)} / slot {code.slot} / {code.status}</p>
               <p className="text-zinc-600">
                 Enviado: {formatHutOperationsDateTime(code.sentAt, timeZoneIana) || "-"} / Validado:{" "}
                 {formatHutOperationsDateTime(code.validatedAt, timeZoneIana) || "-"} / Usado:{" "}

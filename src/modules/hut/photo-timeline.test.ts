@@ -8,7 +8,7 @@ import {
 } from "./photo-timeline";
 
 describe("HutPhotoTimeline", () => {
-  it("maps historical COLOCACION evidence to Dia 0 delivery", () => {
+  it("maps historical COLOCACION evidence to delivery without merging it with placement", () => {
     const timeline = buildHutPhotoTimeline({
       applicationEvidence: [
         {
@@ -23,15 +23,22 @@ describe("HutPhotoTimeline", () => {
       }
     });
 
-    expect(timeline).toHaveLength(7);
+    expect(timeline).toHaveLength(10);
     expect(timeline[0]).toMatchObject({
-      dayLabel: "Dia 0",
-      id: "DAY_0_DELIVERY",
+      dayLabel: "Entrega",
+      id: "DELIVERY",
       productCode: "247",
       status: "COMPLETED",
       title: "Entrega del producto"
     });
     expect(timeline[0]?.evidence?.phase).toBe("COLOCACION");
+    expect(timeline[1]).toMatchObject({
+      dayLabel: "Colocacion",
+      evidence: null,
+      id: "PLACEMENT",
+      participantTask: "Foto colocacion",
+      status: "PROGRAMMED"
+    });
   });
 
   it("marks current capturable slots without inventing unsupported photos", () => {
@@ -43,19 +50,20 @@ describe("HutPhotoTimeline", () => {
       }
     });
 
-    expect(timeline.find((slot) => slot.id === "DAY_1_APPLICATION_EVALUATION_1")).toMatchObject({
+    expect(timeline.find((slot) => slot.id === "PRODUCT_1_DAY_3_MORNING")).toMatchObject({
       isCapturableWithCurrentModel: true,
       status: "CURRENT",
-      title: "Aplicacion / Evaluacion 1"
+      title: "Foto diaria"
     });
-    expect(timeline.find((slot) => slot.id === "DAY_2_FOLLOW_UP")).toMatchObject({
-      isCapturableWithCurrentModel: false,
+    expect(timeline.find((slot) => slot.id === "PRODUCT_1_EVALUATION_1")).toMatchObject({
+      interviewerTask: "Evaluacion 1",
+      participantTask: null,
       status: "PROGRAMMED"
     });
-    expect(timeline.find((slot) => slot.id === "DAY_7_FINAL_RETURN")).toMatchObject({
+    expect(timeline.find((slot) => slot.id === "PRODUCT_2_EVALUATION_2")).toMatchObject({
       evidence: null,
       isCapturableWithCurrentModel: false,
-      title: "Regreso final"
+      title: "Evaluacion 2"
     });
   });
 
@@ -74,17 +82,20 @@ describe("HutPhotoTimeline", () => {
     });
 
     expect(timeline.map(formatHutPhotoTimelineSlotTitle)).toEqual([
-      "Dia 0 Entrega",
-      "Dia 1 Aplicacion",
-      "Dia 2 Seguimiento",
-      "Dia 3 Seguimiento",
-      "Dia 4 Seguimiento",
-      "Dia 5 Evaluacion 2",
-      "Dia 7 Regreso final"
+      "Entrega del producto",
+      "Colocacion",
+      "Producto 1 - Dia 1",
+      "Producto 1 - Dia 2",
+      "Producto 1 - Dia 3 manana",
+      "Producto 1 - Dia 3 tarde - Evaluacion 1",
+      "Producto 2 - Dia 1",
+      "Producto 2 - Dia 2",
+      "Producto 2 - Dia 3 manana",
+      "Producto 2 - Dia 3 tarde - Evaluacion 2"
     ]);
-    expect(resolveHutPhotoTimelinePhaseLabel("COLOCACION")).toBe("Dia 0 Entrega");
-    expect(resolveHutPhotoTimelinePhaseLabel("REGRESO_1")).toBe("Dia 1 Aplicacion");
-    expect(resolveHutPhotoTimelinePhaseLabel("REGRESO_2")).toBe("Dia 5 Evaluacion 2");
-    expect(resolveHutPhotoTimelineUseDayLabel(3)).toBe("Dia 3 Seguimiento");
+    expect(resolveHutPhotoTimelinePhaseLabel("COLOCACION")).toBe("Entrega");
+    expect(resolveHutPhotoTimelinePhaseLabel("REGRESO_1")).toBe("Producto 1 - Dia 3 manana");
+    expect(resolveHutPhotoTimelinePhaseLabel("REGRESO_2")).toBe("Producto 2 - Dia 3 manana");
+    expect(resolveHutPhotoTimelineUseDayLabel(3)).toBe("Producto 1 - Dia 3 manana");
   });
 });

@@ -75,9 +75,9 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
   return [
     buildTimelineSlot({
       activePhase,
-      dayLabel: "Dia 0",
+      dayLabel: "Entrega",
       evidence: phaseEvidence.get("COLOCACION") ?? null,
-      id: "DAY_0_DELIVERY",
+      id: "DELIVERY",
       interviewerTask: null,
       isCapturableWithCurrentModel: true,
       note: "La evidencia historica COLOCACION se muestra como entrega del producto.",
@@ -88,84 +88,126 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
     }),
     buildTimelineSlot({
       activePhase,
-      dayLabel: "Dia 1",
-      evidence: phaseEvidence.get("REGRESO_1") ?? null,
-      id: "DAY_1_APPLICATION_EVALUATION_1",
-      interviewerTask: "Evaluacion 1",
+      dayLabel: "Colocacion",
+      evidence: null,
+      id: "PLACEMENT",
+      interviewerTask: null,
+      isCapturableWithCurrentModel: false,
+      note: "Entrega y colocacion son actividades independientes; falta una fase separada en el modelo actual.",
+      participantTask: "Foto colocacion",
+      productCode: input.rotation.eva1,
+      sourcePhase: null,
+      title: "Colocacion"
+    }),
+    buildTimelineSlot({
+      activePhase,
+      availableDate: nextAvailableDate,
+      dayLabel: "Producto 1 - Dia 1",
+      evidence: dailyByUseDay.get(1) ?? null,
+      id: "PRODUCT_1_DAY_1",
+      interviewerTask: null,
       isCapturableWithCurrentModel: true,
-      note: "Con el modelo actual, este slot usa la fase REGRESO_1.",
-      participantTask: "Foto aplicacion",
-      productCode: phaseEvidence.get("REGRESO_1")?.productCode ?? input.rotation.eva2,
-      sourcePhase: "REGRESO_1",
-      title: "Aplicacion / Evaluacion 1"
+      note: "Foto diaria del primer producto.",
+      participantTask: "Foto",
+      productCode: dailyByUseDay.get(1)?.productCode ?? input.rotation.eva1,
+      sourcePhase: null,
+      title: "Foto diaria"
     }),
     buildTimelineSlot({
       activePhase,
       availableDate: nextAvailableDate,
-      dayLabel: "Dia 2",
+      dayLabel: "Producto 1 - Dia 2",
       evidence: dailyByUseDay.get(2) ?? null,
-      id: "DAY_2_FOLLOW_UP",
+      id: "PRODUCT_1_DAY_2",
       interviewerTask: null,
-      isCapturableWithCurrentModel: false,
-      note: "No hay fase HUT dedicada para este dia; se muestra como actividad programada.",
+      isCapturableWithCurrentModel: true,
+      note: "Foto diaria del primer producto.",
       participantTask: "Foto",
-      productCode: dailyByUseDay.get(2)?.productCode ?? input.rotation.eva2,
+      productCode: dailyByUseDay.get(2)?.productCode ?? input.rotation.eva1,
       sourcePhase: null,
-      title: "Seguimiento HUT"
+      title: "Foto diaria"
     }),
     buildTimelineSlot({
       activePhase,
       availableDate: nextAvailableDate,
-      dayLabel: "Dia 3",
-      evidence: dailyByUseDay.get(3) ?? null,
-      id: "DAY_3_FOLLOW_UP",
+      dayLabel: "Producto 1 - Dia 3 manana",
+      evidence: phaseEvidence.get("REGRESO_1") ?? dailyByUseDay.get(3) ?? null,
+      id: "PRODUCT_1_DAY_3_MORNING",
       interviewerTask: null,
+      isCapturableWithCurrentModel: true,
+      note: "La evidencia historica REGRESO_1 se muestra como foto de la manana previa a Evaluacion 1.",
+      participantTask: "Foto manana",
+      productCode: phaseEvidence.get("REGRESO_1")?.productCode ?? dailyByUseDay.get(3)?.productCode ?? input.rotation.eva1,
+      sourcePhase: "REGRESO_1",
+      title: "Foto diaria"
+    }),
+    buildTimelineSlot({
+      activePhase,
+      dayLabel: "Producto 1 - Dia 3 tarde",
+      evidence: null,
+      id: "PRODUCT_1_EVALUATION_1",
+      interviewerTask: "Evaluacion 1",
       isCapturableWithCurrentModel: false,
-      note: "No hay fase HUT dedicada para este dia; se muestra como actividad programada.",
-      participantTask: "Foto",
-      productCode: dailyByUseDay.get(3)?.productCode ?? input.rotation.eva2,
+      note: "Visita del encuestador; no se muestra en el portal participante.",
+      participantTask: null,
+      productCode: input.rotation.eva1,
       sourcePhase: null,
-      title: "Seguimiento HUT"
+      title: "Evaluacion 1"
     }),
     buildTimelineSlot({
       activePhase,
       availableDate: nextAvailableDate,
-      dayLabel: "Dia 4",
+      dayLabel: "Producto 2 - Dia 1",
       evidence: dailyByUseDay.get(4) ?? null,
-      id: "DAY_4_FOLLOW_UP",
+      id: "PRODUCT_2_DAY_1",
       interviewerTask: null,
-      isCapturableWithCurrentModel: false,
-      note: "No hay fase HUT dedicada para este dia; se muestra como actividad programada.",
+      isCapturableWithCurrentModel: true,
+      note: "Foto diaria del segundo producto.",
       participantTask: "Foto",
       productCode: dailyByUseDay.get(4)?.productCode ?? input.rotation.eva2,
       sourcePhase: null,
-      title: "Seguimiento HUT"
+      title: "Foto diaria"
     }),
     buildTimelineSlot({
       activePhase,
-      dayLabel: "Dia 5",
-      evidence: phaseEvidence.get("REGRESO_2") ?? null,
-      id: "DAY_5_EVALUATION_2",
-      interviewerTask: "Evaluacion 2",
-      isCapturableWithCurrentModel: true,
-      note: "Con el modelo actual, este slot usa la fase REGRESO_2.",
-      participantTask: "Foto",
-      productCode: phaseEvidence.get("REGRESO_2")?.productCode ?? input.rotation.eva2,
-      sourcePhase: "REGRESO_2",
-      title: "Evaluacion 2"
-    }),
-    buildTimelineSlot({
-      activePhase,
-      dayLabel: "Dia 7",
-      evidence: null,
-      id: "DAY_7_FINAL_RETURN",
+      availableDate: nextAvailableDate,
+      dayLabel: "Producto 2 - Dia 2",
+      evidence: dailyByUseDay.get(5) ?? null,
+      id: "PRODUCT_2_DAY_2",
       interviewerTask: null,
-      isCapturableWithCurrentModel: false,
-      note: "Hito informativo; no hay evidencia fotografica asociada en el modelo actual.",
-      participantTask: null,
-      productCode: null,
+      isCapturableWithCurrentModel: true,
+      note: "Foto diaria del segundo producto.",
+      participantTask: "Foto",
+      productCode: dailyByUseDay.get(5)?.productCode ?? input.rotation.eva2,
       sourcePhase: null,
-      title: "Regreso final"
+      title: "Foto diaria"
+    }),
+    buildTimelineSlot({
+      activePhase,
+      availableDate: nextAvailableDate,
+      dayLabel: "Producto 2 - Dia 3 manana",
+      evidence: phaseEvidence.get("REGRESO_2") ?? dailyByUseDay.get(6) ?? null,
+      id: "PRODUCT_2_DAY_3_MORNING",
+      interviewerTask: null,
+      isCapturableWithCurrentModel: true,
+      note: "La evidencia historica REGRESO_2 se muestra como foto de la manana previa a Evaluacion 2.",
+      participantTask: "Foto manana",
+      productCode: phaseEvidence.get("REGRESO_2")?.productCode ?? dailyByUseDay.get(6)?.productCode ?? input.rotation.eva2,
+      sourcePhase: "REGRESO_2",
+      title: "Foto diaria"
+    }),
+    buildTimelineSlot({
+      activePhase,
+      dayLabel: "Producto 2 - Dia 3 tarde",
+      evidence: null,
+      id: "PRODUCT_2_EVALUATION_2",
+      interviewerTask: "Evaluacion 2",
+      isCapturableWithCurrentModel: false,
+      note: "Visita del encuestador; no se muestra en el portal participante.",
+      participantTask: null,
+      productCode: input.rotation.eva2,
+      sourcePhase: null,
+      title: "Evaluacion 2"
     })
   ];
 }
@@ -188,24 +230,27 @@ export function resolveHutOperationalStatusLabel(status: string): string {
 }
 
 export function formatHutPhotoTimelineSlotTitle(slot: Pick<HutPhotoTimelineSlot, "dayLabel" | "id" | "title">): string {
-  const shortTitles: Record<string, string> = {
-    DAY_0_DELIVERY: "Entrega",
-    DAY_1_APPLICATION_EVALUATION_1: "Aplicacion",
-    DAY_2_FOLLOW_UP: "Seguimiento",
-    DAY_3_FOLLOW_UP: "Seguimiento",
-    DAY_4_FOLLOW_UP: "Seguimiento",
-    DAY_5_EVALUATION_2: "Evaluacion 2",
-    DAY_7_FINAL_RETURN: "Regreso final"
+  const titles: Record<string, string> = {
+    DELIVERY: "Entrega del producto",
+    PLACEMENT: "Colocacion",
+    PRODUCT_1_DAY_1: "Producto 1 - Dia 1",
+    PRODUCT_1_DAY_2: "Producto 1 - Dia 2",
+    PRODUCT_1_DAY_3_MORNING: "Producto 1 - Dia 3 manana",
+    PRODUCT_1_EVALUATION_1: "Producto 1 - Dia 3 tarde - Evaluacion 1",
+    PRODUCT_2_DAY_1: "Producto 2 - Dia 1",
+    PRODUCT_2_DAY_2: "Producto 2 - Dia 2",
+    PRODUCT_2_DAY_3_MORNING: "Producto 2 - Dia 3 manana",
+    PRODUCT_2_EVALUATION_2: "Producto 2 - Dia 3 tarde - Evaluacion 2"
   };
 
-  return `${slot.dayLabel} ${shortTitles[slot.id] ?? slot.title}`;
+  return titles[slot.id] ?? `${slot.dayLabel} ${slot.title}`;
 }
 
 export function resolveHutPhotoTimelinePhaseLabel(phase: string | null | undefined): string {
   const labels: Record<string, string> = {
-    COLOCACION: "Dia 0 Entrega",
-    REGRESO_1: "Dia 1 Aplicacion",
-    REGRESO_2: "Dia 5 Evaluacion 2"
+    COLOCACION: "Entrega",
+    REGRESO_1: "Producto 1 - Dia 3 manana",
+    REGRESO_2: "Producto 2 - Dia 3 manana"
   };
 
   return phase ? labels[phase] ?? phase : "Sin fase";
@@ -213,14 +258,25 @@ export function resolveHutPhotoTimelinePhaseLabel(phase: string | null | undefin
 
 export function resolveHutPhotoTimelineUseDayLabel(useDayNumber: number | null | undefined): string {
   const labels: Record<number, string> = {
-    1: "Dia 0 Entrega",
-    2: "Dia 2 Seguimiento",
-    3: "Dia 3 Seguimiento",
-    4: "Dia 4 Seguimiento",
-    5: "Dia 5 Evaluacion 2"
+    1: "Producto 1 - Dia 1",
+    2: "Producto 1 - Dia 2",
+    3: "Producto 1 - Dia 3 manana",
+    4: "Producto 2 - Dia 1",
+    5: "Producto 2 - Dia 2",
+    6: "Producto 2 - Dia 3 manana"
   };
 
   return typeof useDayNumber === "number" ? labels[useDayNumber] ?? `Dia ${useDayNumber}` : "Dia no asignado";
+}
+
+export function resolveHutPhaseCodeSlotTimelineLabel(slot: number | null | undefined): string {
+  const labels: Record<number, string> = {
+    1: "Entrega",
+    2: "Evaluacion 1",
+    3: "Evaluacion 2"
+  };
+
+  return typeof slot === "number" ? labels[slot] ?? `Slot ${slot}` : "Slot no asignado";
 }
 
 function buildTimelineSlot(input: {

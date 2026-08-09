@@ -43,8 +43,10 @@ describe("FieldHutPage", () => {
     expect(screen.getAllByText("247").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Cronograma HUT")).toBeInTheDocument();
     expect(screen.getByText("Fotos recibidas")).toBeInTheDocument();
-    expect(screen.getByText("Dia 0")).toBeInTheDocument();
-    expect(screen.getAllByText("Dia 0 Entrega").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Entrega del producto").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Colocacion").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Producto 1 - Dia 3 tarde - Evaluacion 1")).toBeInTheDocument();
+    expect(screen.getByText("Producto 2 - Dia 3 tarde - Evaluacion 2")).toBeInTheDocument();
     expect(screen.getAllByText("Producto: 247").length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText("COLOCACION")).not.toBeInTheDocument();
     expect(screen.queryByText("REGRESO_1")).not.toBeInTheDocument();

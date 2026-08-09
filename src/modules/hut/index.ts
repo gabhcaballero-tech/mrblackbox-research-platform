@@ -67,6 +67,7 @@ export {
 export {
   buildHutPhotoTimeline,
   formatHutPhotoTimelineSlotTitle,
+  resolveHutPhaseCodeSlotTimelineLabel,
   resolveHutPhotoTimelinePhaseLabel,
   resolveHutPhotoTimelineUseDayLabel,
   resolveHutOperationalStatusLabel

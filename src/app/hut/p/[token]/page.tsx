@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import {
   buildHutPhotoTimeline,
   createHutRepository,
+  formatHutPhotoTimelineSlotTitle,
   resolveHutOperationalStatusLabel,
   type HutApplicationPhotoDailyAvailability,
   type HutPhotoTimelineSlot,
@@ -234,7 +235,7 @@ function CompletionMessage() {
 
 function ProgressSummary({ view }: { view: HutPortalView }) {
   if (view.protocolVersion === "APPLICATION_PHOTO") {
-    const slots = buildPortalPhotoTimeline(view);
+    const slots = buildPortalPhotoTimeline(view).filter((slot) => slot.participantTask || slot.evidence);
     return (
       <section className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -249,7 +250,7 @@ function ProgressSummary({ view }: { view: HutPortalView }) {
             <div className="rounded-md border border-zinc-200 bg-white p-4 text-sm" key={slot.id}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="font-semibold text-zinc-950">{slot.title}</p>
+                  <p className="font-semibold text-zinc-950">{formatHutPhotoTimelineSlotTitle(slot)}</p>
                   <p className="mt-1 text-zinc-600">{participantSlotDescription(slot)}</p>
                   {slot.productCode ? <p className="mt-1 text-zinc-600">Producto: {slot.productCode}</p> : null}
                   {slot.evidence?.capturedAt ? <p className="mt-1 text-zinc-600">Fecha: {slot.evidence.capturedAt.toLocaleString("es-MX")}</p> : null}

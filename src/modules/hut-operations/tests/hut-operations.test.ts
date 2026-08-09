@@ -34,10 +34,13 @@ describe("hut operations", () => {
       navigoRotationCode: "ROT-1"
     });
     expect(dashboard?.detail?.photoTimeline[0]).toMatchObject({
-      dayLabel: "Dia 0",
+      dayLabel: "Entrega",
       status: "COMPLETED",
       title: "Entrega del producto"
     });
+    expect(dashboard?.detail?.photoTimeline.some((slot) => slot.id === "PLACEMENT")).toBe(true);
+    expect(dashboard?.detail?.photoTimeline.some((slot) => slot.title === "Evaluacion 1" && slot.interviewerTask)).toBe(true);
+    expect(dashboard?.detail?.photoTimeline.some((slot) => slot.title === "Evaluacion 2" && slot.interviewerTask)).toBe(true);
     expect(dashboard?.detail?.answerGroups.some((group) => group.answers.some((answer) => answer.code === "HUT_PARTICIPO_CLT"))).toBe(true);
     expect(dashboard?.detail?.timeline.length).toBeGreaterThan(0);
   });

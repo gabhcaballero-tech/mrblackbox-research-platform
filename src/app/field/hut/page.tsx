@@ -4,6 +4,7 @@ import {
   formatHutPhotoTimelineSlotTitle,
   getHutQuestions,
   getHutV5Definition,
+  resolveHutPhaseCodeSlotTimelineLabel,
   resolveHutPhotoTimelinePhaseLabel,
   resolveHutPhotoTimelineUseDayLabel,
   resolveHutOperationalStatusLabel,
@@ -206,7 +207,7 @@ function FieldHutWorkspace({
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {workspace.phaseCodes.map((phaseCode) => (
             <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={phaseCode.phase}>
-              <p className="font-semibold text-zinc-950">{resolveHutPhotoTimelinePhaseLabel(phaseCode.phase)}</p>
+              <p className="font-semibold text-zinc-950">{resolveHutPhaseCodeSlotTimelineLabel(phaseCode.slot)}</p>
               <p className="mt-1 text-zinc-600">Estado: {statusLabel(phaseCode.status)}</p>
             </div>
           ))}
