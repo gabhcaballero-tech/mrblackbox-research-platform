@@ -36,8 +36,10 @@ vi.mock("@/modules/hut/actions", () => {
     reactivateHutParticipantAction: action,
     reconcileReservedHutNavParticipantsAction: action,
     reviewHutVisualVerificationAction: action,
+    resetHutApplicationPhotoEvidenceAction: action,
     revokeHutPhaseCodeAction: action,
     resetHutCallEvaluationAction: action,
+    resetHutQuestionnaireAttemptAction: action,
     resetHutReferenceSelfieAction: action,
     resetHutVideoSubmissionAction: action,
     sendHutRegistrationWhatsAppAction: action,
@@ -439,6 +441,8 @@ describe("HutAdminPage", () => {
     expect(screen.getByText("Fotos diarias de aplicacion")).toBeInTheDocument();
     expect(screen.getByText("HUT_PARTICIPO_CLT")).toBeInTheDocument();
     expect(screen.getByText("HUT_P8_ATRIBUTOS_EVA1")).toBeInTheDocument();
+    expect(screen.getAllByText("Resetear evidencia fotografica").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Resetear evaluacion HUT").length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Ver foto diaria" })).toHaveAttribute("href", "https://storage.example/daily-application-photo.jpg");
     expect(screen.getByRole("button", { name: "Enviar WhatsApp" })).toBeEnabled();
     expect(screen.queryByText("WhatsApp pendiente: se enviarÃ¡ despuÃ©s de guardar la selfie de registro.")).not.toBeInTheDocument();

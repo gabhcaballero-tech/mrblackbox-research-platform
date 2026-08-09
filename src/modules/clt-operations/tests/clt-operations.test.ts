@@ -151,6 +151,7 @@ function createFakePrisma(): Parameters<typeof createCltOperationsRepository>[0]
         ],
         hutParticipant: {
           applicationPhotoEntries: [{ id: "photo-1" }],
+          folio: "HUT-001",
           id: "hut-1",
           origin: "CLT_HUT",
           protocolVersion: "APPLICATION_PHOTO",
@@ -158,7 +159,9 @@ function createFakePrisma(): Parameters<typeof createCltOperationsRepository>[0]
             status: "IN_PROGRESS",
             visits: [{ section: "PRIMERA_VISITA", status: "IN_PROGRESS" }]
           },
-          status: "IN_PROGRESS"
+          status: "IN_PROGRESS",
+          testMode: false,
+          token: "hut-token-1"
         },
         id: "participant-1",
         participantConfirmation: { folio: "NAV-001" },

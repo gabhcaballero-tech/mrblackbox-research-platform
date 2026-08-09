@@ -56,7 +56,7 @@ export default async function HutParticipantPage({ params, searchParams }: HutPa
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-zinc-500">{view.studyName}</p>
               <h1 className="mt-2 text-2xl font-semibold text-zinc-950">{view.name}</h1>
-              <p className="mt-3 text-sm leading-6 text-zinc-600">{view.message}</p>
+              <p className="mt-3 text-sm leading-6 text-zinc-600">{portalIntroMessage(view)}</p>
             </div>
             <StatusBadge status={view.status === "DISQUALIFIED" ? "blocked" : "ready"}>
               {hutParticipantStatusLabel(view.status)}
@@ -64,7 +64,7 @@ export default async function HutParticipantPage({ params, searchParams }: HutPa
           </div>
           <div className="mt-5 grid gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm sm:grid-cols-2">
             <ParticipantFact label="Folio HUT" value={view.folio ?? "No asignado"} />
-            <ParticipantFact label="Fase actual" value={currentHutPhaseLabel(view)} />
+            <ParticipantFact label="Proxima actividad" value={currentHutPhaseLabel(view)} />
             <ParticipantFact label="EVA1" value={view.rotation.firstFragranceLeftArm ?? "No asignada"} />
             <ParticipantFact label="EVA2" value={view.rotation.secondFragranceRightArm ?? "No asignada"} />
           </div>
@@ -144,7 +144,7 @@ async function loadApplicationPhotoAvailability(
 function ApplicationPhotoInstructions() {
   return (
     <section className="rounded-lg border border-teal-200 bg-teal-50 p-5 shadow-sm">
-      <p className="text-sm font-semibold uppercase tracking-wide text-teal-800">Evidencia fotografica HUT</p>
+      <p className="text-sm font-semibold uppercase tracking-wide text-teal-800">Seguimiento fotografico</p>
       <h2 className="mt-2 text-xl font-semibold text-teal-950">Registra la foto indicada por el equipo</h2>
       <p className="mt-3 text-sm leading-6 text-teal-900">
         Este portal es exclusivo para cargar evidencias fotograficas del producto. Las evaluaciones y preguntas del estudio
@@ -173,7 +173,7 @@ function HutPhaseCodeForm({ token, view }: { token: string; view: HutPortalView 
   return (
     <section className="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
       <p className="text-sm font-semibold uppercase tracking-wide text-amber-700">Codigo requerido</p>
-      <h2 className="mt-2 text-xl font-semibold text-amber-950">{view.phaseGate.label}</h2>
+      <h2 className="mt-2 text-xl font-semibold text-amber-950">{photoSlotTitleForPhase(view.phaseGate.phase)}</h2>
       <p className="mt-2 text-sm leading-6 text-amber-900">
         Captura el codigo de esta fase para continuar con la actividad HUT.
       </p>
@@ -207,11 +207,11 @@ function ParticipantFact({ label, value }: { label: string; value: string }) {
 
 function currentHutPhaseLabel(view: HutPortalView): string {
   if (view.phaseGate) {
-    return view.phaseGate.label;
+    return photoSlotTitleForPhase(view.phaseGate.phase);
   }
 
   if (view.availableApplicationPhoto) {
-    return phaseLabel(view.availableApplicationPhoto.phase);
+    return photoSlotTitleForPhase(view.availableApplicationPhoto.phase);
   }
 
   return view.status === "COMPLETED" ? "Completado" : "Sin fase pendiente";
@@ -231,19 +231,35 @@ function CompletionMessage() {
 
 function ProgressSummary({ view }: { view: HutPortalView }) {
   if (view.protocolVersion === "APPLICATION_PHOTO") {
+    const slots = buildPhotoSlots(view);
     return (
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        {(["COLOCACION", "REGRESO_1", "REGRESO_2"] as const).map((phase) => {
-          const evidence = view.applicationEvidence.find((item) => item.phase === phase);
-          return (
-            <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={phase}>
-              <p className="font-semibold text-zinc-950">{phaseLabel(phase)}</p>
-              <p className="mt-1 text-zinc-600">{evidence ? "Foto registrada" : "Pendiente"}</p>
-              {evidence?.productCode ? <p className="text-zinc-600">Producto: {evidence.productCode}</p> : null}
+      <section className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Seguimiento fotografico</p>
+            <h2 className="mt-1 text-xl font-semibold text-zinc-950">Fotos pendientes y completadas</h2>
+          </div>
+          <p className="text-sm text-zinc-600">{nextPhotoActivityMessage(view)}</p>
+        </div>
+        <div className="mt-4 grid gap-3">
+          {slots.map((slot) => (
+            <div className="rounded-md border border-zinc-200 bg-white p-4 text-sm" key={slot.id}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="font-semibold text-zinc-950">{slot.title}</p>
+                  <p className="mt-1 text-zinc-600">{slot.description}</p>
+                  {slot.productCode ? <p className="mt-1 text-zinc-600">Producto: {slot.productCode}</p> : null}
+                  {slot.capturedAt ? <p className="mt-1 text-zinc-600">Fecha: {slot.capturedAt.toLocaleString("es-MX")}</p> : null}
+                  {slot.availableDate ? <p className="mt-1 text-zinc-600">Fecha disponible: {slot.availableDate}</p> : null}
+                </div>
+                <StatusBadge status={slot.status === "COMPLETED" ? "ready" : slot.status === "CURRENT" ? "planned" : "blocked"}>
+                  {slot.status === "COMPLETED" ? "Foto registrada" : slot.status === "CURRENT" ? "Disponible" : "Pendiente"}
+                </StatusBadge>
+              </div>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      </section>
     );
   }
 
@@ -255,15 +271,6 @@ function ProgressSummary({ view }: { view: HutPortalView }) {
   );
 }
 
-function phaseLabel(phase: string): string {
-  const labels: Record<string, string> = {
-    COLOCACION: "Colocacion",
-    REGRESO_1: "Regreso 1",
-    REGRESO_2: "Regreso 2"
-  };
-  return labels[phase] ?? phase;
-}
-
 function BlockSummary({ label, missed, videos }: { label: string; missed: number; videos: number }) {
   return (
     <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm">
@@ -272,6 +279,114 @@ function BlockSummary({ label, missed, videos }: { label: string; missed: number
       <p className="text-zinc-600">Días omitidos: {missed}/1</p>
     </div>
   );
+}
+
+type PhotoTrackingSlot = {
+  availableDate: string | null;
+  capturedAt: Date | null;
+  description: string;
+  id: string;
+  productCode: string | null;
+  status: "COMPLETED" | "CURRENT" | "PENDING";
+  title: string;
+};
+
+function buildPhotoSlots(view: HutPortalView): PhotoTrackingSlot[] {
+  const evidenceByPhase = new Map(view.applicationEvidence.map((item) => [item.phase, item]));
+  const currentPhase = view.phaseGate?.phase ?? view.availableApplicationPhoto?.phase ?? null;
+  const nextAvailableDate = view.availability.nextAvailableAt?.toLocaleDateString("es-MX") ?? null;
+  const deliveryEvidence = evidenceByPhase.get("COLOCACION") ?? null;
+  const evaluation1Evidence = evidenceByPhase.get("REGRESO_1") ?? null;
+  const evaluation2Evidence = evidenceByPhase.get("REGRESO_2") ?? null;
+
+  return [
+    {
+      availableDate: null,
+      capturedAt: deliveryEvidence?.capturedAt ?? null,
+      description: "Foto requerida para confirmar que recibiste el producto.",
+      id: "ENTREGA",
+      productCode: deliveryEvidence?.productCode ?? view.rotation.firstFragranceLeftArm,
+      status: deliveryEvidence ? "COMPLETED" : currentPhase === "COLOCACION" ? "CURRENT" : "PENDING",
+      title: "Entrega del producto"
+    },
+    {
+      availableDate: null,
+      capturedAt: null,
+      description: "Foto pendiente de aplicacion o colocacion cuando el equipo lo indique.",
+      id: "COLOCACION_VISUAL",
+      productCode: view.rotation.firstFragranceLeftArm,
+      status: "PENDING",
+      title: "Colocacion"
+    },
+    {
+      availableDate: nextAvailableDate,
+      capturedAt: evaluation1Evidence?.capturedAt ?? null,
+      description: "Slot fotografico de seguimiento.",
+      id: "EVALUACION_1_DIA_1",
+      productCode: evaluation1Evidence?.productCode ?? view.rotation.secondFragranceRightArm,
+      status: evaluation1Evidence ? "COMPLETED" : currentPhase === "REGRESO_1" ? "CURRENT" : "PENDING",
+      title: "Evaluacion 1 - Dia 1"
+    },
+    {
+      availableDate: null,
+      capturedAt: null,
+      description: "Cuando llegue el momento recibiras instrucciones.",
+      id: "EVALUACION_1_DIA_2",
+      productCode: view.rotation.secondFragranceRightArm,
+      status: "PENDING",
+      title: "Evaluacion 1 - Dia 2"
+    },
+    {
+      availableDate: null,
+      capturedAt: null,
+      description: "Cuando llegue el momento recibiras instrucciones.",
+      id: "EVALUACION_1_DIA_3",
+      productCode: view.rotation.secondFragranceRightArm,
+      status: "PENDING",
+      title: "Evaluacion 1 - Dia 3"
+    },
+    {
+      availableDate: nextAvailableDate,
+      capturedAt: evaluation2Evidence?.capturedAt ?? null,
+      description: "Slot fotografico de seguimiento.",
+      id: "EVALUACION_2_DIA_1",
+      productCode: evaluation2Evidence?.productCode ?? view.rotation.secondFragranceRightArm,
+      status: evaluation2Evidence ? "COMPLETED" : currentPhase === "REGRESO_2" ? "CURRENT" : "PENDING",
+      title: "Evaluacion 2 - Dia 1"
+    }
+  ];
+}
+
+function photoSlotTitleForPhase(phase: string): string {
+  const labels: Record<string, string> = {
+    COLOCACION: "Entrega del producto",
+    REGRESO_1: "Evaluacion 1 - Dia 1",
+    REGRESO_2: "Evaluacion 2 - Dia 1"
+  };
+  return labels[phase] ?? phase;
+}
+
+function nextPhotoActivityMessage(view: HutPortalView): string {
+  if (view.status === "COMPLETED") {
+    return "Todas las fotografias requeridas estan registradas.";
+  }
+  if (view.availableApplicationPhoto) {
+    return "Tienes una fotografia pendiente por registrar.";
+  }
+  if (view.availability.nextAvailableAt) {
+    return `Tu proxima actividad estara disponible el dia ${view.availability.nextAvailableAt.toLocaleDateString("es-MX")}.`;
+  }
+  return "Cuando llegue el momento recibiras instrucciones.";
+}
+
+function portalIntroMessage(view: HutPortalView): string {
+  if (view.protocolVersion !== "APPLICATION_PHOTO") {
+    return view.message;
+  }
+  if (view.status === "COMPLETED") {
+    return "Tu seguimiento fotografico HUT esta completo. Gracias por tu participacion.";
+  }
+  return "Este portal es exclusivo para registrar fotografias. Revisa tus actividades pendientes y sigue las instrucciones del equipo.";
 }
 
 function hutParticipantStatusLabel(status: string) {

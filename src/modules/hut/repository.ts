@@ -524,6 +524,21 @@ export type HutRepository = {
     participantId: string;
     studyId: string;
   }) => Promise<HutActionResult<{ participantId: string }>>;
+  resetApplicationPhotoEvidence: (input: {
+    actorUserId: string;
+    confirmation: string;
+    participantId: string;
+    phase: HutPhase;
+    reason: string;
+    studyId: string;
+  }) => Promise<HutActionResult<{ participantId: string; phase: HutPhase }>>;
+  resetQuestionnaireAttempt: (input: {
+    actorUserId: string;
+    confirmation: string;
+    participantId: string;
+    reason: string;
+    studyId: string;
+  }) => Promise<HutActionResult<{ participantId: string }>>;
   assignParticipantRotation: (input: {
     firstFragranceLeftArm?: string | null;
     folio?: string | null;
@@ -737,6 +752,7 @@ type PrismaModel = {
 
 type HutPrismaClient = PrismaClientLike & {
   $transaction: <T>(callback: (tx: HutPrismaClient) => Promise<T>) => Promise<T>;
+  auditLog: PrismaModel;
   hutBlock: PrismaModel;
   hutCallEvaluation: PrismaModel;
   hutDailyCheck: PrismaModel;
@@ -2627,6 +2643,168 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         return {
           data: { participantId: participant.id },
           message: `Bloque ${input.blockNumber} restablecido. El Video 1 esta disponible para iniciar de nuevo.`,
+          ok: true
+        };
+      });
+    },
+
+    async resetApplicationPhotoEvidence(input) {
+      if (input.confirmation.trim() !== "RESET EVIDENCIA HUT") {
+        return { message: "Escribe RESET EVIDENCIA HUT para confirmar.", ok: false };
+      }
+      if (!input.reason.trim()) {
+        return { message: "Captura el motivo del reset de evidencia fotografica.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipant(tx, input.participantId);
+
+        if (!participant || participant.studyId !== input.studyId) {
+          return { message: "No encontramos el participante HUT.", ok: false };
+        }
+        if (!isApplicationPhotoProtocol(participant)) {
+          return { message: "El reset de evidencia fotografica aplica solo al protocolo APPLICATION_PHOTO.", ok: false };
+        }
+
+        const evidence = participant.applicationEvidence?.find((item) => item.phase === input.phase) ?? null;
+        if (!evidence) {
+          return { message: "No hay evidencia fotografica registrada para esa fase.", ok: false };
+        }
+
+        const matchingDailyEntries = (participant.applicationPhotoEntries ?? []).filter(
+          (entry) => entry.privateStorageKey === evidence.privateStorageKey
+        );
+        const beforeJson = toAuditJson({
+          evidence,
+          matchingDailyEntries,
+          participant: {
+            firstFragranceLeftArm: participant.firstFragranceLeftArm,
+            folio: participant.folio,
+            id: participant.id,
+            secondFragranceRightArm: participant.secondFragranceRightArm,
+            status: participant.status,
+            studyParticipantId: participant.studyParticipantId
+          }
+        });
+
+        await tx.hutApplicationPhotoEntry.deleteMany?.({
+          where: {
+            participantId: participant.id,
+            privateStorageKey: evidence.privateStorageKey
+          }
+        });
+        await tx.hutApplicationEvidence.deleteMany?.({
+          where: {
+            participantId: participant.id,
+            phase: input.phase
+          }
+        });
+        await tx.auditLog.create?.({
+          data: {
+            action: "PARTICIPANT_MODIFIED",
+            actorUserId: input.actorUserId,
+            afterJson: toAuditJson({
+              action: "HUT_APPLICATION_PHOTO_EVIDENCE_RESET",
+              phase: input.phase,
+              resetAt: new Date()
+            }),
+            beforeJson,
+            entityId: participant.id,
+            entityType: "HutParticipant",
+            reason: input.reason.trim()
+          }
+        });
+
+        return {
+          data: { participantId: participant.id, phase: input.phase },
+          message: "Evidencia fotografica reseteada. La fase queda lista para nueva captura.",
+          ok: true
+        };
+      });
+    },
+
+    async resetQuestionnaireAttempt(input) {
+      if (input.confirmation.trim() !== "RESET ENCUESTA HUT") {
+        return { message: "Escribe RESET ENCUESTA HUT para confirmar.", ok: false };
+      }
+      if (!input.reason.trim()) {
+        return { message: "Captura el motivo del reset de evaluacion HUT.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipant(tx, input.participantId);
+
+        if (!participant || participant.studyId !== input.studyId) {
+          return { message: "No encontramos el participante HUT.", ok: false };
+        }
+        if (!isApplicationPhotoProtocol(participant)) {
+          return { message: "El reset de encuesta HUT aplica solo al protocolo APPLICATION_PHOTO.", ok: false };
+        }
+        if (!participant.questionnaireAttempt) {
+          return { message: "Este participante no tiene encuesta HUT iniciada.", ok: false };
+        }
+
+        const attempt = participant.questionnaireAttempt;
+        const answerCount = attempt.answers?.length ?? 0;
+        const visitCount = attempt.visits?.length ?? 0;
+        const beforeJson = toAuditJson({
+          answerCount,
+          attempt,
+          participant: {
+            firstFragranceLeftArm: participant.firstFragranceLeftArm,
+            folio: participant.folio,
+            id: participant.id,
+            secondFragranceRightArm: participant.secondFragranceRightArm,
+            status: participant.status,
+            studyParticipantId: participant.studyParticipantId
+          },
+          visitCount
+        });
+
+        await tx.hutAnswer.deleteMany?.({
+          where: {
+            attemptId: attempt.id
+          }
+        });
+        await tx.hutVisitProgress.deleteMany?.({
+          where: {
+            attemptId: attempt.id
+          }
+        });
+        await tx.hutQuestionnaireAttempt.update?.({
+          data: {
+            completedAt: null,
+            startedAt: null,
+            status: "PENDING",
+            terminatedAt: null,
+            terminationReason: null
+          },
+          where: { id: attempt.id }
+        });
+        await tx.auditLog.create?.({
+          data: {
+            action: "PARTICIPANT_MODIFIED",
+            actorUserId: input.actorUserId,
+            afterJson: toAuditJson({
+              action: "HUT_QUESTIONNAIRE_ATTEMPT_RESET",
+              answerCount,
+              resetAt: new Date(),
+              visitCount
+            }),
+            beforeJson,
+            entityId: participant.id,
+            entityType: "HutParticipant",
+            reason: input.reason.trim()
+          }
+        });
+
+        return {
+          data: { participantId: participant.id },
+          message: "Evaluacion HUT reseteada. Las fotos, fases, codigos y rotacion se conservaron.",
           ok: true
         };
       });
@@ -4792,6 +4970,10 @@ function isLegacyVideoProtocol(participant: Pick<HutParticipantRecord, "protocol
 
 function participantOrigin(participant: Pick<HutParticipantRecord, "origin" | "studyId"> & { studyParticipantId?: string | null }): "CLT_HUT" | "HUT_DIRECTO" {
   return participant.origin ?? (participant.studyParticipantId ? "CLT_HUT" : "HUT_DIRECTO");
+}
+
+function toAuditJson(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value));
 }
 
 const RESERVED_HUT_NAV_MIN_NUMBER = 1;

@@ -10,6 +10,7 @@ import { EmptyState } from "@/shared/ui/EmptyState";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { resolveRequestOrigin } from "@/shared/utils/request-origin";
+import { FieldDashboardCopyButton } from "./FieldDashboardCopyButton";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +93,7 @@ export default async function FieldOperationsPage({ searchParams }: FieldOperati
           <OperationsList
             participants={dashboard.participants}
             dashboard={dashboard}
+            requestOrigin={requestOrigin}
             selectedSessionId={query?.sessionId ?? null}
             selectedStudyId={dashboard.selectedStudyId}
             timeZoneIana={selectedStudy?.timeZoneIana ?? "America/Mexico_City"}
@@ -171,6 +173,11 @@ function ViewerIdentity({ dashboard }: { dashboard: FieldOperationsDashboard }) 
     <section className="grid gap-3 rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm sm:grid-cols-2">
       <Fact label="Encuestador" value={dashboard.viewer.label} />
       <Fact label="Código" value={dashboard.viewer.code} />
+      <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 sm:col-span-2">
+        <a className="inline-flex rounded-md border border-teal-700 px-3 py-2 text-sm font-semibold text-teal-800" href="/field/dashboard">
+          Cambiar encuestador
+        </a>
+      </div>
     </section>
   );
 }
@@ -247,12 +254,14 @@ function AdminInterviewerFilter({
 function OperationsList({
   dashboard,
   participants,
+  requestOrigin,
   selectedSessionId,
   selectedStudyId,
   timeZoneIana
 }: {
   dashboard: FieldOperationsDashboard;
   participants: CltOperationsDetail[];
+  requestOrigin: string;
   selectedSessionId: string | null;
   selectedStudyId: string | null;
   timeZoneIana: string;
@@ -260,8 +269,8 @@ function OperationsList({
   return (
     <section className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
       <div className="border-b border-zinc-200 px-4 py-3">
-        <h2 className="text-lg font-semibold text-zinc-950">Mis participantes</h2>
-        <p className="mt-1 text-sm text-zinc-600">Una fila por entrevista CLT asignada a tu usuario.</p>
+        <h2 className="text-lg font-semibold text-zinc-950">Participantes operativos</h2>
+        <p className="mt-1 text-sm text-zinc-600">Incluye participantes con actividad CLT, Navigo o HUT, aunque no tengan todos los modulos iniciados.</p>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
@@ -287,8 +296,12 @@ function OperationsList({
                   {participant.cltStatus} · {participant.cltProgressLabel}
                 </td>
                 <td className="px-4 py-3 text-zinc-700">{formatOperationsDateTime(participant.t0, timeZoneIana) || "-"}</td>
-                <td className="px-4 py-3 text-zinc-700">{navigoSummary(participant)}</td>
-                <td className="px-4 py-3 text-zinc-700">{hutSummary(participant)}</td>
+                <td className="px-4 py-3 text-zinc-700">
+                  <ModuleStatusCard label={navigoStatusSummary(participant)} meta={navigoSummary(participant)} />
+                </td>
+                <td className="px-4 py-3 text-zinc-700">
+                  <ModuleStatusCard label={hutStatusSummary(participant)} meta={hutSummary(participant)} />
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-2">
                     <Link className={linkClass} href={returnPath({ dashboard, sessionId: participant.id, studyId: selectedStudyId })}>
@@ -299,6 +312,11 @@ function OperationsList({
                         HUT
                       </Link>
                     ) : null}
+                    <ParticipantAccessLinks
+                      compact
+                      hutUrl={hutPhotoLink(participant, requestOrigin)}
+                      navigoUrl={navigoParticipantLink(participant, requestOrigin)}
+                    />
                   </div>
                 </td>
               </tr>
@@ -326,6 +344,7 @@ function OperationsDetail({
   const navigoLink = detail.navigoLinkToken
     ? new URL(`/p/${encodeURIComponent(detail.navigoLinkToken)}/activities`, requestOrigin).toString()
     : null;
+  const hutLink = hutPhotoLink(detail, requestOrigin);
 
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
@@ -336,7 +355,7 @@ function OperationsDetail({
             {detail.folio} · {detail.participantName}
           </h2>
           <p className="mt-1 text-sm text-zinc-600">
-            CLT {detail.cltStatus}; encuestador {detail.interviewer ?? "sin asignar"}.
+            CLT {cltStatusLabel(detail.cltStatus)}; encuestador {detail.interviewer ?? "sin asignar"}.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -357,11 +376,15 @@ function OperationsDetail({
         <Fact label="Encargado" value={detail.interviewer ?? "Sin asignar"} />
         <Fact label="Folio NAV" value={detail.folio} />
         <Fact label="Folio HUT" value={detail.hut.folio ?? "Sin HUT"} />
-        <Fact label="Estado CLT" value={detail.cltStatus} />
+        <Fact label="Estado CLT" value={cltStatusLabel(detail.cltStatus)} />
         <Fact label="Fecha CLT" value={formatOperationsDateTime(detail.cltCompletedAt ?? detail.cltStartedAt, timeZoneIana) || "-"} />
         <Fact label="T0" value={formatOperationsDateTime(detail.t0, timeZoneIana) || "-"} />
         <Fact label="WhatsApp" value={detail.whatsapp.messageCount > 0 ? detail.whatsapp.lastStatus ?? "Registrado" : "Sin envio"} />
       </div>
+
+      <Section title="Accesos">
+        <ParticipantAccessLinks hutUrl={hutLink} navigoUrl={navigoLink} />
+      </Section>
 
       <Section title="Navigo">
         <div className="grid gap-3">
@@ -388,6 +411,11 @@ function OperationsDetail({
       </Section>
 
       <Section title="HUT">
+        {detail.hut.testMode ? (
+          <p className="mb-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900">
+            Modo prueba activo
+          </p>
+        ) : null}
         <div className="grid gap-3 text-sm md:grid-cols-4">
           <Fact label="Folio HUT" value={detail.hut.folio ?? "Sin HUT"} />
           <Fact label="Fotos" value={String(detail.hut.applicationPhotoCount)} />
@@ -428,6 +456,15 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ModuleStatusCard({ label, meta }: { label: string; meta: string }) {
+  return (
+    <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+      <p className="font-semibold text-zinc-950">{label}</p>
+      <p className="mt-1 text-xs text-zinc-600">{meta}</p>
+    </div>
+  );
+}
+
 function Section({ children, title }: { children: React.ReactNode; title: string }) {
   return (
     <div className="mt-6 border-t border-zinc-200 pt-5">
@@ -437,19 +474,109 @@ function Section({ children, title }: { children: React.ReactNode; title: string
   );
 }
 
+function ParticipantAccessLinks({
+  compact = false,
+  hutUrl,
+  navigoUrl
+}: {
+  compact?: boolean;
+  hutUrl: string | null;
+  navigoUrl: string | null;
+}) {
+  if (!hutUrl && !navigoUrl) {
+    return compact ? null : <p className="text-sm text-zinc-600">No hay enlaces disponibles para este participante.</p>;
+  }
+
+  return (
+    <div className={compact ? "flex flex-wrap gap-2" : "grid gap-3 text-sm md:grid-cols-2"}>
+      {navigoUrl ? (
+        <div className={compact ? "flex flex-wrap gap-2" : "rounded-md border border-zinc-200 bg-zinc-50 p-3"}>
+          {compact ? null : <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Link participante Navigo</p>}
+          <a className={compact ? linkClass : buttonClass} href={navigoUrl} rel="noreferrer" target="_blank">
+            Abrir Navigo
+          </a>
+          <FieldDashboardCopyButton label={compact ? "Copiar Navigo" : "Copiar enlace"} value={navigoUrl} />
+        </div>
+      ) : null}
+      {hutUrl ? (
+        <div className={compact ? "flex flex-wrap gap-2" : "rounded-md border border-zinc-200 bg-zinc-50 p-3"}>
+          {compact ? null : <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Link fotos HUT</p>}
+          <a className={compact ? linkClass : buttonClass} href={hutUrl} rel="noreferrer" target="_blank">
+            Abrir fotos HUT
+          </a>
+          <FieldDashboardCopyButton label={compact ? "Copiar HUT" : "Copiar enlace"} value={hutUrl} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function navigoParticipantLink(participant: CltOperationsDetail, requestOrigin: string): string | null {
+  return participant.navigoLinkToken
+    ? new URL(`/p/${encodeURIComponent(participant.navigoLinkToken)}/activities`, requestOrigin).toString()
+    : null;
+}
+
+function hutPhotoLink(participant: CltOperationsDetail, requestOrigin: string): string | null {
+  return participant.hut.token
+    ? new URL(`/hut/p/${encodeURIComponent(participant.hut.token)}`, requestOrigin).toString()
+    : null;
+}
+
 function navigoSummary(participant: CltOperationsDetail): string {
+  if (participant.navigoActivities.length === 0 && !participant.navigoLinkToken && !participant.t0) {
+    return "Sin actividades";
+  }
   const completed = participant.navigoActivities.filter((activity) => activity.status === "COMPLETED").length;
   const linkSent = participant.whatsapp.templateNames.includes("navigo_acceso_evaluaciones") ? "link enviado" : "sin link";
 
   return `${linkSent}; ${completed}/${participant.navigoActivities.length} evaluaciones`;
 }
 
+function navigoStatusSummary(participant: CltOperationsDetail): string {
+  if (participant.navigoActivities.length === 0 && !participant.navigoLinkToken && !participant.t0) {
+    return "No disponible";
+  }
+  if (participant.navigoActivities.some((activity) => activity.status === "AVAILABLE")) {
+    return "Evaluacion disponible";
+  }
+  if (participant.navigoActivities.every((activity) => activity.status === "COMPLETED") && participant.navigoActivities.length > 0) {
+    return "Completado";
+  }
+  return "Pendiente";
+}
+
 function hutSummary(participant: CltOperationsDetail): string {
   if (!participant.hut.id) {
-    return "Sin HUT";
+    return "Sin participante HUT";
   }
 
-  return `${participant.hut.applicationPhotoCount} fotos; ${participant.hut.questionnaireStatus ?? participant.hut.status ?? "pendiente"}`;
+  const testMode = participant.hut.testMode ? "🧪 Modo prueba; " : "";
+  return `${testMode}${participant.hut.applicationPhotoCount} fotos; ${participant.hut.questionnaireStatus ?? participant.hut.status ?? "pendiente"}`;
+}
+
+function hutStatusSummary(participant: CltOperationsDetail): string {
+  if (!participant.hut.id) {
+    return "No iniciado";
+  }
+  if (participant.hut.questionnaireStatus === "COMPLETED" || participant.hut.status === "COMPLETED") {
+    return "Completado";
+  }
+  if (participant.hut.questionnaireStatus === "IN_PROGRESS" || participant.hut.status) {
+    return "En progreso";
+  }
+  return "Pendiente";
+}
+
+function cltStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    COMPLETED: "Completado",
+    IN_PROGRESS: "En progreso",
+    NO_DISPONIBLE: "No disponible",
+    PENDING: "Pendiente"
+  };
+
+  return labels[status] ?? status;
 }
 
 function reminderLabel(detail: CltOperationsDetail, activityCode: string): string {
@@ -502,3 +629,4 @@ function returnPath(input: {
 const buttonClass =
   "inline-flex items-center justify-center rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50";
 const linkClass = "font-semibold text-teal-700 hover:text-teal-800";
+

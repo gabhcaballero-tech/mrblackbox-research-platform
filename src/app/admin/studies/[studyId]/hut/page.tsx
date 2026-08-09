@@ -11,7 +11,9 @@ import {
   reactivateHutParticipantAction,
   reconcileReservedHutNavParticipantsAction,
   reviewHutVisualVerificationAction,
+  resetHutApplicationPhotoEvidenceAction,
   resetHutCallEvaluationAction,
+  resetHutQuestionnaireAttemptAction,
   resetHutReferenceSelfieAction,
   resetHutVideoSubmissionAction,
   revokeHutPhaseCodeAction,
@@ -57,7 +59,7 @@ type HutAdminPageProps = {
 export default async function HutAdminPage({ params, searchParams }: HutAdminPageProps) {
   const { studyId } = await params;
   const query = await searchParams;
-  await requireCapability("screening:review");
+  const actor = await requireCapability("screening:review");
   const requestOrigin = resolveRequestOrigin(await headers());
   const dashboard = await createHutRepository().getAdminDashboard({
     requestOrigin,
@@ -147,6 +149,7 @@ export default async function HutAdminPage({ params, searchParams }: HutAdminPag
                 key={participant.id}
                 participant={participant}
                 requestOrigin={requestOrigin}
+                showAdminResetTools={actor.role === "ADMIN"}
                 studyId={studyId}
                 studyTimeZone={dashboard.study.timeZoneIana || "America/Mexico_City"}
               />
@@ -387,12 +390,14 @@ function HutParticipantCard({
   availableSlots,
   participant,
   requestOrigin,
+  showAdminResetTools,
   studyId,
   studyTimeZone
 }: {
   availableSlots: HutRegistrationSlotAdmin[];
   participant: HutAdminParticipant;
   requestOrigin: string;
+  showAdminResetTools: boolean;
   studyId: string;
   studyTimeZone: string;
 }) {
@@ -569,7 +574,12 @@ function HutParticipantCard({
               <IdentityReviewCard participant={participant} studyId={studyId} studyTimeZone={studyTimeZone} />
             </>
           ) : (
-            <ApplicationPhotoProtocolCard participant={participant} studyTimeZone={studyTimeZone} />
+            <ApplicationPhotoProtocolCard
+              participant={participant}
+              showAdminResetTools={showAdminResetTools}
+              studyId={studyId}
+              studyTimeZone={studyTimeZone}
+            />
           )}
 
           <HutPhaseCodesCard participant={participant} studyId={studyId} studyTimeZone={studyTimeZone} />
@@ -601,7 +611,12 @@ function HutParticipantCard({
           </section>
         </div>
         ) : (
-          <ApplicationPhotoQuestionnaireCard participant={participant} studyTimeZone={studyTimeZone} />
+          <ApplicationPhotoQuestionnaireCard
+            participant={participant}
+            showAdminResetTools={showAdminResetTools}
+            studyId={studyId}
+            studyTimeZone={studyTimeZone}
+          />
         )}
 
         <div className="space-y-4">
@@ -814,9 +829,13 @@ function HutPhaseCodesCard({
 
 function ApplicationPhotoProtocolCard({
   participant,
+  showAdminResetTools,
+  studyId,
   studyTimeZone
 }: {
   participant: HutAdminParticipant;
+  showAdminResetTools: boolean;
+  studyId: string;
   studyTimeZone: string;
 }) {
   const applicationEvidence = participant.applicationEvidence ?? [];
@@ -861,15 +880,40 @@ function ApplicationPhotoProtocolCard({
           );
         })}
       </div>
+      {showAdminResetTools ? (
+        <details className="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-rose-950">Resetear evidencia fotografica</summary>
+          <p className="mt-2 text-xs leading-5 text-rose-900">
+            Esta accion libera una fase para recaptura. Conserva folio, rotacion, vinculo NAV, codigos y fases; la auditoria queda registrada.
+          </p>
+          <form action={resetHutApplicationPhotoEvidenceAction.bind(null, studyId, participant.id)} className="mt-3 space-y-2">
+            <label className="flex flex-col gap-1 text-xs font-semibold text-rose-950">
+              Fase
+              <select className={inputClass} name="phase" required>
+                <option value="COLOCACION">Colocacion / entrega 1</option>
+                <option value="REGRESO_1">Regreso 1 / evaluacion 1 / entrega 2</option>
+                <option value="REGRESO_2">Regreso 2 / evaluacion 2</option>
+              </select>
+            </label>
+            <textarea className={inputClass} name="reason" placeholder="Motivo obligatorio" required rows={2} />
+            <input className={inputClass} name="confirmation" placeholder="RESET EVIDENCIA HUT" required />
+            <SubmitButton pendingLabel="Reseteando evidencia...">Resetear evidencia fotografica</SubmitButton>
+          </form>
+        </details>
+      ) : null}
     </section>
   );
 }
 
 function ApplicationPhotoQuestionnaireCard({
   participant,
+  showAdminResetTools,
+  studyId,
   studyTimeZone
 }: {
   participant: HutAdminParticipant;
+  showAdminResetTools: boolean;
+  studyId: string;
   studyTimeZone: string;
 }) {
   const questionnaire = participant.questionnaire;
@@ -916,6 +960,19 @@ function ApplicationPhotoQuestionnaireCard({
             Sin cuestionario HUT v5 iniciado.
           </p>
         )}
+        {showAdminResetTools ? (
+          <details className="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-rose-950">Resetear evaluacion HUT</summary>
+            <p className="mt-2 text-xs leading-5 text-rose-900">
+              Reinicia el intento y elimina respuestas HUT v5. No modifica participante, rotacion, fotos, codigos ni fases.
+            </p>
+            <form action={resetHutQuestionnaireAttemptAction.bind(null, studyId, participant.id)} className="mt-3 space-y-2">
+              <textarea className={inputClass} name="reason" placeholder="Motivo obligatorio" required rows={2} />
+              <input className={inputClass} name="confirmation" placeholder="RESET ENCUESTA HUT" required />
+              <SubmitButton disabled={!questionnaire} pendingLabel="Reseteando encuesta...">Resetear evaluacion HUT</SubmitButton>
+            </form>
+          </details>
+        ) : null}
       </section>
 
       <section className="rounded-md border border-zinc-200 bg-white p-4">

@@ -139,7 +139,7 @@ const sessionSelect = {
         select: {
           expiresAt: true,
           id: true,
-          status: true
+          status: true,
         }
       },
       activities: {
@@ -216,7 +216,9 @@ const sessionSelect = {
               }
             }
           },
-          status: true
+          status: true,
+          testMode: true,
+          token: true
         }
       },
       id: true,
@@ -308,17 +310,19 @@ type SessionRecord = {
         applicationPhotoEntries: Array<{ id: string }>;
         folio: string | null;
         id: string;
-      origin: string;
-      protocolVersion: string;
-      questionnaireAttempt: {
-        status: string;
-        visits: Array<{
-          section: string;
+        origin: string;
+        protocolVersion: string;
+        questionnaireAttempt: {
           status: string;
-        }>;
+          visits: Array<{
+            section: string;
+            status: string;
+          }>;
+        } | null;
+        status: string;
+        testMode: boolean;
+        token: string;
       } | null;
-      status: string;
-    } | null;
     id: string;
     participantConfirmation: { folio: string } | null;
     participantProfile: { name: string };
@@ -406,7 +410,9 @@ function toHut(session: SessionRecord): CltOperationsHutSummary {
       origin: null,
       protocolVersion: null,
       questionnaireStatus: null,
-      status: null
+      status: null,
+      testMode: false,
+      token: null
     };
   }
 
@@ -420,7 +426,9 @@ function toHut(session: SessionRecord): CltOperationsHutSummary {
     origin: hut.origin,
     protocolVersion: hut.protocolVersion,
     questionnaireStatus: hut.questionnaireAttempt?.status ?? null,
-    status: hut.status
+    status: hut.status,
+    testMode: hut.testMode,
+    token: hut.token
   };
 }
 

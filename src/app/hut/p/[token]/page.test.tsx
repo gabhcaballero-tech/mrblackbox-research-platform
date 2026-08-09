@@ -24,8 +24,8 @@ vi.mock("./HutVideoUploadForm", () => ({
 }));
 
 vi.mock("./HutApplicationPhotoUploadForm", () => ({
-  HutApplicationPhotoUploadForm: ({ phase, productCode }: { phase: string; productCode: string | null }) => (
-    <div>{`Foto de aplicacion ${phase} ${productCode ?? ""}`}</div>
+  HutApplicationPhotoUploadForm: ({ productCode }: { phase: string; productCode: string | null }) => (
+    <div>{`Formulario de foto ${productCode ?? ""}`}</div>
   )
 }));
 
@@ -102,7 +102,7 @@ describe("HutParticipantPage", () => {
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
     expect(screen.getByText("Codigo requerido")).toBeInTheDocument();
-    expect(screen.getAllByText("Colocacion").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Entrega del producto").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole("button", { name: "Validar codigo" })).toBeInTheDocument();
     expect(screen.queryByText("Formulario HUT")).not.toBeInTheDocument();
   });
@@ -145,8 +145,14 @@ describe("HutParticipantPage", () => {
 
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
-    expect(screen.getByText("Foto de aplicacion COLOCACION 247")).toBeInTheDocument();
-    expect(screen.getByText("Evidencia fotografica HUT")).toBeInTheDocument();
+    expect(screen.getByText("Formulario de foto 247")).toBeInTheDocument();
+    expect(screen.getAllByText("Seguimiento fotografico").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Entrega del producto").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Colocacion")).toBeInTheDocument();
+    expect(screen.getByText("Evaluacion 1 - Dia 1")).toBeInTheDocument();
+    expect(screen.getByText("Evaluacion 1 - Dia 2")).toBeInTheDocument();
+    expect(screen.getByText("Evaluacion 1 - Dia 3")).toBeInTheDocument();
+    expect(screen.getByText("Evaluacion 2 - Dia 1")).toBeInTheDocument();
     expect(screen.queryByText("Codigo requerido")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Validar codigo" })).not.toBeInTheDocument();
     expect(screen.queryByText("Cuestionario HUT v5")).not.toBeInTheDocument();
@@ -236,7 +242,7 @@ describe("HutParticipantPage", () => {
 
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
-    expect(screen.getByText("Foto de aplicacion COLOCACION 247")).toBeInTheDocument();
+    expect(screen.getByText("Formulario de foto 247")).toBeInTheDocument();
     expect(screen.queryByText("Genero")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Guardar y continuar" })).not.toBeInTheDocument();
   });
@@ -281,10 +287,71 @@ describe("HutParticipantPage", () => {
 
     render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
 
-    expect(screen.getByText("Foto de aplicacion COLOCACION 247")).toBeInTheDocument();
+    expect(screen.getByText("Formulario de foto 247")).toBeInTheDocument();
     expect(screen.queryByText("Confirmar entrega del primer perfume")).not.toBeInTheDocument();
     expect(screen.queryByText("Genero")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Guardar y continuar" })).not.toBeInTheDocument();
+  });
+
+  it("muestra evidencia COLOCACION historica como entrega del producto", async () => {
+    getPortalViewMock.mockResolvedValue({
+      data: createPortalView({
+        applicationEvidence: [
+          {
+            capturedAt: new Date("2026-08-07T15:30:00.000Z"),
+            phase: "COLOCACION",
+            productCode: "247"
+          }
+        ],
+        availableApplicationPhoto: {
+          phase: "REGRESO_1",
+          productCode: "583"
+        },
+        availability: {
+          nextAvailableAt: null,
+          reason: "AVAILABLE_FOR_APPLICATION_PHOTO"
+        },
+        protocolVersion: "APPLICATION_PHOTO",
+        status: "BLOCK_1_CALL_PENDING"
+      }),
+      ok: true
+    });
+
+    render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
+
+    expect(screen.getAllByText("Entrega del producto").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Foto registrada").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Producto: 247").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Colocacion")).toBeInTheDocument();
+    expect(screen.getAllByText("Evaluacion 1 - Dia 1").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Formulario de foto 583")).toBeInTheDocument();
+  });
+
+  it("muestra todos los slots fotograficos aunque no tengan evidencia", async () => {
+    getPortalViewMock.mockResolvedValue({
+      data: createPortalView({
+        applicationEvidence: [],
+        availableApplicationPhoto: null,
+        availability: {
+          nextAvailableAt: new Date("2026-08-09T11:00:00.000Z"),
+          reason: "BLOCK_NOT_ACTIVE"
+        },
+        protocolVersion: "APPLICATION_PHOTO",
+        status: "NOT_STARTED"
+      }),
+      ok: true
+    });
+
+    render(await HutParticipantPage({ params: Promise.resolve({ token: "token-1" }) }));
+
+    expect(screen.getByText("Entrega del producto")).toBeInTheDocument();
+    expect(screen.getByText("Colocacion")).toBeInTheDocument();
+    expect(screen.getByText("Evaluacion 1 - Dia 1")).toBeInTheDocument();
+    expect(screen.getByText("Evaluacion 1 - Dia 2")).toBeInTheDocument();
+    expect(screen.getByText("Evaluacion 1 - Dia 3")).toBeInTheDocument();
+    expect(screen.getByText("Evaluacion 2 - Dia 1")).toBeInTheDocument();
+    expect(screen.getAllByText("Pendiente").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Tu proxima actividad estara disponible/)).toBeInTheDocument();
   });
 
   it("bloquea foto diaria cuando ya existe captura del dia", async () => {
@@ -330,7 +397,7 @@ describe("HutParticipantPage", () => {
 
     expect(screen.getByText("Foto diaria ya registrada")).toBeInTheDocument();
     expect(screen.getByText(/2026-08-08/)).toBeInTheDocument();
-    expect(screen.queryByText(/Foto de aplicacion COLOCACION/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Formulario de foto/)).not.toBeInTheDocument();
   });
 });
 

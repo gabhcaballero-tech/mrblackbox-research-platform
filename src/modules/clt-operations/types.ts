@@ -53,6 +53,8 @@ export type CltOperationsHutSummary = {
   protocolVersion: string | null;
   questionnaireStatus: string | null;
   status: string | null;
+  testMode: boolean;
+  token: string | null;
 };
 
 export type CltOperationsListItem = {

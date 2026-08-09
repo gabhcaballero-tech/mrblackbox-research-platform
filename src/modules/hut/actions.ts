@@ -175,6 +175,33 @@ export async function resetHutCallEvaluationAction(
   redirectWithHutMessage(studyId, result, participantId);
 }
 
+export async function resetHutApplicationPhotoEvidenceAction(studyId: string, participantId: string, formData: FormData) {
+  const actor = await requireCapability("admin:access");
+  const result = await createHutRepository().resetApplicationPhotoEvidence({
+    actorUserId: actor.id,
+    confirmation: String(formData.get("confirmation") ?? ""),
+    participantId,
+    phase: String(formData.get("phase") ?? "") as HutPhase,
+    reason: String(formData.get("reason") ?? ""),
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
+export async function resetHutQuestionnaireAttemptAction(studyId: string, participantId: string, formData: FormData) {
+  const actor = await requireCapability("admin:access");
+  const result = await createHutRepository().resetQuestionnaireAttempt({
+    actorUserId: actor.id,
+    confirmation: String(formData.get("confirmation") ?? ""),
+    participantId,
+    reason: String(formData.get("reason") ?? ""),
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
 export async function startHutBlockAction(studyId: string, participantId: string, blockNumber: 1 | 2, formData: FormData) {
   await requireCapability("screening:review");
   const startDate = parseOptionalDate(formData.get("startDate")) ?? new Date();

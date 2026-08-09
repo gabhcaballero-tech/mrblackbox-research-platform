@@ -830,6 +830,129 @@ describe("HUT module foundation", () => {
     expect(prisma.state.participants.find((participant) => participant.id === normalParticipantId)?.testMode).toBe(false);
   });
 
+  it("resets application photo evidence without deleting rotation or phase codes", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const created = await repository.createParticipant({
+      firstFragranceLeftArm: "247",
+      folio: "HUT-RESET-PHOTO",
+      name: "Participante Reset Foto",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const participantId = created.ok ? created.data.participantId : "";
+    const participant = prisma.state.participants.find((item) => item.id === participantId)!;
+    participant.applicationEvidence.push({
+      capturedAt: new Date("2026-08-07T15:00:00.000Z"),
+      extension: "jpg",
+      id: "application-evidence-reset",
+      mimeType: "image/jpeg",
+      originalFilename: "foto.jpg",
+      participantId,
+      phase: "COLOCACION",
+      privateStorageKey: "hut/application-photo/reset-photo.jpg",
+      productCode: "247",
+      sizeBytes: 1234,
+      storageBucket: "participant-evidence"
+    });
+    prisma.state.applicationPhotoEntries.push({
+      capturedAt: new Date("2026-08-07T15:00:00.000Z"),
+      capturedLocalDate: "2026-08-07",
+      capturedLocalTimezone: "America/Mexico_City",
+      id: "application-photo-entry-reset",
+      participantId,
+      privateStorageKey: "hut/application-photo/reset-photo.jpg",
+      productCode: "247",
+      useDayNumber: 1
+    });
+    participant.applicationPhotoEntries = prisma.state.applicationPhotoEntries.filter((entry) => entry.participantId === participantId);
+    const phaseCodeCount = participant.phaseCodes.length;
+
+    const result = await repository.resetApplicationPhotoEvidence({
+      actorUserId: "admin-1",
+      confirmation: "RESET EVIDENCIA HUT",
+      participantId,
+      phase: "COLOCACION",
+      reason: "Foto borrosa.",
+      studyId: "study-hut"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(participant.firstFragranceLeftArm).toBe("247");
+    expect(participant.secondFragranceRightArm).toBe("583");
+    expect(participant.phaseCodes).toHaveLength(phaseCodeCount);
+    expect(participant.applicationEvidence).toHaveLength(0);
+    expect(prisma.state.applicationPhotoEntries).toHaveLength(0);
+    expect(prisma.state.auditLogs[0]).toMatchObject({
+      action: "PARTICIPANT_MODIFIED",
+      actorUserId: "admin-1",
+      entityId: participantId,
+      entityType: "HutParticipant",
+      reason: "Foto borrosa."
+    });
+  });
+
+  it("resets HUT questionnaire without deleting application photos", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const created = await repository.createParticipant({
+      firstFragranceLeftArm: "247",
+      folio: "HUT-RESET-QUESTIONNAIRE",
+      name: "Participante Reset Encuesta",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const participantId = created.ok ? created.data.participantId : "";
+    await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_PARTICIPO_CLT: "SI" },
+      participantId,
+      questionCode: "HUT_PARTICIPO_CLT",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants.find((item) => item.id === participantId)!;
+    participant.applicationEvidence.push({
+      capturedAt: new Date("2026-08-07T15:00:00.000Z"),
+      extension: "jpg",
+      id: "application-evidence-keep",
+      mimeType: "image/jpeg",
+      originalFilename: "foto.jpg",
+      participantId,
+      phase: "COLOCACION",
+      privateStorageKey: "hut/application-photo/keep-photo.jpg",
+      productCode: "247",
+      sizeBytes: 1234,
+      storageBucket: "participant-evidence"
+    });
+
+    const result = await repository.resetQuestionnaireAttempt({
+      actorUserId: "admin-1",
+      confirmation: "RESET ENCUESTA HUT",
+      participantId,
+      reason: "Captura incorrecta.",
+      studyId: "study-hut"
+    });
+    const state = await repository.getQuestionnaireState({ participantId, studyId: "study-hut" });
+
+    expect(result.ok).toBe(true);
+    expect(state.ok ? state.data.attempt.status : null).toBe("PENDING");
+    expect(state.ok ? state.data.answers : null).toEqual({});
+    expect(participant.applicationEvidence).toHaveLength(1);
+    expect(participant.firstFragranceLeftArm).toBe("247");
+    expect(participant.secondFragranceRightArm).toBe("583");
+    expect(prisma.state.auditLogs[0]).toMatchObject({
+      action: "PARTICIPANT_MODIFIED",
+      afterJson: expect.objectContaining({
+        action: "HUT_QUESTIONNAIRE_ATTEMPT_RESET"
+      }),
+      entityId: participantId,
+      reason: "Captura incorrecta."
+    });
+  });
+
   it("syncs HUT phase codes from participant reference codes without overwriting existing records", async () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
@@ -2781,6 +2904,7 @@ async function uploadNextVideo(
 function createFakeHutPrisma() {
   const state = {
     applicationPhotoEntries: [] as FakeApplicationPhotoEntry[],
+    auditLogs: [] as FakeAuditLog[],
     answers: [] as FakeHutAnswer[],
     confirmations: [] as FakeParticipantConfirmation[],
     nextId: 1,
@@ -2811,6 +2935,12 @@ function createFakeHutPrisma() {
     $disconnect: vi.fn(),
     async $transaction<T>(callback: (tx: FakePrisma) => Promise<T>) {
       return callback(prisma);
+    },
+    auditLog: {
+      async create(args: { data: FakeAuditLog }) {
+        state.auditLogs.push(args.data);
+        return args.data;
+      }
     },
     study: {
       async findUnique(args: { where: { id: string } }) {
@@ -2855,6 +2985,7 @@ function createFakeHutPrisma() {
           phaseCodes: [],
           phone: (args.data.phone as string | null) ?? null,
           protocolVersion: (args.data.protocolVersion as FakeParticipant["protocolVersion"]) ?? "LEGACY_VIDEO",
+          questionnaireAttempt: null,
           recruiter: (args.data.recruiter as string | null) ?? null,
           referenceSelfie: null,
           registrationSlot: null,
@@ -3110,13 +3241,15 @@ function createFakeHutPrisma() {
         participant?.applicationEvidence.push(evidence);
         return evidence;
       },
-      async deleteMany(args: { where: { participantId: string } }) {
+      async deleteMany(args: { where: { participantId: string; phase?: FakeApplicationEvidence["phase"] } }) {
         const participant = state.participants.find((item) => item.id === args.where.participantId);
-        const count = participant?.applicationEvidence.length ?? 0;
+        const before = participant?.applicationEvidence.length ?? 0;
         if (participant) {
-          participant.applicationEvidence = [];
+          participant.applicationEvidence = participant.applicationEvidence.filter(
+            (evidence) => args.where.phase && evidence.phase !== args.where.phase
+          );
         }
-        return { count };
+        return { count: before - (participant?.applicationEvidence.length ?? 0) };
       }
     },
     hutQuestionnaireAttempt: {
@@ -3128,6 +3261,10 @@ function createFakeHutPrisma() {
         let attempt = state.questionnaireAttempts.find((item) => item.participantId === args.where.participantId);
         if (attempt) {
           Object.assign(attempt, args.update);
+          const participant = state.participants.find((item) => item.id === attempt?.participantId);
+          if (participant) {
+            participant.questionnaireAttempt = attempt;
+          }
           return attemptWithRelations(attempt, state);
         }
         attempt = {
@@ -3142,6 +3279,10 @@ function createFakeHutPrisma() {
           visits: []
         };
         state.questionnaireAttempts.push(attempt);
+        const participant = state.participants.find((item) => item.id === attempt?.participantId);
+        if (participant) {
+          participant.questionnaireAttempt = attempt;
+        }
         return attemptWithRelations(attempt, state);
       },
       async findUnique(args: { where: { id?: string; participantId?: string } }) {
@@ -3187,6 +3328,14 @@ function createFakeHutPrisma() {
         const attempt = state.questionnaireAttempts.find((item) => item.id === visit?.attemptId);
         attempt?.visits.push(visit);
         return visit;
+      },
+      async deleteMany(args: { where: { attemptId: string } }) {
+        const attempt = state.questionnaireAttempts.find((item) => item.id === args.where.attemptId);
+        const count = attempt?.visits.length ?? 0;
+        if (attempt) {
+          attempt.visits = [];
+        }
+        return { count };
       }
     },
     hutAnswer: {
@@ -3218,6 +3367,15 @@ function createFakeHutPrisma() {
         const attempt = state.questionnaireAttempts.find((item) => item.id === answer?.attemptId);
         attempt?.answers.push(answer);
         return answer;
+      },
+      async deleteMany(args: { where: { attemptId: string } }) {
+        const before = state.answers.length;
+        state.answers = state.answers.filter((answer) => answer.attemptId !== args.where.attemptId);
+        const attempt = state.questionnaireAttempts.find((item) => item.id === args.where.attemptId);
+        if (attempt) {
+          attempt.answers = [];
+        }
+        return { count: before - state.answers.length };
       }
     },
     hutApplicationPhotoEntry: {
@@ -3246,6 +3404,18 @@ function createFakeHutPrisma() {
               (!args.where.capturedLocalDate || entry.capturedLocalDate === args.where.capturedLocalDate)
           ) ?? null
         );
+      },
+      async deleteMany(args: { where: { participantId: string; privateStorageKey?: string } }) {
+        const before = state.applicationPhotoEntries.length;
+        state.applicationPhotoEntries = state.applicationPhotoEntries.filter(
+          (entry) =>
+            entry.participantId !== args.where.participantId ||
+            (args.where.privateStorageKey ? entry.privateStorageKey !== args.where.privateStorageKey : false)
+        );
+        for (const participant of state.participants) {
+          participant.applicationPhotoEntries = state.applicationPhotoEntries.filter((entry) => entry.participantId === participant.id);
+        }
+        return { count: before - state.applicationPhotoEntries.length };
       }
     },
     hutCallEvaluation: {
@@ -3408,6 +3578,7 @@ type FakeParticipant = {
   phaseCodes: FakeHutPhaseCode[];
   phone: string | null;
   protocolVersion: "APPLICATION_PHOTO" | "LEGACY_VIDEO";
+  questionnaireAttempt: FakeHutQuestionnaireAttempt | null;
   recruiter: string | null;
   referenceSelfie: FakeReferenceSelfie | null;
   registrationSlot: FakeRegistrationSlot | null;
@@ -3443,6 +3614,16 @@ type FakeParticipant = {
   visualOverrideReason: string | null;
   visualVerifications: FakeVisualVerification[];
   videoSubmissions: Array<FakeVideo & { id?: string }>;
+};
+
+type FakeAuditLog = {
+  action: string;
+  actorUserId?: string | null;
+  afterJson?: unknown;
+  beforeJson?: unknown;
+  entityId: string;
+  entityType: string;
+  reason?: string | null;
 };
 
 type FakeHutQuestionnaireAttempt = {

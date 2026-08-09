@@ -55,11 +55,17 @@ describe("FieldOperationsPage", () => {
     expect(screen.getByRole("heading", { name: "Seguimiento de participantes" })).toBeInTheDocument();
     expect(screen.getAllByText("Encuestador").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("JES26")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Cambiar encuestador" })).toHaveAttribute("href", "/field/dashboard");
     expect(screen.getAllByText("NAV-121").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("HUT-121").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Encargado")).toBeInTheDocument();
     expect(screen.getByText("Participante Seguimiento")).toBeInTheDocument();
     expect(screen.getByText(/link enviado/)).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Abrir Navigo" }).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByRole("button", { name: /Copiar Navigo|Copiar enlace/ }).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByRole("link", { name: /Abrir fotos HUT|HUT/ }).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/🧪 Modo prueba/)).toBeInTheDocument();
+    expect(screen.getByText("Modo prueba activo")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Abrir captura HUT" })).toHaveAttribute("href", "/field/hut?folio=HUT-121");
     expect(screen.getAllByRole("button", { name: "Enviar recordatorio ahora" }).length).toBeGreaterThan(0);
   });
@@ -152,7 +158,9 @@ function createDashboard() {
       origin: "CLT_HUT",
       protocolVersion: "APPLICATION_PHOTO",
       questionnaireStatus: "IN_PROGRESS",
-      status: "BLOCK_1_CALL_PENDING"
+      status: "BLOCK_1_CALL_PENDING",
+      testMode: true,
+      token: "hut-token-121"
     },
     id: "ctl-1",
     interviewer: "Encuestadora Uno",
