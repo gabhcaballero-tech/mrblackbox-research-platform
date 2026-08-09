@@ -11,6 +11,7 @@ import {
   generateNavigoParticipantLinkAction,
   registerNavigoDirectParticipantAction,
   releaseNavigoAfterCtlAction,
+  reopenNavigoActivityOutsideWindowAction,
   resetNavigoParticipantAppAction,
   reviewNavigoActivityIdentityAction,
   updateNavigoVisualVerificationModeAction
@@ -1087,6 +1088,8 @@ function ActivityDetail({
           <DetailItem label="Ultimo recordatorio" value={activityReminderLabel(activity, timeZoneIana)} />
         </dl>
 
+        <ManualReopenPanel activity={activity} studyId={studyId} timeZoneIana={timeZoneIana} />
+
         {isT0 ? (
           <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
             <p className="font-semibold">Identidad en salón: {identityStatusLabel(activity?.identityStatus)}</p>
@@ -1124,6 +1127,62 @@ function ActivityDetail({
   );
 }
 
+function ManualReopenPanel({
+  activity,
+  studyId,
+  timeZoneIana
+}: {
+  activity?: NavigoActivityListItem;
+  studyId: string;
+  timeZoneIana: string;
+}) {
+  if (!activity || isInitialNavigoEvaluation(activity.code) || activity.status === "COMPLETED") {
+    return null;
+  }
+
+  const reopened = Boolean(activity.reopenedAt);
+  const outsideWindow = activity.availability?.reason === "AFTER_WINDOW";
+
+  return (
+    <section className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm">
+      <h4 className="font-semibold text-zinc-950">Reapertura fuera de ventana</h4>
+      {reopened ? (
+        <div className="mt-2 grid gap-2 text-xs text-zinc-700 sm:grid-cols-3">
+          <DetailItem label="Estado" value="Reabierta manualmente" />
+          <DetailItem label="Fecha" value={activity.reopenedAt ? formatDate(activity.reopenedAt, timeZoneIana) : "Sin fecha"} />
+          <DetailItem label="Usuario" value={activity.reopenedBy?.name ?? "Usuario no disponible"} />
+          <div className="rounded-md border border-zinc-200 bg-white p-2 sm:col-span-3">
+            <p className="font-medium text-zinc-500">Motivo</p>
+            <p className="mt-1 text-zinc-900">{activity.reopenReason ?? "Sin motivo registrado"}</p>
+          </div>
+        </div>
+      ) : null}
+
+      {outsideWindow ? (
+        <form action={reopenNavigoActivityOutsideWindowAction.bind(null, studyId, activity.id ?? "")} className="mt-3 space-y-2">
+          <label className="block text-xs font-semibold text-zinc-700" htmlFor={`reopen-reason-${activity.id}`}>
+            Motivo obligatorio
+          </label>
+          <textarea
+            className="min-h-20 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            id={`reopen-reason-${activity.id}`}
+            name="reason"
+            placeholder="Participante bloqueado por validacion facial incorrecta del sistema."
+            required
+          />
+          <SubmitButton pendingLabel="Reabriendo evaluacion...">
+            Reabrir evaluacion fuera de ventana
+          </SubmitButton>
+        </form>
+      ) : reopened ? (
+        <p className="mt-2 text-xs text-emerald-700">La evaluacion permanecera disponible hasta que sea completada.</p>
+      ) : (
+        <p className="mt-2 text-xs text-zinc-500">Disponible solo cuando la evaluacion este fuera de ventana.</p>
+      )}
+    </section>
+  );
+}
+
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-zinc-200 bg-zinc-50 p-2">
@@ -1148,6 +1207,10 @@ function activityAvailabilityLabel(activity: NavigoActivityListItem | undefined,
 
   if (activity.availability?.reason === "AFTER_WINDOW") {
     return "Fuera de ventana";
+  }
+
+  if (activity.availability?.reason === "AVAILABLE_OVERRIDE") {
+    return "Reabierta manualmente";
   }
 
   if (activity.availability?.canCapture) {
@@ -1388,6 +1451,9 @@ function navigoMeasurementProgressLabel(activity?: NavigoActivityListItem): stri
 
 function navigoOperationalStatusLabel(activity: NavigoActivityListItem): string {
   if (!isInitialNavigoEvaluation(activity.code)) {
+    if (activity.availability?.reason === "AVAILABLE_OVERRIDE" && activity.status !== "COMPLETED") {
+      return "Reabierta manualmente";
+    }
     if (activity.availability?.reason === "AFTER_WINDOW" && activity.status !== "COMPLETED") {
       return "Requiere llamada";
     }

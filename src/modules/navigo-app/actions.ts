@@ -353,6 +353,29 @@ export async function deleteNavigoParticipantStagesAction(
   redirectWithNavigoMessage(studyId, { message: result.message });
 }
 
+export async function reopenNavigoActivityOutsideWindowAction(studyId: string, participantActivityId: string, formData: FormData) {
+  const actor = await requireCapability("activity:reopen");
+  const reason = String(formData.get("reason") ?? "").trim();
+
+  if (!reason) {
+    redirectWithNavigoMessage(studyId, { error: "Captura el motivo de la reapertura." });
+  }
+
+  const result = await createNavigoAppRepository().reopenActivityOutsideWindow({
+    actorUserId: actor.id,
+    participantActivityId,
+    reason,
+    studyId
+  });
+
+  if (!result.ok) {
+    redirectWithNavigoMessage(studyId, { error: result.message });
+  }
+
+  revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+  redirectWithNavigoMessage(studyId, { message: result.message });
+}
+
 export async function configureNavigoRotationAction(studyId: string, studyParticipantId: string, formData: FormData) {
   const actor = await requireCapability("rotation:register");
   const result = await createNavigoAppRepository().configureParticipantRotation({

@@ -158,6 +158,12 @@ export type NavigoActivityListItem = NavigoActivityRecord & {
     source: string | null;
     status: string;
   } | null;
+  reopenedAt: Date | null;
+  reopenedBy: {
+    name: string;
+  } | null;
+  reopenedByUserId: string | null;
+  reopenReason: string | null;
   responseCount: number;
 };
 
@@ -663,6 +669,13 @@ export type NavigoAppRepository = {
     requestOrigin: string;
     studyId: string;
   }) => Promise<NavigoActionResult<NavigoEvaluationReminderManualSendResult>>;
+  reopenActivityOutsideWindow: (input: {
+    actorUserId: string;
+    now?: Date;
+    participantActivityId: string;
+    reason: string;
+    studyId: string;
+  }) => Promise<NavigoMaintenanceResult>;
   updateParticipantVisualVerificationMode: (input: {
     actorUserId: string;
     mode: NavigoVisualVerificationMode;
@@ -836,6 +849,14 @@ const activitySelect = {
   availableUntil: true,
   id: true,
   occurrenceKey: true,
+  reopenedAt: true,
+  reopenedBy: {
+    select: {
+      name: true
+    }
+  },
+  reopenedByUserId: true,
+  reopenReason: true,
   participantActivityEvidence: {
     select: {
       id: true,
@@ -1215,6 +1236,10 @@ type ActivityRecord = NavigoActivityRecord & {
     sentAt: Date | null;
     status: string;
   }>;
+  reopenedAt?: Date | null;
+  reopenedBy?: { name: string } | null;
+  reopenedByUserId?: string | null;
+  reopenReason?: string | null;
   responses: Array<{ answerJson: unknown; questionId: string }>;
 };
 type ConfirmationWithParticipant = {
@@ -3205,6 +3230,89 @@ export function createNavigoAppRepository(
           whatsappMessageId: sent.result.whatsappMessageId,
           whatsappStatus: sent.result.status === "SENT" ? "ENVIADO" : "ERROR"
         },
+        ok: true
+      };
+    },
+
+    async reopenActivityOutsideWindow(input) {
+      const prisma = await getPrisma();
+      const now = input.now ?? new Date();
+      const reason = input.reason.trim();
+
+      if (!reason) {
+        return { message: "Captura el motivo de la reapertura.", ok: false };
+      }
+
+      const activity = (await prisma.participantActivity.findFirst?.({
+        select: {
+          activitySchedule: {
+            select: {
+              code: true
+            }
+          },
+          availableUntil: true,
+          id: true,
+          reopenedAt: true,
+          status: true,
+          studyParticipant: {
+            select: {
+              participantConfirmation: {
+                select: {
+                  folio: true
+                }
+              },
+              studyId: true
+            }
+          }
+        },
+        where: {
+          id: input.participantActivityId,
+          studyParticipant: {
+            qaParticipantRun: { is: null },
+            studyId: input.studyId
+          }
+        }
+      })) as {
+        activitySchedule: { code: string };
+        availableUntil: Date;
+        id: string;
+        reopenedAt: Date | null;
+        status: string;
+        studyParticipant: { participantConfirmation: { folio: string } | null; studyId: string };
+      } | null;
+
+      if (!activity) {
+        return { message: "No encontramos la actividad Navigo.", ok: false };
+      }
+
+      if (!isSupportedNavigoActivityCode(activity.activitySchedule.code)) {
+        return { message: "La actividad seleccionada no pertenece al protocolo Navigo activo.", ok: false };
+      }
+
+      if (isInitialNavigoEvaluation(activity.activitySchedule.code)) {
+        return { message: "T0 se controla desde CTL y no se reabre desde esta accion.", ok: false };
+      }
+
+      if (activity.status === "COMPLETED") {
+        return { message: "La evaluacion ya esta completada.", ok: false };
+      }
+
+      if (activity.availableUntil.getTime() >= now.getTime()) {
+        return { message: "La evaluacion todavia esta dentro de su ventana operativa.", ok: false };
+      }
+
+      await prisma.participantActivity.update?.({
+        data: {
+          reopenedAt: now,
+          reopenedByUserId: input.actorUserId,
+          reopenReason: reason,
+          status: "REOPENED"
+        },
+        where: { id: activity.id }
+      });
+
+      return {
+        message: `Evaluacion ${activity.activitySchedule.code} reabierta manualmente para ${activity.studyParticipant.participantConfirmation?.folio ?? "participante sin folio"}.`,
         ok: true
       };
     },
@@ -7998,6 +8106,10 @@ async function toActivityListItem(activity: ActivityRecord, storage: EvidenceSto
     existingResponses: Object.fromEntries(activity.responses.map((response) => [response.questionId, response.answerJson])),
     latestReminder: getLatestNavigoEvaluationReminder(activity),
     readableResponses: createReadableNavigoResponses(activity.responses),
+    reopenedAt: activity.reopenedAt ?? null,
+    reopenedBy: activity.reopenedBy ?? null,
+    reopenedByUserId: activity.reopenedByUserId ?? null,
+    reopenReason: activity.reopenReason ?? null,
     responseCount: countNavigoMeasurementResponses(activity.responses)
   };
 }
@@ -8055,6 +8167,9 @@ function toNavigoActivityRecord(activity: ActivityRecord): NavigoActivityRecord 
     identityStatus: isInitialEvaluation ? identityStatus : undefined,
     identityReviewStatus: getActivitySelfie(activity)?.reviewStatus,
     occurrenceKey: activity.occurrenceKey,
+    reopenedAt: activity.reopenedAt ?? null,
+    reopenedByUserId: activity.reopenedByUserId ?? null,
+    reopenReason: activity.reopenReason ?? null,
     responseCount,
     scheduledAt: activity.scheduledAt,
     selfieCount: getActivitySelfieCount(activity),

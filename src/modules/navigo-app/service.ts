@@ -39,6 +39,9 @@ export type NavigoActivityRecord = {
   occurrenceKey: string;
   identityStatus?: "CONFIRMED" | "PENDING" | "REJECTED";
   identityReviewStatus?: "APPROVED" | "PENDING" | "REJECTED";
+  reopenedAt?: Date | null;
+  reopenedByUserId?: string | null;
+  reopenReason?: string | null;
   scheduledAt: Date;
   selfieCount?: number;
   status: "AVAILABLE" | "COMPLETED" | "EXPIRED" | "INCOMPLETE" | "PENDING" | "REOPENED" | "STARTED";
@@ -106,7 +109,7 @@ export type NavigoActivityAvailability =
   | {
       canCapture: true;
       label: "Disponible" | "Proxima a vencer";
-      reason: "AVAILABLE" | "DUE_SOON";
+      reason: "AVAILABLE" | "AVAILABLE_OVERRIDE" | "DUE_SOON";
     };
 
 export type NavigoActivityTimelineItem = NavigoActivityRecord & {
@@ -899,6 +902,14 @@ function getNavigoActivityAvailability({
   }
 
   if (now.getTime() > activity.availableUntil.getTime()) {
+    if (activity.reopenedAt) {
+      return {
+        canCapture: true,
+        label: "Disponible",
+        reason: "AVAILABLE_OVERRIDE"
+      };
+    }
+
     return {
       canCapture: false,
       label: "Fuera de ventana",

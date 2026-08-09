@@ -209,6 +209,7 @@ function readTestModeParams(query: { navigoTestMode?: string; navigoTestSignatur
 function availabilityMessage(availability: { blockedByCode?: string; reason: string }): string {
   switch (availability.reason) {
     case "AVAILABLE":
+    case "AVAILABLE_OVERRIDE":
     case "DUE_SOON":
       return "Ya puedes realizar esta evaluación. Hazla lo antes posible.";
     case "BEFORE_WINDOW":

@@ -521,6 +521,29 @@ describe("navigo app MVP rules", () => {
     });
   });
 
+  it("allows a manually reopened out-of-window activity until it is completed", () => {
+    const reopenedTimeline = buildNavigoActivityTimeline({
+      activities: navigoActivityRecords({ t3ReopenedAt: new Date("2026-06-26T01:05:00.000Z") }),
+      now: new Date("2026-06-26T01:10:00.000Z")
+    });
+    const completedTimeline = buildNavigoActivityTimeline({
+      activities: navigoActivityRecords({
+        t3Completed: true,
+        t3ReopenedAt: new Date("2026-06-26T01:05:00.000Z")
+      }),
+      now: new Date("2026-06-26T01:10:00.000Z")
+    });
+
+    expect(reopenedTimeline.find((activity) => activity.code === "T3_HORAS")?.availability).toMatchObject({
+      canCapture: true,
+      reason: "AVAILABLE_OVERRIDE"
+    });
+    expect(completedTimeline.find((activity) => activity.code === "T3_HORAS")?.availability).toMatchObject({
+      canCapture: false,
+      reason: "ALREADY_COMPLETED"
+    });
+  });
+
   it("validates complete AP1 to AP7 answers and rejects incomplete submissions", () => {
     const complete = validateNavigoMeasurementAnswers({
       input: {
@@ -794,6 +817,9 @@ describe("navigo app MVP rules", () => {
     expect(adminPage).toContain("Umbrales: MATCH &gt;= 0.60, NO_MATCH &lt;= 0.35");
     expect(adminPage).toContain("verificación biométrica automatizada");
     expect(adminPage).toContain("Valor interno conservado");
+    expect(adminPage).toContain("Reapertura fuera de ventana");
+    expect(adminPage).toContain("Reabrir evaluacion fuera de ventana");
+    expect(adminPage).toContain("Reabierta manualmente");
     expect(participantPage).not.toContain("Score/similitud");
     expect(adminPage).not.toContain("privateStorageKey");
     expect(adminPage).not.toContain("storageBucket");
@@ -801,8 +827,11 @@ describe("navigo app MVP rules", () => {
     expect(repository).toContain("readableResponses");
     expect(repository).toContain("navigoComparativeNumericEquivalent");
     expect(repository).toContain("reviewActivityIdentity");
+    expect(repository).toContain("reopenActivityOutsideWindow");
+    expect(repository).toContain("reopenedAt: now");
     expect(repository).toContain("evidence.internalNote");
     expect(actions).toContain("reviewNavigoActivityIdentityAction");
+    expect(actions).toContain("reopenNavigoActivityOutsideWindowAction");
   });
 
   it("renders manual rotation save as a visible Navigo-only adjustment with row-level feedback", () => {
@@ -1191,6 +1220,31 @@ describe("navigo app MVP rules", () => {
       reminderType: "NAVIGO_WHATSAPP_EVALUATION_REMINDER",
       source: "MANUAL_ADMIN"
     });
+  });
+
+  it("reabre una sola evaluacion fuera de ventana y guarda auditoria", async () => {
+    const state = createNavigoParticipantActivityState();
+    const repository = createNavigoAppRepository(state.prisma as never);
+    const target = state.activities.find((activity) => activity.activitySchedule.code === "T4_HORAS");
+    const untouched = state.activities.find((activity) => activity.activitySchedule.code === "T8_HORAS");
+
+    const result = await repository.reopenActivityOutsideWindow({
+      actorUserId: "admin-1",
+      now: new Date("2026-06-26T01:01:00.000Z"),
+      participantActivityId: target?.id ?? "",
+      reason: "Participante bloqueado por validacion facial incorrecta del sistema.",
+      studyId: state.participant.study.id
+    });
+
+    expect(result).toMatchObject({ ok: true });
+    expect(target).toMatchObject({
+      reopenedByUserId: "admin-1",
+      reopenReason: "Participante bloqueado por validacion facial incorrecta del sistema.",
+      status: "REOPENED"
+    });
+    expect((target?.reopenedAt as Date | null)?.toISOString()).toBe("2026-06-26T01:01:00.000Z");
+    expect(untouched?.reopenedAt).toBeNull();
+    expect(untouched?.status).toBe("PENDING");
   });
 
   it("returns the same evaluation link sent by WhatsApp for operator backup", async () => {
@@ -3653,6 +3707,7 @@ function navigoActivityRecords({
   t0Status = "COMPLETED",
   t3Completed = false,
   t3IdentityReviewStatus,
+  t3ReopenedAt = null,
   t3SelfieCount = 0,
   t45Completed = false,
   t6Completed = false
@@ -3661,6 +3716,7 @@ function navigoActivityRecords({
   t0Status?: "COMPLETED" | "STARTED";
   t3Completed?: boolean;
   t3IdentityReviewStatus?: "APPROVED" | "PENDING" | "REJECTED";
+  t3ReopenedAt?: Date | null;
   t3SelfieCount?: number;
   t45Completed?: boolean;
   t6Completed?: boolean;
@@ -3671,6 +3727,7 @@ function navigoActivityRecords({
     }),
     navigoActivityRecord("T3_HORAS", 180, -30, 420, t3Completed ? "COMPLETED" : "PENDING", null, null, {
       identityReviewStatus: t3IdentityReviewStatus,
+      reopenedAt: t3ReopenedAt,
       selfieCount: t3SelfieCount
     }),
     navigoActivityRecord("T4_5_HORAS", 270, -30, 330, t45Completed ? "COMPLETED" : "PENDING", null, null),
@@ -3690,6 +3747,7 @@ function navigoActivityRecord(
   extra: Partial<{
     identityReviewStatus: "APPROVED" | "PENDING" | "REJECTED";
     identityStatus: "CONFIRMED" | "PENDING" | "REJECTED";
+    reopenedAt: Date | null;
     selfieCount: number;
   }> = {}
 ) {
@@ -3918,11 +3976,34 @@ function createNavigoParticipantActivityState() {
           activitySchedule: schedule as (typeof activities)[number]["activitySchedule"],
           id: `activity-${schedule.code}`,
           participantActivityEvidence: [],
+          reopenedAt: null,
+          reopenedBy: null,
+          reopenedByUserId: null,
+          reopenReason: null,
           responses: []
         };
         activities.push(record);
         participant.activities = activities;
         return record;
+      },
+      async findFirst(args: { where?: { id?: string; studyParticipant?: { studyId?: string } } }) {
+        const target = activities.find(
+          (activity) =>
+            (!args.where?.id || activity.id === args.where.id) &&
+            (!args.where?.studyParticipant?.studyId || participant.study.id === args.where.studyParticipant.studyId)
+        );
+
+        if (!target) {
+          return null;
+        }
+
+        return {
+          ...target,
+          studyParticipant: {
+            participantConfirmation: participant.participantConfirmation,
+            studyId: participant.study.id
+          }
+        };
       },
       async update(args: {
         data: Partial<(typeof activities)[number]>;
@@ -4135,6 +4216,10 @@ function createParticipantActivity(
     id: `activity-${code}`,
     occurrenceKey: "DEFAULT",
     participantActivityEvidence: overrides.participantActivityEvidence ?? [],
+    reopenedAt: null,
+    reopenedBy: null,
+    reopenedByUserId: null,
+    reopenReason: null,
     responses: overrides.responses ?? [],
     scheduledAt,
     studyParticipantId: "study-participant-1",
