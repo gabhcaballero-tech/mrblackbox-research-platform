@@ -71,6 +71,7 @@ export {
   formatHutPhotoTimelineSlotTitle,
   HUT_PHOTO_TIME_ZONE,
   resolveHutPhaseCodeSlotTimelineLabel,
+  resolveHutPhotoTimelinePhotoLabel,
   resolveHutPhotoTimelinePhaseLabel,
   resolveHutPhotoTimelineUseDayLabel,
   resolveHutOperationalStatusLabel

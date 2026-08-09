@@ -454,11 +454,19 @@ export async function saveHutQuestionnaireAnswerForFieldAction(
     questionCode,
     studyId
   });
+  const terminated = result.ok && Boolean(result.data?.terminated);
+  const savedMessage = result.ok
+    ? terminated
+      ? result.message ?? "Filtro terminado."
+      : nextQuestionCode
+        ? "Guardado correctamente"
+        : "Evaluacion completada"
+    : null;
   redirectToFieldHut(
     folio,
-    result.ok ? (nextQuestionCode ? "Guardado correctamente" : "Evaluacion completada") : null,
+    savedMessage,
     result.ok ? null : result.message,
-    result.ok ? nextQuestionCode : questionCode
+    result.ok ? (terminated ? null : nextQuestionCode) : questionCode
   );
 }
 

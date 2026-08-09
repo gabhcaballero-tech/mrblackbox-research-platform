@@ -6,7 +6,8 @@ import {
   type HutDefinition,
   type HutDefinitionContext,
   type HutMatrixQuestionDefinition,
-  type HutQuestionDefinition
+  type HutQuestionDefinition,
+  type HutQuestionOption
 } from "./definition";
 
 export const HUT_REQUIRED_VIDEOS_PER_BLOCK = 3;
@@ -183,6 +184,11 @@ export type HutAnswerDraft = {
   questionCode: string;
 };
 
+export type HutQuestionTerminationDecision = {
+  reason: string | null;
+  terminates: boolean;
+};
+
 export function parseHutQuestionnaireAnswers(
   input: HutAnswerInput,
   definition: HutDefinition = getHutV5Definition(),
@@ -328,6 +334,44 @@ export function hutFormDataToAnswerInput(formData: FormData): HutAnswerInput {
   return input;
 }
 
+export function getHutQuestionTerminationDecision(
+  question: HutQuestionDefinition,
+  answerValue: unknown
+): HutQuestionTerminationDecision {
+  if (question.type !== "SELECT") {
+    return { reason: null, terminates: false };
+  }
+
+  const selectedValues = new Set(
+    (Array.isArray(answerValue) ? answerValue : [answerValue])
+      .map(normalizeHutAnswerCode)
+      .filter(Boolean)
+  );
+
+  if (question.requiredOptionValues?.length) {
+    const missingRequiredValues = question.requiredOptionValues
+      .map(normalizeHutAnswerCode)
+      .filter((value) => !selectedValues.has(value));
+
+    if (missingRequiredValues.length > 0) {
+      return {
+        reason: `No selecciono la opcion requerida para continuar: ${missingRequiredValues.join(", ")}`,
+        terminates: true
+      };
+    }
+  }
+
+  const terminatingOptions = question.options.filter((option) => option.terminates);
+  if (terminatingOptions.some((option) => selectedValues.has(normalizeHutAnswerCode(option.value)))) {
+    return {
+      reason: `Selecciono una opcion de terminacion: ${selectedOptionLabels(terminatingOptions, selectedValues).join(", ")}`,
+      terminates: true
+    };
+  }
+
+  return { reason: null, terminates: false };
+}
+
 function parseHutAnswerForQuestion(input: HutAnswerInput, question: HutQuestionDefinition):
   | {
       answerValue: unknown;
@@ -404,6 +448,12 @@ function parseHutAnswerForQuestion(input: HutAnswerInput, question: HutQuestionD
   }
 
   return { answerValue: normalized, empty: false, ok: true };
+}
+
+function selectedOptionLabels(options: HutQuestionOption[], selectedValues: Set<string>): string[] {
+  return options
+    .filter((option) => selectedValues.has(normalizeHutAnswerCode(option.value)))
+    .map((option) => option.label);
 }
 
 function parseHutRankingAnswer(

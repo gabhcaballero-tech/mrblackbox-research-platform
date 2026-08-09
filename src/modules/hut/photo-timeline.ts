@@ -91,7 +91,7 @@ export const HUT_PHOTO_TIMELINE_DEFINITIONS: HutPhotoTimelineSlotDefinition[] = 
     dayLabel: "Producto 1 - Dia 1",
     id: "PRODUCT_1_DAY_1",
     interviewerTask: null,
-    note: "Colocacion y primera aplicacion del Producto 1. La evidencia historica COLOCACION se muestra aqui.",
+    note: "Colocacion y primera aplicacion del Producto 1. La evidencia historica COLOCACION se conserva y se presenta segun exista entrega separada.",
     participantTask: "Foto colocacion / aplicacion",
     product: "EVA1",
     sourcePhase: "COLOCACION",
@@ -212,7 +212,12 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
     });
   });
   const firstMissingCapturable = preliminarySlots.find((slot) => slot.participantTask && !slot.evidence);
-  const availableSlotId = explicitAvailableSlotId ?? firstMissingCapturable?.id ?? null;
+  const explicitAvailableSlot = explicitAvailableSlotId
+    ? preliminarySlots.find((slot) => slot.id === explicitAvailableSlotId) ?? null
+    : null;
+  const availableSlotId = explicitAvailableSlot?.evidence
+    ? firstMissingCapturable?.id ?? null
+    : explicitAvailableSlotId ?? firstMissingCapturable?.id ?? null;
   let blockedByPrevious = false;
 
   return preliminarySlots.map((slot) => {
@@ -295,6 +300,25 @@ export function resolveHutPhotoTimelineUseDayLabel(useDayNumber: number | null |
   return typeof useDayNumber === "number" ? labels[useDayNumber] ?? `Dia ${useDayNumber}` : "Dia no asignado";
 }
 
+export function resolveHutPhotoTimelinePhotoLabel(
+  photo: {
+    capturedAt: Date;
+    phase?: string | null;
+    source: "DAILY_ENTRY" | "PHASE_EVIDENCE";
+    useDayNumber?: number | null;
+  },
+  timeline: Array<Pick<HutPhotoTimelineSlot, "dayLabel" | "evidence" | "id" | "title">> = []
+): string {
+  const matchingSlot = timeline.find((slot) => slot.evidence && sameTimelinePhoto(slot.evidence, photo));
+  if (matchingSlot) {
+    return formatHutPhotoTimelineSlotTitle(matchingSlot);
+  }
+
+  return photo.source === "PHASE_EVIDENCE"
+    ? resolveHutPhotoTimelinePhaseLabel(photo.phase)
+    : resolveHutPhotoTimelineUseDayLabel(photo.useDayNumber);
+}
+
 export function resolveHutPhaseCodeSlotTimelineLabel(slot: number | null | undefined): string {
   const labels: Record<number, string> = {
     1: "Colocacion / Producto 1 Dia 1",
@@ -350,8 +374,14 @@ function resolveEvidenceForDefinition(
   phaseEvidence: Map<HutPhase, HutPhotoTimelinePhoto>,
   dailyByUseDay: Map<number, HutPhotoTimelinePhoto>
 ): HutPhotoTimelinePhoto | null {
+  const colocacionEvidence = phaseEvidence.get("COLOCACION") ?? null;
+  const deliveryEvidence = dailyByUseDay.get(0) ?? null;
+
+  if (definition.id === "DELIVERY") {
+    return deliveryEvidence ?? colocacionEvidence;
+  }
   if (definition.sourcePhase === "COLOCACION") {
-    return phaseEvidence.get("COLOCACION") ?? dailyByUseDay.get(1) ?? null;
+    return deliveryEvidence ? colocacionEvidence ?? dailyByUseDay.get(1) ?? null : dailyByUseDay.get(1) ?? null;
   }
   if (typeof definition.useDayNumber === "number") {
     return dailyByUseDay.get(definition.useDayNumber) ?? null;
@@ -386,4 +416,23 @@ function dedupeDailyEntries(
     }
     return true;
   });
+}
+
+function sameTimelinePhoto(
+  timelinePhoto: HutPhotoTimelinePhoto,
+  photo: {
+    capturedAt: Date;
+    phase?: string | null;
+    source: "DAILY_ENTRY" | "PHASE_EVIDENCE";
+    useDayNumber?: number | null;
+  }
+): boolean {
+  if (timelinePhoto.source !== photo.source || timelinePhoto.capturedAt.getTime() !== photo.capturedAt.getTime()) {
+    return false;
+  }
+  if (photo.source === "PHASE_EVIDENCE") {
+    return timelinePhoto.phase === photo.phase;
+  }
+
+  return timelinePhoto.useDayNumber === photo.useDayNumber;
 }

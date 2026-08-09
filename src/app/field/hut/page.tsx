@@ -5,8 +5,7 @@ import {
   getHutQuestions,
   getHutV5Definition,
   resolveHutPhaseCodeSlotTimelineLabel,
-  resolveHutPhotoTimelinePhaseLabel,
-  resolveHutPhotoTimelineUseDayLabel,
+  resolveHutPhotoTimelinePhotoLabel,
   resolveHutOperationalStatusLabel,
   type HutFieldQuestionnaireWorkspace,
   type HutPhotoTimelineSlot,
@@ -111,11 +110,14 @@ function FieldHutWorkspace({
   const questions = applicableQuestions(workspace);
   const requiredQuestions = questions.filter((question) => question.required);
   const selectedQuestion = questions.find((question) => question.code === selectedQuestionCode) ?? null;
-  const nextQuestion = selectedQuestion
-    ?? requiredQuestions.find((question) => !(question.code in workspace.questionnaire.answers))
-    ?? questions.find((question) => !(question.code in workspace.questionnaire.answers))
-    ?? null;
-  const captureQuestion = selectedQuestionCode ? selectedQuestion : null;
+  const questionnaireClosed = workspace.questionnaire.attempt.status === "COMPLETED" || workspace.questionnaire.attempt.status === "TERMINATED";
+  const nextQuestion = questionnaireClosed
+    ? null
+    : selectedQuestion
+      ?? requiredQuestions.find((question) => !(question.code in workspace.questionnaire.answers))
+      ?? questions.find((question) => !(question.code in workspace.questionnaire.answers))
+      ?? null;
+  const captureQuestion = !questionnaireClosed && selectedQuestionCode ? selectedQuestion : null;
   const answeredRequired = requiredQuestions.filter((question) => question.code in workspace.questionnaire.answers).length;
   const progress = requiredQuestions.length > 0 ? Math.round((answeredRequired / requiredQuestions.length) * 100) : 100;
   const hutTimeline = buildFieldPhotoTimeline(workspace);
@@ -232,9 +234,7 @@ function FieldHutWorkspace({
             {workspace.photos.map((photo, index) => (
               <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={`${photo.source}-${photo.capturedAt.toISOString()}-${index}`}>
                 <p className="font-semibold text-zinc-950">
-                  {photo.source === "PHASE_EVIDENCE"
-                    ? resolveHutPhotoTimelinePhaseLabel(photo.phase)
-                    : resolveHutPhotoTimelineUseDayLabel(photo.useDayNumber)}
+                  {resolveHutPhotoTimelinePhotoLabel(photo, hutTimeline)}
                 </p>
                 <p className="mt-1 text-zinc-600">Producto: {photo.productCode ?? "No asignado"}</p>
                 <p className="text-zinc-600">Fecha: {photo.capturedAt.toLocaleString("es-MX")}</p>
@@ -338,7 +338,7 @@ function SectionProgressControls({
         const required = sectionQuestions.filter((question) => question.required);
         const pending = required.filter((question) => !(question.code in workspace.questionnaire.answers));
         const visit = visitsBySection.get(section.id);
-        const canComplete = pending.length === 0 && visit?.status !== "COMPLETED";
+        const canComplete = workspace.questionnaire.attempt.status !== "TERMINATED" && pending.length === 0 && visit?.status !== "COMPLETED";
         return (
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={section.id}>
             <p className="font-semibold text-zinc-950">{section.title}</p>

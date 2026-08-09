@@ -2,12 +2,46 @@ import { describe, expect, it } from "vitest";
 import {
   buildHutPhotoTimeline,
   formatHutPhotoTimelineSlotTitle,
+  resolveHutPhotoTimelinePhotoLabel,
   resolveHutPhotoTimelinePhaseLabel,
   resolveHutPhotoTimelineUseDayLabel,
   resolveHutOperationalStatusLabel
 } from "./photo-timeline";
 
 describe("HutPhotoTimeline", () => {
+  it("shows historical colocacion evidence as delivery when no separate delivery photo exists", () => {
+    const capturedAt = new Date("2026-08-08T06:30:00.000Z");
+    const timeline = buildHutPhotoTimeline({
+      applicationEvidence: [
+        {
+          capturedAt,
+          phase: "COLOCACION",
+          productCode: "247"
+        }
+      ],
+      rotation: {
+        eva1: "247",
+        eva2: "583"
+      }
+    });
+
+    expect(timeline.find((slot) => slot.id === "DELIVERY")).toMatchObject({
+      evidence: expect.objectContaining({
+        capturedAt,
+        phase: "COLOCACION",
+        source: "PHASE_EVIDENCE"
+      }),
+      productCode: "247",
+      status: "COMPLETED"
+    });
+    expect(timeline.find((slot) => slot.id === "PRODUCT_1_DAY_1")).toMatchObject({
+      evidence: null,
+      productCode: "247",
+      status: "AVAILABLE"
+    });
+    expect(timeline.filter((slot) => slot.evidence?.capturedAt.getTime() === capturedAt.getTime())).toHaveLength(1);
+  });
+
   it("keeps delivery and product 1 day 1 as different slots without duplicating colocacion", () => {
     const timeline = buildHutPhotoTimeline({
       applicationEvidence: [
@@ -49,6 +83,119 @@ describe("HutPhotoTimeline", () => {
     });
     expect(timeline.filter((slot) => slot.id === "PRODUCT_1_DAY_1")).toHaveLength(1);
     expect(timeline.map((slot) => slot.id)).not.toContain("PLACEMENT");
+  });
+
+  it("does not duplicate a historical colocacion daily mirror when remapping it to delivery", () => {
+    const capturedAt = new Date("2026-08-08T06:30:00.000Z");
+    const timeline = buildHutPhotoTimeline({
+      applicationEvidence: [
+        {
+          capturedAt,
+          phase: "COLOCACION",
+          productCode: "247"
+        }
+      ],
+      dailyEntries: [
+        {
+          capturedAt,
+          capturedLocalDate: "2026-08-08",
+          productCode: "247",
+          useDayNumber: 1
+        }
+      ],
+      rotation: {
+        eva1: "247",
+        eva2: "583"
+      }
+    });
+
+    expect(timeline.find((slot) => slot.id === "DELIVERY")?.status).toBe("COMPLETED");
+    expect(timeline.find((slot) => slot.id === "PRODUCT_1_DAY_1")).toMatchObject({
+      evidence: null,
+      status: "AVAILABLE"
+    });
+    expect(timeline.filter((slot) => slot.evidence?.capturedAt.getTime() === capturedAt.getTime())).toHaveLength(1);
+  });
+
+  it("falls back to the next missing slot when an explicit available slot is already completed", () => {
+    const timeline = buildHutPhotoTimeline({
+      applicationEvidence: [
+        {
+          capturedAt: new Date("2026-08-08T06:30:00.000Z"),
+          phase: "COLOCACION",
+          productCode: "247"
+        }
+      ],
+      availableSlotId: "DELIVERY",
+      rotation: {
+        eva1: "247",
+        eva2: "583"
+      }
+    });
+
+    expect(timeline.find((slot) => slot.id === "DELIVERY")?.status).toBe("COMPLETED");
+    expect(timeline.find((slot) => slot.id === "PRODUCT_1_DAY_1")?.status).toBe("AVAILABLE");
+  });
+
+  it("labels raw historical colocacion photos from the resolved timeline", () => {
+    const capturedAt = new Date("2026-08-08T06:30:00.000Z");
+    const historicalTimeline = buildHutPhotoTimeline({
+      applicationEvidence: [
+        {
+          capturedAt,
+          phase: "COLOCACION",
+          productCode: "247"
+        }
+      ],
+      rotation: {
+        eva1: "247",
+        eva2: "583"
+      }
+    });
+    const newTimeline = buildHutPhotoTimeline({
+      applicationEvidence: [
+        {
+          capturedAt,
+          phase: "COLOCACION",
+          productCode: "247"
+        }
+      ],
+      dailyEntries: [
+        {
+          capturedAt: new Date("2026-08-08T05:30:00.000Z"),
+          capturedLocalDate: "2026-08-07",
+          productCode: null,
+          useDayNumber: 0
+        }
+      ],
+      rotation: {
+        eva1: "247",
+        eva2: "583"
+      }
+    });
+
+    expect(
+      resolveHutPhotoTimelinePhotoLabel(
+        {
+          capturedAt,
+          phase: "COLOCACION",
+          source: "PHASE_EVIDENCE",
+          useDayNumber: null
+        },
+        historicalTimeline
+      )
+    ).toBe("Entrega del producto");
+    expect(
+      resolveHutPhotoTimelinePhotoLabel(
+        {
+          capturedAt,
+          phase: "COLOCACION",
+          source: "PHASE_EVIDENCE",
+          useDayNumber: null
+        },
+        newTimeline
+      )
+    ).toBe("Producto 1 - Dia 1 (Colocacion)");
   });
 
   it("uses a single sequential availability state across the timeline", () => {

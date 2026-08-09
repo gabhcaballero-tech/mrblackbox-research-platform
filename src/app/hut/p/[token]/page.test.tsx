@@ -291,7 +291,7 @@ describe("HutParticipantPage", () => {
     expect(screen.queryByRole("button", { name: "Guardar y continuar" })).not.toBeInTheDocument();
   });
 
-  it("muestra evidencia COLOCACION historica como Producto 1 Dia 1", async () => {
+  it("muestra evidencia COLOCACION historica como entrega cuando no existe entrega separada", async () => {
     getPortalViewMock.mockResolvedValue({
       data: createPortalView({
         applicationEvidence: [
@@ -323,7 +323,7 @@ describe("HutParticipantPage", () => {
     expect(screen.getAllByText("Foto registrada").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Producto: 247").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Producto 1 - Dia 1 (Colocacion)").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByRole("link", { name: "Capturar foto" })).toHaveAttribute("href", "/hut/p/token-1/photo/DELIVERY");
+    expect(screen.getByRole("link", { name: "Capturar foto" })).toHaveAttribute("href", "/hut/p/token-1/photo/PRODUCT_1_DAY_1");
     expect(screen.queryByText("Llamada pendiente")).not.toBeInTheDocument();
     expect(screen.queryByText("BLOCK_1_CALL_PENDING")).not.toBeInTheDocument();
     expect(screen.queryByText("Codigo requerido")).not.toBeInTheDocument();

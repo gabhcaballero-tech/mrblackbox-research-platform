@@ -660,6 +660,91 @@ describe("HUT module foundation", () => {
     });
   });
 
+  it("continues HUT F6 when multiple selections include perfume", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await repository.createParticipant({
+      name: "Participante F6 Multiple",
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    const participantId = participant.ok ? participant.data.participantId : "";
+
+    const result = await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_F6_PRODUCTOS_7_DIAS: ["1", "3", "5"] },
+      participantId,
+      questionCode: "HUT_F6_PRODUCTOS_7_DIAS",
+      studyId: "study-hut"
+    });
+
+    expect(result).toMatchObject({
+      data: {
+        answerValue: ["1", "3", "5"],
+        questionCode: "HUT_F6_PRODUCTOS_7_DIAS"
+      },
+      ok: true
+    });
+    expect(prisma.state.questionnaireAttempts[0]?.status).not.toBe("TERMINATED");
+  });
+
+  it("continues HUT F6 when only perfume is selected", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await repository.createParticipant({
+      name: "Participante F6 Perfume",
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    const participantId = participant.ok ? participant.data.participantId : "";
+
+    const result = await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_F6_PRODUCTOS_7_DIAS: "3" },
+      participantId,
+      questionCode: "HUT_F6_PRODUCTOS_7_DIAS",
+      studyId: "study-hut"
+    });
+
+    expect(result).toMatchObject({
+      data: {
+        answerValue: ["3"],
+        questionCode: "HUT_F6_PRODUCTOS_7_DIAS"
+      },
+      ok: true
+    });
+    expect(prisma.state.questionnaireAttempts[0]?.status).not.toBe("TERMINATED");
+  });
+
+  it("terminates HUT F6 when perfume is not selected", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await repository.createParticipant({
+      name: "Participante F6 Sin Perfume",
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    const participantId = participant.ok ? participant.data.participantId : "";
+
+    const result = await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_F6_PRODUCTOS_7_DIAS: ["1", "5", "7"] },
+      participantId,
+      questionCode: "HUT_F6_PRODUCTOS_7_DIAS",
+      studyId: "study-hut"
+    });
+
+    expect(result).toMatchObject({
+      data: {
+        answerValue: ["1", "5", "7"],
+        questionCode: "HUT_F6_PRODUCTOS_7_DIAS",
+        terminated: true
+      },
+      ok: true
+    });
+    expect(prisma.state.questionnaireAttempts[0]).toMatchObject({
+      status: "TERMINATED",
+      terminationReason: "No selecciono la opcion requerida para continuar: 3"
+    });
+  });
+
   it("omits repeated HUT filter answers for CLT_HUT participants", async () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
@@ -1260,7 +1345,7 @@ describe("HUT module foundation", () => {
     expect(prisma.state.participants[0]?.applicationEvidence).toHaveLength(1);
   });
 
-  it("keeps delivery independent when historical COLOCACION evidence already exists", async () => {
+  it("shows historical COLOCACION evidence as delivery and offers product 1 day 1 next", async () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
@@ -1307,12 +1392,12 @@ describe("HUT module foundation", () => {
     expect(view.ok ? view.data.phaseGate : null).toBeNull();
     expect(view.ok ? view.data.availableApplicationPhoto : null).toMatchObject({
       phase: "COLOCACION",
-      productCode: null,
-      slotId: "DELIVERY"
+      productCode: "247",
+      slotId: "PRODUCT_1_DAY_1"
     });
     expect(upload.ok ? upload.data : null).toMatchObject({
       phase: "COLOCACION",
-      productCode: null
+      productCode: "247"
     });
   });
 

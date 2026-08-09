@@ -16,6 +16,7 @@ import {
   normalizeHutPhone,
   normalizeHutText,
   normalizeOptionalHutText,
+  getHutQuestionTerminationDecision,
   parseHutQuestionAnswer,
   parseHutParticipantImportText,
   parseHutRegistrationSlotImportText,
@@ -705,13 +706,13 @@ export type HutRepository = {
     participantId: string;
     questionCode: string;
     studyId: string;
-  }) => Promise<HutActionResult<{ answerValue: unknown; questionCode: string; visitProgressId: string | null }>>;
+  }) => Promise<HutActionResult<{ answerValue: unknown; questionCode: string; terminated?: boolean; visitProgressId: string | null }>>;
   saveQuestionnaireAnswerByToken: (input: {
     answerInput: HutAnswerInput;
     now?: Date;
     questionCode: string;
     token: string;
-  }) => Promise<HutActionResult<{ answerValue: unknown; questionCode: string; visitProgressId: string | null }>>;
+  }) => Promise<HutActionResult<{ answerValue: unknown; questionCode: string; terminated?: boolean; visitProgressId: string | null }>>;
   completeQuestionnaireSection: (input: {
     attemptId?: string;
     now?: Date;
@@ -1767,6 +1768,30 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           }
         }
       });
+
+      const termination = getHutQuestionTerminationDecision(question, parsed.answer.answerValue);
+      if (termination.terminates) {
+        await prisma.hutQuestionnaireAttempt.update?.({
+          data: {
+            completedAt: null,
+            status: "TERMINATED",
+            terminatedAt: now,
+            terminationReason: termination.reason
+          },
+          where: { id: attempt.data.id }
+        });
+
+        return {
+          data: {
+            answerValue: parsed.answer.answerValue,
+            questionCode: question.code,
+            terminated: true,
+            visitProgressId: progress.data.id
+          },
+          message: "Respuesta HUT guardada. El participante no cumple el filtro para continuar.",
+          ok: true
+        };
+      }
 
       return {
         data: {

@@ -62,6 +62,7 @@ export type HutTextQuestionDefinition = HutBaseQuestionDefinition & {
 export type HutSelectQuestionDefinition = HutBaseQuestionDefinition & {
   multiple?: boolean;
   options: HutQuestionOption[];
+  requiredOptionValues?: string[];
   type: "SELECT";
 };
 
@@ -443,6 +444,7 @@ const filterQuestions: HutQuestionDefinition[] = [
     ],
     required: true,
     requiredForCltHut: true,
+    requiredOptionValues: ["3"],
     section: "FILTROS",
     type: "SELECT"
   },

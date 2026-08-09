@@ -9,8 +9,7 @@ import {
 import {
   formatHutPhotoTimelineSlotTitle,
   resolveHutPhaseCodeSlotTimelineLabel,
-  resolveHutPhotoTimelinePhaseLabel,
-  resolveHutPhotoTimelineUseDayLabel
+  resolveHutPhotoTimelinePhotoLabel
 } from "@/modules/hut";
 import type { HutOperationsDetail, HutOperationsListItem } from "@/modules/hut-operations";
 import { requireCapability } from "@/shared/auth/session";
@@ -274,9 +273,7 @@ function OperationsDetail({
           {detail.photos.map((photo) => (
             <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={`${photo.source}-${photo.phase ?? photo.capturedLocalDate}-${photo.useDayNumber}-${photo.capturedAt.toISOString()}`}>
               <p className="font-semibold text-zinc-950">
-                {photo.source === "PHASE_EVIDENCE"
-                  ? resolveHutPhotoTimelinePhaseLabel(photo.phase)
-                  : resolveHutPhotoTimelineUseDayLabel(photo.useDayNumber)} / {photo.productCode ?? "sin producto"}
+                {resolveHutPhotoTimelinePhotoLabel(photo, detail.photoTimeline)} / {photo.productCode ?? "sin producto"}
               </p>
               <p className="text-zinc-600">
                 {photo.capturedLocalDate || "Evidencia de fase"} / {formatHutOperationsDateTime(photo.capturedAt, timeZoneIana)}

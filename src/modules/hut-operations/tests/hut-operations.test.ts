@@ -35,12 +35,12 @@ describe("hut operations", () => {
     });
     expect(dashboard?.detail?.photoTimeline[0]).toMatchObject({
       dayLabel: "Entrega",
-      status: "AVAILABLE",
+      status: "COMPLETED",
       title: "Entrega del producto"
     });
     expect(dashboard?.detail?.photoTimeline[1]).toMatchObject({
       dayLabel: "Producto 1 - Dia 1",
-      status: "COMPLETED",
+      status: "AVAILABLE",
       title: "Colocacion / aplicacion del producto 1"
     });
     expect(dashboard?.detail?.photoTimeline.some((slot) => String(slot.id) === "PLACEMENT")).toBe(false);
