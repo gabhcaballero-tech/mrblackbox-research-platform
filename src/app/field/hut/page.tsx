@@ -1,16 +1,18 @@
 import {
+  buildHutQuestionnaireProgress,
   buildHutPhotoTimeline,
   createHutRepository,
   formatHutPhotoTimelineSlotTitle,
   getHutQuestions,
   getHutV5Definition,
+  progressQuestionsForSection,
+  progressSectionTitle,
   resolveHutPhaseCodeSlotTimelineLabel,
   resolveHutPhotoTimelinePhotoLabel,
   resolveHutOperationalStatusLabel,
   type HutFieldQuestionnaireWorkspace,
   type HutPhotoTimelineSlot,
-  type HutQuestionDefinition,
-  type HutQuestionnaireSectionId
+  type HutQuestionDefinition
 } from "@/modules/hut";
 import {
   completeHutQuestionnaireSectionForFieldAction,
@@ -108,18 +110,32 @@ function FieldHutWorkspace({
   workspace: HutFieldQuestionnaireWorkspace;
 }) {
   const questions = applicableQuestions(workspace);
+  const operationalQuestions = workspace.participant.origin === "CLT_HUT"
+    ? questions.filter((question) => question.section !== "FILTROS")
+    : questions;
   const requiredQuestions = questions.filter((question) => question.required);
+  const operationalRequiredQuestions = operationalQuestions.filter((question) => question.required);
+  const questionnaireProgress = buildHutQuestionnaireProgress({
+    applicableQuestionCodes: workspace.questionnaire.applicableQuestionCodes,
+    answers: workspace.questionnaire.answers,
+    participantOrigin: workspace.participant.origin
+  });
   const selectedQuestion = questions.find((question) => question.code === selectedQuestionCode) ?? null;
   const questionnaireClosed = workspace.questionnaire.attempt.status === "COMPLETED" || workspace.questionnaire.attempt.status === "TERMINATED";
+  const selectedQuestionBlockedByDirectFilter = workspace.participant.origin === "HUT_DIRECTO"
+    && workspace.questionnaire.filterStatus !== "COMPLETED"
+    && selectedQuestion?.section !== "FILTROS";
   const nextQuestion = questionnaireClosed
     ? null
-    : selectedQuestion
-      ?? requiredQuestions.find((question) => !(question.code in workspace.questionnaire.answers))
-      ?? questions.find((question) => !(question.code in workspace.questionnaire.answers))
+    : selectedQuestionBlockedByDirectFilter
+      ? requiredQuestions.find((question) => question.section === "FILTROS" && !(question.code in workspace.questionnaire.answers))
+      ?? questions.find((question) => question.section === "FILTROS" && !(question.code in workspace.questionnaire.answers))
+      ?? null
+      : selectedQuestion
+      ?? operationalRequiredQuestions.find((question) => !(question.code in workspace.questionnaire.answers))
+      ?? operationalQuestions.find((question) => !(question.code in workspace.questionnaire.answers))
       ?? null;
-  const captureQuestion = !questionnaireClosed && selectedQuestionCode ? selectedQuestion : null;
-  const answeredRequired = requiredQuestions.filter((question) => question.code in workspace.questionnaire.answers).length;
-  const progress = requiredQuestions.length > 0 ? Math.round((answeredRequired / requiredQuestions.length) * 100) : 100;
+  const captureQuestion = !questionnaireClosed && selectedQuestionCode && !selectedQuestionBlockedByDirectFilter ? selectedQuestion : null;
   const hutTimeline = buildFieldPhotoTimeline(workspace);
   const photoTimelineSlots = hutTimeline.filter((slot) => slot.participantTask);
   const evaluationTimelineSlots = hutTimeline.filter((slot) => slot.interviewerTask);
@@ -170,10 +186,24 @@ function FieldHutWorkspace({
           <Fact label="Teléfono" value={workspace.participant.phone ?? "No disponible"} />
           <Fact label="Correo" value={workspace.participant.email ?? "No disponible"} />
           <Fact label="Estado HUT" value={resolveHutOperationalStatusLabel(workspace.participant.status)} />
+          <Fact label="Filtro" value={filterStatusLabel(workspace.questionnaire.filterStatus)} />
           <Fact label="Modo prueba" value={workspace.participant.testMode ? "Activo" : "Inactivo"} />
-          <Fact label="Evaluacion actual" value={currentEvaluationQuestion ? sectionTitle(currentEvaluationQuestion.section) : "Evaluacion completada"} />
+          <Fact
+            label="Evaluacion actual"
+            value={currentEvaluationQuestion ? progressSectionTitle(currentEvaluationQuestion.section, workspace.participant.origin) : "Evaluacion completada"}
+          />
           <Fact label="Producto" value={currentEvaluationQuestion ? productLabelForQuestion(currentEvaluationQuestion, workspace) : "Sin pendiente"} />
         </div>
+        {workspace.questionnaire.filterStatus === "PENDING" ? (
+          <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+            Filtro pendiente de captura.
+          </p>
+        ) : null}
+        {workspace.questionnaire.filterStatus === "REJECTED" ? (
+          <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-900">
+            Filtro rechazado. Revisa el motivo antes de continuar.
+          </p>
+        ) : null}
       </section>
 
       <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
@@ -267,16 +297,23 @@ function FieldHutWorkspace({
         <div className="flex items-center justify-between gap-3 text-sm text-zinc-600">
           <span>Preguntas contestadas</span>
           <span>
-            {answeredRequired}/{requiredQuestions.length}
+            {questionnaireProgress.answered}/{questionnaireProgress.total}
           </span>
         </div>
         <div className="mt-2 h-2 rounded-full bg-zinc-100">
-          <div className="h-2 rounded-full bg-teal-600" style={{ width: `${progress}%` }} />
+          <div className="h-2 rounded-full bg-teal-600" style={{ width: `${questionnaireProgress.percentage}%` }} />
         </div>
-        {nextQuestion ? (
+        {workspace.questionnaire.attempt.status === "TERMINATED" ? (
+          <div className="mt-5 rounded-md border border-rose-200 bg-rose-50 p-4">
+            <p className="text-lg font-semibold text-rose-950">Entrevista terminada</p>
+            <p className="mt-1 text-sm text-rose-900">
+              Motivo: {workspace.questionnaire.attempt.terminationReason ?? "No cumple criterios operativos para continuar."}
+            </p>
+          </div>
+        ) : nextQuestion ? (
           <div className="mt-5 rounded-md border border-teal-200 bg-teal-50 p-4">
             <p className="text-sm font-semibold text-teal-950">Siguiente evaluacion</p>
-            <p className="mt-1 text-lg font-semibold text-zinc-950">{sectionTitle(nextQuestion.section)}</p>
+            <p className="mt-1 text-lg font-semibold text-zinc-950">{progressSectionTitle(nextQuestion.section, workspace.participant.origin)}</p>
             <p className="mt-1 text-sm text-zinc-700">Producto: {productLabelForQuestion(nextQuestion, workspace)}</p>
             <a
               className="mt-4 inline-flex min-h-12 items-center justify-center rounded-md bg-teal-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-800"
@@ -326,25 +363,32 @@ function SectionProgressControls({
   searchedFolio: string;
   workspace: HutFieldQuestionnaireWorkspace;
 }) {
-  const questions = applicableQuestions(workspace);
+  const progress = buildHutQuestionnaireProgress({
+    applicableQuestionCodes: workspace.questionnaire.applicableQuestionCodes,
+    answers: workspace.questionnaire.answers,
+    participantOrigin: workspace.participant.origin
+  });
   const visitsBySection = new Map(workspace.questionnaire.visits.map((visit) => [visit.section, visit]));
   return (
     <div className="mt-5 grid gap-3 sm:grid-cols-2">
-      {getHutV5Definition().sections.map((section) => {
-        const sectionQuestions = questions.filter((question) => question.section === section.id);
-        if (!sectionQuestions.length) {
-          return null;
-        }
-        const required = sectionQuestions.filter((question) => question.required);
-        const pending = required.filter((question) => !(question.code in workspace.questionnaire.answers));
-        const visit = visitsBySection.get(section.id);
-        const canComplete = workspace.questionnaire.attempt.status !== "TERMINATED" && pending.length === 0 && visit?.status !== "COMPLETED";
+      {progress.sections.map((sectionProgress) => {
+        const visit = visitsBySection.get(sectionProgress.section);
+        const pendingQuestionCode = sectionProgress.pendingQuestionCodes[0];
+        const canComplete = workspace.questionnaire.attempt.status !== "TERMINATED" && sectionProgress.pendingQuestionCodes.length === 0 && visit?.status !== "COMPLETED";
         return (
-          <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={section.id}>
-            <p className="font-semibold text-zinc-950">{section.title}</p>
+          <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={sectionProgress.section}>
+            <p className="font-semibold text-zinc-950">{sectionProgress.title}</p>
             <p className="mt-1 text-zinc-600">
-              {required.length - pending.length}/{required.length} obligatorias · {statusLabel(visit?.status ?? "PENDING")}
+              {sectionProgress.answered}/{sectionProgress.total} · {statusLabel(visit?.status ?? "PENDING")}
             </p>
+            {pendingQuestionCode ? (
+              <a
+                className="mt-3 inline-flex rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-800"
+                href={`/field/hut?folio=${encodeURIComponent(searchedFolio)}&questionCode=${encodeURIComponent(pendingQuestionCode)}`}
+              >
+                Capturar pendiente
+              </a>
+            ) : null}
             {canComplete ? (
               <form
                 action={completeHutQuestionnaireSectionForFieldAction.bind(
@@ -352,7 +396,7 @@ function SectionProgressControls({
                   searchedFolio,
                   workspace.participant.id,
                   workspace.participant.studyId,
-                  section.id
+                  sectionProgress.section
                 )}
                 className="mt-3"
               >
@@ -379,13 +423,22 @@ function QuestionnaireForm({
 }) {
   const savedAnswer = workspace.questionnaire.answers[question.code];
   const questions = applicableQuestions(workspace);
-  const questionIndex = questions.findIndex((candidate) => candidate.code === question.code);
+  const sectionQuestions = progressQuestionsForSection({
+    answers: workspace.questionnaire.answers,
+    applicableQuestions: questions,
+    participantOrigin: workspace.participant.origin,
+    section: question.section
+  });
+  const progressQuestions = sectionQuestions.length > 0
+    ? sectionQuestions
+    : questions.filter((candidate) => candidate.section === question.section);
+  const questionIndex = progressQuestions.findIndex((candidate) => candidate.code === question.code);
   const nextQuestion = nextQuestionAfterCurrent({
     answers: workspace.questionnaire.answers,
     currentCode: question.code,
     questions
   });
-  const progress = questions.length > 0 ? Math.round(((questionIndex >= 0 ? questionIndex + 1 : 1) / questions.length) * 100) : 100;
+  const progress = progressQuestions.length > 0 ? Math.round(((questionIndex >= 0 ? questionIndex + 1 : 1) / progressQuestions.length) * 100) : 100;
 
   return (
     <section className="rounded-lg border border-teal-200 bg-white p-5 shadow-sm">
@@ -396,10 +449,10 @@ function QuestionnaireForm({
       ) : null}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">
-          {sectionTitle(question.section)}
+          {progressSectionTitle(question.section, workspace.participant.origin)}
         </p>
         <p className="text-sm font-semibold text-zinc-600">
-          Pregunta {questionIndex >= 0 ? questionIndex + 1 : "-"} de {questions.length}
+          Pregunta {questionIndex >= 0 ? questionIndex + 1 : "-"} de {progressQuestions.length}
         </p>
       </div>
       <p className="mt-2 text-sm font-semibold text-zinc-700">Producto: {productLabelForQuestion(question, workspace)}</p>
@@ -637,10 +690,6 @@ function applicableQuestions(workspace: HutFieldQuestionnaireWorkspace) {
   return getHutQuestions().filter((question) => applicableCodes.has(question.code));
 }
 
-function sectionTitle(section: HutQuestionnaireSectionId) {
-  return getHutV5Definition().sections.find((candidate) => candidate.id === section)?.title ?? section;
-}
-
 function productLabelForQuestion(question: HutQuestionDefinition, workspace: HutFieldQuestionnaireWorkspace): string {
   if (question.section === "EVALUACION_PRIMER_PERFUME" || question.section === "PRIMERA_VISITA") {
     return workspace.rotation.eva1 ?? "EVA1 no asignado";
@@ -707,6 +756,7 @@ function buildFieldPhotoTimeline(workspace: HutFieldQuestionnaireWorkspace): Hut
       eva1: workspace.rotation.eva1,
       eva2: workspace.rotation.eva2
     },
+    photoCaptureBlocked: workspace.participant.origin === "HUT_DIRECTO" && workspace.questionnaire.filterStatus !== "COMPLETED",
     testMode: workspace.participant.testMode
   });
 }
@@ -760,6 +810,16 @@ function originLabel(value: string): string {
   return labels[value] ?? value;
 }
 
+function filterStatusLabel(value: HutFieldQuestionnaireWorkspace["questionnaire"]["filterStatus"]): string {
+  const labels: Record<HutFieldQuestionnaireWorkspace["questionnaire"]["filterStatus"], string> = {
+    COMPLETED: "Completado",
+    PENDING: "Pendiente",
+    REJECTED: "Rechazado"
+  };
+
+  return labels[value];
+}
+
 function statusLabel(value: string): string {
   if (value === "COMPLETED" || value === "USED" || value === "VALIDATED") {
     return "Completado";
@@ -799,3 +859,5 @@ function Fact({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+

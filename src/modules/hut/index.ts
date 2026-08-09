@@ -32,6 +32,8 @@ export type {
   HutMatrixQuestionDefinition,
   HutParticipantOrigin,
   HutQuestionDefinition,
+  HutQuestionSkipRule,
+  HutQuestionTerminationRule,
   HutQuestionnaireSectionId,
   HutQuestionType,
   HutSectionDefinition
@@ -76,6 +78,11 @@ export {
   resolveHutPhotoTimelineUseDayLabel,
   resolveHutOperationalStatusLabel
 } from "./photo-timeline";
+export {
+  buildHutQuestionnaireProgress,
+  progressQuestionsForSection,
+  progressSectionTitle
+} from "./progress";
 export type {
   HutPhase,
   HutPhaseCodeStatus
@@ -86,6 +93,10 @@ export type {
   HutPhotoTimelineSlotId,
   HutPhotoTimelineSlotStatus
 } from "./photo-timeline";
+export type {
+  HutQuestionnaireProgress,
+  HutQuestionnaireSectionProgress
+} from "./progress";
 export type {
   HutSignedVideoUpload,
   HutVideoUploadMetadata

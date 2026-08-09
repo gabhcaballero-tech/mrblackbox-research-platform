@@ -338,15 +338,50 @@ export function getHutQuestionTerminationDecision(
   question: HutQuestionDefinition,
   answerValue: unknown
 ): HutQuestionTerminationDecision {
-  if (question.type !== "SELECT") {
-    return { reason: null, terminates: false };
-  }
-
   const selectedValues = new Set(
     (Array.isArray(answerValue) ? answerValue : [answerValue])
       .map(normalizeHutAnswerCode)
       .filter(Boolean)
   );
+  const numericAnswer = Number.parseFloat(String(Array.isArray(answerValue) ? answerValue[0] : answerValue ?? "").replace(",", "."));
+
+  for (const rule of question.terminationRules ?? []) {
+    if (Number.isFinite(numericAnswer)) {
+      const minMatches = typeof rule.minNumber !== "number" || numericAnswer >= rule.minNumber;
+      const maxMatches = typeof rule.maxNumber !== "number" || numericAnswer <= rule.maxNumber;
+      if ((typeof rule.minNumber === "number" || typeof rule.maxNumber === "number") && minMatches && maxMatches) {
+        return {
+          reason: rule.reason,
+          terminates: true
+        };
+      }
+    }
+
+    if (rule.missingRequiredOptionValues?.length) {
+      const missingRequiredValues = rule.missingRequiredOptionValues
+        .map(normalizeHutAnswerCode)
+        .filter((value) => !selectedValues.has(value));
+
+      if (missingRequiredValues.length > 0) {
+        return {
+          reason: rule.reason,
+          terminates: true
+        };
+      }
+    }
+
+    const ruleAnswers = rule.answer ? (Array.isArray(rule.answer) ? rule.answer : [rule.answer]).map(normalizeHutAnswerCode) : [];
+    if (ruleAnswers.some((value) => selectedValues.has(value))) {
+      return {
+        reason: rule.reason,
+        terminates: true
+      };
+    }
+  }
+
+  if (question.type !== "SELECT") {
+    return { reason: null, terminates: false };
+  }
 
   if (question.requiredOptionValues?.length) {
     const missingRequiredValues = question.requiredOptionValues

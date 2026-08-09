@@ -574,6 +574,7 @@ describe("HUT module foundation", () => {
       studyId: "study-hut"
     });
     const participantId = participant.ok ? participant.data.participantId : "";
+    prisma.state.participants.find((item) => item.id === participantId)!.origin = "CLT_HUT";
 
     const started = await repository.ensureQuestionnaireSectionProgress({
       participantId,
@@ -612,6 +613,7 @@ describe("HUT module foundation", () => {
       studyId: "study-hut"
     });
     const participantId = participant.ok ? participant.data.participantId : "";
+    prisma.state.participants.find((item) => item.id === participantId)!.origin = "CLT_HUT";
 
     const first = await repository.saveQuestionnaireAnswer({
       answerInput: { HUT_EVA1_GUSTO: "6" },
@@ -714,6 +716,69 @@ describe("HUT module foundation", () => {
     expect(prisma.state.questionnaireAttempts[0]?.status).not.toBe("TERMINATED");
   });
 
+  it("terminates HUT F2 exact age when the participant is 25", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await repository.createParticipant({
+      name: "Participante Edad 25",
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    const participantId = participant.ok ? participant.data.participantId : "";
+
+    const result = await repository.saveQuestionnaireAnswer({
+      actorUserId: "field-user-1",
+      answerInput: { HUT_F2_EDAD_EXACTA: "25" },
+      participantId,
+      questionCode: "HUT_F2_EDAD_EXACTA",
+      studyId: "study-hut"
+    });
+
+    expect(result).toMatchObject({
+      data: {
+        questionCode: "HUT_F2_EDAD_EXACTA",
+        terminated: true
+      },
+      ok: true
+    });
+    expect(prisma.state.questionnaireAttempts[0]).toMatchObject({
+      status: "TERMINATED",
+      terminationReason: "HUT_F2_EDAD_EXACTA: Edad fuera de rango"
+    });
+    expect(prisma.state.auditLogs[0]).toMatchObject({
+      actorUserId: "field-user-1",
+      entityId: participantId,
+      reason: "Edad fuera de rango"
+    });
+  });
+
+  it("continues HUT F2 exact age when the participant is 35", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await repository.createParticipant({
+      name: "Participante Edad 35",
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    const participantId = participant.ok ? participant.data.participantId : "";
+
+    const result = await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_F2_EDAD_EXACTA: "35" },
+      participantId,
+      questionCode: "HUT_F2_EDAD_EXACTA",
+      studyId: "study-hut"
+    });
+
+    expect(result).toMatchObject({
+      data: {
+        answerValue: "35",
+        questionCode: "HUT_F2_EDAD_EXACTA"
+      },
+      ok: true
+    });
+    expect(prisma.state.questionnaireAttempts[0]?.status).not.toBe("TERMINATED");
+  });
+
   it("terminates HUT F6 when perfume is not selected", async () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
@@ -741,8 +806,63 @@ describe("HUT module foundation", () => {
     });
     expect(prisma.state.questionnaireAttempts[0]).toMatchObject({
       status: "TERMINATED",
-      terminationReason: "No selecciono la opcion requerida para continuar: 3"
+      terminationReason: "HUT_F6_PRODUCTOS_7_DIAS: No selecciono Perfume/fragancia"
     });
+  });
+
+  it("does not allow answering later questions after a participant is terminated", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await repository.createParticipant({
+      name: "Participante Terminado",
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    const participantId = participant.ok ? participant.data.participantId : "";
+    await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_F6_PRODUCTOS_7_DIAS: ["1", "5"] },
+      participantId,
+      questionCode: "HUT_F6_PRODUCTOS_7_DIAS",
+      studyId: "study-hut"
+    });
+
+    const later = await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_F20_TIEMPO_USO_MARCA: "3" },
+      participantId,
+      questionCode: "HUT_F20_TIEMPO_USO_MARCA",
+      studyId: "study-hut"
+    });
+
+    expect(later).toMatchObject({
+      message: "La entrevista HUT ya fue terminada y no permite capturar preguntas posteriores.",
+      ok: false
+    });
+    expect(prisma.state.answers.find((answer) => answer.questionCode === "HUT_F20_TIEMPO_USO_MARCA")).toBeUndefined();
+  });
+
+  it("skips F16 when F15 answer is No and resumes at F17", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await repository.createParticipant({
+      name: "Participante Salto F15",
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    const participantId = participant.ok ? participant.data.participantId : "";
+
+    await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_F15_NOTO_DIFERENCIA: "2" },
+      participantId,
+      questionCode: "HUT_F15_NOTO_DIFERENCIA",
+      studyId: "study-hut"
+    });
+    const state = await repository.getQuestionnaireState({
+      participantId,
+      studyId: "study-hut"
+    });
+
+    expect(state.ok ? state.data.applicableQuestionCodes : []).not.toContain("HUT_F16_DIFERENCIA_NOTADA");
+    expect(state.ok ? state.data.applicableQuestionCodes : []).toContain("HUT_F17_APLICACIONES_DIA");
   });
 
   it("omits repeated HUT filter answers for CLT_HUT participants", async () => {
@@ -776,6 +896,159 @@ describe("HUT module foundation", () => {
     expect(state.ok ? state.data.applicableQuestionCodes : []).not.toContain("HUT_PARTICIPO_CLT");
   });
 
+  it("keeps full filters applicable for HUT_DIRECTO participants", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await repository.createParticipant({
+      name: "Participante HUT Directo Filtros",
+      requestOrigin: "https://example.com",
+      studyId: "study-hut"
+    });
+    const participantId = participant.ok ? participant.data.participantId : "";
+
+    const state = await repository.getQuestionnaireState({
+      participantId,
+      studyId: "study-hut"
+    });
+
+    expect(state.ok ? state.data.applicableQuestionCodes : []).toContain("HUT_F1_GENERO");
+    expect(state.ok ? state.data.applicableQuestionCodes : []).toContain("HUT_F21_MOSTRAR_PERFUME");
+    expect(state.ok ? state.data.applicableQuestionCodes : []).toContain("HUT_F22_IMPORTANCIA_PERFUME");
+  });
+
+  it("allows CLT_HUT participants with pending filters to capture application photos", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const created = await repository.createParticipant({
+      firstFragranceLeftArm: "247",
+      folio: "HUT-CLT-FILTER-PENDING",
+      name: "Participante CLT HUT Foto",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants.find((item) => item.id === (created.ok ? created.data.participantId : ""))!;
+    participant.origin = "CLT_HUT";
+
+    const state = await repository.getQuestionnaireState({
+      participantId: participant.id,
+      studyId: "study-hut"
+    });
+    const upload = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      slotId: "DELIVERY",
+      storage,
+      token: participant.token
+    });
+    const confirm = await repository.confirmApplicationPhotoUpload({
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: upload.ok ? upload.data.privateStorageKey : "",
+        storageBucket: upload.ok ? upload.data.storageBucket : ""
+      },
+      slotId: "DELIVERY",
+      token: participant.token
+    });
+
+    expect(state.ok ? state.data.filterStatus : null).toBe("PENDING");
+    expect(upload).toMatchObject({ ok: true });
+    expect(confirm).toMatchObject({ ok: true });
+    expect(participant.applicationPhotoEntries).toHaveLength(1);
+  });
+
+  it("blocks HUT_DIRECTO application photos until filters are completed", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const created = await repository.createParticipant({
+      firstFragranceLeftArm: "247",
+      folio: "HUT-DIRECT-FILTER-PENDING",
+      name: "Participante HUT Directo",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants.find((item) => item.id === (created.ok ? created.data.participantId : ""))!;
+
+    const upload = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      slotId: "DELIVERY",
+      storage,
+      token: participant.token
+    });
+    const saveOperationalAnswer = await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_V1_CONFIRMACION_ENTREGA: "1" },
+      participantId: participant.id,
+      questionCode: "HUT_V1_CONFIRMACION_ENTREGA",
+      studyId: "study-hut"
+    });
+
+    expect(upload).toMatchObject({
+      message: "Completa los filtros HUT antes de registrar fotografias.",
+      ok: false
+    });
+    expect(saveOperationalAnswer).toMatchObject({
+      message: "Completa los filtros HUT antes de continuar el protocolo.",
+      ok: false
+    });
+  });
+
+  it("keeps photos, evaluations and rotation when CLT_HUT filters are captured later", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const created = await repository.createParticipant({
+      firstFragranceLeftArm: "247",
+      folio: "HUT-CLT-LATE-FILTER",
+      name: "Participante Filtro Posterior",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants.find((item) => item.id === (created.ok ? created.data.participantId : ""))!;
+    participant.origin = "CLT_HUT";
+    const upload = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      slotId: "DELIVERY",
+      storage,
+      token: participant.token
+    });
+    await repository.confirmApplicationPhotoUpload({
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: upload.ok ? upload.data.privateStorageKey : "",
+        storageBucket: upload.ok ? upload.data.storageBucket : ""
+      },
+      slotId: "DELIVERY",
+      token: participant.token
+    });
+    await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_V1_CONFIRMACION_ENTREGA: "1" },
+      participantId: participant.id,
+      questionCode: "HUT_V1_CONFIRMACION_ENTREGA",
+      studyId: "study-hut"
+    });
+
+    const filter = await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_F6_PRODUCTOS_7_DIAS: "3" },
+      participantId: participant.id,
+      questionCode: "HUT_F6_PRODUCTOS_7_DIAS",
+      studyId: "study-hut"
+    });
+    const state = await repository.getQuestionnaireState({
+      participantId: participant.id,
+      studyId: "study-hut"
+    });
+
+    expect(filter).toMatchObject({ ok: true });
+    expect(state.ok ? state.data.filterStatus : null).toBe("PENDING");
+    expect(participant.applicationPhotoEntries).toHaveLength(1);
+    expect(prisma.state.answers.find((answer) => answer.questionCode === "HUT_V1_CONFIRMACION_ENTREGA")).toBeTruthy();
+    expect(participant.firstFragranceLeftArm).toBe("247");
+    expect(participant.secondFragranceRightArm).toBe("583");
+  });
+
   it("blocks a second HUT v5 application photo on the same Mexico City day", async () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
@@ -785,6 +1058,7 @@ describe("HUT module foundation", () => {
       studyId: "study-hut"
     });
     const participantId = participant.ok ? participant.data.participantId : "";
+    prisma.state.participants.find((item) => item.id === participantId)!.origin = "CLT_HUT";
     const now = new Date("2026-08-07T15:00:00.000Z");
 
     const availabilityBefore = await repository.getApplicationPhotoDailyAvailability({
@@ -878,6 +1152,8 @@ describe("HUT module foundation", () => {
     });
     const testParticipantId = testParticipant.ok ? testParticipant.data.participantId : "";
     const normalParticipantId = normalParticipant.ok ? normalParticipant.data.participantId : "";
+    prisma.state.participants.find((item) => item.id === testParticipantId)!.origin = "CLT_HUT";
+    prisma.state.participants.find((item) => item.id === normalParticipantId)!.origin = "CLT_HUT";
     const now = new Date("2026-08-07T15:00:00.000Z");
 
     await repository.setTestMode({
@@ -991,6 +1267,7 @@ describe("HUT module foundation", () => {
     });
     const participantId = created.ok ? created.data.participantId : "";
     const participant = prisma.state.participants.find((item) => item.id === participantId)!;
+    participant.origin = "CLT_HUT";
 
     await repository.setTestMode({
       enabled: true,
@@ -1283,6 +1560,7 @@ describe("HUT module foundation", () => {
     });
     prisma.state.confirmations.push(confirmationWithCodes("NAV-004"));
     const participant = prisma.state.participants[0]!;
+    participant.origin = "CLT_HUT";
     participant.applicationPhotoEntries.push({
       capturedAt: new Date("2026-08-07T10:00:00.000Z"),
       capturedLocalDate: "2026-08-07",
@@ -1358,6 +1636,7 @@ describe("HUT module foundation", () => {
       studyId: "study-hut"
     });
     const participant = prisma.state.participants[0]!;
+    participant.origin = "CLT_HUT";
     participant.status = "BLOCK_1_CALL_PENDING";
     participant.phaseCodes.push({
       codeHash: "hash-regreso-1",

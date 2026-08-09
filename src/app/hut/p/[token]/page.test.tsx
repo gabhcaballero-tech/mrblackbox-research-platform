@@ -523,6 +523,7 @@ function createQuestionnaireState(overrides: Partial<QuestionnaireStateForTest> 
       terminatedAt: null,
       terminationReason: null
     },
+    filterStatus: "PENDING",
     omittedQuestionCodes: [],
     participantOrigin: "HUT_DIRECTO",
     visits: [],
@@ -555,6 +556,7 @@ type QuestionnaireStateForTest = {
     terminatedAt: Date | null;
     terminationReason: string | null;
   };
+  filterStatus: "COMPLETED" | "PENDING" | "REJECTED";
   omittedQuestionCodes: string[];
   participantOrigin: "CLT_HUT" | "HUT_DIRECTO";
   visits: [];

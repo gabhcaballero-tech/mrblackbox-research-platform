@@ -64,6 +64,7 @@ describe("HUT admin reset actions", () => {
 
     expect(requireCapability).toHaveBeenCalledWith("field:access");
     expect(saveQuestionnaireAnswerMock).toHaveBeenCalledWith({
+      actorUserId: "field-user-1",
       answerInput: {
         HUT_EVA1_GUSTO: "6",
         returnQuestionCode: "HUT_EVA1_ATRIBUTOS"

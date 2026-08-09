@@ -55,6 +55,7 @@ export type HutPhotoTimelineInput = {
     useDayNumber?: number | null;
   }>;
   nextAvailableAt?: Date | null;
+  photoCaptureBlocked?: boolean;
   now?: Date;
   rotation: {
     eva1: string | null;
@@ -226,6 +227,9 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
     }
     if (!slot.participantTask) {
       return { ...slot, status: "PROGRAMMED" };
+    }
+    if (input.photoCaptureBlocked) {
+      return { ...slot, status: "BLOCKED" };
     }
     if (input.testMode) {
       return { ...slot, status: "AVAILABLE" };

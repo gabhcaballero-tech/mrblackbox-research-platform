@@ -42,6 +42,20 @@ export type HutQuestionReference = {
   source: string;
 };
 
+export type HutQuestionTerminationRule = {
+  action: "TERMINATE";
+  answer?: string | string[];
+  maxNumber?: number;
+  minNumber?: number;
+  missingRequiredOptionValues?: string[];
+  reason: string;
+};
+
+export type HutQuestionSkipRule = {
+  answer: string | string[];
+  goTo: string;
+};
+
 export type HutBaseQuestionDefinition = {
   code: string;
   displayTemplate?: string;
@@ -51,6 +65,8 @@ export type HutBaseQuestionDefinition = {
   required: boolean;
   requiredForCltHut?: boolean;
   section: HutQuestionnaireSectionId;
+  skipRules?: HutQuestionSkipRule[];
+  terminationRules?: HutQuestionTerminationRule[];
   type: HutQuestionType;
   visibleIf?: HutVisibilityCondition[];
 };
@@ -359,6 +375,13 @@ const filterQuestions: HutQuestionDefinition[] = [
     ],
     required: true,
     section: "FILTROS",
+    terminationRules: [
+      {
+        action: "TERMINATE",
+        answer: "2",
+        reason: "Genero fuera del perfil requerido"
+      }
+    ],
     type: "SELECT",
     visibleIf: directOnly
   },
@@ -367,6 +390,18 @@ const filterQuestions: HutQuestionDefinition[] = [
     label: "F2. Me podria decir cual es su edad exacta?",
     required: true,
     section: "FILTROS",
+    terminationRules: [
+      {
+        action: "TERMINATE",
+        maxNumber: 29,
+        reason: "Edad fuera de rango"
+      },
+      {
+        action: "TERMINATE",
+        minNumber: 56,
+        reason: "Edad fuera de rango"
+      }
+    ],
     type: "SHORT_TEXT",
     visibleIf: directOnly
   },
@@ -381,6 +416,13 @@ const filterQuestions: HutQuestionDefinition[] = [
     ],
     required: true,
     section: "FILTROS",
+    terminationRules: [
+      {
+        action: "TERMINATE",
+        answer: ["1", "5"],
+        reason: "Edad fuera de rango"
+      }
+    ],
     type: "SELECT",
     visibleIf: directOnly
   },
@@ -397,6 +439,13 @@ const filterQuestions: HutQuestionDefinition[] = [
     ],
     required: true,
     section: "FILTROS",
+    terminationRules: [
+      {
+        action: "TERMINATE",
+        answer: ["1", "2", "3", "4", "5"],
+        reason: "Familiar trabaja en industria relacionada"
+      }
+    ],
     type: "SELECT",
     visibleIf: directOnly
   },
@@ -409,6 +458,13 @@ const filterQuestions: HutQuestionDefinition[] = [
     ],
     required: true,
     section: "FILTROS",
+    terminationRules: [
+      {
+        action: "TERMINATE",
+        answer: "2",
+        reason: "Participacion reciente en encuesta de producto"
+      }
+    ],
     type: "SELECT",
     visibleIf: directOnly
   },
@@ -425,6 +481,13 @@ const filterQuestions: HutQuestionDefinition[] = [
     ],
     required: true,
     section: "FILTROS",
+    terminationRules: [
+      {
+        action: "TERMINATE",
+        answer: ["1", "2", "3"],
+        reason: "Condicion fisica incompatible con el estudio"
+      }
+    ],
     type: "SELECT",
     visibleIf: directOnly
   },
@@ -446,6 +509,13 @@ const filterQuestions: HutQuestionDefinition[] = [
     requiredForCltHut: true,
     requiredOptionValues: ["3"],
     section: "FILTROS",
+    terminationRules: [
+      {
+        action: "TERMINATE",
+        missingRequiredOptionValues: ["3"],
+        reason: "No selecciono Perfume/fragancia"
+      }
+    ],
     type: "SELECT"
   },
   {
@@ -457,6 +527,13 @@ const filterQuestions: HutQuestionDefinition[] = [
     ],
     required: true,
     section: "FILTROS",
+    terminationRules: [
+      {
+        action: "TERMINATE",
+        answer: "2",
+        reason: "No vive en domicilio permanente"
+      }
+    ],
     type: "SELECT",
     visibleIf: directOnly
   },
@@ -466,6 +543,13 @@ const filterQuestions: HutQuestionDefinition[] = [
     options: yesNoTerminateOptions,
     required: true,
     section: "FILTROS",
+    terminationRules: [
+      {
+        action: "TERMINATE",
+        answer: "2",
+        reason: "No acepta las visitas requeridas"
+      }
+    ],
     type: "SELECT",
     visibleIf: directOnly
   },
@@ -478,6 +562,13 @@ const filterQuestions: HutQuestionDefinition[] = [
     ],
     required: true,
     section: "FILTROS",
+    terminationRules: [
+      {
+        action: "TERMINATE",
+        answer: "1",
+        reason: "Planea salir de la ciudad o cambiar de domicilio"
+      }
+    ],
     type: "SELECT",
     visibleIf: directOnly
   },
@@ -520,6 +611,13 @@ const filterQuestions: HutQuestionDefinition[] = [
     ],
     required: true,
     section: "FILTROS",
+    terminationRules: [
+      {
+        action: "TERMINATE",
+        answer: ["1", "2"],
+        reason: "Frecuencia semanal insuficiente de uso de perfume"
+      }
+    ],
     type: "SELECT",
     visibleIf: directOnly
   },
@@ -540,6 +638,12 @@ const filterQuestions: HutQuestionDefinition[] = [
     ],
     required: true,
     section: "FILTROS",
+    skipRules: [
+      {
+        answer: "2",
+        goTo: "HUT_F17_APLICACIONES_DIA"
+      }
+    ],
     type: "SELECT",
     visibleIf: directOnly
   },
@@ -623,6 +727,13 @@ const filterQuestions: HutQuestionDefinition[] = [
     required: true,
     requiredForCltHut: true,
     section: "FILTROS",
+    terminationRules: [
+      {
+        action: "TERMINATE",
+        answer: "1",
+        reason: "Usa la marca desde hace menos de 1 mes"
+      }
+    ],
     type: "SELECT"
   },
   {
@@ -631,6 +742,13 @@ const filterQuestions: HutQuestionDefinition[] = [
     options: yesNoTerminateOptions,
     required: true,
     section: "FILTROS",
+    terminationRules: [
+      {
+        action: "TERMINATE",
+        answer: "2",
+        reason: "No mostro el perfume requerido"
+      }
+    ],
     type: "SELECT",
     visibleIf: directOnly
   },
@@ -1150,7 +1268,8 @@ export function getHutApplicableQuestions({
   definition?: HutDefinition;
 } = {}): HutQuestionDefinition[] {
   const lookup = buildHutVisibilityLookup(answers, context);
-  return getHutQuestions(definition).filter((question) => isHutQuestionVisible(question, lookup, context));
+  const visibleQuestions = getHutQuestions(definition).filter((question) => isHutQuestionVisible(question, lookup, context));
+  return applyHutSkipRules(visibleQuestions, lookup);
 }
 
 export function buildHutVisibilityLookup(
@@ -1205,6 +1324,33 @@ function compareVisibilityValue(
   const matches = expectedValues.some((value) => normalizeHutDefinitionCode(value) === normalizedActual);
 
   return operator === "EQUALS" ? matches : !matches;
+}
+
+function applyHutSkipRules(questions: HutQuestionDefinition[], answers: HutAnswerLookup): HutQuestionDefinition[] {
+  const skippedCodes = new Set<string>();
+
+  for (const question of questions) {
+    if (!question.skipRules?.length || !Object.prototype.hasOwnProperty.call(answers, question.code)) {
+      continue;
+    }
+
+    const matchingRule = question.skipRules.find((rule) => compareVisibilityValue(answers[question.code], rule.answer, "EQUALS"));
+    if (!matchingRule) {
+      continue;
+    }
+
+    const currentIndex = questions.findIndex((candidate) => candidate.code === question.code);
+    const targetIndex = questions.findIndex((candidate) => candidate.code === matchingRule.goTo);
+    if (currentIndex < 0 || targetIndex <= currentIndex) {
+      continue;
+    }
+
+    for (const skippedQuestion of questions.slice(currentIndex + 1, targetIndex)) {
+      skippedCodes.add(skippedQuestion.code);
+    }
+  }
+
+  return questions.filter((question) => !skippedCodes.has(question.code));
 }
 
 function normalizeHutDefinitionCode(value: unknown): string {

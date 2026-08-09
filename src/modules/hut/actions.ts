@@ -445,10 +445,11 @@ export async function saveHutQuestionnaireAnswerForFieldAction(
   questionCode: string,
   formData: FormData
 ) {
-  await requireCapability("field:access");
+  const actor = await requireCapability("field:access");
   const returnQuestionCode = String(formData.get("returnQuestionCode") ?? questionCode).trim();
   const nextQuestionCode = returnQuestionCode === "__HUT_SUMMARY__" ? null : returnQuestionCode || questionCode;
   const result = await createHutRepository().saveQuestionnaireAnswer({
+    actorUserId: actor.id,
     answerInput: hutFormDataToAnswerInput(formData),
     participantId,
     questionCode,

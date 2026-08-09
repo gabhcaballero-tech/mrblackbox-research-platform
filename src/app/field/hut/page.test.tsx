@@ -45,6 +45,11 @@ describe("FieldHutPage", () => {
     expect(within(compactHeader).queryByText("5512345678")).not.toBeInTheDocument();
     expect(within(compactHeader).queryByText("participante@example.test")).not.toBeInTheDocument();
     expect(screen.getByTestId("field-hut-secondary-details")).toBeInTheDocument();
+    expect(screen.getByText("Filtro pendiente de captura.")).toBeInTheDocument();
+    expect(screen.getByText("Filtro")).toBeInTheDocument();
+    expect(screen.getByText("Filtros obligatorios")).toBeInTheDocument();
+    expect(screen.getByText(/0\/3/)).toBeInTheDocument();
+    expect(screen.getAllByText("Pendiente").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("247").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Evidencia fotografica")).toBeInTheDocument();
     expect(screen.getByText("Evaluaciones")).toBeInTheDocument();
@@ -102,6 +107,19 @@ describe("FieldHutPage", () => {
     expect(screen.queryByText("HUT_EVA1")).not.toBeInTheDocument();
     expect(screen.queryByText("HUT_EVA2")).not.toBeInTheDocument();
   });
+
+  it("muestra pantalla de entrevista terminada con motivo", async () => {
+    getFieldQuestionnaireWorkspaceMock.mockResolvedValue({
+      data: createTerminatedWorkspace(),
+      ok: true
+    });
+
+    render(await FieldHutPage({ searchParams: Promise.resolve({ folio: "HUT-121" }) }));
+
+    expect(screen.getByText("Entrevista terminada")).toBeInTheDocument();
+    expect(screen.getByText("Motivo: HUT_F6_PRODUCTOS_7_DIAS: No selecciono Perfume/fragancia")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Iniciar evaluacion" })).not.toBeInTheDocument();
+  });
 });
 
 function createWorkspace() {
@@ -154,7 +172,9 @@ function createWorkspace() {
         "HUT_DG_NOMBRE",
         "HUT_DG_FOLIO",
         "HUT_DG_FECHA",
-        "HUT_PARTICIPO_CLT",
+        "HUT_F6_PRODUCTOS_7_DIAS",
+        "HUT_F20_TIEMPO_USO_MARCA",
+        "HUT_F22_IMPORTANCIA_PERFUME",
         "HUT_V1_CONFIRMACION_ENTREGA"
       ],
       attempt: {
@@ -166,6 +186,7 @@ function createWorkspace() {
         terminatedAt: null,
         terminationReason: null
       },
+      filterStatus: "PENDING",
       omittedQuestionCodes: [],
       participantOrigin: "CLT_HUT",
       visits: []
@@ -199,11 +220,29 @@ function createScaleWorkspace() {
         "HUT_DG_NOMBRE",
         "HUT_DG_FOLIO",
         "HUT_DG_FECHA",
-        "HUT_PARTICIPO_CLT",
+        "HUT_F6_PRODUCTOS_7_DIAS",
+        "HUT_F20_TIEMPO_USO_MARCA",
+        "HUT_F22_IMPORTANCIA_PERFUME",
         "HUT_V1_CONFIRMACION_ENTREGA",
         "HUT_EVA1_GUSTO",
         "HUT_EVA1_ATRIBUTOS"
       ]
+    }
+  };
+}
+
+function createTerminatedWorkspace() {
+  const workspace = createWorkspace();
+  return {
+    ...workspace,
+    questionnaire: {
+      ...workspace.questionnaire,
+      attempt: {
+        ...workspace.questionnaire.attempt,
+        status: "TERMINATED",
+        terminatedAt: new Date("2026-08-08T12:00:00.000Z"),
+        terminationReason: "HUT_F6_PRODUCTOS_7_DIAS: No selecciono Perfume/fragancia"
+      }
     }
   };
 }

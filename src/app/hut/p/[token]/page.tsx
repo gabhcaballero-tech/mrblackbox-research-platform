@@ -184,6 +184,9 @@ function currentHutPhaseLabel(view: HutPortalView): string {
       title: ""
     });
   }
+  if (view.availability.reason === "FILTER_PENDING") {
+    return "Filtro HUT pendiente";
+  }
 
   return view.status === "COMPLETED" ? "Completado" : "Sin fase pendiente";
 }
@@ -267,6 +270,7 @@ function buildPortalPhotoTimeline(view: HutPortalView): HutPhotoTimelineSlot[] {
     availableSlotId: view.availableApplicationPhoto?.slotId ?? null,
     currentPhase: view.phaseGate?.phase ?? null,
     nextAvailableAt: view.availability.nextAvailableAt,
+    photoCaptureBlocked: view.availability.reason === "FILTER_PENDING",
     rotation: {
       eva1: view.rotation.firstFragranceLeftArm,
       eva2: view.rotation.secondFragranceRightArm

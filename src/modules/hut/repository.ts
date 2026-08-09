@@ -224,6 +224,7 @@ export type HutQuestionnaireState = {
   answers: Record<string, unknown>;
   applicableQuestionCodes: string[];
   attempt: HutQuestionnaireAttemptSummary;
+  filterStatus: "COMPLETED" | "PENDING" | "REJECTED";
   omittedQuestionCodes: string[];
   participantOrigin: "CLT_HUT" | "HUT_DIRECTO";
   visits: HutQuestionnaireProgressSummary[];
@@ -259,7 +260,7 @@ export type HutApplicationPhotoDailyAvailability = {
   capturedLocalDate: string;
   existingEntry: HutApplicationPhotoEntrySummary | null;
   nextAvailableLocalDate: string | null;
-  reason: "AVAILABLE" | "LEGACY_PROTOCOL" | "PHOTO_ALREADY_CAPTURED_TODAY";
+  reason: "AVAILABLE" | "FILTER_PENDING" | "LEGACY_PROTOCOL" | "PHOTO_ALREADY_CAPTURED_TODAY";
   slotId: HutPhotoTimelineSlotId | null;
 };
 
@@ -702,6 +703,7 @@ export type HutRepository = {
   }) => Promise<HutActionResult<{ participantId: string; phase: HutPhase }>>;
   saveQuestionnaireAnswer: (input: {
     answerInput: HutAnswerInput;
+    actorUserId?: string | null;
     now?: Date;
     participantId: string;
     questionCode: string;
@@ -1644,6 +1646,22 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
     async completeQuestionnaireSection(input) {
       const prisma = await getPrisma();
+      const participant = await findParticipant(prisma, input.participantId);
+
+      if (!participant || participant.studyId !== input.studyId) {
+        return { message: "No encontramos el participante HUT.", ok: false };
+      }
+      if (
+        participantOrigin(participant) === "HUT_DIRECTO"
+        && input.section !== "FILTROS"
+        && hutFilterStatusFromParticipant(participant) !== "COMPLETED"
+      ) {
+        return {
+          message: "Completa los filtros HUT antes de cerrar esta seccion.",
+          ok: false
+        };
+      }
+
       const prepared = await ensureHutQuestionnaireAttemptForParticipant(prisma, input);
 
       if (!prepared.ok) {
@@ -1699,6 +1717,12 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       if (!attempt.ok) {
         return { message: attempt.message, ok: false };
       }
+      if (attempt.data.status === "TERMINATED") {
+        return {
+          message: "La entrevista HUT ya fue terminada y no permite capturar preguntas posteriores.",
+          ok: false
+        };
+      }
 
       const existingAnswers = (await prisma.hutAnswer.findMany?.({
         select: {
@@ -1710,13 +1734,14 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         where: { attemptId: attempt.data.id }
       })) as HutAnswerRecord[];
       const answerLookup = Object.fromEntries(existingAnswers.map((answer) => [answer.questionCode, answer.answerJson]));
+      const origin = participantOrigin(participant);
       const applicableCodes = new Set(
         getHutApplicableQuestions({
           answers: {
             ...answerLookup,
             ...input.answerInput
           },
-          context: { participantOrigin: participantOrigin(participant) },
+          context: { participantOrigin: origin },
           definition: getHutV5Definition()
         }).map((candidate) => candidate.code)
       );
@@ -1724,6 +1749,20 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       if (!applicableCodes.has(question.code)) {
         return {
           message: "Esta pregunta HUT se omite para este participante.",
+          ok: false
+        };
+      }
+      if (
+        origin === "HUT_DIRECTO"
+        && question.section !== "FILTROS"
+        && hutFilterStatus({
+          answers: answerLookup,
+          attemptStatus: attempt.data.status,
+          participantOrigin: origin
+        }) !== "COMPLETED"
+      ) {
+        return {
+          message: "Completa los filtros HUT antes de continuar el protocolo.",
           ok: false
         };
       }
@@ -1776,9 +1815,27 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
             completedAt: null,
             status: "TERMINATED",
             terminatedAt: now,
-            terminationReason: termination.reason
+            terminationReason: `${question.code}: ${termination.reason}`
           },
           where: { id: attempt.data.id }
+        });
+        await prisma.auditLog.create?.({
+          data: {
+            action: "PARTICIPANT_MODIFIED",
+            actorUserId: input.actorUserId ?? null,
+            afterJson: toAuditJson({
+              answerValue: parsed.answer.answerValue,
+              questionCode: question.code,
+              status: "TERMINATED",
+              terminationReason: termination.reason
+            }),
+            beforeJson: toAuditJson({
+              status: attempt.data.status
+            }),
+            entityId: participant.id,
+            entityType: "HutParticipant",
+            reason: termination.reason
+          }
         });
 
         return {
@@ -1835,9 +1892,10 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       }
 
       const answers = Object.fromEntries((state.answers ?? []).map((answer) => [answer.questionCode, answer.answerJson]));
+      const origin = participantOrigin(participant);
       const applicableQuestionCodes = getHutApplicableQuestions({
         answers,
-        context: { participantOrigin: participantOrigin(participant) },
+        context: { participantOrigin: origin },
         definition: getHutV5Definition()
       }).map((question) => question.code);
       const applicableSet = new Set(applicableQuestionCodes);
@@ -1850,8 +1908,13 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           answers,
           applicableQuestionCodes,
           attempt: toQuestionnaireAttemptSummary(state),
+          filterStatus: hutFilterStatus({
+            answers,
+            attemptStatus: state.status,
+            participantOrigin: origin
+          }),
           omittedQuestionCodes,
-          participantOrigin: participantOrigin(participant),
+          participantOrigin: origin,
           visits: (state.visits ?? []).map(toVisitProgressSummary)
         },
         ok: true
@@ -1940,6 +2003,19 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           ok: true
         };
       }
+      if (participantOrigin(participant) === "HUT_DIRECTO" && hutFilterStatusFromParticipant(participant) !== "COMPLETED") {
+        return {
+          data: {
+            available: false,
+            capturedLocalDate,
+            existingEntry: null,
+            nextAvailableLocalDate: null,
+            reason: "FILTER_PENDING",
+            slotId: null
+          },
+          ok: true
+        };
+      }
       const expectedSlot = expectedApplicationPhotoSlot(participant);
 
       const existing = (await prisma.hutApplicationPhotoEntry.findFirst?.({
@@ -1990,6 +2066,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         }
         if (!isApplicationPhotoProtocol(participant)) {
           return { message: "Este participante conserva el flujo HUT historico.", ok: false };
+        }
+        if (participantOrigin(participant) === "HUT_DIRECTO" && hutFilterStatusFromParticipant(participant) !== "COMPLETED") {
+          return { message: "Completa los filtros HUT antes de registrar fotografias.", ok: false };
         }
 
         const capturedLocalDate = applicationPhotoCapturedLocalDate({
@@ -3346,6 +3425,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       if (!isApplicationPhotoProtocol(participant)) {
         return { message: "Este participante conserva el flujo HUT historico.", ok: false };
       }
+      if (participantOrigin(participant) === "HUT_DIRECTO" && hutFilterStatusFromParticipant(participant) !== "COMPLETED") {
+        return { message: "Completa los filtros HUT antes de registrar fotografias.", ok: false };
+      }
 
       const slotResult = resolveRequestedApplicationPhotoSlot(participant, input.slotId ?? null);
       if (!slotResult.ok) {
@@ -3409,6 +3491,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         }
         if (!isApplicationPhotoProtocol(participant)) {
           return { message: "Este participante conserva el flujo HUT historico.", ok: false };
+        }
+        if (participantOrigin(participant) === "HUT_DIRECTO" && hutFilterStatusFromParticipant(participant) !== "COMPLETED") {
+          return { message: "Completa los filtros HUT antes de registrar fotografias.", ok: false };
         }
 
         const slotResult = resolveRequestedApplicationPhotoSlot(participant, input.slotId ?? null);
@@ -4635,6 +4720,50 @@ function toAdminQuestionnaireSummary(participant: HutParticipantRecord): HutQues
   };
 }
 
+function hutFilterStatusFromParticipant(participant: HutParticipantRecord): HutQuestionnaireState["filterStatus"] {
+  const attempt = participant.questionnaireAttempt;
+  const answers = Object.fromEntries((attempt?.answers ?? []).map((answer) => [answer.questionCode, answer.answerJson]));
+
+  return hutFilterStatus({
+    answers,
+    attemptStatus: attempt?.status ?? "PENDING",
+    participantOrigin: participantOrigin(participant)
+  });
+}
+
+function hutFilterStatus({
+  answers,
+  attemptStatus,
+  participantOrigin
+}: {
+  answers: Record<string, unknown>;
+  attemptStatus: HutQuestionnaireAttemptSummary["status"];
+  participantOrigin: "CLT_HUT" | "HUT_DIRECTO";
+}): HutQuestionnaireState["filterStatus"] {
+  const filterQuestions = getHutApplicableQuestions({
+    answers,
+    context: { participantOrigin },
+    definition: getHutV5Definition()
+  }).filter((question) => question.section === "FILTROS" && question.required);
+
+  const hasTerminatingFilterAnswer = filterQuestions.some((question) => {
+    if (!Object.prototype.hasOwnProperty.call(answers, question.code)) {
+      return false;
+    }
+
+    return getHutQuestionTerminationDecision(question, answers[question.code]).terminates;
+  });
+
+  if (attemptStatus === "TERMINATED" && hasTerminatingFilterAnswer) {
+    return "REJECTED";
+  }
+  if (filterQuestions.every((question) => Object.prototype.hasOwnProperty.call(answers, question.code))) {
+    return "COMPLETED";
+  }
+
+  return "PENDING";
+}
+
 async function sendHutRegistrationWhatsAppForParticipant({
   force,
   link,
@@ -4812,7 +4941,8 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
 function toApplicationPhotoPortalView(participant: HutParticipantRecord): HutPortalView {
   const evidence = applicationEvidenceSummary(participant);
   const entries = applicationPhotoEntrySummary(participant);
-  const nextSlot = expectedApplicationPhotoSlot(participant);
+  const filterBlocksPhotoCapture = participantOrigin(participant) === "HUT_DIRECTO" && hutFilterStatusFromParticipant(participant) !== "COMPLETED";
+  const nextSlot = filterBlocksPhotoCapture ? null : expectedApplicationPhotoSlot(participant);
   const availableApplicationPhoto = nextSlot
     ? {
         phase: storagePhaseForApplicationPhotoSlot(nextSlot.id),
@@ -4828,7 +4958,7 @@ function toApplicationPhotoPortalView(participant: HutParticipantRecord): HutPor
     availableUpload: null,
     availability: {
       nextAvailableAt: null,
-      reason: availableApplicationPhoto ? "AVAILABLE_FOR_APPLICATION_PHOTO" : "COMPLETE"
+      reason: filterBlocksPhotoCapture ? "FILTER_PENDING" : availableApplicationPhoto ? "AVAILABLE_FOR_APPLICATION_PHOTO" : "COMPLETE"
     },
     block1: null,
     block2: null,
@@ -5393,6 +5523,9 @@ function applicationPhotoEntrySummary(participant: HutParticipantRecord): HutPor
 function applicationPhotoPortalMessage(participant: HutParticipantRecord): string {
   if (participant.status === "COMPLETED") {
     return "Tu participacion HUT esta completa. Gracias por tu tiempo.";
+  }
+  if (participantOrigin(participant) === "HUT_DIRECTO" && hutFilterStatusFromParticipant(participant) !== "COMPLETED") {
+    return "Filtro HUT pendiente. El encuestador debe completar los filtros antes de iniciar las fotografias.";
   }
 
   const slot = expectedApplicationPhotoSlot(participant);

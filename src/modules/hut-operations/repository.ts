@@ -1,11 +1,11 @@
 import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
 import {
   buildHutPhotoTimeline,
+  buildHutQuestionnaireProgress,
   resolveHutOperationalStatusLabel
 } from "@/modules/hut";
 import {
   buildHutAnswerGroups,
-  getHutQuestionCount,
   latestTimelineDate,
   resolveHutQuestionnaireProgress
 } from "./service";
@@ -264,8 +264,11 @@ type HutParticipantRecord = {
 };
 
 function toDetail(participant: HutParticipantRecord): HutOperationsDetail {
-  const answerCount = participant.questionnaireAttempt?.answers.length ?? 0;
-  const questionCount = getHutQuestionCount();
+  const answers = Object.fromEntries((participant.questionnaireAttempt?.answers ?? []).map((answer) => [answer.questionCode, answer.answerJson]));
+  const questionnaireProgress = buildHutQuestionnaireProgress({
+    answers,
+    participantOrigin: participant.origin === "CLT_HUT" ? "CLT_HUT" : "HUT_DIRECTO"
+  });
   const visits = participant.questionnaireAttempt?.visits.map((visit) => ({
     completedAt: visit.completedAt,
     section: visit.section,
@@ -307,7 +310,7 @@ function toDetail(participant: HutParticipantRecord): HutOperationsDetail {
     photoCount: photoTimeline.filter((slot) => slot.evidence).length,
     photos,
     protocolVersion: participant.protocolVersion,
-    questionnaireProgressLabel: resolveHutQuestionnaireProgress(answerCount, questionCount),
+    questionnaireProgressLabel: resolveHutQuestionnaireProgress(questionnaireProgress.answered, questionnaireProgress.total),
     questionnaireStatus: participant.questionnaireAttempt?.status ?? null,
     rotation,
     timeline,
