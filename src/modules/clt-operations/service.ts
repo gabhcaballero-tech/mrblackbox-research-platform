@@ -1,4 +1,5 @@
 import { getCtlDefinition, getCtlQuestions } from "@/modules/ctl/definition";
+import { formatDateTimeMexicoCity, MEXICO_CITY_TIME_ZONE } from "@/shared/utils/date-format";
 import type {
   CltOperationsAnswerGroup,
   CltOperationsDashboard,
@@ -9,7 +10,7 @@ import type {
 
 const TSV_CONTENT_TYPE = "text/tab-separated-values; charset=utf-8";
 const TSV_SEPARATOR = "\t";
-const DEFAULT_TIME_ZONE = "America/Mexico_City";
+const DEFAULT_TIME_ZONE = MEXICO_CITY_TIME_ZONE;
 
 export function resolveCltProgress(answeredCount: number, questionCount: number): string {
   if (questionCount <= 0) {
@@ -20,19 +21,8 @@ export function resolveCltProgress(answeredCount: number, questionCount: number)
 }
 
 export function formatOperationsDateTime(value: Date | null | undefined, timeZoneIana = DEFAULT_TIME_ZONE): string {
-  if (!value) {
-    return "";
-  }
-
-  return new Intl.DateTimeFormat("es-MX", {
-    day: "2-digit",
-    hour: "2-digit",
-    hour12: true,
-    minute: "2-digit",
-    month: "2-digit",
-    timeZone: timeZoneIana || DEFAULT_TIME_ZONE,
-    year: "numeric"
-  }).format(value);
+  void timeZoneIana;
+  return formatDateTimeMexicoCity(value);
 }
 
 export function buildCltAnswerGroups(answers: Array<{ questionCode: string; answerValue: unknown }>): CltOperationsAnswerGroup[] {

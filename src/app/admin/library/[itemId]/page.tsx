@@ -5,6 +5,7 @@ import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { LIBRARY_REVISION_STATUS_LABELS, ROLE_LABELS, UI_LABELS } from "@/shared/ui/labels";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 import { createQuestionLibraryRepository } from "@/modules/question-library/repository";
 import {
   getLibraryItemForAdmin,
@@ -26,11 +27,6 @@ type LibraryItemPageProps = {
   }>;
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
-
-const dateFormatter = new Intl.DateTimeFormat("es-MX", {
-  dateStyle: "medium",
-  timeStyle: "short"
-});
 
 export default async function LibraryItemPage({ params, searchParams }: LibraryItemPageProps) {
   const { itemId } = await params;
@@ -130,7 +126,7 @@ function RevisionCard({
           </h3>
           <p className="mt-1 text-sm text-zinc-600">
             Estado: {LIBRARY_REVISION_STATUS_LABELS[revision.status]} · Creada el{" "}
-            {dateFormatter.format(revision.createdAt)}
+            {formatDateTimeMexicoCity(revision.createdAt)}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-zinc-600">
             <span>Hash:</span>

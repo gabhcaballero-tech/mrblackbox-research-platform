@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { sendPublicCtlNavigoEvaluationLinkWhatsAppAction } from "@/modules/ctl/public-actions";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 
 export type CtlNavigoPreparedActivity = {
   availableFromLabel: string;
@@ -196,10 +197,5 @@ function formatResultDate(value: string): string {
     return value;
   }
 
-  return new Intl.DateTimeFormat("es-MX", {
-    dateStyle: "short",
-    hour12: true,
-    timeStyle: "short",
-    timeZone: "America/Mexico_City"
-  }).format(date);
+  return formatDateTimeMexicoCity(date);
 }

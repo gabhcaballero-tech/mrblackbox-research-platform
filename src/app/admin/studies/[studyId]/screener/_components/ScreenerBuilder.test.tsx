@@ -263,12 +263,16 @@ describe("ScreenerBuilder", () => {
       }
     });
 
-    expect(formatScreenerDate(new Date("2026-06-25T00:15:00Z"), "America/Mexico_City")).toContain("24 jun 2026");
-    expect(screen.getByText(/24 jun 2026/)).toBeInTheDocument();
+    expect(formatScreenerDate(new Date("2026-06-25T00:15:00Z"), "America/Mexico_City")).toBe(
+      "24/06/2026, 18:15 hrs CDMX"
+    );
+    expect(screen.getByText("24/06/2026, 18:15 hrs CDMX")).toBeInTheDocument();
   });
 
   it("usa America/Mexico_City como fallback de zona horaria", () => {
-    expect(formatScreenerDate(new Date("2026-06-25T00:15:00Z"), "Zona/Invalida")).toContain("24 jun 2026");
+    expect(formatScreenerDate(new Date("2026-06-25T00:15:00Z"), "Zona/Invalida")).toBe(
+      "24/06/2026, 18:15 hrs CDMX"
+    );
   });
 
   it("ofrece crear una nueva versión cuando el estudio activo no tiene borrador editable", () => {

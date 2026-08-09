@@ -5,6 +5,7 @@ import { requireCapability } from "@/shared/auth/session";
 import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 import {
   cleanupLegacyQaParticipantAction,
   cleanupOrphanParticipantProfilesAction,
@@ -780,11 +781,7 @@ function parseScenarioReport(value: unknown): QaParticipantScenarioReport | null
 }
 
 function formatDateTime(value: Date): string {
-  return new Intl.DateTimeFormat("es-MX", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "America/Mexico_City"
-  }).format(value);
+  return formatDateTimeMexicoCity(value);
 }
 
 function statusBadgeClass(status: QaParticipantRunSummary["status"]): string {

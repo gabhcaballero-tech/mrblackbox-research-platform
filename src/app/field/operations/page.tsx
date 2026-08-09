@@ -9,6 +9,7 @@ import { AppShell } from "@/shared/ui/AppShell";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 import { resolveRequestOrigin } from "@/shared/utils/request-origin";
 import { FieldDashboardCopyButton } from "./FieldDashboardCopyButton";
 
@@ -587,7 +588,7 @@ function reminderLabel(detail: CltOperationsDetail, activityCode: string): strin
     return rightTime - leftTime;
   })[0];
 
-  return latest ? `${latest.status}${latest.sentAt ? ` · ${latest.sentAt.toLocaleString("es-MX")}` : ""}` : "sin recordatorio";
+  return latest ? `${latest.status}${latest.sentAt ? ` · ${formatDateTimeMexicoCity(latest.sentAt)}` : ""}` : "sin recordatorio";
 }
 
 function interviewerCodeStatusLabel(status: string): string {

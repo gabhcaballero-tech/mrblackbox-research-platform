@@ -11,6 +11,7 @@ import {
   type CreateCtlInterviewerCodeActionState
 } from "@/modules/ctl/actions";
 import type { CtlInterviewerCodeView } from "@/modules/ctl/repository";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 
 type CtlInterviewerCodesSectionProps = {
   codes: CtlInterviewerCodeView[];
@@ -227,11 +228,7 @@ function formatDateTime(value: Date | null): string {
     return "-";
   }
 
-  return new Intl.DateTimeFormat("es-MX", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "America/Mexico_City"
-  }).format(value);
+  return formatDateTimeMexicoCity(value);
 }
 
 function formatExpiration(value: Date | null): string {

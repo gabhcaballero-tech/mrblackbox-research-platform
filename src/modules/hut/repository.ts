@@ -72,6 +72,7 @@ import {
 import {
   buildHutPhotoTimeline,
   getNextHutPhotoTimelineSlot,
+  getNextPendingHutPhotoTimelineSlot,
   isLegacyMirroredPlacementPhoto,
   type HutPhotoTimelineSlotId
 } from "./photo-timeline";
@@ -263,7 +264,7 @@ export type HutApplicationPhotoDailyAvailability = {
   capturedLocalDate: string;
   existingEntry: HutApplicationPhotoEntrySummary | null;
   nextAvailableLocalDate: string | null;
-  reason: "AVAILABLE" | "FILTER_PENDING" | "LEGACY_PROTOCOL" | "PHOTO_ALREADY_CAPTURED_TODAY";
+  reason: "AVAILABLE" | "FILTER_PENDING" | "LEGACY_PROTOCOL" | "PHOTO_ALREADY_CAPTURED_TODAY" | "WAIT_UNTIL_NEXT_DAY";
   slotId: HutPhotoTimelineSlotId | null;
 };
 
@@ -630,6 +631,7 @@ export type HutRepository = {
   }) => Promise<HutActionResult<HutSignedSelfieUpload & { referenceSelfieSignedUrl: string }>>;
   requestApplicationPhotoUpload: (input: {
     metadata: HutApplicationPhotoUploadMetadata;
+    now?: Date;
     slotId?: HutPhotoTimelineSlotId | null;
     storage?: HutStorageClient;
     token: string;
@@ -647,6 +649,7 @@ export type HutRepository = {
       privateStorageKey: string;
       storageBucket: string;
     };
+    now?: Date;
     slotId?: HutPhotoTimelineSlotId | null;
     token: string;
   }) => Promise<HutActionResult<{ phase: HutPhase }>>;
@@ -2022,7 +2025,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           ok: true
         };
       }
-      const expectedSlot = expectedApplicationPhotoSlot(participant);
+      const now = input.now ?? new Date();
+      const expectedSlot = expectedApplicationPhotoSlot(participant, now);
+      const nextPendingSlot = nextPendingApplicationPhotoSlot(participant, now);
 
       const existing = (await prisma.hutApplicationPhotoEntry.findFirst?.({
         select: hutApplicationPhotoEntrySelect,
@@ -2034,11 +2039,21 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
       return {
         data: {
-          available: participant.testMode || !existing,
+          available: Boolean(expectedSlot) && (participant.testMode || !existing),
           capturedLocalDate,
           existingEntry: existing ? toApplicationPhotoEntrySummary(existing) : null,
-          nextAvailableLocalDate: existing && !participant.testMode ? nextLocalDateKey(capturedLocalDate) : null,
-          reason: existing && !participant.testMode ? "PHOTO_ALREADY_CAPTURED_TODAY" : "AVAILABLE",
+          nextAvailableLocalDate: existing && !participant.testMode
+            ? nextLocalDateKey(capturedLocalDate)
+            : nextPendingSlot?.availableAt && !expectedSlot
+              ? hutLocalDateKey(nextPendingSlot.availableAt)
+              : null,
+          reason: existing && !participant.testMode
+            ? "PHOTO_ALREADY_CAPTURED_TODAY"
+            : expectedSlot
+              ? "AVAILABLE"
+              : nextPendingSlot?.availableAt
+                ? "WAIT_UNTIL_NEXT_DAY"
+                : "AVAILABLE",
           slotId: expectedSlot?.id ?? null
         },
         ok: true
@@ -2076,7 +2091,6 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         if (participantOrigin(participant) === "HUT_DIRECTO" && hutFilterStatusFromParticipant(participant) !== "COMPLETED") {
           return { message: "Completa los filtros HUT antes de registrar fotografias.", ok: false };
         }
-
         const capturedLocalDate = applicationPhotoCapturedLocalDate({
           now,
           testMode: participant.testMode,
@@ -3423,6 +3437,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
     async requestApplicationPhotoUpload(input) {
       const prisma = await getPrisma();
+      const now = input.now ?? new Date();
       const participant = await findParticipantByToken(prisma, input.token);
 
       if (!participant) {
@@ -3435,7 +3450,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         return { message: "Completa los filtros HUT antes de registrar fotografias.", ok: false };
       }
 
-      const slotResult = resolveRequestedApplicationPhotoSlot(participant, input.slotId ?? null);
+      const slotResult = resolveRequestedApplicationPhotoSlot(participant, input.slotId ?? null, now);
       if (!slotResult.ok) {
         return { message: slotResult.message, ok: false };
       }
@@ -3445,7 +3460,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       }
 
       if (slot.useDayNumber !== null) {
-        const capturedLocalDate = hutLocalDateKey(new Date());
+        const capturedLocalDate = hutLocalDateKey(now);
         const existingDailyPhoto = blockingApplicationPhotoEntryByLocalDate(participant, capturedLocalDate, slot.useDayNumber);
         if (existingDailyPhoto && !participant.testMode) {
           return { message: "Ya existe una foto de aplicacion registrada para el dia de hoy.", ok: false };
@@ -3481,7 +3496,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
     async confirmApplicationPhotoUpload(input) {
       const prisma = await getPrisma();
-      const now = new Date();
+      const now = input.now ?? new Date();
 
       return prisma.$transaction(async (tx) => {
         const participant = await findParticipantByToken(tx, input.token);
@@ -3496,7 +3511,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           return { message: "Completa los filtros HUT antes de registrar fotografias.", ok: false };
         }
 
-        const slotResult = resolveRequestedApplicationPhotoSlot(participant, input.slotId ?? null);
+        const slotResult = resolveRequestedApplicationPhotoSlot(participant, input.slotId ?? null, now);
         if (!slotResult.ok) {
           return { message: slotResult.message, ok: false };
         }
@@ -4938,18 +4953,21 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
 }
 
 function toApplicationPhotoPortalView(participant: HutParticipantRecord): HutPortalView {
+  const now = new Date();
   const evidence = applicationEvidenceSummary(participant);
   const entries = applicationPhotoEntrySummary(participant);
   const filterBlocksPhotoCapture = participantOrigin(participant) === "HUT_DIRECTO" && hutFilterStatusFromParticipant(participant) !== "COMPLETED";
   const legacyMirroredPlacementPhoto = hasLegacyMirroredPlacementPhoto(participant);
-  const nextSlot = filterBlocksPhotoCapture ? null : expectedApplicationPhotoSlot(participant);
-  const availableApplicationPhoto = nextSlot
+  const nextAvailableSlot = filterBlocksPhotoCapture ? null : expectedApplicationPhotoSlot(participant, now);
+  const nextPendingSlot = filterBlocksPhotoCapture ? null : nextPendingApplicationPhotoSlot(participant, now);
+  const availableApplicationPhoto = nextAvailableSlot
     ? {
-        phase: storagePhaseForApplicationPhotoSlot(nextSlot.id),
-        productCode: nextSlot.productCode,
-        slotId: nextSlot.id
+        phase: storagePhaseForApplicationPhotoSlot(nextAvailableSlot.id),
+        productCode: nextAvailableSlot.productCode,
+        slotId: nextAvailableSlot.id
       }
     : null;
+  const nextAvailableAt = nextPendingSlot?.status === "PROGRAMMED" ? nextPendingSlot.availableAt : null;
 
   return {
     applicationEvidence: evidence,
@@ -4957,8 +4975,14 @@ function toApplicationPhotoPortalView(participant: HutParticipantRecord): HutPor
     availableApplicationPhoto,
     availableUpload: null,
     availability: {
-      nextAvailableAt: null,
-      reason: filterBlocksPhotoCapture ? "FILTER_PENDING" : availableApplicationPhoto ? "AVAILABLE_FOR_APPLICATION_PHOTO" : "COMPLETE"
+      nextAvailableAt,
+      reason: filterBlocksPhotoCapture
+        ? "FILTER_PENDING"
+        : availableApplicationPhoto
+          ? "AVAILABLE_FOR_APPLICATION_PHOTO"
+          : nextAvailableAt
+            ? "WAIT_UNTIL_NEXT_DAY"
+            : "COMPLETE"
     },
     block1: null,
     block2: null,
@@ -5102,11 +5126,26 @@ function expectedApplicationPhotoPhase(participant: HutParticipantRecord): HutPh
   return slot ? storagePhaseForApplicationPhotoSlot(slot.id) : null;
 }
 
-function expectedApplicationPhotoSlot(participant: HutParticipantRecord) {
+function expectedApplicationPhotoSlot(participant: HutParticipantRecord, now = new Date()) {
   return getNextHutPhotoTimelineSlot({
     applicationEvidence: applicationEvidenceSummary(participant),
     dailyEntries: applicationPhotoEntrySummary(participant),
     legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
+    now,
+    rotation: {
+      eva1: participant.firstFragranceLeftArm,
+      eva2: participant.secondFragranceRightArm
+    },
+    testMode: participant.testMode
+  });
+}
+
+function nextPendingApplicationPhotoSlot(participant: HutParticipantRecord, now = new Date()) {
+  return getNextPendingHutPhotoTimelineSlot({
+    applicationEvidence: applicationEvidenceSummary(participant),
+    dailyEntries: applicationPhotoEntrySummary(participant),
+    legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
+    now,
     rotation: {
       eva1: participant.firstFragranceLeftArm,
       eva2: participant.secondFragranceRightArm
@@ -5117,7 +5156,8 @@ function expectedApplicationPhotoSlot(participant: HutParticipantRecord) {
 
 function resolveRequestedApplicationPhotoSlot(
   participant: HutParticipantRecord,
-  requestedSlotId: HutPhotoTimelineSlotId | null
+  requestedSlotId: HutPhotoTimelineSlotId | null,
+  now = new Date()
 ):
   | { ok: true; slot: NonNullable<ReturnType<typeof expectedApplicationPhotoSlot>> | null }
   | { message: string; ok: false } {
@@ -5125,6 +5165,7 @@ function resolveRequestedApplicationPhotoSlot(
     applicationEvidence: applicationEvidenceSummary(participant),
     dailyEntries: applicationPhotoEntrySummary(participant),
     legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
+    now,
     rotation: {
       eva1: participant.firstFragranceLeftArm,
       eva2: participant.secondFragranceRightArm
@@ -5232,7 +5273,9 @@ function blockingApplicationPhotoEntryByLocalDate(
   useDayNumber: number | null
 ): HutApplicationPhotoEntryRecord | null {
   return participant.applicationPhotoEntries?.find((entry) =>
-    entry.capturedLocalDate === capturedLocalDate && !(useDayNumber === 1 && isLegacyMirroredPlacementEntry(participant, entry))
+    entry.capturedLocalDate === capturedLocalDate
+    && !(useDayNumber === 1 && entry.useDayNumber === 0)
+    && !(useDayNumber === 1 && isLegacyMirroredPlacementEntry(participant, entry))
   ) ?? null;
 }
 
@@ -5581,9 +5624,12 @@ function applicationPhotoPortalMessage(participant: HutParticipantRecord): strin
     return "Filtro HUT pendiente. El encuestador debe completar los filtros antes de iniciar las fotografias.";
   }
 
-  const slot = expectedApplicationPhotoSlot(participant);
+  const slot = nextPendingApplicationPhotoSlot(participant);
   if (!slot) {
     return "No hay fotos HUT pendientes.";
+  }
+  if (slot.status === "PROGRAMMED" && slot.availableDate) {
+    return `Tu siguiente fotografia estara disponible a partir de ${slot.availableDate}.`;
   }
 
   return `Tienes pendiente registrar: ${slot.title}.`;

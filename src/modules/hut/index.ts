@@ -70,6 +70,7 @@ export {
   buildHutPhotoTimeline,
   getHutPhotoTimelineSlotDefinition,
   getNextHutPhotoTimelineSlot,
+  getNextPendingHutPhotoTimelineSlot,
   formatHutPhotoTimelineSlotTitle,
   HUT_PHOTO_TIME_ZONE,
   isLegacyMirroredPlacementPhoto,

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { StudyListItem } from "@/modules/studies/repository";
 import { STUDY_STATUS_LABELS, UI_LABELS } from "@/shared/ui/labels";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 import { StudyEmptyState } from "./StudyEmptyState";
 import { StudyEditForm } from "./StudyEditForm";
 
@@ -8,22 +9,9 @@ type StudyListProps = {
   studies: StudyListItem[];
 };
 
-const DEFAULT_STUDY_TIME_ZONE = "America/Mexico_City";
-
 export function formatStudyListDate(value: Date, timeZoneIana?: string) {
-  try {
-    return new Intl.DateTimeFormat("es-MX", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: timeZoneIana || DEFAULT_STUDY_TIME_ZONE
-    }).format(value);
-  } catch {
-    return new Intl.DateTimeFormat("es-MX", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: DEFAULT_STUDY_TIME_ZONE
-    }).format(value);
-  }
+  void timeZoneIana;
+  return formatDateTimeMexicoCity(value);
 }
 
 function StudyStatusBadge({ status }: { status: StudyListItem["status"] }) {

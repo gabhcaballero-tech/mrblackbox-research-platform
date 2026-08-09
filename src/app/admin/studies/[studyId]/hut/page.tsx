@@ -34,6 +34,7 @@ import {
 } from "@/modules/hut";
 import { normalizeWhatsAppRecipient } from "@/modules/oneui-whatsapp";
 import { SubmitButton } from "@/app/admin/_components/SubmitButton";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 import { requireCapability } from "@/shared/auth/session";
 import { AppShell } from "@/shared/ui/AppShell";
 import { EmptyState } from "@/shared/ui/EmptyState";
@@ -1670,14 +1671,8 @@ function formatDateTime(value: Date | null | undefined, timeZone: string) {
     return "—";
   }
 
-  return new Intl.DateTimeFormat("es-MX", {
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    month: "short",
-    timeZone,
-    year: "numeric"
-  }).format(value);
+  void timeZone;
+  return formatDateTimeMexicoCity(value);
 }
 
 function formatAvailability(value: Date | null | undefined, timeZone: string) {

@@ -8,6 +8,7 @@ import {
   type CtlMatrixQuestionDefinition,
   type CtlQuestionDefinition
 } from "./definition";
+import { formatDateMexicoCity, formatTimeMexicoCity } from "@/shared/utils/date-format";
 
 export type CtlInternalActor = {
   id: string;
@@ -127,21 +128,13 @@ export function normalizeCtlText(value: unknown): string {
 }
 
 export function formatCtlDate(value: Date, timeZoneIana = CTL_OPERATIONAL_TIME_ZONE): string {
-  return new Intl.DateTimeFormat("es-MX", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: timeZoneIana,
-    year: "numeric"
-  }).format(value);
+  void timeZoneIana;
+  return formatDateMexicoCity(value);
 }
 
 export function formatCtlTime(value: Date, timeZoneIana = CTL_OPERATIONAL_TIME_ZONE): string {
-  return new Intl.DateTimeFormat("es-MX", {
-    hour: "2-digit",
-    hour12: true,
-    minute: "2-digit",
-    timeZone: timeZoneIana
-  }).format(value);
+  void timeZoneIana;
+  return formatTimeMexicoCity(value);
 }
 
 export function parseCtlAnswers(

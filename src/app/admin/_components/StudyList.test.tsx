@@ -19,10 +19,10 @@ describe("StudyList", () => {
   it("renders created and updated dates using the study time zone", () => {
     render(<StudyList studies={[activeStudy]} />);
 
-    expect(screen.getAllByText(/24 jun 2026/i).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("24/06/2026, 18:15 hrs CDMX").length).toBeGreaterThanOrEqual(2);
   });
 
   it("falls back to America/Mexico_City when the study time zone is invalid", () => {
-    expect(formatStudyListDate(mexicoCityTimestamp, "Zona/Invalida")).toContain("24 jun 2026");
+    expect(formatStudyListDate(mexicoCityTimestamp, "Zona/Invalida")).toBe("24/06/2026, 18:15 hrs CDMX");
   });
 });

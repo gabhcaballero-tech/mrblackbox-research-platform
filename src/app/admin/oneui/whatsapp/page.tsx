@@ -10,6 +10,7 @@ import type {
   OneuiWhatsAppMessageRecord
 } from "@/modules/oneui-whatsapp";
 import { requireInternalUser } from "@/shared/auth/session";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
@@ -216,9 +217,5 @@ function formatDate(value: Date | null | undefined): string {
     return "Sin fecha";
   }
 
-  return new Intl.DateTimeFormat("es-MX", {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: "America/Mexico_City"
-  }).format(value);
+  return formatDateTimeMexicoCity(value);
 }

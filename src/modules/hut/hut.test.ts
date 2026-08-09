@@ -1315,6 +1315,77 @@ describe("HUT module foundation", () => {
     expect(participant.applicationPhotoEntries.map((entry) => entry.useDayNumber).sort()).toEqual([0, 2, 3]);
   });
 
+  it("blocks the next HUT photo slot until 4 a.m. Mexico City on the next day outside test mode", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const created = await repository.createParticipant({
+      email: "schedule-photo@example.test",
+      firstFragranceLeftArm: "247",
+      folio: "HUT-SCHEDULE",
+      name: "Participante Horario Foto",
+      phone: "5544444444",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const participantId = created.ok ? created.data.participantId : "";
+    const participant = prisma.state.participants.find((item) => item.id === participantId)!;
+    participant.origin = "CLT_HUT";
+    const day1CaptureAt = new Date("2026-08-09T16:00:00.000Z");
+
+    async function uploadSlot(slotId: "DELIVERY" | "PRODUCT_1_DAY_1", now: Date) {
+      const upload = await repository.requestApplicationPhotoUpload({
+        metadata: selfieMetadata(),
+        now,
+        slotId,
+        storage,
+        token: participant.token
+      });
+      expect(upload.ok).toBe(true);
+
+      return repository.confirmApplicationPhotoUpload({
+        metadata: {
+          ...selfieMetadata(),
+          privateStorageKey: upload.ok ? upload.data.privateStorageKey : "",
+          storageBucket: upload.ok ? upload.data.storageBucket : ""
+        },
+        now,
+        slotId,
+        token: participant.token
+      });
+    }
+
+    await expect(uploadSlot("DELIVERY", new Date("2026-08-09T15:00:00.000Z"))).resolves.toMatchObject({ ok: true });
+    await expect(uploadSlot("PRODUCT_1_DAY_1", day1CaptureAt)).resolves.toMatchObject({ ok: true });
+
+    const sameDayDay2 = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      now: new Date("2026-08-09T18:00:00.000Z"),
+      slotId: "PRODUCT_1_DAY_2",
+      storage,
+      token: participant.token
+    });
+    const nextMorningDay2 = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      now: new Date("2026-08-10T10:00:00.000Z"),
+      slotId: "PRODUCT_1_DAY_2",
+      storage,
+      token: participant.token
+    });
+
+    expect(sameDayDay2).toMatchObject({
+      message: "Esta foto HUT aun no esta disponible.",
+      ok: false
+    });
+    expect(nextMorningDay2).toMatchObject({
+      data: {
+        productCode: "247"
+      },
+      ok: true
+    });
+  });
+
   it("resets application photo evidence without deleting rotation or phase codes", async () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);

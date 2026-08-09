@@ -44,6 +44,7 @@ import { AppShell } from "@/shared/ui/AppShell";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 import { resolveRequestOrigin } from "@/shared/utils/request-origin";
 import { ParticipantLinkPanel } from "./_components/ParticipantLinkPanel";
 import {
@@ -1542,11 +1543,8 @@ function identityStatusLabel(status?: "CONFIRMED" | "PENDING" | "REJECTED") {
 }
 
 function formatDate(value: Date, timeZoneIana: string): string {
-  return new Intl.DateTimeFormat("es-MX", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: timeZoneIana
-  }).format(value);
+  void timeZoneIana;
+  return formatDateTimeMexicoCity(value);
 }
 
 

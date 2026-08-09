@@ -20,6 +20,7 @@ import {
 } from "@/modules/hut/actions";
 import { requireCapability } from "@/shared/auth/session";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { formatDateMexicoCity, formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 import { HutFieldSubmitButton } from "./HutFieldSubmitButton";
 
 export const dynamic = "force-dynamic";
@@ -219,7 +220,7 @@ function FieldHutWorkspace({
                     Participante: {slot.participantTask ?? "Sin captura fotografica"}{slot.interviewerTask ? ` / Encuestador: ${slot.interviewerTask}` : ""}
                   </p>
                   <p className="mt-1 text-zinc-600">Producto: {slot.productCode ?? "No asignado"}</p>
-                  {slot.evidence?.capturedAt ? <p className="mt-1 text-zinc-600">Foto: {slot.evidence.capturedAt.toLocaleString("es-MX")}</p> : null}
+                  {slot.evidence?.capturedAt ? <p className="mt-1 text-zinc-600">Foto: {formatDateTimeMexicoCity(slot.evidence.capturedAt)}</p> : null}
                   {!slot.isCapturableWithCurrentModel && !slot.evidence ? <p className="mt-1 text-zinc-600">Proxima actividad programada</p> : null}
                 </div>
                 <StatusBadge status={slot.status === "COMPLETED" ? "ready" : slot.status === "AVAILABLE" ? "planned" : "blocked"}>
@@ -243,7 +244,7 @@ function FieldHutWorkspace({
                   <p className="mt-1 text-zinc-600">Encuestador: {slot.interviewerTask}</p>
                   <p className="mt-1 text-zinc-600">Producto: {slot.productCode ?? "No asignado"}</p>
                   {slot.evidence?.capturedAt ? (
-                    <p className="mt-1 text-zinc-600">Registro historico: {slot.evidence.capturedAt.toLocaleString("es-MX")}</p>
+                    <p className="mt-1 text-zinc-600">Registro historico: {formatDateTimeMexicoCity(slot.evidence.capturedAt)}</p>
                   ) : (
                     <p className="mt-1 text-zinc-600">Visita pendiente</p>
                   )}
@@ -267,7 +268,7 @@ function FieldHutWorkspace({
                   {resolveHutPhotoTimelinePhotoLabel(photo, hutTimeline)}
                 </p>
                 <p className="mt-1 text-zinc-600">Producto: {photo.productCode ?? "No asignado"}</p>
-                <p className="text-zinc-600">Fecha: {photo.capturedAt.toLocaleString("es-MX")}</p>
+                <p className="text-zinc-600">Fecha: {formatDateTimeMexicoCity(photo.capturedAt)}</p>
                 {photo.signedUrl ? (
                   <a className="mt-2 inline-block font-semibold text-teal-700" href={photo.signedUrl} rel="noreferrer" target="_blank">
                     Ver foto
@@ -715,12 +716,7 @@ function resolveHutQuestionText(text: string, workspace: HutFieldQuestionnaireWo
     HUT_EVA1: workspace.rotation.eva1 ?? "No asignado",
     HUT_EVA2: workspace.rotation.eva2 ?? "No asignado",
     PARTICIPANT_NAME: workspace.participant.name,
-    TODAY: new Intl.DateTimeFormat("es-MX", {
-      day: "2-digit",
-      month: "2-digit",
-      timeZone: "America/Mexico_City",
-      year: "numeric"
-    }).format(new Date())
+    TODAY: formatDateMexicoCity(new Date())
   };
 
   return Object.entries(replacements).reduce((current, [token, value]) => {

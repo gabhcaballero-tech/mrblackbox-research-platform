@@ -107,7 +107,7 @@ function blockedSlotMessage(slot: HutPhotoTimelineSlot): string {
     return "Completa primero las fotografias anteriores del cronograma.";
   }
   return slot.availableDate
-    ? `Esta actividad estara disponible el dia ${slot.availableDate}.`
+    ? `Esta actividad estara disponible a partir de ${slot.availableDate}.`
     : "Esta actividad todavia no esta programada para captura.";
 }
 

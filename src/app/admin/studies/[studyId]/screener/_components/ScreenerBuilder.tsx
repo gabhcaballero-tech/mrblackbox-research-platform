@@ -28,6 +28,7 @@ import {
   UI_LABELS
 } from "@/shared/ui/labels";
 import { DETERGENTS_STUDY_CODE } from "@/modules/study-templates/study-behavior";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 import { AddContentTabs } from "./AddContentTabs";
 import { ConsentDefaultOptionsButton } from "./ConsentDefaultOptionsButton";
 import {
@@ -87,24 +88,9 @@ const optionActionTypes = [
   "PENDING_REVIEW"
 ] satisfies Array<ScreenerOption["actions"][number]["type"]>;
 
-const DEFAULT_STUDY_TIME_ZONE = "America/Mexico_City";
-
 export function formatScreenerDate(value: Date, timeZoneIana?: string | null): string {
-  const timeZone = timeZoneIana || DEFAULT_STUDY_TIME_ZONE;
-
-  try {
-    return new Intl.DateTimeFormat("es-MX", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone
-    }).format(value);
-  } catch {
-    return new Intl.DateTimeFormat("es-MX", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: DEFAULT_STUDY_TIME_ZONE
-    }).format(value);
-  }
+  void timeZoneIana;
+  return formatDateTimeMexicoCity(value);
 }
 
 export function ScreenerBuilder({

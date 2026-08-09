@@ -8,6 +8,7 @@ import {
   applyStudyScreenerDefinitionOverrides,
   DETERGENT_RECRUITER_QUESTION_ID
 } from "@/modules/screener/study-overrides";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 import {
   type ScreeningSupervisionRepository,
   type SupervisionAttemptExportRecord,
@@ -480,15 +481,8 @@ function formatDateTime(value: Date | null, timeZoneIana: string): string {
     return "";
   }
 
-  try {
-    return new Intl.DateTimeFormat("es-MX", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: resolveStudyTimeZone(timeZoneIana)
-    }).format(value);
-  } catch {
-    return value.toISOString();
-  }
+  void timeZoneIana;
+  return formatDateTimeMexicoCity(value);
 }
 
 function formatDateForFilename(value: Date, timeZoneIana: string): string {

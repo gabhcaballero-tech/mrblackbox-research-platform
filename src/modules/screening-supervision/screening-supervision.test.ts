@@ -735,8 +735,8 @@ describe("screening supervision service", () => {
     expect(result.ok ? result.data.fileContent : "").toContain("MAR\u00cdA \u00d1AND\u00da");
     expect(result.ok ? result.data.fileContent : "").toContain("Portal participante");
     expect(result.ok ? result.data.fileContent : "").toContain("Elegible confirmado");
-    expect(result.ok ? result.data.fileContent : "").toContain("23 jun 2026, 9:00 a.m.");
-    expect(result.ok ? result.data.fileContent : "").toContain("23 jun 2026, 10:00 a.m.");
+    expect(result.ok ? result.data.fileContent : "").toContain("23/06/2026, 09:00 hrs CDMX");
+    expect(result.ok ? result.data.fileContent : "").toContain("23/06/2026, 10:00 hrs CDMX");
     expect(result.ok ? result.data.fileContent : "").toContain("144\tC típico\tRANGO-3");
     expect(result.ok ? result.data.fileContent : "").toContain("Navigo|Otra - Especificación: Marca local");
     expect(result.ok ? result.data.fileContent : "").toContain("Motivo; interno, con separadores");
@@ -1347,8 +1347,8 @@ describe("screening supervision service", () => {
       studyId: invalidTimeZoneStudy.id
     });
 
-    expect(result.ok ? result.data.fileContent : "").toContain("23 jun 2026, 9:00 a.m.");
-    expect(result.ok ? result.data.fileContent : "").toContain("23 jun 2026, 10:00 a.m.");
+    expect(result.ok ? result.data.fileContent : "").toContain("23/06/2026, 09:00 hrs CDMX");
+    expect(result.ok ? result.data.fileContent : "").toContain("23/06/2026, 10:00 hrs CDMX");
     expect(result.ok ? result.data.filename : null).toBe("FMASCULINA-NAVIGO-2026_intentos_screener_2026-06-24.tsv");
   });
 

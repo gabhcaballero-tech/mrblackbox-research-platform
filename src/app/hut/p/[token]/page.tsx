@@ -9,6 +9,7 @@ import {
 } from "@/modules/hut";
 import { validateHutPhaseCodeAction } from "@/modules/hut/actions";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 import { HutVideoUploadForm } from "./HutVideoUploadForm";
 
 export const dynamic = "force-dynamic";
@@ -223,7 +224,7 @@ function ProgressSummary({ view }: { view: HutPortalView }) {
                   <p className="font-semibold text-zinc-950">{formatHutPhotoTimelineSlotTitle(slot)}</p>
                   <p className="mt-1 text-zinc-600">{participantSlotDescription(slot)}</p>
                   {slot.productCode ? <p className="mt-1 text-zinc-600">Producto: {slot.productCode}</p> : null}
-                  {slot.evidence?.capturedAt ? <p className="mt-1 text-zinc-600">Fecha: {slot.evidence.capturedAt.toLocaleString("es-MX")}</p> : null}
+                  {slot.evidence?.capturedAt ? <p className="mt-1 text-zinc-600">Fecha: {formatDateTimeMexicoCity(slot.evidence.capturedAt)}</p> : null}
                   {slot.availableDate ? <p className="mt-1 text-zinc-600">Fecha disponible: {slot.availableDate}</p> : null}
                 </div>
                 <StatusBadge status={slot.status === "COMPLETED" ? "ready" : slot.status === "AVAILABLE" ? "planned" : "blocked"}>
@@ -297,7 +298,7 @@ function nextPhotoActivityMessage(view: HutPortalView): string {
     return "Tienes una fotografia pendiente por registrar.";
   }
   if (view.availability.nextAvailableAt) {
-    return `Tu proxima actividad estara disponible el dia ${view.availability.nextAvailableAt.toLocaleDateString("es-MX")}.`;
+    return `Tu proxima actividad estara disponible a partir de ${formatDateTimeMexicoCity(view.availability.nextAvailableAt)}.`;
   }
   return "Cuando llegue el momento recibiras instrucciones.";
 }
@@ -353,7 +354,7 @@ function availabilityMessage(reason: string, nextAvailableAt: Date | null) {
     return "El siguiente video estará disponible mañana a partir de las 5:00 a.m.";
   }
   if (reason === "WAIT_UNTIL_5_AM") {
-    return `Tu siguiente video estará disponible a partir de las 5:00 a.m.${nextAvailableAt ? ` (${nextAvailableAt.toLocaleString("es-MX")})` : ""}.`;
+    return `Tu siguiente video estará disponible a partir de las 5:00 a.m.${nextAvailableAt ? ` (${formatDateTimeMexicoCity(nextAvailableAt)})` : ""}.`;
   }
   if (reason === "MISSING_REFERENCE_SELFIE") {
     return "Tu registro aún no está completo. Contacta al encuestador.";

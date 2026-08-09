@@ -5,6 +5,7 @@ import {
   sendNavigoEvaluationReminderNowAction,
   type NavigoEvaluationReminderNowActionResult
 } from "@/modules/navigo-app/actions";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 
 type NavigoEvaluationReminderSendPanelProps = {
   activityCode: string;
@@ -136,10 +137,6 @@ function formatReminderDateTime(value: string, timeZoneIana: string): string {
     return value;
   }
 
-  return new Intl.DateTimeFormat("es-MX", {
-    dateStyle: "short",
-    hour12: true,
-    timeStyle: "short",
-    timeZone: timeZoneIana
-  }).format(date);
+  void timeZoneIana;
+  return formatDateTimeMexicoCity(date);
 }

@@ -17,6 +17,7 @@ import {
   savePublicCtlQuestionAnswerAction
 } from "@/modules/ctl/public-actions";
 import type { CtlAgeAnswerValue } from "@/modules/ctl/service";
+import { formatDateMexicoCity } from "@/shared/utils/date-format";
 
 type FlatQuestion = {
   index: number;
@@ -1190,7 +1191,7 @@ function buildAutomaticCtlAnswers({
   todayLabel?: string;
 }): Record<string, string> {
   return {
-    DG_FECHA: todayLabel ?? new Date().toLocaleDateString("es-MX"),
+    DG_FECHA: todayLabel ?? formatDateMexicoCity(new Date()),
     DG_HORA_INICIO: startedAtLabel ?? "",
     DG_HORA_TERMINO: completedAtLabel ?? "",
     DG_NOMBRE: participant.name

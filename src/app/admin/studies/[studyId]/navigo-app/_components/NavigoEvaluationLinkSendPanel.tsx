@@ -5,6 +5,7 @@ import {
   sendNavigoEvaluationLinkWhatsAppAction,
   type NavigoEvaluationLinkWhatsAppActionResult
 } from "@/modules/navigo-app/actions";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 import { NavigoEvaluationLinkResultPanel } from "./NavigoEvaluationLinkResultPanel";
 
 export type NavigoEvaluationLinkPanelResult = {
@@ -120,10 +121,6 @@ function formatEvaluationLinkDateTime(value: string, timeZoneIana: string): stri
     return value;
   }
 
-  return new Intl.DateTimeFormat("es-MX", {
-    dateStyle: "short",
-    hour12: true,
-    timeStyle: "short",
-    timeZone: timeZoneIana
-  }).format(date);
+  void timeZoneIana;
+  return formatDateTimeMexicoCity(date);
 }

@@ -22,35 +22,15 @@ import { ScreeningAttemptBulkTable } from "./ScreeningAttemptBulkTable";
 import { EvidenceReplacementForm } from "./EvidenceReplacementForm";
 import { ExportCsvButton } from "./ExportCsvButton";
 import { WhatsAppManualBlock } from "./WhatsAppManualBlock";
-
-const DEFAULT_STUDY_TIME_ZONE = "America/Mexico_City";
-
-function resolveStudyTimeZone(timeZoneIana?: string | null): string {
-  const candidate = timeZoneIana?.trim() || DEFAULT_STUDY_TIME_ZONE;
-
-  try {
-    new Intl.DateTimeFormat("es-MX", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: candidate
-    }).format(new Date());
-
-    return candidate;
-  } catch {
-    return DEFAULT_STUDY_TIME_ZONE;
-  }
-}
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 
 function formatDate(value: Date | null, timeZoneIana?: string | null): string {
   if (!value) {
     return "Sin cierre";
   }
 
-  return new Intl.DateTimeFormat("es-MX", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: resolveStudyTimeZone(timeZoneIana)
-  }).format(value);
+  void timeZoneIana;
+  return formatDateTimeMexicoCity(value);
 }
 
 function formatInputDate(value: Date | undefined): string {

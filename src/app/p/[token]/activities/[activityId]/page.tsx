@@ -7,6 +7,7 @@ import { EmptyState } from "@/shared/ui/EmptyState";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { PublicParticipantShell } from "@/shared/ui/PublicParticipantShell";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 import { participantTokenSchema } from "@/shared/validation/participant";
 
 export const dynamic = "force-dynamic";
@@ -137,9 +138,6 @@ function readTestModeParams(query: { navigoTestMode?: string; navigoTestSignatur
 }
 
 function formatDate(value: Date, timeZoneIana: string): string {
-  return new Intl.DateTimeFormat("es-MX", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: timeZoneIana
-  }).format(value);
+  void timeZoneIana;
+  return formatDateTimeMexicoCity(value);
 }

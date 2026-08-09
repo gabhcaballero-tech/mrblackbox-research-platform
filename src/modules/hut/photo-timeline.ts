@@ -1,4 +1,5 @@
 import type { HutPhase } from "./phase-codes";
+import { formatDateMexicoCity, formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 
 export const HUT_PHOTO_TIME_ZONE = "America/Mexico_City";
 
@@ -15,6 +16,7 @@ export type HutPhotoTimelinePhoto = {
 export type HutPhotoTimelineSlotStatus = "BLOCKED" | "COMPLETED" | "AVAILABLE" | "PROGRAMMED";
 
 export type HutPhotoTimelineSlot = {
+  availableAt: Date | null;
   availableDate: string | null;
   dayLabel: string;
   evidence: HutPhotoTimelinePhoto | null;
@@ -222,16 +224,16 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
     });
   }
   const explicitAvailableSlotId = input.availableSlotId ?? null;
-  const nextAvailableDate = input.nextAvailableAt ? formatHutTimelineDate(input.nextAvailableAt) : null;
   const preliminarySlots = HUT_PHOTO_TIMELINE_DEFINITIONS.map((definition) => {
     const evidence = resolveEvidenceForDefinition(definition, phaseEvidence, dailyByUseDay, legacyMirroredPlacementPhoto);
     return buildTimelineSlot({
-      availableDate: nextAvailableDate,
+      availableAt: null,
       definition,
       evidence,
       productCode: resolveProductCode(definition, input.rotation)
     });
   });
+  const scheduledAvailability = buildScheduledAvailability(preliminarySlots);
   const firstMissingCapturable = preliminarySlots.find((slot) => slot.participantTask && !slot.evidence);
   const explicitAvailableSlot = explicitAvailableSlotId
     ? preliminarySlots.find((slot) => slot.id === explicitAvailableSlotId) ?? null
@@ -240,30 +242,41 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
     ? firstMissingCapturable?.id ?? null
     : explicitAvailableSlotId ?? firstMissingCapturable?.id ?? null;
   let blockedByPrevious = false;
+  const now = input.now ?? new Date();
 
   return preliminarySlots.map((slot) => {
-    if (slot.evidence) {
-      return { ...slot, status: "COMPLETED" };
+    const availableAt = scheduledAvailability.get(slot.id) ?? input.nextAvailableAt ?? null;
+    const slotWithAvailability = {
+      ...slot,
+      availableAt,
+      availableDate: availableAt ? formatHutTimelineDateTime(availableAt) : null
+    };
+
+    if (slotWithAvailability.evidence) {
+      return { ...slotWithAvailability, status: "COMPLETED" };
     }
-    if (!slot.participantTask) {
-      return { ...slot, status: "PROGRAMMED" };
+    if (!slotWithAvailability.participantTask) {
+      return { ...slotWithAvailability, status: "PROGRAMMED" };
     }
     if (input.photoCaptureBlocked) {
-      return { ...slot, status: "BLOCKED" };
+      return { ...slotWithAvailability, status: "BLOCKED" };
     }
     if (input.testMode) {
-      return { ...slot, status: "AVAILABLE" };
+      return { ...slotWithAvailability, status: "AVAILABLE" };
     }
     if (blockedByPrevious) {
-      return { ...slot, status: "BLOCKED" };
+      return { ...slotWithAvailability, status: "BLOCKED" };
     }
-    if (slot.id === availableSlotId) {
+    if (slotWithAvailability.id === availableSlotId) {
       blockedByPrevious = true;
-      return { ...slot, status: "AVAILABLE" };
+      if (availableAt && now.getTime() < availableAt.getTime()) {
+        return { ...slotWithAvailability, status: "PROGRAMMED" };
+      }
+      return { ...slotWithAvailability, status: "AVAILABLE" };
     }
 
     blockedByPrevious = true;
-    return { ...slot, status: "BLOCKED" };
+    return { ...slotWithAvailability, status: "BLOCKED" };
   });
 }
 
@@ -361,13 +374,16 @@ export function getNextHutPhotoTimelineSlot(input: HutPhotoTimelineInput): HutPh
   return buildHutPhotoTimeline(input).find((slot) => slot.participantTask && slot.status === "AVAILABLE") ?? null;
 }
 
+export function getNextPendingHutPhotoTimelineSlot(input: HutPhotoTimelineInput): HutPhotoTimelineSlot | null {
+  return buildHutPhotoTimeline(input).find((slot) => slot.participantTask && !slot.evidence) ?? null;
+}
+
 export function formatHutTimelineDate(date: Date): string {
-  return new Intl.DateTimeFormat("es-MX", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: HUT_PHOTO_TIME_ZONE,
-    year: "numeric"
-  }).format(date);
+  return formatDateMexicoCity(date);
+}
+
+export function formatHutTimelineDateTime(date: Date): string {
+  return formatDateTimeMexicoCity(date);
 }
 
 export function isLegacyMirroredPlacementPhoto(input: {
@@ -405,13 +421,14 @@ export function isLegacyMirroredPlacementPhoto(input: {
 }
 
 function buildTimelineSlot(input: {
-  availableDate: string | null;
+  availableAt: Date | null;
   definition: HutPhotoTimelineSlotDefinition;
   evidence: HutPhotoTimelinePhoto | null;
   productCode: string | null;
 }): HutPhotoTimelineSlot {
   return {
-    availableDate: input.availableDate,
+    availableAt: input.availableAt,
+    availableDate: input.availableAt ? formatHutTimelineDateTime(input.availableAt) : null,
     dayLabel: input.definition.dayLabel,
     evidence: sanitizeTimelinePhoto(input.evidence),
     id: input.definition.id,
@@ -425,6 +442,99 @@ function buildTimelineSlot(input: {
     title: input.definition.title,
     useDayNumber: input.definition.useDayNumber
   };
+}
+
+function buildScheduledAvailability(slots: HutPhotoTimelineSlot[]): Map<HutPhotoTimelineSlotId, Date> {
+  const dependencies: Partial<Record<HutPhotoTimelineSlotId, HutPhotoTimelineSlotId>> = {
+    PRODUCT_1_DAY_2: "PRODUCT_1_DAY_1",
+    PRODUCT_1_DAY_3_MORNING: "PRODUCT_1_DAY_2",
+    PRODUCT_2_DAY_2: "PRODUCT_2_DAY_1",
+    PRODUCT_2_DAY_3_MORNING: "PRODUCT_2_DAY_2"
+  };
+  const byId = new Map(slots.map((slot) => [slot.id, slot]));
+  const availability = new Map<HutPhotoTimelineSlotId, Date>();
+
+  for (const [slotId, previousSlotId] of Object.entries(dependencies) as Array<[HutPhotoTimelineSlotId, HutPhotoTimelineSlotId]>) {
+    const previousEvidence = byId.get(previousSlotId)?.evidence ?? null;
+    if (!previousEvidence) {
+      continue;
+    }
+    availability.set(slotId, nextPhotoCaptureAvailableAt(previousEvidence.capturedAt));
+  }
+
+  return availability;
+}
+
+function nextPhotoCaptureAvailableAt(previousCapturedAt: Date): Date {
+  const previousLocalDate = mexicoCityLocalDateKey(previousCapturedAt);
+  const nextLocalDate = offsetLocalDateKey(previousLocalDate, 1);
+
+  return mexicoCityLocalDateTimeToUtc(nextLocalDate, 4, 0);
+}
+
+function mexicoCityLocalDateKey(date: Date): string {
+  const parts = mexicoCityDateParts(date);
+
+  return [
+    String(parts.year).padStart(4, "0"),
+    String(parts.month).padStart(2, "0"),
+    String(parts.day).padStart(2, "0")
+  ].join("-");
+}
+
+function mexicoCityDateParts(date: Date): {
+  day: number;
+  hour: number;
+  minute: number;
+  month: number;
+  second: number;
+  year: number;
+} {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+    minute: "2-digit",
+    month: "2-digit",
+    second: "2-digit",
+    timeZone: HUT_PHOTO_TIME_ZONE,
+    year: "numeric"
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value ?? "0");
+
+  return {
+    day: value("day"),
+    hour: value("hour"),
+    minute: value("minute"),
+    month: value("month"),
+    second: value("second"),
+    year: value("year")
+  };
+}
+
+function mexicoCityLocalDateTimeToUtc(dateKey: string, hour: number, minute: number): Date {
+  const [year = 1970, month = 1, day = 1] = dateKey.split("-").map(Number);
+  const targetUtc = Date.UTC(year, month - 1, day, hour, minute, 0);
+  let candidate = new Date(targetUtc);
+
+  for (let index = 0; index < 3; index += 1) {
+    const parts = mexicoCityDateParts(candidate);
+    const candidateLocalAsUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+    candidate = new Date(candidate.getTime() + (targetUtc - candidateLocalAsUtc));
+  }
+
+  return candidate;
+}
+
+function offsetLocalDateKey(dateKey: string, days: number): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year ?? 1970, (month ?? 1) - 1, (day ?? 1) + days));
+
+  return [
+    String(date.getUTCFullYear()).padStart(4, "0"),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0")
+  ].join("-");
 }
 
 function sanitizeTimelinePhoto(photo: HutPhotoTimelinePhoto | null): HutPhotoTimelinePhoto | null {

@@ -5,8 +5,7 @@ import { useMemo, useState } from "react";
 import type { ScreeningAttemptListItem } from "@/modules/screening-supervision";
 import { deleteSelectedParticipantEvidenceTestRecordsAction } from "@/modules/participant-portal/evidence-review-actions";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
-
-const DEFAULT_STUDY_TIME_ZONE = "America/Mexico_City";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 
 export function ScreeningAttemptBulkTable({
   attempts,
@@ -191,32 +190,13 @@ export function ScreeningAttemptBulkTable({
   );
 }
 
-function resolveStudyTimeZone(timeZoneIana?: string | null): string {
-  const candidate = timeZoneIana?.trim() || DEFAULT_STUDY_TIME_ZONE;
-
-  try {
-    new Intl.DateTimeFormat("es-MX", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: candidate
-    }).format(new Date());
-
-    return candidate;
-  } catch {
-    return DEFAULT_STUDY_TIME_ZONE;
-  }
-}
-
 function formatDate(value: Date | null, timeZoneIana?: string | null): string {
   if (!value) {
     return "Sin cierre";
   }
 
-  return new Intl.DateTimeFormat("es-MX", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: resolveStudyTimeZone(timeZoneIana)
-  }).format(value);
+  void timeZoneIana;
+  return formatDateTimeMexicoCity(value);
 }
 
 function badgeTone(status: ScreeningAttemptListItem["status"]) {

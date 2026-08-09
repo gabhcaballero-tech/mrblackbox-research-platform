@@ -7,17 +7,13 @@ import {
   type FieldStartActionState
 } from "@/modules/field/actions";
 import type { FieldDuplicateAttemptSummary, FieldDuplicateParticipantMatch } from "@/modules/field/service";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 
 type ParticipantStartFormProps = {
   error?: string;
   initialState?: FieldStartActionState;
   studyId: string;
 };
-
-const dateFormatter = new Intl.DateTimeFormat("es-MX", {
-  dateStyle: "medium",
-  timeStyle: "short"
-});
 
 export function ParticipantStartForm({ error, initialState, studyId }: ParticipantStartFormProps) {
   const [state, formAction, pending] = useActionState(
@@ -178,7 +174,7 @@ function AttemptSummary({ attempt }: { attempt: FieldDuplicateAttemptSummary }) 
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="font-medium text-zinc-900">
-            {fieldAttemptStatusLabel(attempt.status)} · {dateFormatter.format(attempt.startedAt)}
+            {fieldAttemptStatusLabel(attempt.status)} · {formatDateTimeMexicoCity(attempt.startedAt)}
           </p>
           <p className="mt-1">NSE: {nse}</p>
           {attempt.code || attempt.reason ? (

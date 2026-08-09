@@ -44,7 +44,7 @@ describe("NavigoEvaluationLinkSendPanel", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "✓ Enlace enviado" })).toBeInTheDocument());
     expect(screen.getByText("https://example.test/p/token/activities")).toBeInTheDocument();
     expect(screen.getByText(/WhatsApp: Enviado correctamente/)).toBeInTheDocument();
-    expect(screen.getByText(/08\/08\/26/)).toBeInTheDocument();
+    expect(screen.getByText("08/08/2026, 01:45 hrs CDMX")).toBeInTheDocument();
     expect(mockedSendAction).toHaveBeenCalledWith("study-1", "participant-1", "https://example.test");
   });
 

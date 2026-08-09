@@ -323,8 +323,8 @@ describe("ScreeningSupervisionComponents", () => {
   it("renders start and close times using the study time zone", () => {
     render(<ScreeningAttemptTable attempts={listData.attempts} studyId={study.id} />);
 
-    expect(screen.getByText("23 jun 2026, 9:00 a.m.")).toBeInTheDocument();
-    expect(screen.getByText("23 jun 2026, 10:00 a.m.")).toBeInTheDocument();
+    expect(screen.getByText("23/06/2026, 09:00 hrs CDMX")).toBeInTheDocument();
+    expect(screen.getByText("23/06/2026, 10:00 hrs CDMX")).toBeInTheDocument();
   });
 
   it("truncates long reason visually and keeps the full title", () => {
@@ -342,8 +342,8 @@ describe("ScreeningSupervisionComponents", () => {
     expect(screen.getByText("Navigo, Otra. EspecificaciÃ³n: Marca local")).toBeInTheDocument();
     expect(screen.getByText("C tÃ­pico")).toBeInTheDocument();
     expect(screen.getByText("RANGO-3")).toBeInTheDocument();
-    expect(screen.getByText("23 jun 2026, 9:00 a.m.")).toBeInTheDocument();
-    expect(screen.getByText("23 jun 2026, 10:00 a.m.")).toBeInTheDocument();
+    expect(screen.getByText("23/06/2026, 09:00 hrs CDMX")).toBeInTheDocument();
+    expect(screen.getByText("23/06/2026, 10:00 hrs CDMX")).toBeInTheDocument();
     expect(screen.queryByText(/answerJson|StudyProduct\.realName/)).not.toBeInTheDocument();
   });
 
@@ -360,8 +360,8 @@ describe("ScreeningSupervisionComponents", () => {
       />
     );
 
-    expect(screen.getByText("23 jun 2026, 9:00 a.m.")).toBeInTheDocument();
-    expect(screen.getByText("23 jun 2026, 10:00 a.m.")).toBeInTheDocument();
+    expect(screen.getByText("23/06/2026, 09:00 hrs CDMX")).toBeInTheDocument();
+    expect(screen.getByText("23/06/2026, 10:00 hrs CDMX")).toBeInTheDocument();
   });
 
   it("keeps statuses in Spanish", () => {

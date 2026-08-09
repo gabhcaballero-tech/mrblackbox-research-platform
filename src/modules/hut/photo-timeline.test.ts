@@ -286,6 +286,94 @@ describe("HutPhotoTimeline", () => {
     });
   });
 
+  it("programs product 1 day 2 until 4 a.m. Mexico City on the next local day", () => {
+    const timeline = buildHutPhotoTimeline({
+      dailyEntries: [
+        {
+          capturedAt: new Date("2026-08-09T15:00:00.000Z"),
+          capturedLocalDate: "2026-08-09",
+          productCode: null,
+          useDayNumber: 0
+        },
+        {
+          capturedAt: new Date("2026-08-09T16:00:00.000Z"),
+          capturedLocalDate: "2026-08-09",
+          productCode: "247",
+          useDayNumber: 1
+        }
+      ],
+      now: new Date("2026-08-09T18:00:00.000Z"),
+      rotation: {
+        eva1: "247",
+        eva2: "583"
+      }
+    });
+
+    expect(timeline.find((slot) => slot.id === "PRODUCT_1_DAY_1")?.status).toBe("COMPLETED");
+    expect(timeline.find((slot) => slot.id === "PRODUCT_1_DAY_2")).toMatchObject({
+      availableDate: "10/08/2026, 04:00 hrs CDMX",
+      status: "PROGRAMMED"
+    });
+  });
+
+  it("makes product 1 day 2 available after 4 a.m. Mexico City on the next local day", () => {
+    const timeline = buildHutPhotoTimeline({
+      dailyEntries: [
+        {
+          capturedAt: new Date("2026-08-09T15:00:00.000Z"),
+          capturedLocalDate: "2026-08-09",
+          productCode: null,
+          useDayNumber: 0
+        },
+        {
+          capturedAt: new Date("2026-08-09T16:00:00.000Z"),
+          capturedLocalDate: "2026-08-09",
+          productCode: "247",
+          useDayNumber: 1
+        }
+      ],
+      now: new Date("2026-08-10T10:00:00.000Z"),
+      rotation: {
+        eva1: "247",
+        eva2: "583"
+      }
+    });
+
+    expect(timeline.find((slot) => slot.id === "PRODUCT_1_DAY_2")).toMatchObject({
+      availableDate: "10/08/2026, 04:00 hrs CDMX",
+      status: "AVAILABLE"
+    });
+  });
+
+  it("uses the Mexico City local date when scheduling captures close to midnight", () => {
+    const timeline = buildHutPhotoTimeline({
+      dailyEntries: [
+        {
+          capturedAt: new Date("2026-08-10T04:30:00.000Z"),
+          capturedLocalDate: "2026-08-09",
+          productCode: null,
+          useDayNumber: 0
+        },
+        {
+          capturedAt: new Date("2026-08-10T05:30:00.000Z"),
+          capturedLocalDate: "2026-08-09",
+          productCode: "247",
+          useDayNumber: 1
+        }
+      ],
+      now: new Date("2026-08-10T09:59:00.000Z"),
+      rotation: {
+        eva1: "247",
+        eva2: "583"
+      }
+    });
+
+    expect(timeline.find((slot) => slot.id === "PRODUCT_1_DAY_2")).toMatchObject({
+      availableDate: "10/08/2026, 04:00 hrs CDMX",
+      status: "PROGRAMMED"
+    });
+  });
+
   it("makes every pending photo slot available in test mode", () => {
     const timeline = buildHutPhotoTimeline({
       dailyEntries: [
