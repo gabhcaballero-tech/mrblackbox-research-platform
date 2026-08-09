@@ -80,6 +80,31 @@ describe("HutPhotoTimeline", () => {
     });
   });
 
+  it("makes every pending photo slot available in test mode", () => {
+    const timeline = buildHutPhotoTimeline({
+      dailyEntries: [
+        {
+          capturedAt: new Date("2026-08-08T05:30:00.000Z"),
+          capturedLocalDate: "2026-08-07",
+          productCode: null,
+          useDayNumber: 0
+        }
+      ],
+      rotation: {
+        eva1: "247",
+        eva2: "583"
+      },
+      testMode: true
+    });
+
+    expect(timeline.find((slot) => slot.id === "DELIVERY")?.status).toBe("COMPLETED");
+    expect(
+      timeline
+        .filter((slot) => slot.participantTask && !slot.evidence)
+        .map((slot) => slot.status)
+    ).toEqual(["AVAILABLE", "AVAILABLE", "AVAILABLE", "AVAILABLE", "AVAILABLE", "AVAILABLE"]);
+  });
+
   it("hides legacy call pending labels in the operational presentation", () => {
     expect(resolveHutOperationalStatusLabel("BLOCK_1_CALL_PENDING")).toBe("En seguimiento");
     expect(resolveHutOperationalStatusLabel("BLOCK_2_CALL_PENDING")).toBe("En seguimiento");

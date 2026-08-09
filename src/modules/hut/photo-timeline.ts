@@ -60,6 +60,7 @@ export type HutPhotoTimelineInput = {
     eva1: string | null;
     eva2: string | null;
   };
+  testMode?: boolean;
 };
 
 export type HutPhotoTimelineSlotDefinition = {
@@ -220,6 +221,9 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
     }
     if (!slot.participantTask) {
       return { ...slot, status: "PROGRAMMED" };
+    }
+    if (input.testMode) {
+      return { ...slot, status: "AVAILABLE" };
     }
     if (blockedByPrevious) {
       return { ...slot, status: "BLOCKED" };

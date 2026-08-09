@@ -706,7 +706,8 @@ function buildFieldPhotoTimeline(workspace: HutFieldQuestionnaireWorkspace): Hut
     rotation: {
       eva1: workspace.rotation.eva1,
       eva2: workspace.rotation.eva2
-    }
+    },
+    testMode: workspace.participant.testMode
   });
 }
 

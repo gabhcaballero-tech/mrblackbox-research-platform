@@ -270,7 +270,8 @@ function buildPortalPhotoTimeline(view: HutPortalView): HutPhotoTimelineSlot[] {
     rotation: {
       eva1: view.rotation.firstFragranceLeftArm,
       eva2: view.rotation.secondFragranceRightArm
-    }
+    },
+    testMode: view.testMode
   });
 }
 

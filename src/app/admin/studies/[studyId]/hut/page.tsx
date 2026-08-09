@@ -857,7 +857,8 @@ function ApplicationPhotoProtocolCard({
     rotation: {
       eva1: participant.firstFragranceLeftArm,
       eva2: participant.secondFragranceRightArm
-    }
+    },
+    testMode: participant.testMode
   });
   const photoSlots = hutTimeline.filter((slot) => slot.participantTask);
   const evaluationSlots = hutTimeline.filter((slot) => slot.interviewerTask);

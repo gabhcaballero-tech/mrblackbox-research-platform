@@ -863,7 +863,7 @@ describe("HUT module foundation", () => {
     expect(testAvailability).toMatchObject({
       data: {
         available: true,
-        existingEntry: expect.objectContaining({ productCode: "247" }),
+        existingEntry: null,
         reason: "AVAILABLE"
       },
       ok: true
@@ -888,6 +888,69 @@ describe("HUT module foundation", () => {
     });
     expect(prisma.state.participants.find((participant) => participant.id === testParticipantId)?.testMode).toBe(true);
     expect(prisma.state.participants.find((participant) => participant.id === normalParticipantId)?.testMode).toBe(false);
+  });
+
+  it("lets test mode complete every application photo slot on the same day but blocks duplicate slots", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const created = await repository.createParticipant({
+      email: "slot-test@example.test",
+      firstFragranceLeftArm: "247",
+      folio: "HUT-SLOT-TEST",
+      name: "Participante Slots Test",
+      phone: "5533333333",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const participantId = created.ok ? created.data.participantId : "";
+    const participant = prisma.state.participants.find((item) => item.id === participantId)!;
+
+    await repository.setTestMode({
+      enabled: true,
+      participantId,
+      studyId: "study-hut"
+    });
+
+    async function uploadSlot(slotId: "DELIVERY" | "PRODUCT_1_DAY_1" | "PRODUCT_1_DAY_2" | "PRODUCT_1_DAY_3_MORNING") {
+      const upload = await repository.requestApplicationPhotoUpload({
+        metadata: selfieMetadata(),
+        slotId,
+        storage,
+        token: participant.token
+      });
+      expect(upload.ok).toBe(true);
+
+      return repository.confirmApplicationPhotoUpload({
+        metadata: {
+          ...selfieMetadata(),
+          privateStorageKey: upload.ok ? upload.data.privateStorageKey : "",
+          storageBucket: upload.ok ? upload.data.storageBucket : ""
+        },
+        slotId,
+        token: participant.token
+      });
+    }
+
+    await expect(uploadSlot("DELIVERY")).resolves.toMatchObject({ ok: true });
+    await expect(uploadSlot("PRODUCT_1_DAY_1")).resolves.toMatchObject({ ok: true });
+    await expect(uploadSlot("PRODUCT_1_DAY_2")).resolves.toMatchObject({ ok: true });
+    await expect(uploadSlot("PRODUCT_1_DAY_3_MORNING")).resolves.toMatchObject({ ok: true });
+
+    const duplicate = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      slotId: "PRODUCT_1_DAY_2",
+      storage,
+      token: participant.token
+    });
+
+    expect(duplicate).toMatchObject({
+      message: "Esta foto HUT ya fue registrada.",
+      ok: false
+    });
+    expect(participant.applicationEvidence).toHaveLength(1);
+    expect(participant.applicationPhotoEntries.map((entry) => entry.useDayNumber).sort()).toEqual([0, 2, 3]);
   });
 
   it("resets application photo evidence without deleting rotation or phase codes", async () => {
@@ -3505,14 +3568,17 @@ function createFakeHutPrisma() {
           useDayNumber: Number(args.data.useDayNumber)
         };
         state.applicationPhotoEntries.push(entry);
+        const participant = state.participants.find((item) => item.id === entry.participantId);
+        participant?.applicationPhotoEntries.push(entry);
         return entry;
       },
-      async findFirst(args: { where: { capturedLocalDate?: string; participantId: string } }) {
+      async findFirst(args: { where: { capturedLocalDate?: string; participantId: string; useDayNumber?: number } }) {
         return (
           state.applicationPhotoEntries.find(
             (entry) =>
               entry.participantId === args.where.participantId &&
-              (!args.where.capturedLocalDate || entry.capturedLocalDate === args.where.capturedLocalDate)
+              (!args.where.capturedLocalDate || entry.capturedLocalDate === args.where.capturedLocalDate) &&
+              (typeof args.where.useDayNumber !== "number" || entry.useDayNumber === args.where.useDayNumber)
           ) ?? null
         );
       },

@@ -159,6 +159,7 @@ const hutParticipantSelect = {
   },
   secondFragranceRightArm: true,
   status: true,
+  testMode: true,
   studyParticipant: {
     select: {
       accessTokens: {
@@ -246,6 +247,7 @@ type HutParticipantRecord = {
   } | null;
   secondFragranceRightArm: string | null;
   status: string;
+  testMode: boolean;
   studyParticipant: {
     accessTokens: Array<{
       id: string;
@@ -277,7 +279,8 @@ function toDetail(participant: HutParticipantRecord): HutOperationsDetail {
     rotation: {
       eva1: participant.firstFragranceLeftArm,
       eva2: participant.secondFragranceRightArm
-    }
+    },
+    testMode: participant.testMode
   });
   const timeline = buildTimeline(participant);
   const rotation = toRotation(participant);
@@ -320,7 +323,8 @@ function resolveCurrentPhase(participant: HutParticipantRecord): string {
       rotation: {
         eva1: participant.firstFragranceLeftArm,
         eva2: participant.secondFragranceRightArm
-      }
+      },
+      testMode: participant.testMode
     });
     return timeline.find((slot) => slot.status === "AVAILABLE")?.title ?? resolveHutOperationalStatusLabel(participant.status);
   }

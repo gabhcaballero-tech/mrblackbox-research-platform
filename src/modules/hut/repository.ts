@@ -1967,11 +1967,15 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           return { message: "Este participante conserva el flujo HUT historico.", ok: false };
         }
 
-        const capturedLocalDate = hutLocalDateKey(now);
+        const capturedLocalDate = applicationPhotoCapturedLocalDate({
+          now,
+          testMode: participant.testMode,
+          useDayNumber: input.useDayNumber
+        });
         const existing = (await tx.hutApplicationPhotoEntry.findFirst?.({
           select: hutApplicationPhotoEntrySelect,
           where: {
-            capturedLocalDate,
+            capturedLocalDate: hutLocalDateKey(now),
             participantId: participant.id
           }
         })) as HutApplicationPhotoEntryRecord | null;
@@ -1979,6 +1983,14 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         if (existing && !participant.testMode) {
           return {
             message: "Ya existe una foto de aplicacion registrada para el dia de hoy.",
+            ok: false
+          };
+        }
+
+        const existingSlotPhoto = await findApplicationPhotoEntryByUseDayNumber(tx, participant.id, input.useDayNumber);
+        if (existingSlotPhoto) {
+          return {
+            message: "Esta foto HUT ya fue registrada.",
             ok: false
           };
         }
@@ -3331,6 +3343,11 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         if (existingDailyPhoto && !participant.testMode) {
           return { message: "Ya existe una foto de aplicacion registrada para el dia de hoy.", ok: false };
         }
+
+        const existingSlotPhoto = await findApplicationPhotoEntryByUseDayNumber(prisma, participant.id, slot.useDayNumber);
+        if (existingSlotPhoto) {
+          return { message: "Esta foto HUT ya fue registrada.", ok: false };
+        }
       }
       const phase = storagePhaseForApplicationPhotoSlot(slot.id);
 
@@ -3378,18 +3395,27 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           return { message: "No hay foto de aplicacion pendiente.", ok: false };
         }
         const phase = storagePhaseForApplicationPhotoSlot(slot.id);
-        const capturedLocalDate = hutLocalDateKey(now);
+        const capturedLocalDate = applicationPhotoCapturedLocalDate({
+          now,
+          testMode: participant.testMode,
+          useDayNumber: slot.useDayNumber
+        });
 
         if (slot.useDayNumber !== null) {
           const existingDailyPhoto = (await tx.hutApplicationPhotoEntry.findFirst?.({
             select: hutApplicationPhotoEntrySelect,
             where: {
-              capturedLocalDate,
+              capturedLocalDate: hutLocalDateKey(now),
               participantId: participant.id
             }
           })) as HutApplicationPhotoEntryRecord | null;
           if (existingDailyPhoto && !participant.testMode) {
             return { message: "Ya existe una foto de aplicacion registrada para el dia de hoy.", ok: false };
+          }
+
+          const existingSlotPhoto = await findApplicationPhotoEntryByUseDayNumber(tx, participant.id, slot.useDayNumber);
+          if (existingSlotPhoto) {
+            return { message: "Esta foto HUT ya fue registrada.", ok: false };
           }
         }
 
@@ -4927,7 +4953,8 @@ function expectedApplicationPhotoSlot(participant: HutParticipantRecord) {
     rotation: {
       eva1: participant.firstFragranceLeftArm,
       eva2: participant.secondFragranceRightArm
-    }
+    },
+    testMode: participant.testMode
   });
 }
 
@@ -4943,7 +4970,8 @@ function resolveRequestedApplicationPhotoSlot(
     rotation: {
       eva1: participant.firstFragranceLeftArm,
       eva2: participant.secondFragranceRightArm
-    }
+    },
+    testMode: participant.testMode
   });
   const expected = timeline.find((slot) => slot.participantTask && slot.status === "AVAILABLE") ?? null;
   if (!requestedSlotId) {
@@ -4981,6 +5009,45 @@ function nextLocalDateKey(dateKey: string): string {
     String(date.getUTCMonth() + 1).padStart(2, "0"),
     String(date.getUTCDate()).padStart(2, "0")
   ].join("-");
+}
+
+function applicationPhotoCapturedLocalDate({
+  now,
+  testMode,
+  useDayNumber
+}: {
+  now: Date;
+  testMode: boolean;
+  useDayNumber: number | null;
+}): string {
+  const capturedLocalDate = hutLocalDateKey(now);
+  if (!testMode || useDayNumber === null) {
+    return capturedLocalDate;
+  }
+
+  return offsetLocalDateKey(capturedLocalDate, Math.max(0, useDayNumber));
+}
+
+async function findApplicationPhotoEntryByUseDayNumber(
+  prisma: HutPrismaClient,
+  participantId: string,
+  useDayNumber: number
+): Promise<HutApplicationPhotoEntryRecord | null> {
+  return (await prisma.hutApplicationPhotoEntry.findFirst?.({
+    select: hutApplicationPhotoEntrySelect,
+    where: {
+      participantId,
+      useDayNumber
+    }
+  })) as HutApplicationPhotoEntryRecord | null;
+}
+
+function offsetLocalDateKey(dateKey: string, days: number): string {
+  let current = dateKey;
+  for (let index = 0; index < days; index += 1) {
+    current = nextLocalDateKey(current);
+  }
+  return current;
 }
 
 function nextApplicationPhotoParticipantStateForSlot(

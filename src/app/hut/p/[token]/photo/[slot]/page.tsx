@@ -34,7 +34,8 @@ export default async function HutPhotoSlotPage({ params }: HutPhotoSlotPageProps
     rotation: {
       eva1: view.rotation.firstFragranceLeftArm,
       eva2: view.rotation.secondFragranceRightArm
-    }
+    },
+    testMode: view.testMode
   });
   const selectedSlot = timeline.find((candidate) => candidate.id === slot) ?? null;
 
