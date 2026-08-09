@@ -165,7 +165,12 @@ const duplicateCleanupPreview: DuplicateScreeningAttemptCleanupPreview = {
   },
   participantOperationalContext: {
     activeConfirmationFolio: "NAV-041",
-    operationalStatus: "SCREENING_PASSED",
+    operationalStatus: "SCREENING_TERMINATED",
+    screeningStatus: "TERMINATED"
+  },
+  projectedParticipantOperationalContext: {
+    activeConfirmationFolio: "NAV-041",
+    operationalStatus: "IN_PROGRESS",
     screeningStatus: "PASSED"
   },
   requiresFolioReleaseConfirmation: false,

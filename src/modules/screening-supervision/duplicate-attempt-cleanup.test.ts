@@ -31,7 +31,14 @@ describe("duplicate screening attempt cleanup", () => {
   });
 
   it("deletes only direct duplicate attempt relations and writes audit log", async () => {
-    const prisma = prismaStub();
+    const prisma = prismaStub({
+      remainingAttempts: [{ id: "attempt-passed", status: "PASSED" }],
+      studyParticipant: {
+        operationalStatus: "SCREENING_TERMINATED",
+        screeningStatus: "TERMINATED"
+      },
+      withActiveConfirmation: true
+    });
     const repository = createDuplicateScreeningAttemptCleanupRepository(prisma as never);
 
     const result = await deleteDuplicateScreeningAttempt({
@@ -55,8 +62,14 @@ describe("duplicate screening attempt cleanup", () => {
     expect(prisma.screeningAttempt.delete).toHaveBeenCalledWith({
       where: { id: "attempt-1" }
     });
-    expect((prisma as Record<string, unknown>).studyParticipant).toBeUndefined();
     expect((prisma as Record<string, unknown>).participantProfile).toBeUndefined();
+    expect(prisma.studyParticipant.update).toHaveBeenCalledWith({
+      data: {
+        operationalStatus: "IN_PROGRESS",
+        screeningStatus: "PASSED"
+      },
+      where: { id: "study-participant-1" }
+    });
     expect(prisma.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -68,6 +81,83 @@ describe("duplicate screening attempt cleanup", () => {
         })
       })
     );
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          afterJson: expect.objectContaining({
+            statusChange: {
+              after: {
+                operationalStatus: "IN_PROGRESS",
+                screeningStatus: "PASSED"
+              },
+              before: {
+                operationalStatus: "SCREENING_TERMINATED",
+                screeningStatus: "TERMINATED"
+              }
+            }
+          })
+        })
+      })
+    );
+  });
+
+  it("projects PASSED after deleting a TERMINATED duplicate when a valid PASSED confirmation remains", async () => {
+    const prisma = prismaStub({
+      remainingAttempts: [{ id: "attempt-passed", status: "PASSED" }],
+      studyParticipant: {
+        operationalStatus: "SCREENING_TERMINATED",
+        screeningStatus: "TERMINATED"
+      },
+      withActiveConfirmation: true
+    });
+    const repository = createDuplicateScreeningAttemptCleanupRepository(prisma as never);
+
+    const result = await getDuplicateScreeningAttemptCleanupPreview({
+      actor: admin,
+      attemptId: "attempt-1",
+      repository
+    });
+
+    expect(result.ok ? result.data.participantOperationalContext : null).toMatchObject({
+      operationalStatus: "SCREENING_TERMINATED",
+      screeningStatus: "TERMINATED"
+    });
+    expect(result.ok ? result.data.projectedParticipantOperationalContext : null).toMatchObject({
+      operationalStatus: "IN_PROGRESS",
+      screeningStatus: "PASSED"
+    });
+  });
+
+  it("keeps TERMINATED when only TERMINATED attempts remain after cleanup", async () => {
+    const prisma = prismaStub({
+      remainingAttempts: [{ id: "attempt-terminated-2", status: "TERMINATED" }],
+      studyParticipant: {
+        operationalStatus: "SCREENING_TERMINATED",
+        screeningStatus: "TERMINATED"
+      }
+    });
+    const repository = createDuplicateScreeningAttemptCleanupRepository(prisma as never);
+
+    const result = await deleteDuplicateScreeningAttempt({
+      actor: admin,
+      attemptId: "attempt-1",
+      confirmationText: "ELIMINAR INTENTO DUPLICADO",
+      reason: "Intento terminado repetido",
+      repository
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.statusChange.after : null).toEqual({
+      operationalStatus: "SCREENING_TERMINATED",
+      screeningStatus: "TERMINATED"
+    });
+    expect(prisma.studyParticipant.update).toHaveBeenCalledWith({
+      data: {
+        operationalStatus: "SCREENING_TERMINATED",
+        screeningStatus: "TERMINATED"
+      },
+      where: { id: "study-participant-1" }
+    });
   });
 
   it("requires explicit folio release confirmation before deleting an attempt with confirmation", async () => {
@@ -132,11 +222,22 @@ describe("duplicate screening attempt cleanup", () => {
 
 function prismaStub({
   counts = {},
+  remainingAttempts,
+  studyParticipant: studyParticipantOverrides = {},
+  withActiveConfirmation = false,
   withConfirmation = false
 }: {
   counts?: Partial<Record<"ctlSession" | "hutParticipant" | "participantAccessToken" | "participantActivity", number>>;
+  remainingAttempts?: Array<{ id: string; status: string }>;
+  studyParticipant?: Partial<{
+    applicationStartedAt: Date | null;
+    operationalStatus: string;
+    screeningStatus: string;
+  }>;
+  withActiveConfirmation?: boolean;
   withConfirmation?: boolean;
 } = {}) {
+  const hasActiveConfirmation = withActiveConfirmation || withConfirmation;
   const attempt = {
     answers: [
       {
@@ -180,13 +281,14 @@ function prismaStub({
     startedAt: new Date("2026-08-08T05:00:00Z"),
     status: withConfirmation ? "PASSED" : "INCOMPLETE",
     studyParticipant: {
+      applicationStartedAt: studyParticipantOverrides.applicationStartedAt ?? new Date("2026-08-08T09:00:00Z"),
       id: "study-participant-1",
-      operationalStatus: "SCREENING_STARTED",
-      participantConfirmation: withConfirmation
+      operationalStatus: studyParticipantOverrides.operationalStatus ?? "SCREENING_STARTED",
+      participantConfirmation: hasActiveConfirmation
         ? {
             folio: "NAV-041",
             id: "confirmation-1",
-            screeningAttemptId: "attempt-1"
+            screeningAttemptId: withConfirmation ? "attempt-1" : "attempt-passed"
           }
         : null,
       participantProfile: {
@@ -195,7 +297,7 @@ function prismaStub({
         name: "Participante Uno",
         phone: "5550000000"
       },
-      screeningStatus: "INCOMPLETE",
+      screeningStatus: studyParticipantOverrides.screeningStatus ?? "INCOMPLETE",
       studyId: "study-1"
     },
     studyParticipantId: "study-participant-1"
@@ -224,6 +326,28 @@ function prismaStub({
     screeningAttempt: {
       ...delegate(),
       findUnique: vi.fn(async () => attempt)
+    },
+    studyParticipant: {
+      ...delegate(),
+      findUnique: vi.fn(async () => ({
+        accessTokens: hasActiveConfirmation ? [{ id: "token-1" }] : [],
+        activities: hasActiveConfirmation ? [{ id: "activity-1", status: "AVAILABLE" }] : [],
+        applicationStartedAt: attempt.studyParticipant.applicationStartedAt,
+        ctlSessions: hasActiveConfirmation ? [{ id: "ctl-1", status: "COMPLETED" }] : [],
+        hutParticipant: null,
+        participantConfirmation: hasActiveConfirmation
+          ? {
+              folio: "NAV-041",
+              screeningAttempt: { status: "PASSED" },
+              screeningAttemptId: "attempt-passed"
+            }
+          : null,
+        participantScreeningReviews: hasActiveConfirmation
+          ? [{ screeningAttemptId: "attempt-passed", status: "APPROVED" }]
+          : [],
+        screeningAttempts: remainingAttempts ?? []
+      })),
+      update: vi.fn(async () => ({}))
     }
   };
 

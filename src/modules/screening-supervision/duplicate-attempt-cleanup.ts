@@ -6,7 +6,10 @@ type Delegate = {
   create?: (args: unknown) => Promise<unknown>;
   delete?: (args: unknown) => Promise<unknown>;
   deleteMany?: (args: unknown) => Promise<{ count: number }>;
+  findFirst?: (args: unknown) => Promise<unknown | null>;
+  findMany?: (args: unknown) => Promise<unknown[]>;
   findUnique?: (args: unknown) => Promise<unknown | null>;
+  update?: (args: unknown) => Promise<unknown>;
 };
 
 type DuplicateAttemptCleanupPrisma = {
@@ -22,6 +25,7 @@ type DuplicateAttemptCleanupPrisma = {
   participantScreeningReview: Delegate;
   screeningAnswer: Delegate;
   screeningAttempt: Delegate;
+  studyParticipant: Delegate;
 };
 
 export type DuplicateScreeningAttemptCleanupActor = {
@@ -120,6 +124,11 @@ export type DuplicateScreeningAttemptCleanupPreview = {
     operationalStatus: string;
     screeningStatus: string;
   };
+  projectedParticipantOperationalContext: {
+    activeConfirmationFolio: string | null;
+    operationalStatus: string;
+    screeningStatus: string;
+  };
   requiresFolioReleaseConfirmation: boolean;
   review: {
     id: string;
@@ -147,6 +156,16 @@ export type DuplicateScreeningAttemptCleanupReport = {
   folioReleased: string | null;
   participantProfileId: string;
   reason: string;
+  statusChange: {
+    after: {
+      operationalStatus: string;
+      screeningStatus: string;
+    };
+    before: {
+      operationalStatus: string;
+      screeningStatus: string;
+    };
+  };
   studyId: string;
   studyParticipantId: string;
 };
@@ -231,6 +250,23 @@ export function createDuplicateScreeningAttemptCleanupRepository(
         });
         deletedCounts.screeningAttempt = 1;
 
+        const recalculatedStatus = await recalculateParticipantScreeningStatus(tx, preview.participant.studyParticipantId);
+        const statusChange = {
+          after: {
+            operationalStatus: recalculatedStatus.operationalStatus,
+            screeningStatus: recalculatedStatus.screeningStatus
+          },
+          before: {
+            operationalStatus: preview.participantOperationalContext.operationalStatus,
+            screeningStatus: preview.participantOperationalContext.screeningStatus
+          }
+        };
+
+        await tx.studyParticipant.update?.({
+          data: statusChange.after,
+          where: { id: preview.participant.studyParticipantId }
+        });
+
         const report: DuplicateScreeningAttemptCleanupReport = {
           attemptId: input.attemptId,
           deletedAt: new Date(),
@@ -239,6 +275,7 @@ export function createDuplicateScreeningAttemptCleanupRepository(
           folioReleased: preview.confirmation?.folio ?? null,
           participantProfileId: preview.participant.id,
           reason: input.reason,
+          statusChange,
           studyId: preview.study.id,
           studyParticipantId: preview.participant.studyParticipantId
         };
@@ -249,7 +286,8 @@ export function createDuplicateScreeningAttemptCleanupRepository(
             actorUserId: input.actorUserId,
             afterJson: toAuditJson({
               deletionType: "DUPLICATE_SCREENING_ATTEMPT",
-              report
+              report,
+              statusChange
             }),
             beforeJson: toAuditJson(preview),
             entityId: input.attemptId,
@@ -452,6 +490,7 @@ async function buildDuplicateAttemptCleanupPreview(
     review: attempt.participantScreeningReview ? 1 : 0
   };
   const blockers = buildDuplicateAttemptCleanupBlockers({ confirmation, counts });
+  const projectedStatus = await recalculateParticipantScreeningStatus(prisma, attempt.studyParticipantId, attempt.id);
 
   return {
     attempt: {
@@ -478,9 +517,185 @@ async function buildDuplicateAttemptCleanupPreview(
       operationalStatus: attempt.studyParticipant.operationalStatus,
       screeningStatus: attempt.studyParticipant.screeningStatus
     },
+    projectedParticipantOperationalContext: {
+      activeConfirmationFolio: projectedStatus.activeConfirmationFolio,
+      operationalStatus: projectedStatus.operationalStatus,
+      screeningStatus: projectedStatus.screeningStatus
+    },
     requiresFolioReleaseConfirmation: Boolean(confirmation),
     review: attempt.participantScreeningReview,
     study: attempt.questionnaireVersion.study
+  };
+}
+
+type ParticipantStatusProjection = {
+  activeConfirmationFolio: string | null;
+  operationalStatus: string;
+  screeningStatus: string;
+};
+
+type RecalculateStudyParticipantRecord = {
+  applicationStartedAt?: Date | null;
+  accessTokens?: Array<{ id: string }>;
+  activities?: Array<{ id: string; status: string }>;
+  ctlSessions?: Array<{ id: string; status: string }>;
+  hutParticipant?: { id: string } | null;
+  participantConfirmation: {
+    folio: string;
+    screeningAttempt: {
+      status: string;
+    };
+    screeningAttemptId: string;
+  } | null;
+  participantScreeningReviews: Array<{
+    screeningAttemptId: string | null;
+    status: string;
+  }>;
+  screeningAttempts: Array<{
+    id: string;
+    status: string;
+  }>;
+};
+
+async function recalculateParticipantScreeningStatus(
+  prisma: DuplicateAttemptCleanupPrisma,
+  studyParticipantId: string,
+  excludedAttemptId?: string
+): Promise<ParticipantStatusProjection> {
+  const screeningAttemptsSelection = excludedAttemptId
+    ? {
+        select: {
+          id: true,
+          status: true
+        },
+        where: { id: { not: excludedAttemptId } }
+      }
+    : {
+        select: {
+          id: true,
+          status: true
+        }
+      };
+  const participant = (await prisma.studyParticipant.findUnique?.({
+    select: {
+      accessTokens: {
+        select: {
+          id: true
+        }
+      },
+      applicationStartedAt: true,
+      activities: {
+        select: {
+          id: true,
+          status: true
+        }
+      },
+      ctlSessions: {
+        select: {
+          id: true,
+          status: true
+        }
+      },
+      hutParticipant: {
+        select: {
+          id: true
+        }
+      },
+      participantConfirmation: {
+        select: {
+          folio: true,
+          screeningAttempt: {
+            select: {
+              status: true
+            }
+          },
+          screeningAttemptId: true
+        }
+      },
+      participantScreeningReviews: {
+        select: {
+          screeningAttemptId: true,
+          status: true
+        }
+      },
+      screeningAttempts: screeningAttemptsSelection
+    },
+    where: { id: studyParticipantId }
+  })) as RecalculateStudyParticipantRecord | null;
+
+  if (!participant) {
+    return {
+      activeConfirmationFolio: null,
+      operationalStatus: "SCREENING_STARTED",
+      screeningStatus: "INCOMPLETE"
+    };
+  }
+
+  const confirmation = participant.participantConfirmation;
+  if (confirmation?.screeningAttempt.status === "PASSED") {
+    const approvedReview = participant.participantScreeningReviews.some(
+      (review) => review.screeningAttemptId === confirmation.screeningAttemptId && review.status === "APPROVED"
+    );
+    const hasDownstreamProgress = Boolean(
+      participant.applicationStartedAt ||
+        participant.ctlSessions?.length ||
+        participant.accessTokens?.length ||
+        participant.activities?.length ||
+        participant.hutParticipant
+    );
+
+    return {
+      activeConfirmationFolio: confirmation.folio,
+      operationalStatus: hasDownstreamProgress && approvedReview ? "IN_PROGRESS" : "SCREENING_PASSED",
+      screeningStatus: "PASSED"
+    };
+  }
+
+  const statuses = participant.screeningAttempts.map((attempt) => attempt.status);
+  if (statuses.includes("PASSED")) {
+    return {
+      activeConfirmationFolio: confirmation?.folio ?? null,
+      operationalStatus: "SCREENING_PASSED",
+      screeningStatus: "PASSED"
+    };
+  }
+
+  if (statuses.includes("PENDING_REVIEW")) {
+    return {
+      activeConfirmationFolio: confirmation?.folio ?? null,
+      operationalStatus: "SCREENING_STARTED",
+      screeningStatus: "PENDING_REVIEW"
+    };
+  }
+
+  if (statuses.includes("STARTED")) {
+    return {
+      activeConfirmationFolio: confirmation?.folio ?? null,
+      operationalStatus: "SCREENING_STARTED",
+      screeningStatus: "STARTED"
+    };
+  }
+
+  if (statuses.includes("INCOMPLETE")) {
+    return {
+      activeConfirmationFolio: confirmation?.folio ?? null,
+      operationalStatus: "SCREENING_STARTED",
+      screeningStatus: "INCOMPLETE"
+    };
+  }
+
+  if (statuses.includes("TERMINATED")) {
+    return {
+      activeConfirmationFolio: confirmation?.folio ?? null,
+      operationalStatus: "SCREENING_TERMINATED",
+      screeningStatus: "TERMINATED"
+    };
+  }
+
+  return {
+    activeConfirmationFolio: confirmation?.folio ?? null,
+    operationalStatus: "SCREENING_STARTED",
+    screeningStatus: "INCOMPLETE"
   };
 }
 

@@ -327,6 +327,9 @@ export function DuplicateAttemptCleanupPanel({
   preview: DuplicateScreeningAttemptCleanupPreview;
 }) {
   const hasBlockers = preview.blockers.length > 0;
+  const statusWillChange =
+    preview.participantOperationalContext.screeningStatus !== preview.projectedParticipantOperationalContext.screeningStatus ||
+    preview.participantOperationalContext.operationalStatus !== preview.projectedParticipantOperationalContext.operationalStatus;
 
   return (
     <section id="eliminar-intento-duplicado" className="scroll-mt-24 rounded-lg border border-rose-200 bg-white p-5 shadow-sm">
@@ -375,6 +378,25 @@ export function DuplicateAttemptCleanupPanel({
         <SummaryItem label="HUT asociado" value={String(preview.counts.hutParticipantsForParticipant)} />
         <SummaryItem label="Inicio" value={formatDate(preview.attempt.startedAt)} />
       </dl>
+
+      <div className="mt-4 rounded-md border border-zinc-200 bg-zinc-50 p-4">
+        <h3 className="text-sm font-semibold text-zinc-900">Estado agregado del participante</h3>
+        <dl className="mt-3 grid gap-3 text-sm md:grid-cols-2">
+          <SummaryItem
+            label="Antes de limpiar"
+            value={`${preview.participantOperationalContext.screeningStatus} / ${preview.participantOperationalContext.operationalStatus}`}
+          />
+          <SummaryItem
+            label="Despues de limpiar"
+            value={`${preview.projectedParticipantOperationalContext.screeningStatus} / ${preview.projectedParticipantOperationalContext.operationalStatus}`}
+          />
+        </dl>
+        {statusWillChange ? (
+          <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">
+            Al eliminar este intento, el sistema recalculara el estado agregado del participante.
+          </p>
+        ) : null}
+      </div>
 
       {preview.evidence.length > 0 ? (
         <div className="mt-4 rounded-md border border-zinc-200 bg-white p-4">
