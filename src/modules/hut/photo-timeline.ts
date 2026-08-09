@@ -245,7 +245,12 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
   const now = input.now ?? new Date();
 
   return preliminarySlots.map((slot) => {
-    const availableAt = scheduledAvailability.get(slot.id) ?? input.nextAvailableAt ?? null;
+    const isCurrentPendingSlot = Boolean(slot.participantTask && !slot.evidence && slot.id === availableSlotId);
+    const scheduledAvailableAt = !input.testMode && isCurrentPendingSlot
+      ? scheduledAvailability.get(slot.id) ?? input.nextAvailableAt ?? null
+      : null;
+    const isWaitingForSchedule = Boolean(scheduledAvailableAt && now.getTime() < scheduledAvailableAt.getTime());
+    const availableAt = isWaitingForSchedule ? scheduledAvailableAt : null;
     const slotWithAvailability = {
       ...slot,
       availableAt,
@@ -269,7 +274,7 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
     }
     if (slotWithAvailability.id === availableSlotId) {
       blockedByPrevious = true;
-      if (availableAt && now.getTime() < availableAt.getTime()) {
+      if (isWaitingForSchedule) {
         return { ...slotWithAvailability, status: "PROGRAMMED" };
       }
       return { ...slotWithAvailability, status: "AVAILABLE" };

@@ -310,9 +310,18 @@ describe("HutPhotoTimeline", () => {
     });
 
     expect(timeline.find((slot) => slot.id === "PRODUCT_1_DAY_1")?.status).toBe("COMPLETED");
+    expect(timeline.find((slot) => slot.id === "PRODUCT_1_DAY_1")).toMatchObject({
+      availableAt: null,
+      availableDate: null
+    });
     expect(timeline.find((slot) => slot.id === "PRODUCT_1_DAY_2")).toMatchObject({
       availableDate: "10/08/2026, 04:00 hrs CDMX",
       status: "PROGRAMMED"
+    });
+    expect(timeline.find((slot) => slot.id === "PRODUCT_1_DAY_3_MORNING")).toMatchObject({
+      availableAt: null,
+      availableDate: null,
+      status: "BLOCKED"
     });
   });
 
@@ -340,8 +349,14 @@ describe("HutPhotoTimeline", () => {
     });
 
     expect(timeline.find((slot) => slot.id === "PRODUCT_1_DAY_2")).toMatchObject({
-      availableDate: "10/08/2026, 04:00 hrs CDMX",
+      availableAt: null,
+      availableDate: null,
       status: "AVAILABLE"
+    });
+    expect(timeline.find((slot) => slot.id === "PRODUCT_1_DAY_3_MORNING")).toMatchObject({
+      availableAt: null,
+      availableDate: null,
+      status: "BLOCKED"
     });
   });
 
@@ -371,6 +386,63 @@ describe("HutPhotoTimeline", () => {
     expect(timeline.find((slot) => slot.id === "PRODUCT_1_DAY_2")).toMatchObject({
       availableDate: "10/08/2026, 04:00 hrs CDMX",
       status: "PROGRAMMED"
+    });
+  });
+
+  it("applies the same 4 a.m. schedule to product 2 follow-up photos", () => {
+    const timeline = buildHutPhotoTimeline({
+      dailyEntries: [
+        {
+          capturedAt: new Date("2026-08-09T15:00:00.000Z"),
+          capturedLocalDate: "2026-08-09",
+          productCode: null,
+          useDayNumber: 0
+        },
+        {
+          capturedAt: new Date("2026-08-09T16:00:00.000Z"),
+          capturedLocalDate: "2026-08-09",
+          productCode: "247",
+          useDayNumber: 1
+        },
+        {
+          capturedAt: new Date("2026-08-10T10:10:00.000Z"),
+          capturedLocalDate: "2026-08-10",
+          productCode: "247",
+          useDayNumber: 2
+        },
+        {
+          capturedAt: new Date("2026-08-11T10:10:00.000Z"),
+          capturedLocalDate: "2026-08-11",
+          productCode: "247",
+          useDayNumber: 3
+        },
+        {
+          capturedAt: new Date("2026-08-12T16:00:00.000Z"),
+          capturedLocalDate: "2026-08-12",
+          productCode: "583",
+          useDayNumber: 4
+        }
+      ],
+      now: new Date("2026-08-12T18:00:00.000Z"),
+      rotation: {
+        eva1: "247",
+        eva2: "583"
+      }
+    });
+
+    expect(timeline.find((slot) => slot.id === "PRODUCT_2_DAY_1")).toMatchObject({
+      availableAt: null,
+      availableDate: null,
+      status: "COMPLETED"
+    });
+    expect(timeline.find((slot) => slot.id === "PRODUCT_2_DAY_2")).toMatchObject({
+      availableDate: "13/08/2026, 04:00 hrs CDMX",
+      status: "PROGRAMMED"
+    });
+    expect(timeline.find((slot) => slot.id === "PRODUCT_2_DAY_3_MORNING")).toMatchObject({
+      availableAt: null,
+      availableDate: null,
+      status: "BLOCKED"
     });
   });
 
