@@ -503,21 +503,22 @@ function HutQuestionInput({
     );
   }
   if (question.type === "SELECT") {
-    const selectedValue = answer == null ? "" : String(answer);
+    const selectedValues = Array.isArray(answer) ? answer.map(String) : answer == null ? [] : [String(answer)];
     return (
       <div className="space-y-3">
         {question.options.map((option) => (
           <label className="block" key={option.value}>
             <input
               className="peer sr-only"
-              defaultChecked={selectedValue === option.value}
+              defaultChecked={selectedValues.includes(option.value)}
               name={question.code}
               required={question.required}
-              type="radio"
+              type={question.multiple ? "checkbox" : "radio"}
               value={option.value}
             />
             <span className={optionCardClass}>
-              {resolveHutQuestionText(option.label, workspace)}
+              <span>{resolveHutQuestionText(option.label, workspace)}</span>
+              {option.followUpPrompt ? <span className="text-xs font-medium text-zinc-500">{option.followUpPrompt}</span> : null}
             </span>
           </label>
         ))}
@@ -550,12 +551,40 @@ function HutQuestionInput({
     );
   }
   if (question.type !== "MATRIX") {
-    return null;
+    if (question.type !== "RANKING") {
+      return null;
+    }
+
+    const rankingAnswer = answer && typeof answer === "object" ? answer as Record<string, unknown> : {};
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: question.maxRank }, (_, index) => String(index + 1)).map((rank) => (
+          <label className="block" key={`${question.code}-${rank}`}>
+            <span className="text-sm font-semibold text-zinc-900">Lugar {rank}</span>
+            <select
+              className="mt-2 min-h-12 w-full rounded-md border border-zinc-300 px-4 py-3 text-base"
+              defaultValue={rankingAnswer[rank] == null ? "" : String(rankingAnswer[rank])}
+              name={`${question.code}.${rank}`}
+              required={question.required}
+            >
+              <option value="">Selecciona una opcion</option>
+              {question.options.map((option) => (
+                <option key={`${rank}-${option.value}`} value={option.value}>
+                  {option.value} - {resolveHutQuestionText(option.label, workspace)}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+      </div>
+    );
   }
 
+  const rows = orderedMatrixRows(question, workspace);
   return (
     <div className="space-y-4">
-      {question.rows.map((row) => (
+      {question.randomizeRows ? <input name={`${question.code}.__rowOrder`} type="hidden" value={rows.map((row) => row.code).join("|")} /> : null}
+      {rows.map((row) => (
         <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3" key={row.code}>
           <p className="text-sm font-semibold text-zinc-900">{resolveHutQuestionText(row.label, workspace)}</p>
           <div className="mt-3 space-y-2">
@@ -594,11 +623,12 @@ function nextQuestionAfterCurrent({
   questions: HutQuestionDefinition[];
 }) {
   const currentIndex = questions.findIndex((question) => question.code === currentCode);
-  const remainingQuestions = currentIndex >= 0 ? questions.slice(currentIndex + 1) : questions;
+  const currentSection = currentIndex >= 0 ? questions[currentIndex]?.section : null;
+  const sectionQuestions = currentSection ? questions.filter((question) => question.section === currentSection) : questions;
+  const sectionIndex = sectionQuestions.findIndex((question) => question.code === currentCode);
+  const remainingQuestions = sectionIndex >= 0 ? sectionQuestions.slice(sectionIndex + 1) : sectionQuestions;
   return remainingQuestions.find((question) => question.required && !(question.code in answers))
     ?? remainingQuestions.find((question) => !(question.code in answers))
-    ?? questions.find((question) => question.required && !(question.code in answers))
-    ?? questions.find((question) => !(question.code in answers))
     ?? null;
 }
 
@@ -692,6 +722,23 @@ function fieldTimelineStatusLabel(slot: HutPhotoTimelineSlot): string {
 
 function scaleLabel(question: Extract<HutQuestionDefinition, { type: "SCALE" }>, value: number): string {
   return question.labels?.[value] ?? `Punto ${value}`;
+}
+
+function orderedMatrixRows(question: Extract<HutQuestionDefinition, { type: "MATRIX" }>, workspace: HutFieldQuestionnaireWorkspace) {
+  if (!question.randomizeRows) {
+    return question.rows;
+  }
+
+  const seed = `${workspace.participant.id}:${question.code}`;
+  return [...question.rows].sort((left, right) => stableHash(`${seed}:${left.code}`) - stableHash(`${seed}:${right.code}`));
+}
+
+function stableHash(value: string): number {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
 }
 
 function matrixAnswerValue(answer: unknown, rowCode: string): string {

@@ -88,12 +88,12 @@ describe("FieldHutPage", () => {
     }));
 
     expect(screen.getByRole("heading", { name: /Que tanto le gusto el primer perfume/i })).toBeInTheDocument();
-    expect(screen.getByText("Primer perfume HUT:")).toBeInTheDocument();
+    expect(screen.getByText("Producto 1:")).toBeInTheDocument();
     expect(screen.getAllByText("247").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Modo prueba activo/)).toBeInTheDocument();
-    expect(screen.getByText("Me disgusta muchisimo")).toBeInTheDocument();
-    expect(screen.getByText("Me gusta mucho")).toBeInTheDocument();
-    const selectedScaleOption = screen.getByRole("radio", { name: /Me gusta mucho/i });
+    expect(screen.getByText("Le disgusto muchisimo")).toBeInTheDocument();
+    expect(screen.getByText("Le gusto muchisimo")).toBeInTheDocument();
+    const selectedScaleOption = screen.getByRole("radio", { name: /Le gusto mucho/i });
     expect(selectedScaleOption).toBeChecked();
     expect(selectedScaleOption.closest("div")).toHaveClass("space-y-3");
     expect(screen.getByRole("button", { name: "Guardar y continuar" })).toBeInTheDocument();

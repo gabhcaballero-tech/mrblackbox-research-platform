@@ -544,6 +544,55 @@ describe("navigo app MVP rules", () => {
     });
   });
 
+  it("keeps later measurements blocked while the previous measurement is pending even if they are out of window", () => {
+    const timeline = buildNavigoActivityTimeline({
+      activities: navigoActivityRecords(),
+      now: new Date("2026-06-26T01:10:00.000Z")
+    });
+
+    expect(timeline.find((activity) => activity.code === "T4_5_HORAS")?.availability).toMatchObject({
+      blockedByCode: "T3_HORAS",
+      canCapture: false,
+      reason: "PREVIOUS_REQUIRED"
+    });
+  });
+
+  it("continues a reopened out-of-window sequence after the reopened measurement is completed", () => {
+    const timeline = buildNavigoActivityTimeline({
+      activities: navigoActivityRecords({
+        t3Completed: true,
+        t3ReopenedAt: new Date("2026-06-26T01:05:00.000Z")
+      }),
+      now: new Date("2026-06-26T01:10:00.000Z")
+    });
+
+    expect(timeline.find((activity) => activity.code === "T4_5_HORAS")?.availability).toMatchObject({
+      canCapture: true,
+      reason: "AVAILABLE_OVERRIDE"
+    });
+    expect(timeline.find((activity) => activity.code === "T6_HORAS")?.availability).toMatchObject({
+      blockedByCode: "T4_5_HORAS",
+      canCapture: false,
+      reason: "PREVIOUS_REQUIRED"
+    });
+  });
+
+  it("continues the reopened recovery chain through T6 after T4.5 is completed", () => {
+    const timeline = buildNavigoActivityTimeline({
+      activities: navigoActivityRecords({
+        t3Completed: true,
+        t3ReopenedAt: new Date("2026-06-26T01:05:00.000Z"),
+        t45Completed: true
+      }),
+      now: new Date("2026-06-26T01:10:00.000Z")
+    });
+
+    expect(timeline.find((activity) => activity.code === "T6_HORAS")?.availability).toMatchObject({
+      canCapture: true,
+      reason: "AVAILABLE_OVERRIDE"
+    });
+  });
+
   it("validates complete AP1 to AP7 answers and rejects incomplete submissions", () => {
     const complete = validateNavigoMeasurementAnswers({
       input: {

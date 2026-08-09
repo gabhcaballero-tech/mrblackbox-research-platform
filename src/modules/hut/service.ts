@@ -171,7 +171,11 @@ export function hutLocalDateKey(date: Date, timeZoneIana = "America/Mexico_City"
 
 export type HutAnswerInput = Record<
   string,
-  FormDataEntryValue | Record<string, FormDataEntryValue | null | undefined> | null | undefined
+  | FormDataEntryValue
+  | FormDataEntryValue[]
+  | Record<string, FormDataEntryValue | null | undefined>
+  | null
+  | undefined
 >;
 
 export type HutAnswerDraft = {
@@ -294,7 +298,14 @@ export function hutFormDataToAnswerInput(formData: FormData): HutAnswerInput {
     const separatorIndex = key.indexOf(".");
 
     if (separatorIndex === -1) {
-      input[key] = value;
+      const current = input[key];
+      if (Array.isArray(current)) {
+        current.push(value);
+      } else if (current) {
+        input[key] = [current as FormDataEntryValue, value];
+      } else {
+        input[key] = value;
+      }
       continue;
     }
 
@@ -332,6 +343,10 @@ function parseHutAnswerForQuestion(input: HutAnswerInput, question: HutQuestionD
     return parseHutMatrixAnswer(input[question.code], question);
   }
 
+  if (question.type === "RANKING") {
+    return parseHutRankingAnswer(input[question.code], question);
+  }
+
   const rawValue = input[question.code];
   const normalized = question.type === "SELECT" || question.type === "SCALE"
     ? normalizeHutAnswerCode(rawValue)
@@ -343,6 +358,25 @@ function parseHutAnswerForQuestion(input: HutAnswerInput, question: HutQuestionD
 
   if (question.type === "SELECT") {
     const allowedValues = new Set(question.options.map((option) => normalizeHutAnswerCode(option.value)));
+
+    if (question.multiple) {
+      const rawValues = Array.isArray(rawValue) ? rawValue : [rawValue];
+      const values = rawValues.map(normalizeHutAnswerCode).filter(Boolean);
+
+      if (values.length === 0) {
+        return { answerValue: null, empty: true, ok: true };
+      }
+
+      if (values.some((value) => !allowedValues.has(value))) {
+        return {
+          message: "Selecciona una opcion valida.",
+          missingQuestionCodes: [question.code],
+          ok: false
+        };
+      }
+
+      return { answerValue: values, empty: false, ok: true };
+    }
 
     if (!allowedValues.has(normalized)) {
       return {
@@ -370,6 +404,63 @@ function parseHutAnswerForQuestion(input: HutAnswerInput, question: HutQuestionD
   }
 
   return { answerValue: normalized, empty: false, ok: true };
+}
+
+function parseHutRankingAnswer(
+  rawValue: HutAnswerInput[string],
+  question: Extract<HutQuestionDefinition, { type: "RANKING" }>
+):
+  | {
+      answerValue: Record<string, string>;
+      empty: boolean;
+      ok: true;
+    }
+  | {
+      message: string;
+      missingQuestionCodes: string[];
+      ok: false;
+    } {
+  const rawRanks = isHutMatrixValueRecord(rawValue)
+    ? rawValue as Record<string, FormDataEntryValue | null | undefined>
+    : {};
+  const allowedValues = new Set(question.options.map((option) => normalizeHutAnswerCode(option.value)));
+  const answerValue: Record<string, string> = {};
+  const usedRanks = new Set<string>();
+
+  for (const rank of Array.from({ length: question.maxRank }, (_, index) => String(index + 1))) {
+    const normalized = normalizeHutAnswerCode(rawRanks[rank]);
+    if (!normalized) {
+      if (question.required) {
+        return {
+          message: "Completa todos los lugares del ranking.",
+          missingQuestionCodes: [`${question.code}.${rank}`],
+          ok: false
+        };
+      }
+      continue;
+    }
+
+    if (!allowedValues.has(normalized)) {
+      return {
+        message: "Selecciona una opcion valida.",
+        missingQuestionCodes: [`${question.code}.${rank}`],
+        ok: false
+      };
+    }
+
+    if (usedRanks.has(normalized)) {
+      return {
+        message: "No repitas opciones en el ranking.",
+        missingQuestionCodes: [`${question.code}.${rank}`],
+        ok: false
+      };
+    }
+
+    answerValue[rank] = normalized;
+    usedRanks.add(normalized);
+  }
+
+  return { answerValue, empty: Object.keys(answerValue).length === 0, ok: true };
 }
 
 function parseHutMatrixAnswer(
@@ -414,6 +505,11 @@ function parseHutMatrixAnswer(
     answerValue[row.code] = normalized;
   }
 
+  const rowOrder = normalizeHutText(rawRows.__rowOrder);
+  if (question.randomizeRows && rowOrder) {
+    answerValue.__rowOrder = rowOrder;
+  }
+
   if (missingRows.length > 0) {
     return {
       message: "Responde las preguntas obligatorias antes de continuar.",
@@ -430,12 +526,22 @@ function parseHutMatrixAnswer(
 }
 
 function normalizeHutAnswerCode(value: unknown): string {
-  return String(value ?? "")
+  const normalized = String(value ?? "")
     .normalize("NFC")
     .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
     .trim()
     .replace(/\s+/g, "")
     .toUpperCase();
+
+  if (normalized === "SI" || normalized === "SÍ") {
+    return "1";
+  }
+
+  if (normalized === "NO") {
+    return "2";
+  }
+
+  return normalized;
 }
 
 function isHutMatrixValueRecord(value: unknown): value is Record<string, FormDataEntryValue | null | undefined> {

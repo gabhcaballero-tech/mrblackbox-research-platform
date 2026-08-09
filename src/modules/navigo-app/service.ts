@@ -902,7 +902,7 @@ function getNavigoActivityAvailability({
   }
 
   if (now.getTime() > activity.availableUntil.getTime()) {
-    if (activity.reopenedAt) {
+    if (activity.reopenedAt || hasCompletedReopenExceptionChain(previousActivities)) {
       return {
         canCapture: true,
         label: "Disponible",
@@ -924,6 +924,15 @@ function getNavigoActivityAvailability({
     label: minutesUntilClose <= 60 ? "Proxima a vencer" : "Disponible",
     reason: minutesUntilClose <= 60 ? "DUE_SOON" : "AVAILABLE"
   };
+}
+
+function hasCompletedReopenExceptionChain(previousActivities: NavigoActivityTimelineItem[]): boolean {
+  if (previousActivities.length === 0) {
+    return false;
+  }
+
+  return previousActivities.some((activity) => Boolean(activity.reopenedAt)) &&
+    previousActivities.every((activity) => activity.status === "COMPLETED");
 }
 
 function hasBlockingIdentityIssue(activities: Array<Pick<NavigoActivityRecord, "code" | "identityReviewStatus" | "identityStatus" | "selfieCount">>): boolean {

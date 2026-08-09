@@ -20,10 +20,73 @@ import {
   parseHutRegistrationSlotImportText
 } from ".";
 import type { OneuiWhatsAppMessageRecord, OneuiWhatsAppRepository } from "@/modules/oneui-whatsapp";
+import type { HutQuestionDefinition } from ".";
 import type { HutStorageClient } from "./storage";
 
 function readWorkspaceFile(...segments: string[]) {
   return readFileSync(join(process.cwd(), ...segments), "utf8");
+}
+
+function createCompleteHutV5FormData({ participantOrigin }: { participantOrigin: "CLT_HUT" | "HUT_DIRECTO" }) {
+  const formData = new FormData();
+  const context = { participantOrigin };
+
+  for (let pass = 0; pass < 4; pass += 1) {
+    const input = hutFormDataToAnswerInput(formData);
+    for (const question of getHutApplicableQuestions({ answers: input, context })) {
+      if (!question.required || formData.has(question.code)) {
+        continue;
+      }
+
+      setDefaultHutAnswer(formData, question, participantOrigin);
+    }
+  }
+
+  return formData;
+}
+
+function setDefaultHutAnswer(
+  formData: FormData,
+  question: HutQuestionDefinition,
+  participantOrigin: "CLT_HUT" | "HUT_DIRECTO"
+) {
+  if (question.code === "HUT_PARTICIPO_CLT") {
+    formData.set(question.code, participantOrigin === "CLT_HUT" ? "1" : "2");
+    return;
+  }
+
+  if (question.type === "SHORT_TEXT" || question.type === "LONG_TEXT") {
+    formData.set(question.code, `${question.code} respuesta`);
+    return;
+  }
+
+  if (question.type === "SCALE") {
+    formData.set(question.code, String(question.min));
+    return;
+  }
+
+  if (question.type === "SELECT") {
+    const option = question.options.find((candidate) => !candidate.terminates) ?? question.options[0];
+    if (question.multiple) {
+      formData.append(question.code, option?.value ?? "1");
+    } else {
+      formData.set(question.code, option?.value ?? "1");
+    }
+    return;
+  }
+
+  if (question.type === "RANKING") {
+    question.options.slice(0, question.maxRank).forEach((option, index) => {
+      formData.set(`${question.code}.${index + 1}`, option.value);
+    });
+    return;
+  }
+
+  if (question.type === "MATRIX") {
+    question.rows.forEach((row) => {
+      formData.set(`${question.code}.${row.code}`, String(question.columns[0]?.value ?? "1"));
+    });
+  }
 }
 
 describe("HUT module foundation", () => {
@@ -417,39 +480,25 @@ describe("HUT module foundation", () => {
     });
 
     expect(cltParticipantQuestions.map((question) => question.code)).not.toContain("HUT_F1_GENERO");
-    expect(cltParticipantQuestions.map((question) => question.code)).not.toContain("HUT_F2_EDAD");
+    expect(cltParticipantQuestions.map((question) => question.code)).not.toContain("HUT_F2_EDAD_EXACTA");
+    expect(cltParticipantQuestions.map((question) => question.code)).toContain("HUT_F6_PRODUCTOS_7_DIAS");
+    expect(cltParticipantQuestions.map((question) => question.code)).toContain("HUT_F20_TIEMPO_USO_MARCA");
+    expect(cltParticipantQuestions.map((question) => question.code)).toContain("HUT_F22_IMPORTANCIA_PERFUME");
     expect(directParticipantQuestions.map((question) => question.code)).toContain("HUT_F1_GENERO");
-    expect(directParticipantQuestions.map((question) => question.code)).toContain("HUT_F2_EDAD");
+    expect(directParticipantQuestions.map((question) => question.code)).toContain("HUT_F2_EDAD_EXACTA");
   });
 
   it("defaults HUT filter visibility from participant origin when the operational answer is not present yet", () => {
     const cltParticipantQuestions = getHutApplicableQuestions({ context: { participantOrigin: "CLT_HUT" } });
     const directParticipantQuestions = getHutApplicableQuestions({ context: { participantOrigin: "HUT_DIRECTO" } });
 
-    expect(cltParticipantQuestions.map((question) => question.code)).not.toContain("HUT_F3_USO_PERFUME");
-    expect(directParticipantQuestions.map((question) => question.code)).toContain("HUT_F3_USO_PERFUME");
+    expect(cltParticipantQuestions.map((question) => question.code)).not.toContain("HUT_F10_MARCAS_UTILIZA");
+    expect(directParticipantQuestions.map((question) => question.code)).toContain("HUT_F10_MARCAS_UTILIZA");
   });
 
   it("validates HUT v5 select, scale and matrix answers", () => {
-    const formData = new FormData();
-    formData.set("HUT_PARTICIPO_CLT", "NO");
-    formData.set("HUT_DG_NOMBRE", "Participante Uno");
-    formData.set("HUT_DG_FOLIO", "NAV-001");
-    formData.set("HUT_F1_GENERO", "HOMBRE");
-    formData.set("HUT_F2_EDAD", "35");
-    formData.set("HUT_F3_USO_PERFUME", "Marca A");
-    formData.set("HUT_V1_CONFIRMACION_ENTREGA", "SI");
+    const formData = createCompleteHutV5FormData({ participantOrigin: "HUT_DIRECTO" });
     formData.set("HUT_EVA1_GUSTO", "7");
-    formData.set("HUT_EVA1_ATRIBUTOS.AGRADABLE", "5");
-    formData.set("HUT_EVA1_ATRIBUTOS.DURADERO", "4");
-    formData.set("HUT_EVA1_ATRIBUTOS.ADECUADO_PARA_MI", "3");
-    formData.set("HUT_V2_CONFIRMACION_ENTREGA", "SI");
-    formData.set("HUT_EVA2_GUSTO", "6");
-    formData.set("HUT_EVA2_ATRIBUTOS.AGRADABLE", "5");
-    formData.set("HUT_EVA2_ATRIBUTOS.DURADERO", "4");
-    formData.set("HUT_EVA2_ATRIBUTOS.ADECUADO_PARA_MI", "3");
-    formData.set("HUT_COMP_PREFERENCIA", "EVA1");
-    formData.set("HUT_COMP_RAZONES", "Le gusto mas");
 
     const result = parseHutQuestionnaireAnswers(
       hutFormDataToAnswerInput(formData),
@@ -460,10 +509,9 @@ describe("HUT module foundation", () => {
     expect(result.ok).toBe(true);
     expect(result.ok ? result.answers.find((answer) => answer.questionCode === "HUT_EVA1_GUSTO")?.answerValue : null).toBe(7);
     expect(result.ok ? result.answers.find((answer) => answer.questionCode === "HUT_EVA1_ATRIBUTOS")?.answerValue : null)
-      .toEqual({
-        ADECUADO_PARA_MI: "3",
-        AGRADABLE: "5",
-        DURADERO: "4"
+      .toMatchObject({
+        AROMA_AGRADABLE: "1",
+        AROMA_DURADERO: "1"
       });
   });
 
@@ -471,8 +519,7 @@ describe("HUT module foundation", () => {
     const invalidScale = parseHutQuestionAnswer("HUT_EVA1_GUSTO", { HUT_EVA1_GUSTO: "8" });
     const missingMatrixRow = parseHutQuestionAnswer("HUT_EVA1_ATRIBUTOS", {
       HUT_EVA1_ATRIBUTOS: {
-        AGRADABLE: "5",
-        DURADERO: "4"
+        AROMA_AGRADABLE: "5"
       }
     });
 
@@ -481,7 +528,15 @@ describe("HUT module foundation", () => {
       ok: false
     });
     expect(missingMatrixRow).toMatchObject({
-      missingQuestionCodes: ["HUT_EVA1_ATRIBUTOS.ADECUADO_PARA_MI"],
+      missingQuestionCodes: [
+        "HUT_EVA1_ATRIBUTOS.AROMA_DURADERO",
+        "HUT_EVA1_ATRIBUTOS.ENVASE_COMODO",
+        "HUT_EVA1_ATRIBUTOS.INTENSIDAD_ADECUADA",
+        "HUT_EVA1_ATRIBUTOS.DIRECCION_FACIL",
+        "HUT_EVA1_ATRIBUTOS.CANTIDAD_FACIL",
+        "HUT_EVA1_ATRIBUTOS.SEGURIDAD",
+        "HUT_EVA1_ATRIBUTOS.AROMA_UNICO"
+      ],
       ok: false
     });
   });
@@ -573,9 +628,14 @@ describe("HUT module foundation", () => {
     const matrix = await repository.saveQuestionnaireAnswer({
       answerInput: {
         HUT_EVA1_ATRIBUTOS: {
-          ADECUADO_PARA_MI: "3",
-          AGRADABLE: "5",
-          DURADERO: "4"
+          AROMA_AGRADABLE: "5",
+          AROMA_DURADERO: "4",
+          AROMA_UNICO: "5",
+          CANTIDAD_FACIL: "4",
+          DIRECCION_FACIL: "5",
+          ENVASE_COMODO: "4",
+          INTENSIDAD_ADECUADA: "5",
+          SEGURIDAD: "4"
         }
       },
       participantId,
@@ -594,10 +654,9 @@ describe("HUT module foundation", () => {
     expect(matrix.ok).toBe(true);
     expect(prisma.state.answers.filter((answer) => answer.questionCode === "HUT_EVA1_GUSTO")).toHaveLength(1);
     expect(prisma.state.answers.find((answer) => answer.questionCode === "HUT_EVA1_GUSTO")?.answerJson).toBe(7);
-    expect(prisma.state.answers.find((answer) => answer.questionCode === "HUT_EVA1_ATRIBUTOS")?.answerJson).toEqual({
-      ADECUADO_PARA_MI: "3",
-      AGRADABLE: "5",
-      DURADERO: "4"
+    expect(prisma.state.answers.find((answer) => answer.questionCode === "HUT_EVA1_ATRIBUTOS")?.answerJson).toMatchObject({
+      AROMA_AGRADABLE: "5",
+      AROMA_DURADERO: "4"
     });
   });
 
@@ -628,7 +687,8 @@ describe("HUT module foundation", () => {
       ok: false
     });
     expect(state.ok ? state.data.omittedQuestionCodes : []).toContain("HUT_F1_GENERO");
-    expect(state.ok ? state.data.applicableQuestionCodes : []).toContain("HUT_PARTICIPO_CLT");
+    expect(state.ok ? state.data.applicableQuestionCodes : []).toContain("HUT_F6_PRODUCTOS_7_DIAS");
+    expect(state.ok ? state.data.applicableQuestionCodes : []).not.toContain("HUT_PARTICIPO_CLT");
   });
 
   it("blocks a second HUT v5 application photo on the same Mexico City day", async () => {
