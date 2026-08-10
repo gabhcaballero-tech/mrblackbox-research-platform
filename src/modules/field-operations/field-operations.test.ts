@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createFieldOperationsRepository } from "./repository";
 import type { CltOperationsDetail } from "@/modules/clt-operations/types";
+import { hashCtlInterviewerCode } from "@/modules/ctl/service";
 
 const getCltDashboardMock = vi.hoisted(() => vi.fn());
 
@@ -43,6 +44,80 @@ describe("FieldOperationsRepository", () => {
     expect(dashboard.participants.find((participant) => participant.folio === "HUT-121")?.cltStatus).toBe("NO_DISPONIBLE");
     expect(dashboard.participants.find((participant) => participant.folio === "NAV-200")?.navigoActivities[0]?.code).toBe("T3_HORAS");
     expect(dashboard.participants.find((participant) => participant.folio === "NAV-046")?.hut.folio).toBe("HUT-046");
+  });
+
+  it("mantiene el filtro de encuestador para codigo operativo", async () => {
+    getCltDashboardMock.mockResolvedValue({
+      detail: null,
+      participants: [createDetail({ folio: "NAV-046", id: "ctl-both", participantId: "sp-both" })],
+      study: study()
+    });
+    const repository = createFieldOperationsRepository(createFakePrisma() as never);
+
+    const dashboard = await repository.getDashboard({
+      actorName: "Campo HUT",
+      actorRole: "INTERVIEWER",
+      interviewerCode: "JES26",
+      interviewerUserId: "field-code",
+      mode: "INTERVIEWER_CODE"
+    });
+
+    expect(dashboard.viewer).toMatchObject({
+      code: "JES26",
+      label: "Jesus",
+      mode: "INTERVIEWER_CODE"
+    });
+    expect(getCltDashboardMock).toHaveBeenCalledWith(expect.objectContaining({
+      ctlInterviewerCodeId: "code-jesus"
+    }));
+  });
+
+  it("permite a supervisor ver todos los participantes del estudio", async () => {
+    getCltDashboardMock.mockResolvedValue({
+      detail: null,
+      participants: [createDetail({ folio: "NAV-046", id: "ctl-both", participantId: "sp-both" })],
+      study: study()
+    });
+    const repository = createFieldOperationsRepository(createFakePrisma() as never);
+
+    const dashboard = await repository.getDashboard({
+      actorName: "Campo HUT",
+      actorRole: "INTERVIEWER",
+      interviewerCode: "SUP26",
+      interviewerUserId: "field-code",
+      mode: "SUPERVISOR_CODE"
+    });
+
+    expect(dashboard.viewer).toMatchObject({
+      code: "SUP26",
+      label: "Supervisor Campo",
+      mode: "SUPERVISOR_CODE"
+    });
+    expect(getCltDashboardMock).toHaveBeenCalledWith(expect.objectContaining({
+      ctlInterviewerCodeId: null
+    }));
+    expect(dashboard.participants.map((participant) => participant.folio).sort()).toEqual([
+      "HUT-121",
+      "NAV-046",
+      "NAV-200"
+    ]);
+  });
+
+  it("bloquea modo supervisor con codigo de encuestador", async () => {
+    const repository = createFieldOperationsRepository(createFakePrisma() as never);
+
+    const dashboard = await repository.getDashboard({
+      actorName: "Campo HUT",
+      actorRole: "INTERVIEWER",
+      interviewerCode: "JES26",
+      interviewerUserId: "field-code",
+      mode: "SUPERVISOR_CODE"
+    });
+
+    expect(dashboard.viewer).toMatchObject({
+      error: "El codigo de supervisor no es valido.",
+      mode: "CODE_REQUIRED"
+    });
   });
 });
 
@@ -89,6 +164,29 @@ function createFakePrisma() {
 
   return {
     ctlInterviewerCode: {
+      findFirst: async (args: { where?: { codeHash?: string } }) => {
+        if (args.where?.codeHash === hashCtlInterviewerCode("JES26")) {
+          return {
+            expiresAt: null,
+            id: "code-jesus",
+            label: "Jesus",
+            status: "ACTIVE",
+            study: study(),
+            studyId: "study-1"
+          };
+        }
+        if (args.where?.codeHash === hashCtlInterviewerCode("SUP26")) {
+          return {
+            expiresAt: null,
+            id: "code-supervisor",
+            label: "Supervisor Campo",
+            status: "ACTIVE",
+            study: study(),
+            studyId: "study-1"
+          };
+        }
+        return null;
+      },
       findMany: async () => []
     },
     hutParticipant: {

@@ -712,6 +712,10 @@ export type HutRepository = {
   saveQuestionnaireAnswer: (input: {
     answerInput: HutAnswerInput;
     actorUserId?: string | null;
+    fieldAccessAudit?: {
+      accessType: "ENCUESTADOR" | "SUPERVISOR";
+      code: string;
+    } | null;
     now?: Date;
     participantId: string;
     questionCode: string;
@@ -1815,6 +1819,12 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           }
         }
       });
+      const fieldAccessAudit = input.fieldAccessAudit
+        ? {
+            accessType: input.fieldAccessAudit.accessType,
+            codeMasked: maskFieldAccessCode(input.fieldAccessAudit.code)
+          }
+        : null;
 
       const termination = getHutQuestionTerminationDecision(question, parsed.answer.answerValue);
       if (termination.terminates) {
@@ -1833,6 +1843,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
             actorUserId: input.actorUserId ?? null,
             afterJson: toAuditJson({
               answerValue: parsed.answer.answerValue,
+              fieldAccess: fieldAccessAudit,
               questionCode: question.code,
               status: "TERMINATED",
               terminationReason: termination.reason
@@ -1856,6 +1867,24 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           message: "Respuesta HUT guardada. El participante no cumple el filtro para continuar.",
           ok: true
         };
+      }
+
+      if (fieldAccessAudit) {
+        await prisma.auditLog.create?.({
+          data: {
+            action: "PARTICIPANT_MODIFIED",
+            actorUserId: input.actorUserId ?? null,
+            afterJson: toAuditJson({
+              fieldAccess: fieldAccessAudit,
+              questionCode: question.code,
+              status: "ANSWER_SAVED"
+            }),
+            beforeJson: null,
+            entityId: participant.id,
+            entityType: "HutParticipant",
+            reason: "Captura HUT de campo"
+          }
+        });
       }
 
       return {
@@ -5347,6 +5376,15 @@ function participantOrigin(participant: Pick<HutParticipantRecord, "origin" | "s
 
 function toAuditJson(value: unknown): unknown {
   return JSON.parse(JSON.stringify(value));
+}
+
+function maskFieldAccessCode(code: string): string {
+  const normalized = code.trim().toUpperCase();
+  if (normalized.length <= 2) {
+    return normalized ? "**" : "";
+  }
+
+  return `${normalized.slice(0, 2)}***${normalized.slice(-2)}`;
 }
 
 const RESERVED_HUT_NAV_MIN_NUMBER = 1;

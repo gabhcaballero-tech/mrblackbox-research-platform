@@ -69,7 +69,7 @@ describe("HUT admin reset actions", () => {
 
     await expect(
       saveHutQuestionnaireAnswerForFieldAction("HUT-121", "participant-1", "study-1", "HUT_EVA1_GUSTO", formData)
-    ).rejects.toThrow("REDIRECT:/field/hut?folio=HUT-121&interviewerCode=JES26&hutMessage=Guardado+correctamente&questionCode=HUT_EVA1_ATRIBUTOS");
+    ).rejects.toThrow("REDIRECT:/field/hut?folio=HUT-121&accessType=INTERVIEWER&interviewerCode=JES26&hutMessage=Guardado+correctamente&questionCode=HUT_EVA1_ATRIBUTOS");
 
     expect(requireCapability).not.toHaveBeenCalled();
     expect(createFieldOperationsRepository).toHaveBeenCalled();
@@ -77,6 +77,10 @@ describe("HUT admin reset actions", () => {
       actorUserId: null,
       answerInput: {
         HUT_EVA1_GUSTO: "6"
+      },
+      fieldAccessAudit: {
+        accessType: "ENCUESTADOR",
+        code: "JES26"
       },
       participantId: "participant-1",
       questionCode: "HUT_EVA1_GUSTO",
@@ -92,7 +96,38 @@ describe("HUT admin reset actions", () => {
 
     await expect(
       saveHutQuestionnaireAnswerForFieldAction("HUT-121", "participant-1", "study-1", "HUT_COMP_RAZONES", formData)
-    ).rejects.toThrow("REDIRECT:/field/hut?folio=HUT-121&interviewerCode=JES26&hutMessage=Evaluacion+completada");
+    ).rejects.toThrow("REDIRECT:/field/hut?folio=HUT-121&accessType=INTERVIEWER&interviewerCode=JES26&hutMessage=Evaluacion+completada");
+  });
+
+  it("permite guardar desde campo con codigo supervisor sin asignacion directa", async () => {
+    getDashboardMock.mockResolvedValue({
+      ...createFieldDashboard(),
+      participants: [],
+      viewer: {
+        code: "SUP26",
+        id: "supervisor-code-1",
+        label: "Supervisor Campo",
+        mode: "SUPERVISOR_CODE"
+      }
+    });
+    const formData = new FormData();
+    formData.set("HUT_EVA1_GUSTO", "6");
+    formData.set("accessType", "SUPERVISOR");
+    formData.set("interviewerCode", "SUP26");
+    formData.set("returnQuestionCode", "__HUT_SUMMARY__");
+
+    await expect(
+      saveHutQuestionnaireAnswerForFieldAction("HUT-999", "participant-999", "study-1", "HUT_EVA1_GUSTO", formData)
+    ).rejects.toThrow("REDIRECT:/field/hut?folio=HUT-999&accessType=SUPERVISOR&interviewerCode=SUP26&hutMessage=Evaluacion+completada");
+
+    expect(saveQuestionnaireAnswerMock).toHaveBeenCalledWith(expect.objectContaining({
+      actorUserId: null,
+      fieldAccessAudit: {
+        accessType: "SUPERVISOR",
+        code: "SUP26"
+      },
+      participantId: "participant-999"
+    }));
   });
 });
 

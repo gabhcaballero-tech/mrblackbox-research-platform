@@ -22,6 +22,12 @@ export type FieldOperationsDashboard = {
         mode: "INTERVIEWER_CODE";
       }
     | {
+        code: string;
+        id: string;
+        label: string;
+        mode: "SUPERVISOR_CODE";
+      }
+    | {
         filterInterviewerCodeId: string | null;
         mode: "ADMIN";
       }

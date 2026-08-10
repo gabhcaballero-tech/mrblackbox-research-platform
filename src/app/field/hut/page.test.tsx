@@ -35,15 +35,17 @@ describe("FieldHutPage", () => {
     getDashboardMock.mockResolvedValue(createFieldDashboard());
   });
 
-  it("muestra selector de encuestador sin redirigir a login", async () => {
+  it("muestra selector de tipo de acceso sin redirigir a login", async () => {
     getDashboardMock.mockResolvedValue(createCodeRequiredDashboard());
 
     render(await FieldHutPage({ searchParams: Promise.resolve({}) }));
 
     expect(requireCapability).not.toHaveBeenCalled();
     expect(createFieldOperationsRepository).toHaveBeenCalled();
-    expect(screen.getByRole("heading", { name: "Selecciona tu encuestador" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Codigo de encuestador")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Selecciona tipo de acceso" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Encuestador")).toBeInTheDocument();
+    expect(screen.getByLabelText("Supervisor")).toBeInTheDocument();
+    expect(screen.getByLabelText("Codigo")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ingresar" })).toBeInTheDocument();
     expect(getFieldQuestionnaireWorkspaceMock).not.toHaveBeenCalled();
   });
@@ -56,6 +58,21 @@ describe("FieldHutPage", () => {
     expect(requireCapability).not.toHaveBeenCalled();
     expect(screen.getByText("El codigo de encuestador no es valido.")).toBeInTheDocument();
     expect(getFieldQuestionnaireWorkspaceMock).not.toHaveBeenCalled();
+  });
+
+  it("permite a supervisor ver todos los participantes HUT", async () => {
+    getDashboardMock.mockResolvedValue(createSupervisorDashboard());
+
+    render(await FieldHutPage({ searchParams: Promise.resolve({ accessType: "SUPERVISOR", interviewerCode: "SUP26" }) }));
+
+    expect(screen.getByText("Supervisor: Supervisor Campo")).toBeInTheDocument();
+    expect(screen.getByText("Modo: Supervisor")).toBeInTheDocument();
+    expect(screen.getByText("Participante HUT 121")).toBeInTheDocument();
+    expect(screen.getByText("Participante HUT 999")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Participante HUT 999/ })).toHaveAttribute(
+      "href",
+      "/field/hut?folio=HUT-999&interviewerCode=SUP26&accessType=SUPERVISOR"
+    );
   });
 
   it("protege el modo administrador con login interno", async () => {
@@ -119,7 +136,7 @@ describe("FieldHutPage", () => {
     expect(screen.getByText(/Participo anteriormente en CLT/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Iniciar evaluacion" })).toHaveAttribute(
       "href",
-      "/field/hut?folio=HUT-121&interviewerCode=JES26&questionCode=HUT_V1_CONFIRMACION_ENTREGA"
+      "/field/hut?folio=HUT-121&interviewerCode=JES26&accessType=INTERVIEWER&questionCode=HUT_V1_CONFIRMACION_ENTREGA"
     );
     expect(screen.queryByText("Confirmar entrega del primer perfume")).not.toBeInTheDocument();
     expect(screen.queryByText("Primer perfume HUT:")).not.toBeInTheDocument();
@@ -221,6 +238,39 @@ function createFieldDashboard() {
       id: "interviewer-code-1",
       label: "Jesus",
       mode: "INTERVIEWER_CODE"
+    }
+  };
+}
+
+function createSupervisorDashboard() {
+  return {
+    ...createFieldDashboard(),
+    participants: [
+      ...createFieldDashboard().participants,
+      {
+        folio: "NAV-999",
+        hut: {
+          applicationPhotoCount: 0,
+          currentSection: null,
+          folio: "HUT-999",
+          id: "hut-participant-999",
+          origin: "CLT_HUT",
+          protocolVersion: "APPLICATION_PHOTO",
+          questionnaireStatus: "PENDING",
+          status: "NOT_STARTED",
+          testMode: false,
+          token: "hut-token-999"
+        },
+        id: "nav:study-participant-999",
+        participantId: "study-participant-999",
+        participantName: "Participante HUT 999"
+      }
+    ],
+    viewer: {
+      code: "SUP26",
+      id: "supervisor-code-1",
+      label: "Supervisor Campo",
+      mode: "SUPERVISOR_CODE"
     }
   };
 }

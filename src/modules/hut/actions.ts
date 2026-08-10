@@ -456,6 +456,12 @@ export async function saveHutQuestionnaireAnswerForFieldAction(
   const result = await createHutRepository().saveQuestionnaireAnswer({
     actorUserId: fieldAccess.actorUserId,
     answerInput: hutFormDataToAnswerInput(toHutAnswerOnlyFormData(formData)),
+    fieldAccessAudit: fieldAccess.mode === "ADMIN"
+      ? null
+      : {
+          accessType: fieldAccess.accessType,
+          code: fieldAccess.interviewerCode ?? ""
+        },
     participantId,
     questionCode,
     studyId
@@ -645,15 +651,17 @@ function redirectWithHutMessage(
 type FieldHutActionAccess =
   | {
       actorUserId: string | null;
+      accessType: "ENCUESTADOR" | "SUPERVISOR";
       interviewerCode?: string | null;
-      mode: "ADMIN" | "INTERVIEWER_CODE";
+      mode: "ADMIN" | "INTERVIEWER_CODE" | "SUPERVISOR_CODE";
       ok: true;
       studyId?: string | null;
     }
   | {
+      accessType: "ENCUESTADOR" | "SUPERVISOR";
       interviewerCode?: string | null;
       message: string;
-      mode: "INTERVIEWER_CODE";
+      mode: "INTERVIEWER_CODE" | "SUPERVISOR_CODE";
       ok: false;
     };
 
@@ -661,6 +669,7 @@ async function resolveFieldHutActionAccess(folio: string, formData: FormData): P
   if (String(formData.get("mode") ?? "") === "admin") {
     const actor = await requireCapability("admin:access");
     return {
+      accessType: "SUPERVISOR",
       actorUserId: actor.id,
       mode: "ADMIN",
       ok: true,
@@ -669,45 +678,73 @@ async function resolveFieldHutActionAccess(folio: string, formData: FormData): P
   }
 
   const interviewerCode = String(formData.get("interviewerCode") ?? "").trim().toUpperCase();
+  const accessType = String(formData.get("accessType") ?? "INTERVIEWER").toUpperCase() === "SUPERVISOR"
+    ? "SUPERVISOR"
+    : "ENCUESTADOR";
   const dashboard = await createFieldOperationsRepository().getDashboard({
     actorName: "Campo HUT",
     actorRole: "INTERVIEWER",
     interviewerCode,
     interviewerUserId: "field-hut-code",
-    mode: "INTERVIEWER_CODE"
+    mode: accessType === "SUPERVISOR" ? "SUPERVISOR_CODE" : "INTERVIEWER_CODE"
   });
 
-  if (dashboard.viewer.mode !== "INTERVIEWER_CODE") {
+  if (
+    (accessType === "ENCUESTADOR" && dashboard.viewer.mode !== "INTERVIEWER_CODE") ||
+    (accessType === "SUPERVISOR" && dashboard.viewer.mode !== "SUPERVISOR_CODE")
+  ) {
     return {
+      accessType,
       interviewerCode,
       message: dashboard.viewer.mode === "CODE_REQUIRED" && dashboard.viewer.error
         ? dashboard.viewer.error
         : "Ingresa un codigo de encuestador valido.",
-      mode: "INTERVIEWER_CODE",
+      mode: accessType === "SUPERVISOR" ? "SUPERVISOR_CODE" : "INTERVIEWER_CODE",
       ok: false
     };
   }
 
-  if (!isFolioAssignedToFieldViewer(folio, dashboard.participants)) {
+  if (accessType === "ENCUESTADOR") {
+    if (dashboard.viewer.mode !== "INTERVIEWER_CODE") {
+      return {
+        accessType,
+        interviewerCode,
+        message: "Ingresa un codigo de encuestador valido.",
+        mode: "INTERVIEWER_CODE",
+        ok: false
+      };
+    }
+    if (!isFolioAssignedToFieldViewer(folio, dashboard.participants)) {
+      return {
+        accessType,
+        interviewerCode: dashboard.viewer.code,
+        message: "Este participante no esta asignado a este encuestador.",
+        mode: "INTERVIEWER_CODE",
+        ok: false
+      };
+    }
+
     return {
+      accessType,
+      actorUserId: null,
       interviewerCode: dashboard.viewer.code,
-      message: "Este participante no esta asignado a este encuestador.",
       mode: "INTERVIEWER_CODE",
-      ok: false
+      ok: true
     };
   }
 
   return {
+    accessType,
     actorUserId: null,
-    interviewerCode: dashboard.viewer.code,
-    mode: "INTERVIEWER_CODE",
+    interviewerCode: dashboard.viewer.mode === "SUPERVISOR_CODE" ? dashboard.viewer.code : interviewerCode,
+    mode: "SUPERVISOR_CODE",
     ok: true
   };
 }
 
 function toHutAnswerOnlyFormData(formData: FormData): FormData {
   const answerFormData = new FormData();
-  const metadataKeys = new Set(["interviewerCode", "mode", "returnQuestionCode", "studyId"]);
+  const metadataKeys = new Set(["accessType", "interviewerCode", "mode", "returnQuestionCode", "studyId"]);
   for (const [key, value] of formData.entries()) {
     if (!metadataKeys.has(key)) {
       answerFormData.append(key, value);
@@ -732,7 +769,8 @@ function redirectToFieldHut(
       params.set("studyId", access.studyId);
     }
   }
-  if (access?.mode === "INTERVIEWER_CODE" && access.interviewerCode) {
+  if ((access?.mode === "INTERVIEWER_CODE" || access?.mode === "SUPERVISOR_CODE") && access.interviewerCode) {
+    params.set("accessType", access.mode === "SUPERVISOR_CODE" ? "SUPERVISOR" : "INTERVIEWER");
     params.set("interviewerCode", access.interviewerCode);
   }
   if (message) {

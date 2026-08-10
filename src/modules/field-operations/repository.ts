@@ -28,7 +28,7 @@ export type FieldOperationsRepository = {
     interviewerCode?: string | null;
     interviewerCodeId?: string | null;
     interviewerUserId: string;
-    mode?: "ADMIN" | "INTERVIEWER_CODE";
+    mode?: "ADMIN" | "INTERVIEWER_CODE" | "SUPERVISOR_CODE";
     studyId?: string | null;
   }) => Promise<FieldOperationsDashboard>;
 };
@@ -44,10 +44,12 @@ export function createFieldOperationsRepository(
     async getDashboard(input) {
       const prisma = await getPrisma();
       const isAdminMode = input.actorRole === "ADMIN" && input.mode === "ADMIN";
+      const isSupervisorCodeMode = input.mode === "SUPERVISOR_CODE";
       const codeAccess = !isAdminMode
         ? await resolveInterviewerCodeAccess(prisma, input.interviewerCode)
         : null;
-      if (!isAdminMode && !codeAccess?.ok) {
+      const supervisorCodeAllowed = Boolean(codeAccess?.ok && isSupervisorFieldCode(codeAccess.interviewerCode, codeAccess.code));
+      if (!isAdminMode && (!codeAccess?.ok || (isSupervisorCodeMode && !supervisorCodeAllowed))) {
         return {
           actorName: input.actorName,
           detail: null,
@@ -56,7 +58,11 @@ export function createFieldOperationsRepository(
           selectedStudyId: null,
           studies: [],
           viewer: {
-            error: codeAccess?.message ?? null,
+            error: codeAccess?.ok && isSupervisorCodeMode
+              ? "El codigo de supervisor no es valido."
+              : codeAccess && !codeAccess.ok
+                ? codeAccess.message
+                : null,
             mode: "CODE_REQUIRED"
           }
         };
@@ -77,7 +83,13 @@ export function createFieldOperationsRepository(
         : null;
       const dashboard = selectedStudyId
         ? await createCltOperationsRepository(prisma as never).getDashboard({
-            ctlInterviewerCodeId: isAdminMode ? selectedAdminInterviewerCodeId : codeAccess?.ok ? codeAccess.interviewerCode.id : null,
+            ctlInterviewerCodeId: isAdminMode
+              ? selectedAdminInterviewerCodeId
+              : isSupervisorCodeMode
+                ? null
+                : codeAccess?.ok
+                  ? codeAccess.interviewerCode.id
+                  : null,
             detailSessionId: input.detailSessionId,
             interviewerUserId: null,
             studyId: selectedStudyId
@@ -86,7 +98,13 @@ export function createFieldOperationsRepository(
       const participants = selectedStudyId
         ? await buildOperationalParticipants({
             baseParticipants: dashboard?.participants ?? [],
-            interviewerCodeId: isAdminMode ? selectedAdminInterviewerCodeId : codeAccess?.ok ? codeAccess.interviewerCode.id : null,
+            interviewerCodeId: isAdminMode
+              ? selectedAdminInterviewerCodeId
+              : isSupervisorCodeMode
+                ? null
+                : codeAccess?.ok
+                  ? codeAccess.interviewerCode.id
+                  : null,
             prisma,
             studyId: selectedStudyId
           })
@@ -111,7 +129,7 @@ export function createFieldOperationsRepository(
               code: codeAccess?.ok ? codeAccess.code : "",
               id: codeAccess?.ok ? codeAccess.interviewerCode.id : "",
               label: codeAccess?.ok ? codeAccess.interviewerCode.label : "",
-              mode: "INTERVIEWER_CODE"
+              mode: isSupervisorCodeMode ? "SUPERVISOR_CODE" : "INTERVIEWER_CODE"
             }
       };
     }
@@ -712,4 +730,13 @@ function isUsableInterviewerCode(
   }
 
   return !interviewerCode.expiresAt || interviewerCode.expiresAt.getTime() > now.getTime();
+}
+
+function isSupervisorFieldCode(interviewerCode: FieldOperationsInterviewerCodeRecord, normalizedCode: string): boolean {
+  const normalizedLabel = interviewerCode.label
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toUpperCase();
+
+  return normalizedCode.startsWith("SUP") || normalizedLabel.includes("SUPERVISOR") || normalizedLabel.includes("SUPERVISORA");
 }

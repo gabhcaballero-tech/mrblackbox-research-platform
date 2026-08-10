@@ -32,6 +32,7 @@ export const dynamic = "force-dynamic";
 type FieldHutPageProps = {
   searchParams?: Promise<{
     folio?: string;
+    accessType?: string;
     hutError?: string;
     hutMessage?: string;
     interviewerCode?: string;
@@ -46,6 +47,7 @@ export default async function FieldHutPage({ searchParams }: FieldHutPageProps) 
   const folio = String(query?.folio ?? "").trim().toUpperCase();
   const isAdminMode = query?.mode === "admin";
   const dashboard = await resolveFieldHutDashboard({
+    accessType: query?.accessType,
     interviewerCode: query?.interviewerCode,
     isAdminMode,
     studyId: query?.studyId
@@ -56,6 +58,12 @@ export default async function FieldHutPage({ searchParams }: FieldHutPageProps) 
         label: dashboard.viewer.label,
         mode: "INTERVIEWER_CODE" as const
       }
+    : dashboard.viewer.mode === "SUPERVISOR_CODE"
+      ? {
+          interviewerCode: dashboard.viewer.code,
+          label: dashboard.viewer.label,
+          mode: "SUPERVISOR_CODE" as const
+        }
     : dashboard.viewer.mode === "ADMIN"
       ? {
           mode: "ADMIN" as const,
@@ -65,7 +73,7 @@ export default async function FieldHutPage({ searchParams }: FieldHutPageProps) 
   const assignedParticipants = dashboard.viewer.mode === "CODE_REQUIRED"
     ? []
     : dashboard.participants.filter((participant) => participant.hut.id || participant.hut.folio);
-  const folioAllowed = !folio || isAdminMode || isAssignedFieldHutFolio(folio, dashboard.participants);
+  const folioAllowed = !folio || isAdminMode || dashboard.viewer.mode === "SUPERVISOR_CODE" || isAssignedFieldHutFolio(folio, dashboard.participants);
   const workspaceResult = folio && folioAllowed
     ? await createHutRepository().getFieldQuestionnaireWorkspace({ folio })
     : folio && !folioAllowed
@@ -84,7 +92,7 @@ export default async function FieldHutPage({ searchParams }: FieldHutPageProps) 
         </header>
 
         {dashboard.viewer.mode === "CODE_REQUIRED" ? (
-          <InterviewerCodeGate error={dashboard.viewer.error} folio={folio} />
+          <InterviewerCodeGate accessType={query?.accessType} error={dashboard.viewer.error} folio={folio} />
         ) : null}
 
         {dashboard.viewer.mode !== "CODE_REQUIRED" && access ? (
@@ -154,11 +162,17 @@ type FieldHutAccessContext =
       mode: "INTERVIEWER_CODE";
     }
   | {
+      interviewerCode: string;
+      label: string;
+      mode: "SUPERVISOR_CODE";
+    }
+  | {
       mode: "ADMIN";
       studyId: string | null;
     };
 
 async function resolveFieldHutDashboard(input: {
+  accessType?: string | null;
   interviewerCode?: string | null;
   isAdminMode: boolean;
   studyId?: string | null;
@@ -174,22 +188,34 @@ async function resolveFieldHutDashboard(input: {
     });
   }
 
+  const accessType = String(input.accessType ?? "INTERVIEWER").toUpperCase() === "SUPERVISOR"
+    ? "SUPERVISOR"
+    : "INTERVIEWER";
   return createFieldOperationsRepository().getDashboard({
     actorName: "Campo HUT",
     actorRole: "INTERVIEWER",
     interviewerCode: input.interviewerCode,
     interviewerUserId: "field-hut-code",
-    mode: "INTERVIEWER_CODE",
+    mode: accessType === "SUPERVISOR" ? "SUPERVISOR_CODE" : "INTERVIEWER_CODE",
     studyId: input.studyId
   });
 }
 
-function InterviewerCodeGate({ error, folio }: { error: string | null; folio: string }) {
+function InterviewerCodeGate({
+  accessType,
+  error,
+  folio
+}: {
+  accessType?: string | null;
+  error: string | null;
+  folio: string;
+}) {
+  const selectedAccessType = String(accessType ?? "INTERVIEWER").toUpperCase() === "SUPERVISOR" ? "SUPERVISOR" : "INTERVIEWER";
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-      <h2 className="text-xl font-semibold text-zinc-950">Selecciona tu encuestador</h2>
+      <h2 className="text-xl font-semibold text-zinc-950">Selecciona tipo de acceso</h2>
       <p className="mt-2 text-sm text-zinc-600">
-        Ingresa tu codigo personal para ver tus participantes asignados y aplicar HUT.
+        Ingresa tu codigo personal para ver participantes y aplicar HUT.
       </p>
       {error ? (
         <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
@@ -198,8 +224,21 @@ function InterviewerCodeGate({ error, folio }: { error: string | null; folio: st
       ) : null}
       <form className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
         {folio ? <input name="folio" type="hidden" value={folio} /> : null}
+        <fieldset className="sm:col-span-2">
+          <legend className="text-sm font-semibold text-zinc-800">Tipo de acceso</legend>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <label className="flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-800">
+              <input defaultChecked={selectedAccessType === "INTERVIEWER"} name="accessType" type="radio" value="INTERVIEWER" />
+              Encuestador
+            </label>
+            <label className="flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-800">
+              <input defaultChecked={selectedAccessType === "SUPERVISOR"} name="accessType" type="radio" value="SUPERVISOR" />
+              Supervisor
+            </label>
+          </div>
+        </fieldset>
         <label className="flex flex-col gap-2 text-sm font-semibold text-zinc-800">
-          Codigo de encuestador
+          Codigo
           <input
             autoComplete="off"
             className="min-h-12 rounded-md border border-zinc-300 px-4 py-3 text-base uppercase"
@@ -230,7 +269,12 @@ function FieldHutViewerCard({ access }: { access: FieldHutAccessContext }) {
     <section className="rounded-lg border border-teal-200 bg-teal-50 p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-teal-950">Encuestador: {access.label}</p>
+          <p className="text-sm font-semibold text-teal-950">
+            {access.mode === "SUPERVISOR_CODE" ? "Supervisor" : "Encuestador"}: {access.label}
+          </p>
+          <p className="mt-1 text-sm text-teal-900">
+            Modo: {access.mode === "SUPERVISOR_CODE" ? "Supervisor" : "Encuestador"}
+          </p>
           <p className="mt-1 text-sm text-teal-900">Codigo: {access.interviewerCode}</p>
         </div>
         <a className="text-sm font-semibold text-teal-800 hover:text-teal-950" href="/field/hut">
@@ -696,7 +740,12 @@ function FieldHutAccessHiddenInputs({ access }: { access: FieldHutAccessContext 
     );
   }
 
-  return <input name="interviewerCode" type="hidden" value={access.interviewerCode} />;
+  return (
+    <>
+      <input name="accessType" type="hidden" value={access.mode === "SUPERVISOR_CODE" ? "SUPERVISOR" : "INTERVIEWER"} />
+      <input name="interviewerCode" type="hidden" value={access.interviewerCode} />
+    </>
+  );
 }
 
 function fieldHutHref({
@@ -711,6 +760,11 @@ function fieldHutHref({
   const params = new URLSearchParams({ folio });
   if (access?.mode === "INTERVIEWER_CODE") {
     params.set("interviewerCode", access.interviewerCode);
+    params.set("accessType", "INTERVIEWER");
+  }
+  if (access?.mode === "SUPERVISOR_CODE") {
+    params.set("interviewerCode", access.interviewerCode);
+    params.set("accessType", "SUPERVISOR");
   }
   if (access?.mode === "ADMIN") {
     params.set("mode", "admin");
