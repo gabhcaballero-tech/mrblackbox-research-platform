@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
+import { resolvePublicLinkOrigin } from "@/shared/utils/request-origin";
 import {
   createOneuiWhatsAppRepository,
   sendHutParticipantLinkWhatsApp,

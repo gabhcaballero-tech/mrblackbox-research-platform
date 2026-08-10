@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { getInternalRouteDecision, isPublicCtlPath, isPublicPath, sanitizeInternalNextPath } from "./routes";
+import {
+  getInternalRouteDecision,
+  isPublicCtlPath,
+  isPublicHutParticipantPath,
+  isPublicPath,
+  sanitizeInternalNextPath
+} from "./routes";
 
 describe("auth route rules", () => {
   it("keeps participant token routes public", () => {
@@ -12,7 +18,13 @@ describe("auth route rules", () => {
     expect(isPublicCtlPath("/ctl/FMASCULINA-NAVIGO-2026")).toBe(true);
     expect(isPublicCtlPath("/ctl/FMASCULINA-NAVIGO-2026/sessions/session-1")).toBe(true);
     expect(isPublicCtlPath("/ctl/FMASCULINA-NAVIGO-2026/admin")).toBe(false);
+    expect(isPublicPath("/hut/p/token-generico")).toBe(true);
+    expect(isPublicPath("/hut/p/token-generico/photo/DELIVERY")).toBe(true);
+    expect(isPublicHutParticipantPath("/hut/p/token-generico")).toBe(true);
+    expect(isPublicHutParticipantPath("/hut/p/token-generico/photo/DELIVERY")).toBe(true);
+    expect(isPublicHutParticipantPath("/hut/p/token-generico/admin")).toBe(false);
     expect(getInternalRouteDecision("/hut/p/token-generico", false)).toEqual({ action: "allow" });
+    expect(getInternalRouteDecision("/hut/p/token-generico/photo/DELIVERY", false)).toEqual({ action: "allow" });
     expect(getInternalRouteDecision("/hut/register/token-generico", false)).toEqual({ action: "allow" });
   });
 

@@ -1,4 +1,5 @@
 import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
+import { resolvePublicLinkOrigin } from "@/shared/utils/request-origin";
 import {
   applyHutMissedDay,
   applyHutVideoSubmission,
@@ -6745,11 +6746,11 @@ async function disqualifyParticipant(
 }
 
 function participantLink(requestOrigin: string, token: string) {
-  return new URL(`/hut/p/${encodeURIComponent(token)}`, requestOrigin).toString();
+  return new URL(`/hut/p/${encodeURIComponent(token)}`, resolvePublicLinkOrigin(requestOrigin)).toString();
 }
 
 function registrationLink(requestOrigin: string, token: string) {
-  return new URL(`/hut/register/${encodeURIComponent(token)}`, requestOrigin).toString();
+  return new URL(`/hut/register/${encodeURIComponent(token)}`, resolvePublicLinkOrigin(requestOrigin)).toString();
 }
 
 async function createHutParticipantFoundation(

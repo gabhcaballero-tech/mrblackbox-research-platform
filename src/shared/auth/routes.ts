@@ -5,6 +5,8 @@ const INTERNAL_ENTRY_PATHS = ["/admin", "/field", "/exports"] as const;
 const PUBLIC_CTL_PATTERN = /^\/ctl\/[^/]+(?:\/sessions\/[^/]+)?\/?$/;
 const PUBLIC_FIELD_SCREENING_NEW_PATTERN = /^\/field\/studies\/[^/]+\/screening\/new$/;
 const PUBLIC_FIELD_SCREENING_ATTEMPT_PATTERN = /^\/field\/screening\/[^/]+(?:\/result|\/selfie|\/evidences)?$/;
+const PUBLIC_HUT_PARTICIPANT_PATTERN = /^\/hut\/p\/[^/]+(?:\/photo\/[^/]+)?\/?$/;
+const PUBLIC_HUT_REGISTRATION_PATTERN = /^\/hut\/register\/[^/]+\/?$/;
 
 export type InternalRouteDecision =
   | { action: "allow" }
@@ -17,6 +19,8 @@ export function isPublicPath(pathname: string): boolean {
     pathname === "/unauthorized" ||
     pathname === "/api/health" ||
     isPublicCtlPath(pathname) ||
+    isPublicHutParticipantPath(pathname) ||
+    isPublicHutRegistrationPath(pathname) ||
     pathname.startsWith("/p/") ||
     pathname.startsWith("/participar/") ||
     PUBLIC_FIELD_SCREENING_NEW_PATTERN.test(pathname) ||
@@ -29,6 +33,14 @@ export function isPublicPath(pathname: string): boolean {
 
 export function isPublicCtlPath(pathname: string): boolean {
   return PUBLIC_CTL_PATTERN.test(pathname);
+}
+
+export function isPublicHutParticipantPath(pathname: string): boolean {
+  return PUBLIC_HUT_PARTICIPANT_PATTERN.test(pathname);
+}
+
+export function isPublicHutRegistrationPath(pathname: string): boolean {
+  return PUBLIC_HUT_REGISTRATION_PATTERN.test(pathname);
 }
 
 export function isInternalPath(pathname: string): boolean {

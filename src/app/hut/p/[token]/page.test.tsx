@@ -7,6 +7,12 @@ const getPortalViewMock = vi.fn();
 const getQuestionnaireStateByTokenMock = vi.fn();
 const getApplicationPhotoDailyAvailabilityByTokenMock = vi.fn();
 
+vi.mock("next/navigation", () => ({
+  notFound: vi.fn(() => {
+    throw new Error("not-found");
+  })
+}));
+
 vi.mock("@/modules/hut", async () => {
   const actual = await vi.importActual<typeof import("@/modules/hut")>("@/modules/hut");
   return {
@@ -34,6 +40,18 @@ describe("HutParticipantPage", () => {
       data: createPhotoAvailability(),
       ok: true
     });
+  });
+
+  it("rechaza token HUT invalido o inactivo sin pedir login", async () => {
+    getPortalViewMock.mockResolvedValue({
+      message: "Este enlace HUT no es valido.",
+      ok: false
+    });
+
+    await expect(HutParticipantPage({ params: Promise.resolve({ token: "token-invalido" }) })).rejects.toThrow(
+      "not-found"
+    );
+    expect(createHutRepository).toHaveBeenCalled();
   });
 
   it("muestra mensaje final cuando la participacion HUT esta completa", async () => {

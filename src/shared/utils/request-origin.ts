@@ -25,6 +25,29 @@ export function resolveRequestOrigin(headers: Headers, env: Partial<NodeJS.Proce
   return LOCAL_ORIGIN;
 }
 
+export function resolvePublicRequestOrigin(headers: Headers, env: Partial<NodeJS.ProcessEnv> = process.env): string {
+  return resolveConfiguredPublicOrigin(env) ?? resolveRequestOrigin(headers, env);
+}
+
+export function resolvePublicLinkOrigin(fallbackOrigin: string, env: Partial<NodeJS.ProcessEnv> = process.env): string {
+  return resolveConfiguredPublicOrigin(env) ?? normalizeOrigin(fallbackOrigin) ?? LOCAL_ORIGIN;
+}
+
+function resolveConfiguredPublicOrigin(env: Partial<NodeJS.ProcessEnv>): string | null {
+  return (
+    normalizeOrigin(env.NEXT_PUBLIC_APP_URL) ??
+    normalizeOrigin(env.APP_URL) ??
+    normalizeOrigin(env.NEXT_PUBLIC_SITE_URL) ??
+    normalizeOrigin(env.NEXT_PUBLIC_BASE_URL)
+  );
+}
+
+function normalizeOrigin(value: string | undefined): string | null {
+  const trimmed = value?.trim().replace(/\/+$/g, "");
+
+  return trimmed || null;
+}
+
 function inferProtocol(host: string): "http" | "https" {
   return host.startsWith("localhost") || host.startsWith("127.0.0.1") ? "http" : "https";
 }

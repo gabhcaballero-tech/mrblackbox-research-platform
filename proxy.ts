@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { getInternalRouteDecision, isPublicCtlPath } from "@/shared/auth/routes";
+import { getInternalRouteDecision, isPublicCtlPath, isPublicHutParticipantPath, isPublicHutRegistrationPath } from "@/shared/auth/routes";
 
 function getSupabaseProxyConfig() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -20,7 +20,11 @@ function copyResponseCookies(source: NextResponse, target: NextResponse) {
 }
 
 export async function proxy(request: NextRequest) {
-  if (isPublicCtlPath(request.nextUrl.pathname)) {
+  if (
+    isPublicCtlPath(request.nextUrl.pathname) ||
+    isPublicHutParticipantPath(request.nextUrl.pathname) ||
+    isPublicHutRegistrationPath(request.nextUrl.pathname)
+  ) {
     return NextResponse.next({ request });
   }
 

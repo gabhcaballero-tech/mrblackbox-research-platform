@@ -5,6 +5,12 @@ import { createHutRepository } from "@/modules/hut";
 
 const getPortalViewMock = vi.fn();
 
+vi.mock("next/navigation", () => ({
+  notFound: vi.fn(() => {
+    throw new Error("not-found");
+  })
+}));
+
 vi.mock("@/modules/hut", async () => {
   const actual = await vi.importActual<typeof import("@/modules/hut")>("@/modules/hut");
   return {
@@ -24,6 +30,23 @@ vi.mock("../../HutApplicationPhotoUploadForm", () => ({
 describe("HutPhotoSlotPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("rechaza captura fotografica con token HUT invalido o inactivo", async () => {
+    getPortalViewMock.mockResolvedValue({
+      message: "Este enlace HUT no es valido.",
+      ok: false
+    });
+
+    await expect(
+      HutPhotoSlotPage({
+        params: Promise.resolve({
+          slot: "DELIVERY",
+          token: "token-invalido"
+        })
+      })
+    ).rejects.toThrow("not-found");
+    expect(createHutRepository).toHaveBeenCalled();
   });
 
   it("muestra captura individual para el slot fotografico disponible", async () => {
