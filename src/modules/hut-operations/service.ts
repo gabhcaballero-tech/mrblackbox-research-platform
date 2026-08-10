@@ -12,6 +12,29 @@ const TSV_CONTENT_TYPE = "text/tab-separated-values; charset=utf-8";
 const TSV_SEPARATOR = "\t";
 const DEFAULT_TIME_ZONE = MEXICO_CITY_TIME_ZONE;
 
+const HUT_MATRIX_EXPORT_COLUMNS = [
+  {
+    columnCode: "P10A_ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO",
+    questionCode: "HUT_EVA1_ATRIBUTOS",
+    rowCode: "ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO"
+  },
+  {
+    columnCode: "P10A_REFLEJA_MI_PERSONALIDAD",
+    questionCode: "HUT_EVA1_ATRIBUTOS",
+    rowCode: "REFLEJA_MI_PERSONALIDAD"
+  },
+  {
+    columnCode: "P27_ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO",
+    questionCode: "HUT_P27_COMPARATIVA_ATRIBUTOS",
+    rowCode: "ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO"
+  },
+  {
+    columnCode: "P27_REFLEJA_MI_PERSONALIDAD",
+    questionCode: "HUT_P27_COMPARATIVA_ATRIBUTOS",
+    rowCode: "REFLEJA_MI_PERSONALIDAD"
+  }
+] as const;
+
 export function resolveHutQuestionnaireProgress(answeredCount: number, questionCount: number): string {
   if (questionCount <= 0) {
     return "Sin cuestionario";
@@ -114,8 +137,9 @@ export function buildHutAnswersTsv(input: {
   now?: Date;
 }): HutOperationsExport {
   const questionCodes = collectAnswerQuestionCodes(input.details);
+  const exportColumns = expandHutAnswerExportColumns(questionCodes);
   const rows = [
-    ["Folio HUT", "Folio NAV", "Participante", "Origen", "Protocolo", "Estado cuestionario", ...questionCodes],
+    ["Folio HUT", "Folio NAV", "Participante", "Origen", "Protocolo", "Estado cuestionario", ...exportColumns],
     ...input.details.map((detail) => {
       const answerByCode = new Map(
         detail.answerGroups.flatMap((group) => group.answers.map((answer) => [answer.code, answer.value] as const))
@@ -128,7 +152,7 @@ export function buildHutAnswersTsv(input: {
         detail.origin,
         detail.protocolVersion,
         detail.questionnaireStatus ?? "",
-        ...questionCodes.map((code) => answerByCode.get(code) ?? "")
+        ...exportColumns.map((code) => resolveHutAnswerExportValue(code, answerByCode))
       ];
     })
   ];
@@ -169,6 +193,45 @@ function collectAnswerQuestionCodes(details: HutOperationsDetail[]): string[] {
   }
 
   return ordered;
+}
+
+function expandHutAnswerExportColumns(questionCodes: string[]): string[] {
+  return questionCodes.flatMap((questionCode) => [
+    questionCode,
+    ...HUT_MATRIX_EXPORT_COLUMNS
+      .filter((column) => column.questionCode === questionCode)
+      .map((column) => column.columnCode)
+  ]);
+}
+
+function resolveHutAnswerExportValue(columnCode: string, answerByCode: Map<string, string>): string {
+  const matrixColumn = HUT_MATRIX_EXPORT_COLUMNS.find((column) => column.columnCode === columnCode);
+
+  if (!matrixColumn) {
+    return answerByCode.get(columnCode) ?? "";
+  }
+
+  return getMatrixRowAnswerValue(answerByCode.get(matrixColumn.questionCode), matrixColumn.rowCode);
+}
+
+function getMatrixRowAnswerValue(serializedAnswer: string | undefined, rowCode: string): string {
+  if (!serializedAnswer) {
+    return "";
+  }
+
+  try {
+    const parsed = JSON.parse(serializedAnswer) as unknown;
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return "";
+    }
+
+    const value = (parsed as Record<string, unknown>)[rowCode];
+
+    return value === null || value === undefined ? "" : stringifyHutAnswerValue(value);
+  } catch {
+    return "";
+  }
 }
 
 function tsvCell(value: string | number | null | undefined): string {

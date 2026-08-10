@@ -192,7 +192,7 @@ describe("FieldHutPage", () => {
       })
     }));
 
-    const firstOrder = "ENVASE_COMODO|SEGURIDAD|CANTIDAD_FACIL|INTENSIDAD_ADECUADA|AROMA_AGRADABLE|DIRECCION_FACIL|AROMA_UNICO|AROMA_DURADERO";
+    const firstOrder = "ENVASE_COMODO|SEGURIDAD|REFLEJA_MI_PERSONALIDAD|CANTIDAD_FACIL|INTENSIDAD_ADECUADA|AROMA_AGRADABLE|DIRECCION_FACIL|AROMA_UNICO|AROMA_DURADERO|ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO";
     expect(screen.getByDisplayValue(firstOrder)).toHaveAttribute("name", "HUT_EVA1_ATRIBUTOS.__rowOrder");
     expect(
       firstRender.container.querySelector('input[name="HUT_EVA1_ATRIBUTOS.AROMA_AGRADABLE"][value="7"]')
@@ -213,7 +213,7 @@ describe("FieldHutPage", () => {
       })
     }));
 
-    const secondOrder = "SEGURIDAD|ENVASE_COMODO|DIRECCION_FACIL|AROMA_DURADERO|AROMA_UNICO|INTENSIDAD_ADECUADA|CANTIDAD_FACIL|AROMA_AGRADABLE";
+    const secondOrder = "REFLEJA_MI_PERSONALIDAD|ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO|SEGURIDAD|ENVASE_COMODO|DIRECCION_FACIL|AROMA_DURADERO|AROMA_UNICO|INTENSIDAD_ADECUADA|CANTIDAD_FACIL|AROMA_AGRADABLE";
     expect(secondOrder).not.toBe(firstOrder);
     expect(screen.getByDisplayValue(secondOrder)).toHaveAttribute("name", "HUT_EVA1_ATRIBUTOS.__rowOrder");
     expect(
@@ -480,6 +480,8 @@ function createMatrixWorkspace(participantId: string) {
           DIRECCION_FACIL: "5",
           ENVASE_COMODO: "4",
           INTENSIDAD_ADECUADA: "5",
+          ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO: "6",
+          REFLEJA_MI_PERSONALIDAD: "5",
           SEGURIDAD: "4"
         }
       }

@@ -262,6 +262,8 @@ const productAttributeRows = [
   { code: "DIRECCION_FACIL", label: "Es facil dirigir la aplicacion hacia la zona deseada" },
   { code: "CANTIDAD_FACIL", label: "Es facil aplicar la cantidad adecuada de producto" },
   { code: "SEGURIDAD", label: "Me hace sentir seguro de mi mismo" },
+  { code: "ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO", label: "Me hace sentir fresco por mas tiempo" },
+  { code: "REFLEJA_MI_PERSONALIDAD", label: "Refleja mi personalidad" },
   { code: "AROMA_UNICO", label: "Tiene un aroma unico/diferente" }
 ];
 

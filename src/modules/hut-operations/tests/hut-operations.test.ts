@@ -70,6 +70,12 @@ describe("hut operations", () => {
     expect(operationalExport.body.startsWith("\uFEFF")).toBe(true);
     expect(operationalExport.body).toContain("Folio HUT\tFolio NAV\tParticipante");
     expect(answersExport.body).toContain("HUT-001\tNAV-001\tFrancisco Ruiz\tCLT_HUT");
+    expect(answersExport.body).toContain("P10A_ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO");
+    expect(answersExport.body).toContain("P10A_REFLEJA_MI_PERSONALIDAD");
+    expect(answersExport.body).toContain("P27_ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO");
+    expect(answersExport.body).toContain("P27_REFLEJA_MI_PERSONALIDAD");
+    expect(answersExport.body).toContain("\t6\t5\t");
+    expect(answersExport.body).toContain("\t2\t1");
     expect(answersExport.body).not.toContain("Texto con\t tab");
     expect(answersExport.body).not.toContain("salto\n");
   });
@@ -150,6 +156,25 @@ function createFakePrisma(): Parameters<typeof createHutOperationsRepository>[0]
             answeredAt: new Date("2026-08-08T06:13:00.000Z"),
             questionCode: "HUT_V1_OBSERVACIONES",
             visitProgress: { section: "PRIMERA_VISITA" }
+          },
+          {
+            answerJson: {
+              ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO: "6",
+              REFLEJA_MI_PERSONALIDAD: "5",
+              __rowOrder: "REFLEJA_MI_PERSONALIDAD|ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO"
+            },
+            answeredAt: new Date("2026-08-08T06:14:00.000Z"),
+            questionCode: "HUT_EVA1_ATRIBUTOS",
+            visitProgress: { section: "EVALUACION_PRIMER_PERFUME" }
+          },
+          {
+            answerJson: {
+              ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO: "2",
+              REFLEJA_MI_PERSONALIDAD: "1"
+            },
+            answeredAt: new Date("2026-08-08T06:15:00.000Z"),
+            questionCode: "HUT_P27_COMPARATIVA_ATRIBUTOS",
+            visitProgress: { section: "COMPARATIVA" }
           }
         ],
         completedAt: null,

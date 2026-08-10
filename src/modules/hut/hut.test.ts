@@ -542,8 +542,33 @@ describe("HUT module foundation", () => {
     expect(result.ok ? result.answers.find((answer) => answer.questionCode === "HUT_EVA1_ATRIBUTOS")?.answerValue : null)
       .toMatchObject({
         AROMA_AGRADABLE: "1",
-        AROMA_DURADERO: "1"
+        AROMA_DURADERO: "1",
+        ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO: "1",
+        REFLEJA_MI_PERSONALIDAD: "1"
       });
+  });
+
+  it("includes the new HUT attributes in P10a and P27 without duplicating comparative rows", () => {
+    const questions = getHutQuestions();
+    const p10a = questions.find((question) => question.code === "HUT_EVA1_ATRIBUTOS");
+    const p27 = questions.find((question) => question.code === "HUT_P27_COMPARATIVA_ATRIBUTOS");
+
+    expect(p10a).toMatchObject({
+      randomizeRows: true,
+      type: "MATRIX"
+    });
+    expect(p10a?.type).toBe("MATRIX");
+    expect(p27?.type).toBe("MATRIX");
+
+    const p10aRows = p10a?.type === "MATRIX" ? p10a.rows : [];
+    const p27Rows = p27?.type === "MATRIX" ? p27.rows : [];
+
+    expect(p10aRows.map((row) => row.code)).toEqual(expect.arrayContaining([
+      "ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO",
+      "REFLEJA_MI_PERSONALIDAD"
+    ]));
+    expect(p27Rows.filter((row) => row.code === "ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO")).toHaveLength(1);
+    expect(p27Rows.filter((row) => row.code === "REFLEJA_MI_PERSONALIDAD")).toHaveLength(1);
   });
 
   it("rejects invalid HUT v5 values without using legacy video state", () => {
@@ -566,6 +591,8 @@ describe("HUT module foundation", () => {
         "HUT_EVA1_ATRIBUTOS.DIRECCION_FACIL",
         "HUT_EVA1_ATRIBUTOS.CANTIDAD_FACIL",
         "HUT_EVA1_ATRIBUTOS.SEGURIDAD",
+        "HUT_EVA1_ATRIBUTOS.ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO",
+        "HUT_EVA1_ATRIBUTOS.REFLEJA_MI_PERSONALIDAD",
         "HUT_EVA1_ATRIBUTOS.AROMA_UNICO"
       ],
       ok: false
@@ -668,8 +695,10 @@ describe("HUT module foundation", () => {
           DIRECCION_FACIL: "5",
           ENVASE_COMODO: "4",
           INTENSIDAD_ADECUADA: "5",
+          ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO: "5",
+          REFLEJA_MI_PERSONALIDAD: "4",
           SEGURIDAD: "4",
-          __rowOrder: "ENVASE_COMODO|SEGURIDAD|CANTIDAD_FACIL|INTENSIDAD_ADECUADA|AROMA_AGRADABLE|DIRECCION_FACIL|AROMA_UNICO|AROMA_DURADERO"
+          __rowOrder: "ENVASE_COMODO|SEGURIDAD|CANTIDAD_FACIL|INTENSIDAD_ADECUADA|ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO|REFLEJA_MI_PERSONALIDAD|AROMA_AGRADABLE|DIRECCION_FACIL|AROMA_UNICO|AROMA_DURADERO"
         }
       },
       participantId,
@@ -691,7 +720,9 @@ describe("HUT module foundation", () => {
     expect(prisma.state.answers.find((answer) => answer.questionCode === "HUT_EVA1_ATRIBUTOS")?.answerJson).toMatchObject({
       AROMA_AGRADABLE: "5",
       AROMA_DURADERO: "4",
-      __rowOrder: "ENVASE_COMODO|SEGURIDAD|CANTIDAD_FACIL|INTENSIDAD_ADECUADA|AROMA_AGRADABLE|DIRECCION_FACIL|AROMA_UNICO|AROMA_DURADERO"
+      ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO: "5",
+      REFLEJA_MI_PERSONALIDAD: "4",
+      __rowOrder: "ENVASE_COMODO|SEGURIDAD|CANTIDAD_FACIL|INTENSIDAD_ADECUADA|ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO|REFLEJA_MI_PERSONALIDAD|AROMA_AGRADABLE|DIRECCION_FACIL|AROMA_UNICO|AROMA_DURADERO"
     });
   });
 
