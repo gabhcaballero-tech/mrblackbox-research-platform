@@ -37,6 +37,7 @@ vi.mock("@/modules/hut/actions", () => {
     createHutRegistrationSlotAction: action,
     deleteHutParticipantAction: action,
     markHutMissedDayAction: action,
+    moveHutInitialEvidenceToDeliveryAction: action,
     reactivateHutParticipantAction: action,
     reconcileReservedHutNavParticipantsAction: action,
     reviewHutVisualVerificationAction: action,
@@ -124,6 +125,14 @@ vi.mock("./_components/HutReferenceSelfieUpload", () => ({
         Tomar selfie de registro
       </button>
     </div>
+  )
+}));
+
+vi.mock("./_components/HutDeliveryRecoveryUpload", () => ({
+  HutDeliveryRecoveryUpload: ({ disabled }: { disabled?: boolean }) => (
+    <button disabled={disabled} type="button">
+      Subir evidencia de entrega
+    </button>
   )
 }));
 

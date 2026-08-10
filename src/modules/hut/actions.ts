@@ -16,6 +16,7 @@ import type {
 } from "./storage";
 import { requireCapability } from "@/shared/auth/session";
 import type { NavigoFaceVerificationClientResult } from "@/modules/navigo-app/face-verification-contract";
+import { parseNavigoDateTimeLocal } from "@/modules/navigo-app";
 import { createFieldOperationsRepository } from "@/modules/field-operations";
 import type { CltOperationsDetail } from "@/modules/clt-operations/types";
 
@@ -197,6 +198,61 @@ export async function resetHutApplicationPhotoEvidenceAction(studyId: string, pa
     confirmation: String(formData.get("confirmation") ?? ""),
     participantId,
     phase: String(formData.get("phase") ?? "") as HutPhase,
+    reason: String(formData.get("reason") ?? ""),
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
+export async function requestHutManualDeliveryEvidenceUploadAction(
+  studyId: string,
+  participantId: string,
+  metadata: HutApplicationPhotoUploadMetadata
+): Promise<HutActionResult<HutSignedApplicationPhotoUpload & { productCode: string | null }>> {
+  await requireCapability("admin:access");
+
+  return createHutRepository().requestManualDeliveryEvidenceUpload({
+    metadata,
+    participantId,
+    studyId
+  });
+}
+
+export async function confirmHutManualDeliveryEvidenceUploadAction(
+  studyId: string,
+  participantId: string,
+  input: HutApplicationPhotoUploadMetadata & {
+    capturedAt?: string | null;
+    privateStorageKey: string;
+    reason?: string | null;
+    storageBucket: string;
+  }
+): Promise<HutActionResult<{ participantId: string; useDayNumber: number }>> {
+  const actor = await requireCapability("admin:access");
+  const capturedAt = input.capturedAt
+    ? parseNavigoDateTimeLocal(input.capturedAt, "America/Mexico_City") ?? parseOptionalDate(input.capturedAt)
+    : null;
+  const result = await createHutRepository().confirmManualDeliveryEvidenceUpload({
+    actorUserId: actor.id,
+    capturedAt: capturedAt ?? undefined,
+    metadata: input,
+    participantId,
+    reason: input.reason ?? null,
+    studyId
+  });
+
+  revalidatePath(`/admin/studies/${studyId}/hut`);
+
+  return result;
+}
+
+export async function moveHutInitialEvidenceToDeliveryAction(studyId: string, participantId: string, formData: FormData) {
+  const actor = await requireCapability("admin:access");
+  const result = await createHutRepository().moveInitialEvidenceToDelivery({
+    actorUserId: actor.id,
+    confirmation: String(formData.get("confirmation") ?? ""),
+    participantId,
     reason: String(formData.get("reason") ?? ""),
     studyId
   });

@@ -201,6 +201,7 @@ export type HutCallSummary = {
 export type HutApplicationEvidenceAdmin = {
   capturedAt: Date;
   phase: HutPhase;
+  privateStorageKey?: string | null;
   productCode: string | null;
   signedUrl: string | null;
 };
@@ -209,6 +210,7 @@ export type HutApplicationPhotoEntryAdmin = {
   capturedAt: Date;
   capturedLocalDate: string;
   capturedLocalTimezone: string;
+  privateStorageKey?: string | null;
   productCode: string | null;
   signedUrl: string | null;
   useDayNumber: number;
@@ -813,6 +815,30 @@ export type HutRepository = {
     studyId: string;
     useDayNumber: number;
   }) => Promise<HutActionResult<HutApplicationPhotoEntrySummary>>;
+  requestManualDeliveryEvidenceUpload: (input: {
+    metadata: HutApplicationPhotoUploadMetadata;
+    participantId: string;
+    storage?: HutStorageClient;
+    studyId: string;
+  }) => Promise<HutActionResult<HutSignedApplicationPhotoUpload & { productCode: string | null }>>;
+  confirmManualDeliveryEvidenceUpload: (input: {
+    actorUserId: string;
+    capturedAt?: Date;
+    metadata: HutApplicationPhotoUploadMetadata & {
+      privateStorageKey: string;
+      storageBucket: string;
+    };
+    participantId: string;
+    reason?: string | null;
+    studyId: string;
+  }) => Promise<HutActionResult<{ participantId: string; useDayNumber: number }>>;
+  moveInitialEvidenceToDelivery: (input: {
+    actorUserId: string;
+    confirmation: string;
+    participantId: string;
+    reason?: string | null;
+    studyId: string;
+  }) => Promise<HutActionResult<{ participantId: string; useDayNumber: number }>>;
   validatePhaseCode: (input: {
     code: string;
     phase: HutPhase;
@@ -2287,6 +2313,230 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         return {
           data: toApplicationPhotoEntrySummary(entry),
           message: "Foto diaria de aplicacion registrada correctamente.",
+          ok: true
+        };
+      });
+    },
+
+    async requestManualDeliveryEvidenceUpload(input) {
+      const prisma = await getPrisma();
+      const participant = await findParticipant(prisma, input.participantId);
+
+      if (!participant || participant.studyId !== input.studyId) {
+        return { message: "No encontramos el participante HUT.", ok: false };
+      }
+      if (!isApplicationPhotoProtocol(participant)) {
+        return { message: "La recuperacion de entrega aplica solo al protocolo APPLICATION_PHOTO.", ok: false };
+      }
+      if (blockingApplicationPhotoEntryByUseDayNumber(participant, 0)) {
+        return { message: "Este participante ya tiene evidencia de entrega registrada.", ok: false };
+      }
+
+      try {
+        const signed = await createHutSignedApplicationPhotoUpload({
+          metadata: input.metadata,
+          participantId: participant.id,
+          phase: "COLOCACION",
+          storage: input.storage,
+          studyId: participant.studyId
+        });
+
+        return {
+          data: {
+            ...signed,
+            productCode: participant.firstFragranceLeftArm
+          },
+          ok: true
+        };
+      } catch (error) {
+        return { message: error instanceof Error ? error.message : "No fue posible preparar la evidencia de entrega.", ok: false };
+      }
+    },
+
+    async confirmManualDeliveryEvidenceUpload(input) {
+      const prisma = await getPrisma();
+      const capturedAt = input.capturedAt ?? new Date();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipant(tx, input.participantId);
+
+        if (!participant || participant.studyId !== input.studyId) {
+          return { message: "No encontramos el participante HUT.", ok: false };
+        }
+        if (!isApplicationPhotoProtocol(participant)) {
+          return { message: "La recuperacion de entrega aplica solo al protocolo APPLICATION_PHOTO.", ok: false };
+        }
+        if (blockingApplicationPhotoEntryByUseDayNumber(participant, 0)) {
+          return { message: "Este participante ya tiene evidencia de entrega registrada.", ok: false };
+        }
+        if (input.metadata.storageBucket !== HUT_VIDEO_BUCKET) {
+          return { message: "No fue posible validar la evidencia de entrega.", ok: false };
+        }
+
+        try {
+          assertHutApplicationPhotoStorageKey({
+            participantId: participant.id,
+            privateStorageKey: input.metadata.privateStorageKey,
+            studyId: participant.studyId
+          });
+        } catch (error) {
+          return { message: error instanceof Error ? error.message : "No fue posible validar la evidencia de entrega.", ok: false };
+        }
+
+        const capturedLocalDate = hutLocalDateKey(capturedAt);
+        const existingLocalDate = (participant.applicationPhotoEntries ?? []).find(
+          (entry) => entry.capturedLocalDate === capturedLocalDate
+        ) ?? null;
+        if (existingLocalDate && !participant.testMode) {
+          return {
+            message: "Ya existe una foto HUT registrada para esa fecha local. Ajusta la fecha de entrega o revisa el historial.",
+            ok: false
+          };
+        }
+
+        const beforeJson = toAuditJson({
+          participant: hutParticipantAuditSnapshot(participant),
+          recovery: {
+            capturedAt,
+            capturedLocalDate,
+            type: "DELIVERY_MANUAL_RECOVERY"
+          }
+        });
+        const entry = (await tx.hutApplicationPhotoEntry.create?.({
+          data: {
+            capturedAt,
+            capturedLocalDate,
+            capturedLocalTimezone: "America/Mexico_City",
+            extension: extensionFromFilename(input.metadata.originalFilename),
+            mimeType: input.metadata.mimeType,
+            originalFilename: input.metadata.originalFilename,
+            participantId: participant.id,
+            privateStorageKey: input.metadata.privateStorageKey,
+            productCode: participant.firstFragranceLeftArm,
+            sizeBytes: input.metadata.sizeBytes,
+            storageBucket: input.metadata.storageBucket,
+            useDayNumber: 0
+          },
+          select: hutApplicationPhotoEntrySelect
+        })) as HutApplicationPhotoEntryRecord;
+
+        await tx.hutParticipant.update?.({
+          data: nextApplicationPhotoParticipantStateForSlot("DELIVERY"),
+          where: { id: participant.id }
+        });
+        await tx.auditLog.create?.({
+          data: {
+            action: "PARTICIPANT_MODIFIED",
+            actorUserId: input.actorUserId,
+            afterJson: toAuditJson({
+              action: "HUT_DELIVERY_EVIDENCE_MANUAL_RECOVERY",
+              entry,
+              reasonDetail: input.reason?.trim() || null,
+              recoveredAt: new Date(),
+              type: "DELIVERY_MANUAL_RECOVERY"
+            }),
+            beforeJson,
+            entityId: participant.id,
+            entityType: "HutParticipant",
+            reason: "HUT_LINK_RECOVERY"
+          }
+        });
+
+        return {
+          data: { participantId: participant.id, useDayNumber: 0 },
+          message: "Evidencia de entrega registrada. Producto 1 Dia 1 queda como siguiente actividad pendiente.",
+          ok: true
+        };
+      });
+    },
+
+    async moveInitialEvidenceToDelivery(input) {
+      if (input.confirmation.trim() !== "MOVER ENTREGA HUT") {
+        return { message: "Escribe MOVER ENTREGA HUT para confirmar.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+
+      return prisma.$transaction(async (tx) => {
+        const participant = await findParticipant(tx, input.participantId);
+
+        if (!participant || participant.studyId !== input.studyId) {
+          return { message: "No encontramos el participante HUT.", ok: false };
+        }
+        if (!isApplicationPhotoProtocol(participant)) {
+          return { message: "La regularizacion de entrega aplica solo al protocolo APPLICATION_PHOTO.", ok: false };
+        }
+        if (blockingApplicationPhotoEntryByUseDayNumber(participant, 0)) {
+          return { message: "Este participante ya tiene evidencia de entrega registrada.", ok: false };
+        }
+
+        const sourceEvidence = participant.applicationEvidence?.find((evidence) => evidence.phase === "COLOCACION") ?? null;
+        if (!sourceEvidence) {
+          return { message: "No encontramos una evidencia inicial COLOCACION para mover a entrega.", ok: false };
+        }
+        const mirroredDay1Entry = (participant.applicationPhotoEntries ?? []).find((entry) =>
+          applicationPhotoEntryMatchesEvidence(entry, sourceEvidence)
+        ) ?? null;
+        const beforeJson = toAuditJson({
+          participant: hutParticipantAuditSnapshot(participant),
+          sourceEvidence,
+          sourcePhotoEntry: mirroredDay1Entry
+        });
+        let deliveryEntry: HutApplicationPhotoEntryRecord | null = null;
+
+        if (mirroredDay1Entry) {
+          deliveryEntry = (await tx.hutApplicationPhotoEntry.update?.({
+            data: {
+              useDayNumber: 0
+            },
+            select: hutApplicationPhotoEntrySelect,
+            where: { id: mirroredDay1Entry.id }
+          })) as HutApplicationPhotoEntryRecord;
+        } else {
+          deliveryEntry = (await tx.hutApplicationPhotoEntry.create?.({
+            data: {
+              capturedAt: sourceEvidence.capturedAt,
+              capturedLocalDate: hutLocalDateKey(sourceEvidence.capturedAt),
+              capturedLocalTimezone: "America/Mexico_City",
+              extension: extensionFromFilename(sourceEvidence.privateStorageKey),
+              mimeType: "image/jpeg",
+              originalFilename: null,
+              participantId: participant.id,
+              privateStorageKey: sourceEvidence.privateStorageKey,
+              productCode: sourceEvidence.productCode,
+              sizeBytes: 0,
+              storageBucket: sourceEvidence.storageBucket,
+              useDayNumber: 0
+            },
+            select: hutApplicationPhotoEntrySelect
+          })) as HutApplicationPhotoEntryRecord;
+        }
+
+        await tx.hutParticipant.update?.({
+          data: nextApplicationPhotoParticipantStateForSlot("DELIVERY"),
+          where: { id: participant.id }
+        });
+        await tx.auditLog.create?.({
+          data: {
+            action: "PARTICIPANT_MODIFIED",
+            actorUserId: input.actorUserId,
+            afterJson: toAuditJson({
+              action: "HUT_INITIAL_EVIDENCE_MOVED_TO_DELIVERY",
+              deliveryEntry,
+              reasonDetail: input.reason?.trim() || null,
+              sourceEvidence,
+              updatedAt: new Date()
+            }),
+            beforeJson,
+            entityId: participant.id,
+            entityType: "HutParticipant",
+            reason: "HUT_LINK_RECOVERY"
+          }
+        });
+
+        return {
+          data: { participantId: participant.id, useDayNumber: 0 },
+          message: "Evidencia inicial regularizada como entrega. Producto 1 Dia 1 queda pendiente para captura real.",
           ok: true
         };
       });
@@ -4838,6 +5088,7 @@ async function toAdminParticipant(
     (participant.applicationEvidence ?? []).map(async (evidence) => ({
       capturedAt: evidence.capturedAt,
       phase: evidence.phase,
+      privateStorageKey: evidence.privateStorageKey,
       productCode: evidence.productCode,
       signedUrl: await signedStorageUrl(evidence.privateStorageKey, evidence.storageBucket, storage)
     }))
@@ -4847,6 +5098,7 @@ async function toAdminParticipant(
       capturedAt: entry.capturedAt,
       capturedLocalDate: entry.capturedLocalDate,
       capturedLocalTimezone: entry.capturedLocalTimezone,
+      privateStorageKey: entry.privateStorageKey,
       productCode: entry.productCode,
       signedUrl:
         entry.privateStorageKey && entry.storageBucket
@@ -6029,6 +6281,28 @@ function isLegacyMirroredPlacementEntry(
     day1Entry: entry,
     deliveryEntry
   });
+}
+
+function applicationPhotoEntryMatchesEvidence(
+  entry: HutApplicationPhotoEntryRecord,
+  evidence: HutApplicationEvidenceRecord
+): boolean {
+  return entry.privateStorageKey === evidence.privateStorageKey
+    && entry.capturedAt.getTime() === evidence.capturedAt.getTime()
+    && entry.productCode === evidence.productCode;
+}
+
+function hutParticipantAuditSnapshot(participant: HutParticipantRecord) {
+  return {
+    firstFragranceLeftArm: participant.firstFragranceLeftArm,
+    folio: participant.folio,
+    id: participant.id,
+    origin: participantOrigin(participant),
+    protocolVersion: participant.protocolVersion,
+    secondFragranceRightArm: participant.secondFragranceRightArm,
+    status: participant.status,
+    studyParticipantId: participant.studyParticipantId
+  };
 }
 
 function blockingApplicationPhotoEntryByUseDayNumber(

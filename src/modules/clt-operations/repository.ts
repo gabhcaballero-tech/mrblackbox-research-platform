@@ -398,6 +398,7 @@ function toRotation(session: SessionRecord): CltOperationsRotationSummary {
     arms,
     firstSampleKey: arms.find((arm) => arm.order === 1)?.productCode ?? null,
     rotationCode: session.studyParticipant.rotationAssignment?.rotationCode ?? null,
+    rotationPlanName: session.studyParticipant.rotationAssignment?.rotationPlan.name ?? null,
     secondSampleKey: arms.find((arm) => arm.order === 2)?.productCode ?? null
   };
 }

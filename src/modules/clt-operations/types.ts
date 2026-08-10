@@ -41,6 +41,7 @@ export type CltOperationsRotationSummary = {
   }>;
   firstSampleKey: string | null;
   rotationCode: string | null;
+  rotationPlanName: string | null;
   secondSampleKey: string | null;
 };
 

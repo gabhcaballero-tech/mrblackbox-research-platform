@@ -1934,6 +1934,136 @@ describe("HUT module foundation", () => {
     });
   });
 
+  it("registers manual delivery recovery and leaves product 1 day 1 as the next activity", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const created = await repository.createParticipant({
+      firstFragranceLeftArm: "247",
+      folio: "HUT-RECOVERY-MANUAL",
+      name: "Participante Recuperacion Entrega",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants.find((item) => item.id === (created.ok ? created.data.participantId : ""))!;
+    participant.origin = "CLT_HUT";
+
+    const signed = await repository.requestManualDeliveryEvidenceUpload({
+      metadata: selfieMetadata(),
+      participantId: participant.id,
+      storage,
+      studyId: "study-hut"
+    });
+    const confirmed = await repository.confirmManualDeliveryEvidenceUpload({
+      actorUserId: "admin-1",
+      capturedAt: new Date("2026-08-09T16:34:00.000Z"),
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: signed.ok ? signed.data.privateStorageKey : "",
+        storageBucket: signed.ok ? signed.data.storageBucket : ""
+      },
+      participantId: participant.id,
+      reason: "HUT_LINK_RECOVERY",
+      studyId: "study-hut"
+    });
+    const view = await repository.getPortalView(participant.token);
+
+    expect(signed).toMatchObject({ ok: true });
+    expect(confirmed).toMatchObject({ ok: true });
+    expect(participant.applicationPhotoEntries).toEqual([
+      expect.objectContaining({
+        productCode: "247",
+        useDayNumber: 0
+      })
+    ]);
+    expect(view.ok ? view.data.availableApplicationPhoto : null).toMatchObject({
+      productCode: "247",
+      slotId: "PRODUCT_1_DAY_1"
+    });
+    expect(prisma.state.auditLogs).toEqual([
+      expect.objectContaining({
+        actorUserId: "admin-1",
+        entityId: participant.id,
+        reason: "HUT_LINK_RECOVERY"
+      })
+    ]);
+  });
+
+  it("moves a historical initial photo to delivery without duplicating evidence", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const created = await repository.createParticipant({
+      firstFragranceLeftArm: "247",
+      folio: "HUT-RECOVERY-MOVE",
+      name: "Participante Movimiento Entrega",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants.find((item) => item.id === (created.ok ? created.data.participantId : ""))!;
+    participant.origin = "CLT_HUT";
+    const capturedAt = new Date("2026-08-08T15:15:00.000Z");
+    participant.applicationEvidence.push({
+      capturedAt,
+      extension: "jpg",
+      id: "legacy-colocacion",
+      mimeType: "image/jpeg",
+      originalFilename: "colocacion.jpg",
+      participantId: participant.id,
+      phase: "COLOCACION",
+      privateStorageKey: "hut/recovery-initial.jpg",
+      productCode: "247",
+      sizeBytes: 2048,
+      storageBucket: "participant-evidence"
+    });
+    participant.applicationPhotoEntries.push({
+      capturedAt,
+      capturedLocalDate: "2026-08-08",
+      capturedLocalTimezone: "America/Mexico_City",
+      id: "legacy-day1-entry",
+      participantId: participant.id,
+      privateStorageKey: "hut/recovery-initial.jpg",
+      productCode: "247",
+      storageBucket: "participant-evidence",
+      useDayNumber: 1
+    });
+    prisma.state.applicationPhotoEntries.push(participant.applicationPhotoEntries[0]!);
+
+    const moved = await repository.moveInitialEvidenceToDelivery({
+      actorUserId: "admin-1",
+      confirmation: "MOVER ENTREGA HUT",
+      participantId: participant.id,
+      reason: "HUT_LINK_RECOVERY",
+      studyId: "study-hut"
+    });
+    const duplicate = await repository.moveInitialEvidenceToDelivery({
+      actorUserId: "admin-1",
+      confirmation: "MOVER ENTREGA HUT",
+      participantId: participant.id,
+      reason: "HUT_LINK_RECOVERY",
+      studyId: "study-hut"
+    });
+    const view = await repository.getPortalView(participant.token);
+
+    expect(moved).toMatchObject({ ok: true });
+    expect(duplicate).toMatchObject({
+      message: "Este participante ya tiene evidencia de entrega registrada.",
+      ok: false
+    });
+    expect(participant.applicationEvidence).toHaveLength(1);
+    expect(participant.applicationPhotoEntries).toHaveLength(1);
+    expect(participant.applicationPhotoEntries[0]).toMatchObject({
+      privateStorageKey: "hut/recovery-initial.jpg",
+      useDayNumber: 0
+    });
+    expect(view.ok ? view.data.availableApplicationPhoto : null).toMatchObject({
+      productCode: "247",
+      slotId: "PRODUCT_1_DAY_1"
+    });
+  });
+
   it("does not allow the participant token portal to save HUT questionnaire answers", async () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
@@ -4767,6 +4897,7 @@ function createFakeHutPrisma() {
           participantId: args.data.participantId,
           privateStorageKey: String(args.data.privateStorageKey),
           productCode: (args.data.productCode as string | null) ?? null,
+          storageBucket: String(args.data.storageBucket ?? "participant-evidence"),
           useDayNumber: Number(args.data.useDayNumber)
         };
         state.applicationPhotoEntries.push(entry);
@@ -4783,6 +4914,17 @@ function createFakeHutPrisma() {
               (typeof args.where.useDayNumber !== "number" || entry.useDayNumber === args.where.useDayNumber)
           ) ?? null
         );
+      },
+      async update(args: { data: Partial<FakeApplicationPhotoEntry>; where: { id: string } }) {
+        const entry = state.applicationPhotoEntries.find((item) => item.id === args.where.id);
+        if (entry) {
+          Object.assign(entry, args.data);
+          const participant = state.participants.find((item) => item.id === entry.participantId);
+          if (participant) {
+            participant.applicationPhotoEntries = state.applicationPhotoEntries.filter((candidate) => candidate.participantId === participant.id);
+          }
+        }
+        return entry ?? null;
       },
       async deleteMany(args: { where: { participantId: string; privateStorageKey?: string } }) {
         const before = state.applicationPhotoEntries.length;
@@ -5056,6 +5198,7 @@ type FakeApplicationPhotoEntry = {
   participantId: string;
   privateStorageKey: string;
   productCode: string | null;
+  storageBucket?: string;
   useDayNumber: number;
 };
 

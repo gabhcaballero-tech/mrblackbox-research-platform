@@ -559,11 +559,15 @@ function resolveEvidenceForDefinition(
 ): HutPhotoTimelinePhoto | null {
   const colocacionEvidence = phaseEvidence.get("COLOCACION") ?? null;
   const deliveryEvidence = dailyByUseDay.get(0) ?? null;
+  const deliveryMovedFromColocacion = deliveryEntryRepresentsColocacionEvidence(deliveryEvidence, colocacionEvidence);
 
   if (definition.id === "DELIVERY") {
     return deliveryEvidence ?? colocacionEvidence;
   }
   if (definition.sourcePhase === "COLOCACION") {
+    if (deliveryMovedFromColocacion) {
+      return dailyByUseDay.get(1) ?? null;
+    }
     if (legacyMirroredPlacementPhoto) {
       return dailyByUseDay.get(1) ?? null;
     }
@@ -604,12 +608,44 @@ function dedupeDailyEntries(
     }
     for (const evidence of phaseEvidence.values()) {
       const sameStoredFile = !entry.privateStorageKey || !evidence.privateStorageKey || entry.privateStorageKey === evidence.privateStorageKey;
+      if (entry.useDayNumber === 0 && evidence.phase === "COLOCACION" && sameTimelineStoredPhoto(entry, evidence)) {
+        return true;
+      }
       if (sameStoredFile && entry.capturedAt.getTime() === evidence.capturedAt.getTime() && entry.productCode === evidence.productCode) {
         return false;
       }
     }
     return true;
   });
+}
+
+function deliveryEntryRepresentsColocacionEvidence(
+  deliveryEntry: HutPhotoTimelinePhoto | null,
+  colocacionEvidence: HutPhotoTimelinePhoto | null
+): boolean {
+  if (!deliveryEntry || !colocacionEvidence) {
+    return false;
+  }
+  return sameTimelineStoredPhoto(deliveryEntry, colocacionEvidence);
+}
+
+function sameTimelineStoredPhoto(
+  left: {
+    capturedAt: Date;
+    privateStorageKey?: string | null;
+    productCode: string | null;
+  },
+  right: {
+    capturedAt: Date;
+    privateStorageKey?: string | null;
+    productCode: string | null;
+  }
+): boolean {
+  if (left.privateStorageKey && right.privateStorageKey && left.privateStorageKey !== right.privateStorageKey) {
+    return false;
+  }
+
+  return left.capturedAt.getTime() === right.capturedAt.getTime() && left.productCode === right.productCode;
 }
 
 function sameTimelinePhoto(

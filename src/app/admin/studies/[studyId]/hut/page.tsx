@@ -8,6 +8,7 @@ import {
   createHutRegistrationSlotAction,
   deleteHutParticipantAction,
   markHutMissedDayAction,
+  moveHutInitialEvidenceToDeliveryAction,
   reactivateHutParticipantAction,
   reconcileReservedHutNavParticipantsAction,
   reviewHutVisualVerificationAction,
@@ -43,6 +44,7 @@ import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { resolveRequestOrigin } from "@/shared/utils/request-origin";
 import { HutParticipantImportPanel } from "./_components/HutParticipantImportPanel";
+import { HutDeliveryRecoveryUpload } from "./_components/HutDeliveryRecoveryUpload";
 import { HutPhaseCodeControls } from "./_components/HutPhaseCodeControls";
 import { HutRegistrationSlotImportPanel } from "./_components/HutRegistrationSlotImportPanel";
 import { HutReferenceSelfieUpload } from "./_components/HutReferenceSelfieUpload";
@@ -866,11 +868,13 @@ function ApplicationPhotoProtocolCard({
     applicationEvidence: applicationEvidence.map((evidence) => ({
       capturedAt: evidence.capturedAt,
       phase: evidence.phase,
+      privateStorageKey: evidence.privateStorageKey,
       productCode: evidence.productCode
     })),
     dailyEntries: participant.applicationPhotoEntries.map((entry) => ({
       capturedAt: entry.capturedAt,
       capturedLocalDate: entry.capturedLocalDate,
+      privateStorageKey: entry.privateStorageKey,
       productCode: entry.productCode,
       useDayNumber: entry.useDayNumber
     })),
@@ -884,6 +888,8 @@ function ApplicationPhotoProtocolCard({
   const photoSlots = hutTimeline.filter((slot) => slot.participantTask);
   const evaluationSlots = hutTimeline.filter((slot) => slot.interviewerTask);
   const phaseLabel = applicationPhotoCurrentPhaseLabel(participant);
+  const deliverySlot = photoSlots.find((slot) => slot.id === "DELIVERY") ?? null;
+  const hasColocacionEvidence = applicationEvidence.some((evidence) => evidence.phase === "COLOCACION");
 
   return (
     <section className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
@@ -946,25 +952,45 @@ function ApplicationPhotoProtocolCard({
         </div>
       </div>
       {showAdminResetTools ? (
-        <details className="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3">
-          <summary className="cursor-pointer text-sm font-semibold text-rose-950">Resetear evidencia fotografica</summary>
-          <p className="mt-2 text-xs leading-5 text-rose-900">
-            Esta accion libera una fase para recaptura. Conserva folio, rotacion, vinculo NAV, codigos y fases; la auditoria queda registrada.
-          </p>
-          <form action={resetHutApplicationPhotoEvidenceAction.bind(null, studyId, participant.id)} className="mt-3 space-y-2">
-            <label className="flex flex-col gap-1 text-xs font-semibold text-rose-950">
-              Fase
-              <select className={inputClass} name="phase" required>
-                <option value="COLOCACION">Producto 1 - Dia 1 (Colocacion)</option>
-                <option value="REGRESO_1">Evaluacion 1 - registro historico</option>
-                <option value="REGRESO_2">Evaluacion 2 - registro historico</option>
-              </select>
-            </label>
-            <textarea className={inputClass} name="reason" placeholder="Motivo obligatorio" required rows={2} />
-            <input className={inputClass} name="confirmation" placeholder="RESET EVIDENCIA HUT" required />
-            <SubmitButton pendingLabel="Reseteando evidencia...">Resetear evidencia fotografica</SubmitButton>
-          </form>
-        </details>
+        <div className="mt-4 space-y-3">
+          <details className="rounded-md border border-amber-200 bg-amber-50 p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-amber-950">Regularizar entrega por falla de enlace</summary>
+            <div className="mt-3 space-y-3">
+              <HutDeliveryRecoveryUpload disabled={Boolean(deliverySlot?.evidence)} participantId={participant.id} studyId={studyId} />
+              <form action={moveHutInitialEvidenceToDeliveryAction.bind(null, studyId, participant.id)} className="space-y-2 rounded-md border border-amber-200 bg-white p-3">
+                <h5 className="text-sm font-semibold text-amber-950">Mover evidencia inicial a Entrega</h5>
+                <p className="text-xs leading-5 text-amber-900">
+                  Usa esta accion cuando la foto COLOCACION historica realmente corresponde a la entrega fisica del producto.
+                  Se conserva el archivo original y se registra auditoria.
+                </p>
+                <textarea className={inputClass} name="reason" placeholder="Detalle operativo opcional" rows={2} />
+                <input className={inputClass} name="confirmation" placeholder="MOVER ENTREGA HUT" required />
+                <SubmitButton disabled={Boolean(deliverySlot?.evidence) || !hasColocacionEvidence} pendingLabel="Regularizando entrega...">
+                  Mover evidencia a Entrega
+                </SubmitButton>
+              </form>
+            </div>
+          </details>
+          <details className="rounded-md border border-rose-200 bg-rose-50 p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-rose-950">Resetear evidencia fotografica</summary>
+            <p className="mt-2 text-xs leading-5 text-rose-900">
+              Esta accion libera una fase para recaptura. Conserva folio, rotacion, vinculo NAV, codigos y fases; la auditoria queda registrada.
+            </p>
+            <form action={resetHutApplicationPhotoEvidenceAction.bind(null, studyId, participant.id)} className="mt-3 space-y-2">
+              <label className="flex flex-col gap-1 text-xs font-semibold text-rose-950">
+                Fase
+                <select className={inputClass} name="phase" required>
+                  <option value="COLOCACION">Producto 1 - Dia 1 (Colocacion)</option>
+                  <option value="REGRESO_1">Evaluacion 1 - registro historico</option>
+                  <option value="REGRESO_2">Evaluacion 2 - registro historico</option>
+                </select>
+              </label>
+              <textarea className={inputClass} name="reason" placeholder="Motivo obligatorio" required rows={2} />
+              <input className={inputClass} name="confirmation" placeholder="RESET EVIDENCIA HUT" required />
+              <SubmitButton pendingLabel="Reseteando evidencia...">Resetear evidencia fotografica</SubmitButton>
+            </form>
+          </details>
+        </div>
       ) : null}
     </section>
   );
