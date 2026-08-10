@@ -1767,15 +1767,49 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         }
       })) as HutVisitProgressRecord;
 
-      const completionMessageSent = await sendHutCompletionMessageIfReady({
-        actorUserId: input.actorUserId ?? null,
-        now,
-        participant,
-        prisma,
-        recentlyCompletedSection: input.section,
-        visit,
-        whatsappRepository: getWhatsAppRepository()
-      });
+      const attemptAfterVisit = (await prisma.hutQuestionnaireAttempt.findUnique?.({
+        select: hutQuestionnaireStateSelect,
+        where: { participantId: participant.id }
+      })) as HutQuestionnaireAttemptRecord | null;
+      const finalCompletionReady = attemptAfterVisit
+        ? isHutQuestionnaireFinalCompletionReady({
+            attempt: attemptAfterVisit,
+            participant,
+            recentlyCompletedSection: input.section,
+            visit
+          })
+        : false;
+
+      if (attemptAfterVisit && finalCompletionReady && attemptAfterVisit.status !== "COMPLETED") {
+        await prisma.hutQuestionnaireAttempt.update?.({
+          data: {
+            completedAt: now,
+            status: "COMPLETED"
+          },
+          where: { id: attemptAfterVisit.id }
+        });
+      }
+
+      if (finalCompletionReady && participant.status !== "COMPLETED") {
+        await prisma.hutParticipant.update?.({
+          data: {
+            status: "COMPLETED"
+          },
+          where: { id: participant.id }
+        });
+      }
+
+      const completionMessageSent = finalCompletionReady
+        ? await sendHutCompletionMessageIfReady({
+            actorUserId: input.actorUserId ?? null,
+            now,
+            participant,
+            prisma,
+            recentlyCompletedSection: input.section,
+            visit,
+            whatsappRepository: getWhatsAppRepository()
+          })
+        : false;
 
       return {
         data: toVisitProgressSummary(visit),
@@ -4977,30 +5011,7 @@ async function sendHutCompletionMessageIfReady({
     return false;
   }
 
-  const answers = Object.fromEntries((attempt.answers ?? []).map((answer) => [answer.questionCode, answer.answerJson]));
-  const applicableQuestions = getHutApplicableQuestions({
-    answers,
-    context: { participantOrigin: participantOrigin(participant) },
-    definition: getHutV5Definition()
-  }).filter((question) => question.required);
-  const pendingQuestion = applicableQuestions.find((question) => !Object.prototype.hasOwnProperty.call(answers, question.code));
-
-  if (pendingQuestion) {
-    return false;
-  }
-
-  const completedSections = new Set(
-    (attempt.visits ?? [])
-      .filter((candidate) => candidate.status === "COMPLETED")
-      .map((candidate) => candidate.section)
-  );
-  if (visit.status === "COMPLETED") {
-    completedSections.add(recentlyCompletedSection);
-  }
-
-  const requiredSections = new Set(applicableQuestions.map((question) => question.section));
-  const hasPendingSection = [...requiredSections].some((section) => !completedSections.has(section));
-  if (hasPendingSection) {
+  if (!isHutQuestionnaireFinalCompletionReady({ attempt, participant, recentlyCompletedSection, visit })) {
     return false;
   }
 
@@ -5041,6 +5052,75 @@ async function sendHutCompletionMessageIfReady({
   });
 
   return true;
+}
+
+function isHutQuestionnaireFinalCompletionReady({
+  attempt,
+  participant,
+  recentlyCompletedSection,
+  visit
+}: {
+  attempt: HutQuestionnaireAttemptRecord;
+  participant: HutParticipantRecord;
+  recentlyCompletedSection?: HutQuestionnaireSectionId;
+  visit?: HutVisitProgressRecord;
+}): boolean {
+  if (!isApplicationPhotoProtocol(participant) || participant.status === "DISQUALIFIED" || attempt.status === "TERMINATED") {
+    return false;
+  }
+
+  const answers = Object.fromEntries((attempt.answers ?? []).map((answer) => [answer.questionCode, answer.answerJson]));
+  const applicableQuestions = getHutApplicableQuestions({
+    answers,
+    context: { participantOrigin: participantOrigin(participant) },
+    definition: getHutV5Definition()
+  }).filter((question) => question.required);
+  const pendingQuestion = applicableQuestions.find((question) => !Object.prototype.hasOwnProperty.call(answers, question.code));
+
+  if (pendingQuestion) {
+    return false;
+  }
+
+  const completedSections = new Set(
+    (attempt.visits ?? [])
+      .filter((candidate) => candidate.status === "COMPLETED")
+      .map((candidate) => candidate.section)
+  );
+  if (visit?.status === "COMPLETED" && recentlyCompletedSection) {
+    completedSections.add(recentlyCompletedSection);
+  }
+
+  const requiredSections = new Set(applicableQuestions.map((question) => question.section));
+  const hasPendingSection = [...requiredSections].some((section) => !completedSections.has(section));
+  if (hasPendingSection) {
+    return false;
+  }
+
+  if (!completedSections.has("SEGUNDA_VISITA") || !completedSections.has("COMPARATIVA")) {
+    return false;
+  }
+
+  const secondVisitRequiredQuestions = applicableQuestions.filter((question) => question.section === "SEGUNDA_VISITA");
+  const comparativeRequiredQuestions = applicableQuestions.filter((question) => question.section === "COMPARATIVA");
+  if (secondVisitRequiredQuestions.length === 0 || comparativeRequiredQuestions.length === 0) {
+    return false;
+  }
+
+  const finalComparativeCodes = new Set([
+    "HUT_P24_PREFERENCIA_GENERAL",
+    "HUT_P25_COMPRA_PRIMERO",
+    "HUT_P26_COMPRA_SEGUNDO",
+    "HUT_P27_COMPARATIVA_ATRIBUTOS"
+  ]);
+  const applicableFinalComparativeCodes = comparativeRequiredQuestions
+    .filter((question) => finalComparativeCodes.has(question.code))
+    .map((question) => question.code);
+
+  return (
+    secondVisitRequiredQuestions.every((question) => Object.prototype.hasOwnProperty.call(answers, question.code)) &&
+    applicableFinalComparativeCodes.length === finalComparativeCodes.size &&
+    applicableFinalComparativeCodes.every((code) => Object.prototype.hasOwnProperty.call(answers, code))
+  );
 }
 
 async function hasHutCompletionMessageAudit(prisma: HutPrismaClient, participantId: string): Promise<boolean> {

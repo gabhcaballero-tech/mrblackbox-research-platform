@@ -2214,6 +2214,84 @@ describe("HUT module foundation", () => {
     });
   });
 
+  it("keeps HUT active when only the photographic timeline is complete", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const whatsapp = createFakeWhatsAppRepository();
+    const repository = createHutRepository(prisma as never, whatsapp);
+    stubAcceptedWhatsAppMeta();
+    await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-PHOTOS-COMPLETE" });
+    const participant = prisma.state.participants[0]!;
+
+    for (const useDayNumber of [0, 1, 2, 3, 4, 5, 6]) {
+      addApplicationPhotoEntry(prisma.state, participant, {
+        capturedAt: new Date(`2026-08-${String(9 + useDayNumber).padStart(2, "0")}T15:00:00.000Z`),
+        useDayNumber
+      });
+    }
+
+    const result = await repository.processPhotoWhatsAppReminders({
+      now: new Date("2026-08-18T16:34:00.000Z"),
+      requestOrigin: "https://example.test",
+      studyId: "study-hut"
+    });
+
+    expect(result.ok ? result.data.sent : -1).toBe(0);
+    expect(result.ok ? result.data.skipped : -1).toBe(1);
+    expect(participant.status).not.toBe("COMPLETED");
+    expect(participant.questionnaireAttempt).toBeNull();
+    expect(prisma.state.auditLogs.some((log) => log.reason === "HUT_COMPLETION_MESSAGE")).toBe(false);
+  });
+
+  it("does not complete HUT after Regreso 2 when comparativa P24-P27 is still pending", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const whatsapp = createFakeWhatsAppRepository();
+    const repository = createHutRepository(prisma as never, whatsapp);
+    stubAcceptedWhatsAppMeta();
+    await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-COMPLETE-NO-COMP" });
+    const participant = prisma.state.participants[0]!;
+    const formData = createCompleteHutV5FormData({ participantOrigin: "CLT_HUT" });
+    formData.set("HUT_F2_EDAD_EXACTA", "35");
+    formData.set("HUT_F2_RANGO_EDAD", "2");
+    formData.delete("HUT_F6_PRODUCTOS_7_DIAS");
+    formData.append("HUT_F6_PRODUCTOS_7_DIAS", "3");
+    const answers = hutFormDataToAnswerInput(formData);
+    const applicableQuestions = getHutApplicableQuestions({
+      answers,
+      context: { participantOrigin: "CLT_HUT" },
+      definition: getHutV5Definition()
+    }).filter((question) => question.required);
+
+    for (const question of applicableQuestions) {
+      const result = await repository.saveQuestionnaireAnswer({
+        answerInput: { [question.code]: answers[question.code] },
+        participantId: participant.id,
+        questionCode: question.code,
+        studyId: "study-hut"
+      });
+      expect(result.ok).toBe(true);
+    }
+
+    const sections = [...new Set(applicableQuestions.map((question) => question.section))].filter(
+      (section) => section !== "COMPARATIVA"
+    );
+    let lastResult: Awaited<ReturnType<typeof repository.completeQuestionnaireSection>> | null = null;
+    for (const section of sections) {
+      lastResult = await repository.completeQuestionnaireSection({
+        actorUserId: "field-user-1",
+        participantId: participant.id,
+        section,
+        studyId: "study-hut"
+      });
+      expect(lastResult.ok).toBe(true);
+    }
+
+    expect(lastResult?.ok ? lastResult.message : "").toBe("Seccion HUT v5 completada correctamente.");
+    expect(prisma.state.questionnaireAttempts[0]).toMatchObject({ status: "IN_PROGRESS" });
+    expect(participant.status).not.toBe("COMPLETED");
+    expect(whatsapp.createOutboundMessage).not.toHaveBeenCalled();
+    expect(prisma.state.auditLogs.some((log) => log.reason === "HUT_COMPLETION_MESSAGE")).toBe(false);
+  });
+
   it("sends HUT completion message once when all applicable questionnaire sections are closed", async () => {
     const { prisma } = createFakeHutPrisma();
     const whatsapp = createFakeWhatsAppRepository();
@@ -2263,6 +2341,11 @@ describe("HUT module foundation", () => {
 
     expect(lastResult?.ok ? lastResult.message : "").toBe("Participacion HUT finalizada correctamente.");
     expect(repeated.ok).toBe(true);
+    expect(participant.status).toBe("COMPLETED");
+    expect(prisma.state.questionnaireAttempts[0]).toMatchObject({
+      completedAt: expect.any(Date),
+      status: "COMPLETED"
+    });
     expect(whatsapp.createOutboundMessage).toHaveBeenCalledTimes(1);
     expect(prisma.state.auditLogs.filter((log) => log.reason === "HUT_COMPLETION_MESSAGE")).toHaveLength(1);
     expect(prisma.state.auditLogs.find((log) => log.reason === "HUT_COMPLETION_MESSAGE")).toMatchObject({
