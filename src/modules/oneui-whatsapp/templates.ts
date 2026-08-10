@@ -18,6 +18,9 @@ const NAVIGO_CONFIRMATION_TEMPLATE_NAME = "oneui_navigo_confirmation_participaci
 const LEGACY_NAVIGO_CONFIRMATION_TEMPLATE_NAME = "oneui_navigo_confirmacion_participacion";
 const NAVIGO_EVALUATION_TEMPLATE_NAME = "navigo_acceso_evaluaciones";
 const NAVIGO_EVALUATION_REMINDER_TEMPLATE_NAME = "navigo_recordatorio_evaluacion";
+const HUT_PARTICIPANT_LINK_TEMPLATE_NAME = "hut_link_participant";
+const NAVIGO_HUT_LINKS_TEMPLATE_NAME = "navigo_hut_links";
+const HUT_PHOTO_REMINDER_TEMPLATE_NAME = "hut_photo_reminder";
 
 export function whatsappAutomationStatusFromMessage(
   message: Pick<OneuiWhatsAppMessageRecord, "createdAt" | "metaMessageId" | "rawPayload" | "status" | "timestamp"> | null
@@ -212,6 +215,137 @@ export function buildNavigoEvaluationLinkWhatsAppBody({
   ].join("\n");
 }
 
+export async function sendHutParticipantLinkWhatsApp(input: {
+  env?: NodeJS.ProcessEnv;
+  hutUrl: string;
+  now?: Date;
+  participantId: string;
+  participantName: string;
+  phone: string | null;
+  repository?: OneuiWhatsAppRepository;
+  sender?: WhatsAppTemplateSender;
+  studyId: string;
+}): Promise<OneuiWhatsAppSendTemplateResult | { ok: false; code: "SKIPPED"; message: string }> {
+  const env = input.env ?? process.env;
+
+  if (env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
+    return { code: "SKIPPED", message: "Envio automatico HUT desactivado.", ok: false };
+  }
+
+  if (!input.participantName || !input.phone || !input.hutUrl) {
+    return { code: "SKIPPED", message: "Faltan datos para enviar enlace HUT.", ok: false };
+  }
+
+  const sender = input.sender ?? sendOneuiWhatsAppTemplate;
+
+  return sender({
+    bodyText: buildHutParticipantLinkWhatsAppBody({
+      hutUrl: input.hutUrl,
+      participantName: input.participantName
+    }),
+    env,
+    language: env.WHATSAPP_HUT_LINK_LANGUAGE ?? "es_MX",
+    linkedParticipantId: input.participantId,
+    linkedStudyId: input.studyId,
+    now: input.now,
+    parameters: [
+      textParameter(input.participantName),
+      textParameter(input.hutUrl)
+    ],
+    profileName: input.participantName,
+    repository: input.repository,
+    sourceModule: "HUT",
+    templateName: env.WHATSAPP_HUT_LINK_TEMPLATE ?? HUT_PARTICIPANT_LINK_TEMPLATE_NAME,
+    toPhone: input.phone
+  });
+}
+
+export async function sendNavigoHutLinksWhatsApp(input: {
+  env?: NodeJS.ProcessEnv;
+  hutUrl: string;
+  navigoUrl: string;
+  now?: Date;
+  participantId: string;
+  participantName: string;
+  phone: string | null;
+  repository?: OneuiWhatsAppRepository;
+  sender?: WhatsAppTemplateSender;
+  studyId: string;
+}): Promise<OneuiWhatsAppSendTemplateResult | { ok: false; code: "SKIPPED"; message: string }> {
+  const env = input.env ?? process.env;
+
+  if (env.WHATSAPP_NAVIGO_AUTO_SEND_ENABLED === "false" || env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
+    return { code: "SKIPPED", message: "Envio automatico de enlaces Navigo/HUT desactivado.", ok: false };
+  }
+
+  if (!input.participantName || !input.phone || !input.navigoUrl || !input.hutUrl) {
+    return { code: "SKIPPED", message: "Faltan datos para enviar enlaces Navigo/HUT.", ok: false };
+  }
+
+  const sender = input.sender ?? sendOneuiWhatsAppTemplate;
+
+  return sender({
+    bodyText: buildNavigoHutLinksWhatsAppBody({
+      hutUrl: input.hutUrl,
+      navigoUrl: input.navigoUrl,
+      participantName: input.participantName
+    }),
+    env,
+    language: env.WHATSAPP_NAVIGO_HUT_LINKS_LANGUAGE ?? "es_MX",
+    linkedParticipantId: input.participantId,
+    linkedStudyId: input.studyId,
+    now: input.now,
+    parameters: [
+      textParameter(input.participantName),
+      textParameter(input.navigoUrl),
+      textParameter(input.hutUrl)
+    ],
+    profileName: input.participantName,
+    repository: input.repository,
+    sourceModule: "NAVIGO",
+    templateName: env.WHATSAPP_NAVIGO_HUT_LINKS_TEMPLATE ?? NAVIGO_HUT_LINKS_TEMPLATE_NAME,
+    toPhone: input.phone
+  });
+}
+
+export function buildHutParticipantLinkWhatsAppBody({
+  hutUrl,
+  participantName
+}: {
+  hutUrl: string;
+  participantName: string;
+}): string {
+  return [
+    `Hola ${participantName}.`,
+    "",
+    "Te compartimos tu enlace para el seguimiento fotografico HUT.",
+    `Enlace HUT: ${hutUrl}`,
+    "",
+    "Gracias por participar."
+  ].filter(Boolean).join("\n");
+}
+
+export function buildNavigoHutLinksWhatsAppBody({
+  hutUrl,
+  navigoUrl,
+  participantName
+}: {
+  hutUrl: string;
+  navigoUrl: string;
+  participantName: string;
+}): string {
+  return [
+    `Hola ${participantName}.`,
+    "",
+    "Te compartimos tus enlaces de seguimiento del estudio.",
+    "",
+    `Navigo: ${navigoUrl}`,
+    `HUT: ${hutUrl}`,
+    "",
+    "Gracias por participar."
+  ].join("\n");
+}
+
 export async function sendNavigoEvaluationReminderWhatsApp(input: {
   activityCode: string;
   env?: NodeJS.ProcessEnv;
@@ -258,6 +392,70 @@ export function buildNavigoEvaluationReminderWhatsAppBody(): string {
     "Tu siguiente evaluacion ya se encuentra disponible.",
     "",
     "Te invitamos a realizarla ahora."
+  ].join("\n");
+}
+
+export async function sendHutPhotoReminderWhatsApp(input: {
+  env?: NodeJS.ProcessEnv;
+  hutUrl: string;
+  now?: Date;
+  participantId: string;
+  participantName: string;
+  phone: string | null;
+  repository?: OneuiWhatsAppRepository;
+  sender?: WhatsAppTemplateSender;
+  studyId: string;
+}): Promise<OneuiWhatsAppSendTemplateResult | { ok: false; code: "SKIPPED"; message: string }> {
+  const env = input.env ?? process.env;
+
+  if (env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
+    return { code: "SKIPPED", message: "Envio automatico HUT desactivado.", ok: false };
+  }
+
+  if (!input.participantName || !input.phone || !input.hutUrl) {
+    return { code: "SKIPPED", message: "Faltan datos para enviar recordatorio HUT.", ok: false };
+  }
+
+  const sender = input.sender ?? sendOneuiWhatsAppTemplate;
+
+  return sender({
+    bodyText: buildHutPhotoReminderWhatsAppBody({
+      hutUrl: input.hutUrl,
+      participantName: input.participantName
+    }),
+    env,
+    language: env.WHATSAPP_HUT_PHOTO_REMINDER_LANGUAGE ?? "es_MX",
+    linkedParticipantId: input.participantId,
+    linkedStudyId: input.studyId,
+    now: input.now,
+    parameters: [
+      textParameter(input.participantName),
+      textParameter(input.hutUrl)
+    ],
+    profileName: input.participantName,
+    repository: input.repository,
+    sourceModule: "HUT",
+    templateName: env.WHATSAPP_HUT_PHOTO_REMINDER_TEMPLATE ?? HUT_PHOTO_REMINDER_TEMPLATE_NAME,
+    toPhone: input.phone
+  });
+}
+
+export function buildHutPhotoReminderWhatsAppBody({
+  hutUrl,
+  participantName
+}: {
+  hutUrl: string;
+  participantName: string;
+}): string {
+  return [
+    `Hola ${participantName}.`,
+    "",
+    "Tienes pendiente registrar tu fotografia HUT.",
+    "",
+    "Ingresa en el siguiente enlace:",
+    hutUrl,
+    "",
+    "Gracias por participar."
   ].join("\n");
 }
 

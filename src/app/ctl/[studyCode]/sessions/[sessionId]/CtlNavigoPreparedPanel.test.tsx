@@ -1,13 +1,13 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { sendPublicCtlNavigoEvaluationLinkWhatsAppAction } from "@/modules/ctl/public-actions";
+import { sendPublicCtlParticipantLinksWhatsAppAction } from "@/modules/ctl/public-actions";
 import { CtlNavigoPreparedPanel } from "./CtlNavigoPreparedPanel";
 
 vi.mock("@/modules/ctl/public-actions", () => ({
-  sendPublicCtlNavigoEvaluationLinkWhatsAppAction: vi.fn()
+  sendPublicCtlParticipantLinksWhatsAppAction: vi.fn()
 }));
 
-const sendActionMock = vi.mocked(sendPublicCtlNavigoEvaluationLinkWhatsAppAction);
+const sendActionMock = vi.mocked(sendPublicCtlParticipantLinksWhatsAppAction);
 
 describe("CtlNavigoPreparedPanel", () => {
   beforeEach(() => {
@@ -27,6 +27,9 @@ describe("CtlNavigoPreparedPanel", () => {
     expect(screen.getByText("08/08/2026 12:30 a.m.")).toBeInTheDocument();
     expect(screen.getByText("08/08/2026 03:30 a.m.")).toBeInTheDocument();
     expect(screen.getByText("https://example.test/p/token-1/activities")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enviar enlace Navigo" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enviar enlace HUT" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enviar ambos enlaces" })).toBeInTheDocument();
   });
 
   it("copies the visible evaluation link", async () => {
@@ -40,14 +43,18 @@ describe("CtlNavigoPreparedPanel", () => {
     expect(screen.getByRole("button", { name: "Enlace copiado" })).toBeInTheDocument();
   });
 
-  it("sends the same Navigo evaluation link and changes the button to sent", async () => {
+  it("sends Navigo link and changes the button to resend", async () => {
     sendActionMock.mockResolvedValue({
       data: {
-        evaluationUrl: "https://example.test/p/token-1/activities",
         folio: "NAV-001",
         generatedAtIso: "2026-08-08T07:45:00.000Z",
-        message: "Enlace de evaluacion enviado por WhatsApp.",
+        hutUrl: null,
+        message: "Enlace Navigo enviado por WhatsApp.",
+        navigoUrl: "https://example.test/p/token-1/activities",
         phone: "+525512345678",
+        requestedLinkType: "NAVIGO",
+        sentLinkType: "NAVIGO",
+        warnings: [],
         whatsappError: null,
         whatsappMessageId: "wamid-1",
         whatsappStatus: "ENVIADO"
@@ -57,27 +64,63 @@ describe("CtlNavigoPreparedPanel", () => {
 
     renderPanel();
 
-    fireEvent.click(screen.getByRole("button", { name: "Enviar enlace al panelista" }));
+    fireEvent.click(screen.getByRole("button", { name: "Enviar enlace Navigo" }));
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "✓ Enlace enviado" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Reenviar enlace Navigo" })).toBeInTheDocument());
     expect(sendActionMock).toHaveBeenCalledWith(
       "FMASCULINA-NAVIGO-2026",
       "session-1",
-      "https://example.test"
+      "https://example.test",
+      "NAVIGO"
     );
-    expect(screen.getByText("WhatsApp: ✓ Enviado correctamente")).toBeInTheDocument();
+    expect(screen.getByText("WhatsApp: Enviado correctamente")).toBeInTheDocument();
     expect(screen.getByText("Telefono destino: +525512345678")).toBeInTheDocument();
-    expect(screen.getByText("https://example.test/p/token-1/activities")).toBeInTheDocument();
   });
 
-  it("keeps the link available when WhatsApp fails", async () => {
+  it("sends HUT link and displays it for backup", async () => {
     sendActionMock.mockResolvedValue({
       data: {
-        evaluationUrl: "https://example.test/p/token-1/activities",
         folio: "NAV-001",
         generatedAtIso: "2026-08-08T07:45:00.000Z",
-        message: "Enlace generado. WhatsApp fallo; copia el enlace para compartirlo manualmente.",
+        hutUrl: "https://example.test/hut/p/hut-token",
+        message: "Enlace HUT enviado por WhatsApp.",
+        navigoUrl: "https://example.test/p/token-1/activities",
         phone: "+525512345678",
+        requestedLinkType: "HUT",
+        sentLinkType: "HUT",
+        warnings: [],
+        whatsappError: null,
+        whatsappMessageId: "wamid-hut",
+        whatsappStatus: "ENVIADO"
+      },
+      ok: true
+    });
+
+    renderPanel();
+
+    fireEvent.click(screen.getByRole("button", { name: "Enviar enlace HUT" }));
+
+    await waitFor(() => expect(screen.getByText("https://example.test/hut/p/hut-token")).toBeInTheDocument());
+    expect(sendActionMock).toHaveBeenCalledWith(
+      "FMASCULINA-NAVIGO-2026",
+      "session-1",
+      "https://example.test",
+      "HUT"
+    );
+  });
+
+  it("keeps available links visible when WhatsApp fails", async () => {
+    sendActionMock.mockResolvedValue({
+      data: {
+        folio: "NAV-001",
+        generatedAtIso: "2026-08-08T07:45:00.000Z",
+        hutUrl: "https://example.test/hut/p/hut-token",
+        message: "Enlace preparado. WhatsApp fallo; copia el enlace disponible para compartirlo manualmente.",
+        navigoUrl: "https://example.test/p/token-1/activities",
+        phone: "+525512345678",
+        requestedLinkType: "BOTH",
+        sentLinkType: "BOTH",
+        warnings: [],
         whatsappError: "Meta no disponible",
         whatsappMessageId: null,
         whatsappStatus: "ERROR"
@@ -87,11 +130,12 @@ describe("CtlNavigoPreparedPanel", () => {
 
     renderPanel();
 
-    fireEvent.click(screen.getByRole("button", { name: "Enviar enlace al panelista" }));
+    fireEvent.click(screen.getByRole("button", { name: "Enviar ambos enlaces" }));
 
     await waitFor(() => expect(screen.getByText("Meta no disponible")).toBeInTheDocument());
-    expect(screen.getByRole("button", { name: "Copiar enlace" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Copiar enlace" }).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("https://example.test/p/token-1/activities")).toBeInTheDocument();
+    expect(screen.getByText("https://example.test/hut/p/hut-token")).toBeInTheDocument();
   });
 });
 

@@ -120,6 +120,18 @@ export async function sendHutRegistrationWhatsAppAction(studyId: string, partici
   redirectWithHutMessage(studyId, result, participantId);
 }
 
+export async function sendHutPhotoReminderWhatsAppAction(studyId: string, participantId: string, formData: FormData) {
+  const actor = await requireCapability("screening:review");
+  const result = await createHutRepository().sendPhotoReminderWhatsApp({
+    actorUserId: actor.id,
+    participantId,
+    requestOrigin: String(formData.get("requestOrigin") ?? ""),
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
 export async function deleteHutParticipantAction(studyId: string, participantId: string, formData: FormData) {
   await requireCapability("screening:review");
   const result = await createHutRepository().deleteParticipant({

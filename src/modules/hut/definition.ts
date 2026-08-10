@@ -64,6 +64,7 @@ export type HutBaseQuestionDefinition = {
   references?: HutQuestionReference[];
   required: boolean;
   requiredForCltHut?: boolean;
+  rotationPairGroup?: string;
   section: HutQuestionnaireSectionId;
   skipRules?: HutQuestionSkipRule[];
   terminationRules?: HutQuestionTerminationRule[];
@@ -901,6 +902,7 @@ function productEvaluationQuestions({
       instructions: [rotateQuestionPairInstruction, clarifyInstruction],
       label: `P8${suffix.toLowerCase()}. Que fue lo que le gusto o lo que mas le gusto del perfume que uso durante los ultimos 3 dias? Que mas? Algo mas?`,
       required: true,
+      rotationPairGroup: suffix === "A" ? "HUT_EVA1_LIKES_DISLIKES" : "HUT_EVA2_LIKES_DISLIKES",
       section,
       type: "LONG_TEXT"
     },
@@ -909,6 +911,7 @@ function productEvaluationQuestions({
       instructions: [rotateQuestionPairInstruction, clarifyInstruction, insistNothingInstruction],
       label: `P9${suffix.toLowerCase()}. Que fue lo que no le gusto o lo que menos le gusto del perfume que uso durante los ultimos 3 dias? Que mas? Algo mas?`,
       required: true,
+      rotationPairGroup: suffix === "A" ? "HUT_EVA1_LIKES_DISLIKES" : "HUT_EVA2_LIKES_DISLIKES",
       section,
       type: "LONG_TEXT"
     },
@@ -1007,6 +1010,7 @@ function productEvaluationQuestions({
       instructions: [rotateQuestionPairInstruction, clarifyInstruction],
       label: `P17${suffix.toLowerCase()}. Que fue lo que le gusto o lo que mas le gusto del atomizador/valvula de este perfume que uso? Que mas? Algo mas?`,
       required: true,
+      rotationPairGroup: suffix === "A" ? "HUT_EVA1_ATOMIZER_LIKES_DISLIKES" : "HUT_EVA2_ATOMIZER_LIKES_DISLIKES",
       section,
       type: "LONG_TEXT"
     },
@@ -1015,6 +1019,7 @@ function productEvaluationQuestions({
       instructions: [rotateQuestionPairInstruction, clarifyInstruction, insistNothingInstruction],
       label: `P18${suffix.toLowerCase()}. Que fue lo que no le gusto o lo que menos le gusto del atomizador/valvula de este perfume que uso? Que mas? Algo mas?`,
       required: true,
+      rotationPairGroup: suffix === "A" ? "HUT_EVA1_ATOMIZER_LIKES_DISLIKES" : "HUT_EVA2_ATOMIZER_LIKES_DISLIKES",
       section,
       type: "LONG_TEXT"
     },
@@ -1272,6 +1277,81 @@ export function getHutApplicableQuestions({
   return applyHutSkipRules(visibleQuestions, lookup);
 }
 
+export function orderHutQuestionsForParticipant(
+  questions: HutQuestionDefinition[],
+  participantId: string | null | undefined
+): HutQuestionDefinition[] {
+  if (!participantId) {
+    return questions;
+  }
+
+  const groups = new Map<string, HutQuestionDefinition[]>();
+  for (const question of questions) {
+    if (!question.rotationPairGroup) {
+      continue;
+    }
+
+    groups.set(question.rotationPairGroup, [
+      ...(groups.get(question.rotationPairGroup) ?? []),
+      question
+    ]);
+  }
+
+  if (groups.size === 0) {
+    return questions;
+  }
+
+  const emittedGroups = new Set<string>();
+  const orderedQuestions: HutQuestionDefinition[] = [];
+
+  for (const question of questions) {
+    const group = question.rotationPairGroup;
+    if (!group) {
+      orderedQuestions.push(question);
+      continue;
+    }
+
+    if (emittedGroups.has(group)) {
+      continue;
+    }
+
+    emittedGroups.add(group);
+    const members = groups.get(group) ?? [question];
+    orderedQuestions.push(...orderHutQuestionRotationGroup(members, participantId, group));
+  }
+
+  return orderedQuestions;
+}
+
+export function getHutQuestionPairRotationAudit({
+  definition = getHutV5Definition(),
+  participantId,
+  questionCode
+}: {
+  definition?: HutDefinition;
+  participantId: string | null | undefined;
+  questionCode: string;
+}): { group: string; order: string[] } | null {
+  if (!participantId) {
+    return null;
+  }
+
+  const question = getHutQuestions(definition).find((candidate) => candidate.code === questionCode);
+  if (!question?.rotationPairGroup) {
+    return null;
+  }
+
+  const groupQuestions = getHutQuestions(definition).filter((candidate) => candidate.rotationPairGroup === question.rotationPairGroup);
+  if (groupQuestions.length <= 1) {
+    return null;
+  }
+
+  return {
+    group: question.rotationPairGroup,
+    order: orderHutQuestionRotationGroup(groupQuestions, participantId, question.rotationPairGroup).map((candidate) => candidate.code)
+  };
+}
+
 export function buildHutVisibilityLookup(
   answers: HutAnswerLookup = {},
   context: HutDefinitionContext = {}
@@ -1351,6 +1431,27 @@ function applyHutSkipRules(questions: HutQuestionDefinition[], answers: HutAnswe
   }
 
   return questions.filter((question) => !skippedCodes.has(question.code));
+}
+
+function orderHutQuestionRotationGroup(
+  questions: HutQuestionDefinition[],
+  participantId: string,
+  group: string
+): HutQuestionDefinition[] {
+  return [...questions].sort((left, right) => {
+    const leftHash = stableHutDefinitionHash(`${participantId}:${group}:${left.code}`);
+    const rightHash = stableHutDefinitionHash(`${participantId}:${group}:${right.code}`);
+    return leftHash - rightHash;
+  });
+}
+
+function stableHutDefinitionHash(value: string): number {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+
+  return hash;
 }
 
 function normalizeHutDefinitionCode(value: unknown): string {

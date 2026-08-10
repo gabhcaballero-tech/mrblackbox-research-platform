@@ -17,7 +17,9 @@ export {
   getHutQuestions,
   getHutQuestionsBySection,
   getHutV5Definition,
-  HUT_V5_DEFINITION
+  getHutQuestionPairRotationAudit,
+  HUT_V5_DEFINITION,
+  orderHutQuestionsForParticipant
 } from "./definition";
 export type {
   HutAnswerDraft,
@@ -50,6 +52,8 @@ export type {
   HutFieldPhotoSummary,
   HutFieldQuestionnaireWorkspace,
   HutPhaseCodeSummary,
+  HutPhotoReminderProcessResult,
+  HutPhotoReminderSendResult,
   HutQuestionnaireAttemptSummary,
   HutQuestionnaireProgressSummary,
   HutQuestionnaireState,

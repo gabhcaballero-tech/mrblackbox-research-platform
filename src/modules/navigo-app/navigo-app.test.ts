@@ -770,7 +770,9 @@ describe("navigo app MVP rules", () => {
     expect(adminPage).toContain("new URL(`/p/${encodeURIComponent(participant.participantLinkToken)}/activities`, requestOrigin).toString()");
     expect(adminPage).not.toContain("Guardar aplicacion inicial");
     expect(adminPage).toContain("NavigoEvaluationLinkSendPanel");
-    expect(evaluationLinkSendPanel).toContain("Enviar enlace de evaluacion al panelista");
+    expect(evaluationLinkSendPanel).toContain("Enviar enlace Navigo");
+    expect(evaluationLinkSendPanel).toContain("Enviar enlace HUT");
+    expect(evaluationLinkSendPanel).toContain("Enviar ambos enlaces");
     expect(adminPage).toContain("Generar link participante");
     expect(adminPage).toContain("Regenerar link participante");
     expect(adminPage).toContain("Aplicacion inicial registrada en CTL");
@@ -963,8 +965,9 @@ describe("navigo app MVP rules", () => {
     expect(adminPage).not.toContain("Guardando aplicacion inicial...");
     expect(adminPage).toContain("Aplicacion inicial registrada en CTL");
     expect(adminPage).toContain("NavigoEvaluationLinkSendPanel");
-    expect(evaluationLinkSendPanel).toContain("sendNavigoEvaluationLinkWhatsAppAction");
-    expect(evaluationLinkSendPanel).toContain("✓ Enlace enviado");
+    expect(evaluationLinkSendPanel).toContain("sendNavigoParticipantLinksWhatsAppAction");
+    expect(evaluationLinkSendPanel).toContain("Enviar enlace HUT");
+    expect(evaluationLinkSendPanel).toContain("Enviar ambos enlaces");
     expect(adminPage).toContain("Acciones de correccion");
     expect(adminPage).toContain("REINICIAR APP");
     expect(adminPage).toContain("ELIMINAR ETAPAS");
@@ -974,6 +977,7 @@ describe("navigo app MVP rules", () => {
     expect(actions).toContain("resetNavigoParticipantAppAction");
     expect(actions).toContain("deleteNavigoParticipantAction");
     expect(actions).toContain("sendNavigoEvaluationLinkWhatsAppAction");
+    expect(actions).toContain("sendNavigoParticipantLinksWhatsAppAction");
     expect(actions).toContain("admin:access");
     expect(actions).toContain("Selecciona la hora de aplicacion inicial.");
     expect(repository).toContain("NAVIGO_T0_IDENTITY_QUESTION_ID");
@@ -1450,6 +1454,172 @@ describe("navigo app MVP rules", () => {
     expect(whatsApp.messages[0]).toMatchObject({
       status: "failed"
     });
+  });
+
+  it("sends the HUT photo link for a linked HUT participant and writes audit log", async () => {
+    const state = createNavigoParticipantImportState();
+    const whatsApp = createFakeNavigoWhatsAppRepository();
+    const repository = createNavigoAppRepository(state.prisma as never, whatsApp.repository);
+    const registered = await repository.registerDirectParticipant({
+      actorUserId: "admin-1",
+      celular: "5512345678",
+      folio: "NAV-001",
+      generateLink: true,
+      nombre: "Participante Uno",
+      studyId: state.study.id
+    });
+    if (registered.ok) {
+      state.hutParticipants.push({
+        folio: "HUT-001",
+        id: "hut-participant-1",
+        studyParticipantId: registered.data.studyParticipantId,
+        token: "hut-token-1"
+      });
+    }
+    vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "phone-number-id");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        json: async () => ({ messages: [{ id: "wamid-hut-link", message_status: "accepted" }] }),
+        ok: true,
+        status: 200
+      }))
+    );
+
+    const result = registered.ok
+      ? await repository.sendParticipantLinksWhatsApp({
+          actorUserId: "admin-1",
+          linkType: "HUT",
+          now: new Date("2026-08-08T07:45:00.000Z"),
+          requestOrigin: "https://example.test",
+          studyId: state.study.id,
+          studyParticipantId: registered.data.studyParticipantId
+        })
+      : null;
+
+    expect(result?.ok).toBe(true);
+    expect(result?.ok ? result.data.hutUrl : "").toBe("https://example.test/hut/p/hut-token-1");
+    expect(result?.ok ? result.data.sentLinkType : "").toBe("HUT");
+    const payload = whatsApp.messages[0]?.rawPayload as {
+      request?: { template?: { components?: Array<{ parameters?: Array<{ text: string }> }>; name?: string } };
+    };
+    expect(payload.request?.template?.name).toBe("hut_link_participant");
+    expect(payload.request?.template?.components?.[0]?.parameters).toHaveLength(2);
+    expect(payload.request?.template?.components?.[0]?.parameters?.[1]?.text).toBe("https://example.test/hut/p/hut-token-1");
+    expect(state.auditLogs[0]).toMatchObject({
+      action: "PARTICIPANT_MODIFIED",
+      actorUserId: "admin-1",
+      entityId: registered.ok ? registered.data.studyParticipantId : "",
+      entityType: "StudyParticipant",
+      reason: "Envio manual de enlace HUT"
+    });
+    expect(state.auditLogs[0]?.afterJson).toMatchObject({
+      linkTypeRequested: "HUT",
+      linkTypeSent: "HUT",
+      templateName: "hut_link_participant",
+      whatsappStatus: "ENVIADO"
+    });
+  });
+
+  it("sends a combined Navigo and HUT links template when both links exist", async () => {
+    const state = createNavigoParticipantImportState();
+    const whatsApp = createFakeNavigoWhatsAppRepository();
+    const repository = createNavigoAppRepository(state.prisma as never, whatsApp.repository);
+    const registered = await repository.registerDirectParticipant({
+      actorUserId: "admin-1",
+      celular: "5512345678",
+      folio: "NAV-001",
+      generateLink: false,
+      nombre: "Participante Uno",
+      studyId: state.study.id
+    });
+    if (registered.ok) {
+      state.hutParticipants.push({
+        folio: "HUT-001",
+        id: "hut-participant-1",
+        studyParticipantId: registered.data.studyParticipantId,
+        token: "hut-token-1"
+      });
+    }
+    vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "phone-number-id");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        json: async () => ({ messages: [{ id: "wamid-both-links", message_status: "accepted" }] }),
+        ok: true,
+        status: 200
+      }))
+    );
+
+    const result = registered.ok
+      ? await repository.sendParticipantLinksWhatsApp({
+          actorUserId: "admin-1",
+          linkType: "BOTH",
+          now: new Date("2026-08-08T07:45:00.000Z"),
+          requestOrigin: "https://example.test",
+          studyId: state.study.id,
+          studyParticipantId: registered.data.studyParticipantId
+        })
+      : null;
+
+    expect(result?.ok).toBe(true);
+    expect(result?.ok ? result.data.sentLinkType : "").toBe("BOTH");
+    expect(result?.ok ? result.data.navigoUrl : "").toContain("https://example.test/p/");
+    expect(result?.ok ? result.data.hutUrl : "").toBe("https://example.test/hut/p/hut-token-1");
+    const payload = whatsApp.messages[0]?.rawPayload as {
+      request?: { template?: { components?: Array<{ parameters?: Array<{ text: string }> }>; name?: string } };
+    };
+    expect(payload.request?.template?.name).toBe("navigo_hut_links");
+    expect(payload.request?.template?.components?.[0]?.parameters?.[1]?.text).toBe(result?.ok ? result.data.navigoUrl : "");
+    expect(payload.request?.template?.components?.[0]?.parameters?.[2]?.text).toBe("https://example.test/hut/p/hut-token-1");
+    expect(state.auditLogs[0]?.afterJson).toMatchObject({
+      linkTypeRequested: "BOTH",
+      linkTypeSent: "BOTH",
+      templateName: "navigo_hut_links"
+    });
+  });
+
+  it("falls back to Navigo when both links are requested but HUT is missing", async () => {
+    const state = createNavigoParticipantImportState();
+    const whatsApp = createFakeNavigoWhatsAppRepository();
+    const repository = createNavigoAppRepository(state.prisma as never, whatsApp.repository);
+    const registered = await repository.registerDirectParticipant({
+      actorUserId: "admin-1",
+      celular: "5512345678",
+      folio: "NAV-001",
+      generateLink: false,
+      nombre: "Participante Uno",
+      studyId: state.study.id
+    });
+    vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "phone-number-id");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        json: async () => ({ messages: [{ id: "wamid-navigo-link", message_status: "accepted" }] }),
+        ok: true,
+        status: 200
+      }))
+    );
+
+    const result = registered.ok
+      ? await repository.sendParticipantLinksWhatsApp({
+          actorUserId: "admin-1",
+          linkType: "BOTH",
+          now: new Date("2026-08-08T07:45:00.000Z"),
+          requestOrigin: "https://example.test",
+          studyId: state.study.id,
+          studyParticipantId: registered.data.studyParticipantId
+        })
+      : null;
+
+    expect(result?.ok).toBe(true);
+    expect(result?.ok ? result.data.sentLinkType : "").toBe("NAVIGO");
+    expect(result?.ok ? result.data.warnings : []).toContain("Se enviara solo Navigo porque falta enlace HUT.");
+    const payload = whatsApp.messages[0]?.rawPayload as { request?: { template?: { name?: string } } };
+    expect(payload.request?.template?.name).toBe("navigo_acceso_evaluaciones");
   });
 
   it("does not treat T0 as completed only because an application time exists", () => {
@@ -4748,6 +4918,21 @@ function createNavigoParticipantImportState(
     studyParticipantId: string;
     studyProductId: string;
   }> = [];
+  const hutParticipants: Array<{
+    folio: string | null;
+    id: string;
+    studyParticipantId: string | null;
+    token: string;
+  }> = [];
+  const auditLogs: Array<{
+    action: string;
+    actorUserId: string | null;
+    afterJson: unknown;
+    beforeJson: unknown;
+    entityId: string;
+    entityType: string;
+    reason: string | null;
+  }> = [];
 
   function deleteWhere<T>(items: T[], predicate: (item: T) => boolean) {
     const retained = items.filter((item) => !predicate(item));
@@ -4804,6 +4989,7 @@ function createNavigoParticipantImportState(
           status: session.status
         })),
       id: participant.id,
+      hutParticipant: hutParticipants.find((item) => item.studyParticipantId === participant.id) ?? null,
       participantConfirmation: confirmation
         ? {
             id: confirmation.id,
@@ -4856,6 +5042,12 @@ function createNavigoParticipantImportState(
   }
 
   const tx = {
+    auditLog: {
+      async create(args: { data: (typeof auditLogs)[number] }) {
+        auditLogs.push(args.data);
+        return { id: `audit-${auditLogs.length}` };
+      }
+    },
     activitySchedule: {
       async create(args: { data: (typeof schedules)[number] }) {
         const record = { ...args.data, id: `schedule-${args.data.code}` };
@@ -5500,10 +5692,12 @@ function createNavigoParticipantImportState(
     accessTokens,
     applicationTimeEvents,
     activities,
+    auditLogs,
     armAssignments,
     arms,
     confirmations,
     ctlSessions,
+    hutParticipants,
     mediaEvidencePlaceholders,
     participantActivityEvidence,
     participantAttributeOrders,

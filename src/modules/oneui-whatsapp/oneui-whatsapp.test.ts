@@ -24,9 +24,12 @@ import {
 } from "./service";
 import {
   buildNavigoCodesWhatsAppBody,
+  sendHutParticipantLinkWhatsApp,
+  sendHutPhotoReminderWhatsApp,
   sendHutRegistrationWhatsApp,
   sendNavigoConfirmationWhatsApp,
   sendNavigoEvaluationLinkWhatsApp,
+  sendNavigoHutLinksWhatsApp,
   sendNavigoEvaluationReminderWhatsApp
 } from "./templates";
 
@@ -409,6 +412,84 @@ describe("ONEUI WhatsApp template sending", () => {
     });
   });
 
+  it("arma payload de plantilla HUT con nombre y enlace fotografico", async () => {
+    const repository = createFakeRepository();
+    const fetcher = viFetch({
+      contacts: [{ wa_id: "5215512345678" }],
+      messages: [{ id: "wamid.hut-link-1", message_status: "accepted" }]
+    });
+    const result = await sendHutParticipantLinkWhatsApp({
+      env: whatsappEnv(),
+      hutUrl: "https://example.test/hut/p/hut-token",
+      participantId: "hut-participant-1",
+      participantName: "ANA",
+      phone: "5512345678",
+      repository,
+      sender: (input) => sendOneuiWhatsAppTemplate({ ...input, fetcher }),
+      studyId: "study-1"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(JSON.parse(fetcher.calls[0]?.init.body ?? "{}").template).toMatchObject({
+      components: [
+        {
+          parameters: [
+            { text: "ANA", type: "text" },
+            { text: "https://example.test/hut/p/hut-token", type: "text" }
+          ],
+          type: "body"
+        }
+      ],
+      language: { code: "es_MX" },
+      name: "hut_link_participant"
+    });
+    expect(repository.conversations[0]).toMatchObject({
+      linkedParticipantId: "hut-participant-1",
+      linkedStudyId: "study-1",
+      sourceModule: "HUT"
+    });
+  });
+
+  it("arma payload de plantilla combinada Navigo + HUT", async () => {
+    const repository = createFakeRepository();
+    const fetcher = viFetch({
+      contacts: [{ wa_id: "5215512345678" }],
+      messages: [{ id: "wamid.navigo-hut-links-1", message_status: "accepted" }]
+    });
+    const result = await sendNavigoHutLinksWhatsApp({
+      env: whatsappEnv(),
+      hutUrl: "https://example.test/hut/p/hut-token",
+      navigoUrl: "https://example.test/p/token/activities",
+      participantId: "participant-1",
+      participantName: "ANA",
+      phone: "5512345678",
+      repository,
+      sender: (input) => sendOneuiWhatsAppTemplate({ ...input, fetcher }),
+      studyId: "study-1"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(JSON.parse(fetcher.calls[0]?.init.body ?? "{}").template).toMatchObject({
+      components: [
+        {
+          parameters: [
+            { text: "ANA", type: "text" },
+            { text: "https://example.test/p/token/activities", type: "text" },
+            { text: "https://example.test/hut/p/hut-token", type: "text" }
+          ],
+          type: "body"
+        }
+      ],
+      language: { code: "es_MX" },
+      name: "navigo_hut_links"
+    });
+    expect(repository.conversations[0]).toMatchObject({
+      linkedParticipantId: "participant-1",
+      linkedStudyId: "study-1",
+      sourceModule: "NAVIGO"
+    });
+  });
+
   it("arma payload de recordatorio Navigo como plantilla simple sin parametros", async () => {
     const repository = createFakeRepository();
     const fetcher = viFetch({
@@ -438,6 +519,44 @@ describe("ONEUI WhatsApp template sending", () => {
       messageType: "template",
       metaMessageId: "wamid.navigo-reminder-1",
       status: "accepted"
+    });
+  });
+
+  it("arma payload de recordatorio fotografico HUT con nombre y enlace", async () => {
+    const repository = createFakeRepository();
+    const fetcher = viFetch({
+      contacts: [{ wa_id: "5215512345678" }],
+      messages: [{ id: "wamid.hut-photo-reminder-1", message_status: "accepted" }]
+    });
+    const result = await sendHutPhotoReminderWhatsApp({
+      env: whatsappEnv(),
+      hutUrl: "https://example.test/hut/p/hut-token",
+      participantId: "hut-participant-1",
+      participantName: "ANA",
+      phone: "5512345678",
+      repository,
+      sender: (input) => sendOneuiWhatsAppTemplate({ ...input, fetcher }),
+      studyId: "study-1"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(JSON.parse(fetcher.calls[0]?.init.body ?? "{}").template).toMatchObject({
+      components: [
+        {
+          parameters: [
+            { text: "ANA", type: "text" },
+            { text: "https://example.test/hut/p/hut-token", type: "text" }
+          ],
+          type: "body"
+        }
+      ],
+      language: { code: "es_MX" },
+      name: "hut_photo_reminder"
+    });
+    expect(repository.conversations[0]).toMatchObject({
+      linkedParticipantId: "hut-participant-1",
+      linkedStudyId: "study-1",
+      sourceModule: "HUT"
     });
   });
 

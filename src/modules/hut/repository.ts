@@ -28,8 +28,10 @@ import {
 } from "./service";
 import {
   getHutApplicableQuestions,
+  getHutQuestionPairRotationAudit,
   getHutQuestions,
   getHutV5Definition,
+  orderHutQuestionsForParticipant,
   type HutQuestionnaireSectionId
 } from "./definition";
 import {
@@ -56,7 +58,12 @@ import {
   normalizeNavigoFaceVerificationForStorage,
   type NavigoFaceVerificationClientResult
 } from "@/modules/navigo-app/face-verification-contract";
-import { createOneuiWhatsAppRepository, sendHutRegistrationWhatsApp, type OneuiWhatsAppRepository } from "@/modules/oneui-whatsapp";
+import {
+  createOneuiWhatsAppRepository,
+  sendHutPhotoReminderWhatsApp,
+  sendHutRegistrationWhatsApp,
+  type OneuiWhatsAppRepository
+} from "@/modules/oneui-whatsapp";
 import { whatsappAutomationStatusFromMessage, type WhatsAppAutomationStatus } from "@/modules/oneui-whatsapp/templates";
 import {
   decryptHutPhaseCode,
@@ -257,6 +264,24 @@ export type HutApplicationPhotoEntrySummary = {
   privateStorageKey?: string | null;
   productCode: string | null;
   useDayNumber: number;
+};
+
+export type HutPhotoReminderSendResult = {
+  generatedAt: Date;
+  hutUrl: string;
+  phone: string;
+  slotId: HutPhotoTimelineSlotId;
+  templateName: string;
+  whatsappError: string | null;
+  whatsappMessageId: string | null;
+  whatsappStatus: "ERROR" | "ENVIADO";
+};
+
+export type HutPhotoReminderProcessResult = {
+  failed: Array<{ message: string; participantId: string; slotId: HutPhotoTimelineSlotId | null }>;
+  processed: number;
+  sent: number;
+  skipped: number;
 };
 
 export type HutApplicationPhotoDailyAvailability = {
@@ -624,6 +649,18 @@ export type HutRepository = {
     requestOrigin: string;
     studyId: string;
   }) => Promise<HutActionResult<{ participantId: string }>>;
+  sendPhotoReminderWhatsApp: (input: {
+    actorUserId: string;
+    now?: Date;
+    participantId: string;
+    requestOrigin: string;
+    studyId: string;
+  }) => Promise<HutActionResult<HutPhotoReminderSendResult>>;
+  processPhotoWhatsAppReminders: (input: {
+    now?: Date;
+    requestOrigin: string;
+    studyId?: string;
+  }) => Promise<HutActionResult<HutPhotoReminderProcessResult>>;
   requestDailySelfieUpload: (input: {
     metadata: HutSelfieUploadMetadata;
     storage?: HutStorageClient;
@@ -1799,6 +1836,10 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       }
 
       const now = input.now ?? new Date();
+      const questionPairRotationAudit = getHutQuestionPairRotationAudit({
+        participantId: participant.id,
+        questionCode: question.code
+      });
       await prisma.hutAnswer.upsert?.({
         create: {
           answerJson: parsed.answer.answerValue,
@@ -1844,6 +1885,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
             afterJson: toAuditJson({
               answerValue: parsed.answer.answerValue,
               fieldAccess: fieldAccessAudit,
+              questionPairRotation: questionPairRotationAudit,
               questionCode: question.code,
               status: "TERMINATED",
               terminationReason: termination.reason
@@ -1876,6 +1918,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
             actorUserId: input.actorUserId ?? null,
             afterJson: toAuditJson({
               fieldAccess: fieldAccessAudit,
+              questionPairRotation: questionPairRotationAudit,
               questionCode: question.code,
               status: "ANSWER_SAVED"
             }),
@@ -1930,11 +1973,11 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
       const answers = Object.fromEntries((state.answers ?? []).map((answer) => [answer.questionCode, answer.answerJson]));
       const origin = participantOrigin(participant);
-      const applicableQuestionCodes = getHutApplicableQuestions({
+      const applicableQuestionCodes = orderHutQuestionsForParticipant(getHutApplicableQuestions({
         answers,
         context: { participantOrigin: origin },
         definition: getHutV5Definition()
-      }).map((question) => question.code);
+      }), participant.id).map((question) => question.code);
       const applicableSet = new Set(applicableQuestionCodes);
       const omittedQuestionCodes = getHutQuestions()
         .map((question) => question.code)
@@ -2615,6 +2658,100 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         message: "WhatsApp de registro HUT enviado correctamente.",
         ok: true
       };
+    },
+
+    async sendPhotoReminderWhatsApp(input) {
+      const prisma = await getPrisma();
+      const now = input.now ?? new Date();
+      const participant = await findParticipant(prisma, input.participantId);
+
+      if (!participant || participant.studyId !== input.studyId) {
+        return { message: "No encontramos el participante HUT.", ok: false };
+      }
+
+      const prepared = await prepareHutPhotoReminder({
+        now,
+        participant,
+        prisma
+      });
+      if (!prepared.ok) {
+        return { message: prepared.message, ok: false };
+      }
+
+      const result = await sendHutPhotoReminderForParticipant({
+        actorUserId: input.actorUserId,
+        participant,
+        requestOrigin: input.requestOrigin,
+        source: "MANUAL_ADMIN",
+        ...prepared.data,
+        now,
+        prisma,
+        whatsappRepository: getWhatsAppRepository()
+      });
+
+      return result.ok
+        ? {
+            data: result.data,
+            message: "Recordatorio HUT enviado correctamente.",
+            ok: true
+          }
+        : result;
+    },
+
+    async processPhotoWhatsAppReminders(input) {
+      const prisma = await getPrisma();
+      const now = input.now ?? new Date();
+      const participants = (await prisma.hutParticipant.findMany?.({
+        select: participantSelect,
+        where: {
+          ...(input.studyId ? { studyId: input.studyId } : {}),
+          protocolVersion: "APPLICATION_PHOTO",
+          qaParticipantRun: { is: null },
+          status: { notIn: ["COMPLETED", "DISQUALIFIED"] }
+        }
+      })) as HutParticipantRecord[];
+      const summary: HutPhotoReminderProcessResult = {
+        failed: [],
+        processed: participants.length,
+        sent: 0,
+        skipped: 0
+      };
+
+      for (const participant of participants) {
+        const prepared = await prepareHutPhotoReminder({
+          now,
+          participant,
+          prisma
+        });
+
+        if (!prepared.ok) {
+          summary.skipped += 1;
+          continue;
+        }
+
+        const result = await sendHutPhotoReminderForParticipant({
+          actorUserId: null,
+          participant,
+          requestOrigin: input.requestOrigin,
+          source: "CRON",
+          ...prepared.data,
+          now,
+          prisma,
+          whatsappRepository: getWhatsAppRepository()
+        });
+
+        if (result.ok && result.data.whatsappStatus === "ENVIADO") {
+          summary.sent += 1;
+        } else {
+          summary.failed.push({
+            message: result.ok ? result.data.whatsappError ?? "No fue posible enviar el recordatorio HUT." : result.message,
+            participantId: participant.id,
+            slotId: prepared.data.slot.id as HutPhotoTimelineSlotId
+          });
+        }
+      }
+
+      return { data: summary, ok: true };
     },
 
     async resetReferenceSelfie(input) {
@@ -4868,6 +5005,165 @@ async function sendHutRegistrationWhatsAppForParticipant({
     });
     return { message: "No fue posible enviar el WhatsApp de registro HUT.", ok: false };
   }
+}
+
+async function prepareHutPhotoReminder({
+  now,
+  participant,
+  prisma
+}: {
+  now: Date;
+  participant: HutParticipantRecord;
+  prisma: HutPrismaClient;
+}): Promise<HutActionResult<{ slot: NonNullable<ReturnType<typeof availableHutPhotoReminderSlot>> }>> {
+  const slot = availableHutPhotoReminderSlot(participant, now);
+  if (!slot) {
+    return { message: "Este participante no tiene una fotografia HUT disponible para recordar.", ok: false };
+  }
+  if (!participant.phone) {
+    return { message: "El participante HUT no tiene telefono capturado.", ok: false };
+  }
+  if (participant.qaParticipantRun) {
+    return { message: "Los participantes QA no envian WhatsApp real.", ok: false };
+  }
+  if (await hasRecentHutPhotoReminder(prisma, participant.id, slot.id as HutPhotoTimelineSlotId, now)) {
+    return { message: "Ya se envio un recordatorio HUT para este slot en las ultimas 24 horas.", ok: false };
+  }
+
+  return { data: { slot }, ok: true };
+}
+
+async function sendHutPhotoReminderForParticipant({
+  actorUserId,
+  now,
+  participant,
+  prisma,
+  requestOrigin,
+  slot,
+  source,
+  whatsappRepository
+}: {
+  actorUserId: string | null;
+  now: Date;
+  participant: HutParticipantRecord;
+  prisma: HutPrismaClient;
+  requestOrigin: string;
+  slot: NonNullable<ReturnType<typeof availableHutPhotoReminderSlot>>;
+  source: "CRON" | "MANUAL_ADMIN";
+  whatsappRepository?: OneuiWhatsAppRepository;
+}): Promise<HutActionResult<HutPhotoReminderSendResult>> {
+  const hutUrl = participantLink(requestOrigin, participant.token);
+  const templateName = process.env.WHATSAPP_HUT_PHOTO_REMINDER_TEMPLATE ?? "hut_photo_reminder";
+
+  const result = await sendHutPhotoReminderWhatsApp({
+    hutUrl,
+    now,
+    participantId: participant.id,
+    participantName: participant.name,
+    phone: participant.phone,
+    repository: whatsappRepository ?? createOneuiWhatsAppRepository(),
+    studyId: participant.studyId
+  });
+  const whatsAppMessage = result.ok ? result.data : "data" in result ? result.data : undefined;
+  const whatsappStatus = result.ok ? "ENVIADO" : "ERROR";
+  const whatsappError = result.ok ? null : result.message;
+
+  await prisma.auditLog.create?.({
+    data: {
+      action: "PARTICIPANT_MODIFIED",
+      actorUserId,
+      afterJson: {
+        hutUrlAvailable: true,
+        message: result.ok ? "Recordatorio HUT enviado por WhatsApp." : result.message,
+        metaMessageId: whatsAppMessage?.metaMessageId ?? null,
+        reminderType: "HUT_PHOTO_REMINDER",
+        source,
+        slotId: slot.id,
+        slotTitle: slot.title,
+        templateName,
+        whatsappStatus
+      },
+      beforeJson: null,
+      createdAt: now,
+      entityId: participant.id,
+      entityType: "HutParticipant",
+      reason: source === "MANUAL_ADMIN" ? "HUT_PHOTO_REMINDER_MANUAL" : "HUT_PHOTO_REMINDER_CRON"
+    }
+  });
+
+  return {
+    data: {
+      generatedAt: now,
+      hutUrl,
+      phone: participant.phone ?? "",
+      slotId: slot.id as HutPhotoTimelineSlotId,
+      templateName,
+      whatsappError,
+      whatsappMessageId: whatsAppMessage?.metaMessageId ?? null,
+      whatsappStatus
+    },
+    ok: true
+  };
+}
+
+function availableHutPhotoReminderSlot(participant: HutParticipantRecord, now: Date) {
+  if (!isApplicationPhotoProtocol(participant) || participant.status === "COMPLETED" || participant.status === "DISQUALIFIED") {
+    return null;
+  }
+
+  return getNextHutPhotoTimelineSlot({
+    applicationEvidence: applicationEvidenceSummary(participant),
+    dailyEntries: applicationPhotoEntrySummary(participant),
+    legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
+    now,
+    photoCaptureBlocked: participantOrigin(participant) === "HUT_DIRECTO" && hutFilterStatusFromParticipant(participant) !== "COMPLETED",
+    rotation: {
+      eva1: participant.firstFragranceLeftArm,
+      eva2: participant.secondFragranceRightArm
+    },
+    testMode: participant.testMode
+  });
+}
+
+async function hasRecentHutPhotoReminder(
+  prisma: HutPrismaClient,
+  participantId: string,
+  slotId: HutPhotoTimelineSlotId,
+  now: Date
+): Promise<boolean> {
+  const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const logs = (await prisma.auditLog.findMany?.({
+    orderBy: { createdAt: "desc" },
+    select: {
+      afterJson: true,
+      createdAt: true
+    },
+    where: {
+      action: "PARTICIPANT_MODIFIED",
+      createdAt: { gte: since },
+      entityId: participantId,
+      entityType: "HutParticipant"
+    }
+  })) as Array<{ afterJson?: unknown; createdAt?: Date }> | undefined;
+
+  return Boolean(logs?.some((log) => isMatchingCompletedHutPhotoReminder(log.afterJson, slotId)));
+}
+
+function isMatchingCompletedHutPhotoReminder(afterJson: unknown, slotId: HutPhotoTimelineSlotId): boolean {
+  if (!afterJson || typeof afterJson !== "object") {
+    return false;
+  }
+  const metadata = afterJson as {
+    reminderType?: unknown;
+    slotId?: unknown;
+    templateName?: unknown;
+    whatsappStatus?: unknown;
+  };
+
+  return metadata.reminderType === "HUT_PHOTO_REMINDER"
+    && metadata.slotId === slotId
+    && metadata.templateName === "hut_photo_reminder"
+    && metadata.whatsappStatus === "ENVIADO";
 }
 
 function hasStartedHutBlockOneEvidence(participant: HutParticipantRecord): boolean {

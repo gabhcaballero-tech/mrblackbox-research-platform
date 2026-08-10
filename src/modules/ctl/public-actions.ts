@@ -7,7 +7,11 @@ import { getCtlPublicSessionSecret, getPublicCtlInterviewerActor } from "@/share
 import { createCtlRepository } from "./repository";
 import type { CtlSessionView } from "./repository";
 import { createNavigoAppRepository } from "@/modules/navigo-app/repository";
-import type { NavigoEvaluationLinkWhatsAppActionResult } from "@/modules/navigo-app/actions";
+import type {
+  NavigoEvaluationLinkWhatsAppActionResult,
+  NavigoParticipantLinksWhatsAppActionResult
+} from "@/modules/navigo-app/actions";
+import type { NavigoParticipantLinkSendType } from "@/modules/navigo-app/repository";
 import {
   createCtlPublicSessionToken,
   ctlPublicSessionCookieName,
@@ -359,6 +363,85 @@ export async function sendPublicCtlNavigoEvaluationLinkWhatsAppAction(
     },
     ok: true
   };
+}
+
+export async function sendPublicCtlParticipantLinksWhatsAppAction(
+  studyCode: string,
+  sessionId: string,
+  requestOrigin: string,
+  linkType: NavigoParticipantLinkSendType
+): Promise<NavigoParticipantLinksWhatsAppActionResult> {
+  const actor = await getPublicCtlInterviewerActor({ studyCode });
+
+  if (!actor) {
+    return {
+      message: "Ingresa tu codigo de encuestador para continuar.",
+      ok: false
+    };
+  }
+
+  const session = await createCtlRepository().getSession({ actor, sessionId });
+
+  if (!session || session.status !== "COMPLETED") {
+    return {
+      message: "La sesion CTL debe estar completada antes de enviar enlaces.",
+      ok: false
+    };
+  }
+
+  if (!session.responsibleUserId) {
+    return {
+      message: "No encontramos el responsable interno para enviar WhatsApp.",
+      ok: false
+    };
+  }
+
+  const result = await createNavigoAppRepository().sendParticipantLinksWhatsApp({
+    actorUserId: session.responsibleUserId,
+    linkType,
+    requestOrigin,
+    studyId: actor.studyId,
+    studyParticipantId: session.participant.id
+  });
+
+  if (!result.ok) {
+    return { message: result.message, ok: false };
+  }
+
+  try {
+    revalidatePath(`/ctl/${studyCode}/sessions/${sessionId}`);
+    revalidatePath(`/admin/studies/${actor.studyId}/navigo-app`);
+  } catch {
+    // El envio y la auditoria ya quedaron resueltos; no ocultamos el resultado por una revalidacion secundaria.
+  }
+
+  return {
+    data: {
+      folio: result.data.folio,
+      generatedAtIso: result.data.generatedAt.toISOString(),
+      hutUrl: result.data.hutUrl,
+      message: result.data.whatsappStatus === "ENVIADO"
+        ? publicLinkSentSuccessMessage(result.data.sentLinkType)
+        : "Enlace preparado. WhatsApp fallo; copia el enlace disponible para compartirlo manualmente.",
+      navigoUrl: result.data.navigoUrl,
+      phone: result.data.phone,
+      requestedLinkType: result.data.requestedLinkType,
+      sentLinkType: result.data.sentLinkType,
+      warnings: result.data.warnings,
+      whatsappError: result.data.whatsappError,
+      whatsappMessageId: result.data.whatsappMessageId,
+      whatsappStatus: result.data.whatsappStatus
+    },
+    ok: true
+  };
+}
+
+function publicLinkSentSuccessMessage(linkType: NavigoParticipantLinkSendType): string {
+  if (linkType === "BOTH") {
+    return "Enlaces Navigo y HUT enviados por WhatsApp.";
+  }
+
+  return linkType === "HUT" ? "Enlace HUT enviado por WhatsApp." : "Enlace Navigo enviado por WhatsApp.";
 }
 
 export async function finishPublicCtlSessionAction(studyCode: string, sessionId: string, formData: FormData) {

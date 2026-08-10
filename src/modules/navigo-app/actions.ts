@@ -15,6 +15,8 @@ import {
   type NavigoActionResult,
   type NavigoEvaluationLinkWhatsAppSendResult,
   type NavigoEvaluationReminderManualSendResult,
+  type NavigoParticipantLinksWhatsAppSendResult,
+  type NavigoParticipantLinkSendType,
   type NavigoSignedActivityUpload
 } from "./repository";
 import type { NavigoFaceVerificationClientResult } from "./face-verification-contract";
@@ -161,6 +163,19 @@ export type NavigoEvaluationReminderNowActionResult =
       ok: false;
     };
 
+export type NavigoParticipantLinksWhatsAppActionResult =
+  | {
+      data: Omit<NavigoParticipantLinksWhatsAppSendResult, "generatedAt"> & {
+        generatedAtIso: string;
+        message: string;
+      };
+      ok: true;
+    }
+  | {
+      message: string;
+      ok: false;
+    };
+
 export async function sendNavigoEvaluationLinkWhatsAppAction(
   studyId: string,
   studyParticipantId: string,
@@ -199,6 +214,62 @@ export async function sendNavigoEvaluationLinkWhatsAppAction(
     },
     ok: true
   };
+}
+
+export async function sendNavigoParticipantLinksWhatsAppAction(
+  studyId: string,
+  studyParticipantId: string,
+  requestOrigin: string,
+  linkType: NavigoParticipantLinkSendType
+): Promise<NavigoParticipantLinksWhatsAppActionResult> {
+  const actor = await requireCapability("screening:review");
+  const result = await createNavigoAppRepository().sendParticipantLinksWhatsApp({
+    actorUserId: actor.id,
+    linkType,
+    requestOrigin,
+    studyId,
+    studyParticipantId
+  });
+
+  if (!result.ok) {
+    return { message: result.message, ok: false };
+  }
+
+  try {
+    revalidatePath(`/admin/studies/${studyId}/navigo-app`);
+  } catch {
+    // El envio y la auditoria ya quedaron resueltos; no ocultamos el resultado por una actualizacion secundaria.
+  }
+
+  return {
+    data: {
+      folio: result.data.folio,
+      generatedAtIso: result.data.generatedAt.toISOString(),
+      hutUrl: result.data.hutUrl,
+      message: result.data.whatsappStatus === "ENVIADO"
+        ? linkSentSuccessMessage(result.data.sentLinkType)
+        : "Enlace preparado. WhatsApp fallo; copia el enlace disponible para compartirlo manualmente.",
+      navigoUrl: result.data.navigoUrl,
+      phone: result.data.phone,
+      requestedLinkType: result.data.requestedLinkType,
+      sentLinkType: result.data.sentLinkType,
+      warnings: result.data.warnings,
+      whatsappError: result.data.whatsappError,
+      whatsappMessageId: result.data.whatsappMessageId,
+      whatsappStatus: result.data.whatsappStatus
+    },
+    ok: true
+  };
+}
+
+function linkSentSuccessMessage(linkType: NavigoParticipantLinkSendType): string {
+  if (linkType === "BOTH") {
+    return "Enlaces Navigo y HUT enviados por WhatsApp.";
+  }
+
+  return linkType === "HUT"
+    ? "Enlace HUT enviado por WhatsApp."
+    : "Enlace Navigo enviado por WhatsApp.";
 }
 
 export async function sendNavigoEvaluationReminderNowAction(

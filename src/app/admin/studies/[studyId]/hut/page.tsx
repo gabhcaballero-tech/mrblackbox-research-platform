@@ -17,6 +17,7 @@ import {
   resetHutReferenceSelfieAction,
   resetHutVideoSubmissionAction,
   revokeHutPhaseCodeAction,
+  sendHutPhotoReminderWhatsAppAction,
   sendHutRegistrationWhatsAppAction,
   setHutTestModeAction,
   setHutVisualOverrideAction,
@@ -539,6 +540,24 @@ function HutParticipantCard({
                 </form>
               </div>
             </div>
+            {protocolVersion === "APPLICATION_PHOTO" ? (
+              <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-amber-950">Recordatorio fotografico HUT</p>
+                    <p className="mt-1 text-xs leading-5 text-amber-900">
+                      Usa la plantilla hut_photo_reminder para avisar al participante que tiene una fotografia HUT disponible.
+                    </p>
+                  </div>
+                  <form action={sendHutPhotoReminderWhatsAppAction.bind(null, studyId, participant.id)}>
+                    <input name="requestOrigin" type="hidden" value={requestOrigin} />
+                    <SubmitButton pendingLabel="Enviando recordatorio HUT...">
+                      Enviar recordatorio HUT
+                    </SubmitButton>
+                  </form>
+                </div>
+              </div>
+            ) : null}
             <HutWhatsAppManualBlock message={hutWhatsAppManualMessage} whatsappUrl={hutWhatsAppUrl} />
             <div className="mt-4 rounded-md border border-zinc-200 bg-white p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Link participante</p>

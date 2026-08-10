@@ -46,6 +46,7 @@ vi.mock("@/modules/hut/actions", () => {
     resetHutQuestionnaireAttemptAction: action,
     resetHutReferenceSelfieAction: action,
     resetHutVideoSubmissionAction: action,
+    sendHutPhotoReminderWhatsAppAction: action,
     sendHutRegistrationWhatsAppAction: action,
     setHutTestModeAction: action,
     setHutVisualOverrideAction: action,
@@ -450,6 +451,8 @@ describe("HutAdminPage", () => {
     expect(screen.getAllByText("Resetear evaluacion HUT").length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Ver foto diaria" })).toHaveAttribute("href", "https://storage.example/daily-application-photo.jpg");
     expect(screen.getByRole("button", { name: "Enviar WhatsApp" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Enviar recordatorio HUT" })).toBeEnabled();
+    expect(screen.getByText(/hut_photo_reminder/)).toBeInTheDocument();
     expect(screen.queryByText("WhatsApp pendiente: se enviarÃ¡ despuÃ©s de guardar la selfie de registro.")).not.toBeInTheDocument();
     expect(screen.getByText(/C.digos por fase HUT/)).toBeInTheDocument();
     expect(screen.getByTestId("hut-phase-code-controls-COLOCACION")).toBeInTheDocument();

@@ -1,8 +1,7 @@
 import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
 import {
   buildCltAnswerGroups,
-  getCltQuestionCount,
-  resolveCltProgress
+  resolveCltApplicableProgress
 } from "./service";
 import type {
   CltOperationsActivitySummary,
@@ -345,8 +344,7 @@ type WhatsAppConversationRecord = {
 };
 
 function toListItem(session: SessionRecord, whatsapp?: CltOperationsWhatsAppSummary): CltOperationsDetail {
-  const questionCount = getCltQuestionCount();
-  const answeredCount = session.answers.length;
+  const progress = resolveCltApplicableProgress(session.answers);
   const rotation = toRotation(session);
   const hut = toHut(session);
   const navigoActivities = toNavigoActivities(session);
@@ -354,9 +352,9 @@ function toListItem(session: SessionRecord, whatsapp?: CltOperationsWhatsAppSumm
 
   return {
     answerGroups: buildCltAnswerGroups(session.answers),
-    answeredCount,
+    answeredCount: progress.answeredCount,
     cltCompletedAt: session.completedAt,
-    cltProgressLabel: resolveCltProgress(answeredCount, questionCount),
+    cltProgressLabel: progress.label,
     cltStartedAt: session.startedAt,
     cltStatus: session.status,
     folio: session.studyParticipant.participantConfirmation?.folio ?? "Sin folio",
@@ -368,7 +366,7 @@ function toListItem(session: SessionRecord, whatsapp?: CltOperationsWhatsAppSumm
     participantId: session.studyParticipant.id,
     participantName: session.studyParticipant.participantProfile.name,
     phaseProgress: session.phaseProgress,
-    questionCount,
+    questionCount: progress.questionCount,
     reminders: toReminders(session),
     rotation,
     t0: session.studyParticipant.applicationStartedAt,

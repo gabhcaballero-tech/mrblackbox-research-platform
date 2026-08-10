@@ -4,6 +4,10 @@
     {
       "path": "/api/navigo/reminders",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/hut/reminders",
+      "schedule": "0 * * * *"
     }
   ]
 }

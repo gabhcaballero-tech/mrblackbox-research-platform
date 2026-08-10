@@ -177,6 +177,69 @@ describe("FieldHutPage", () => {
     expect(screen.queryByText("HUT_EVA2")).not.toBeInTheDocument();
   });
 
+  it("rota atributos HUT por participante y conserva el orden mostrado para auditoria", async () => {
+    const firstWorkspace = createMatrixWorkspace("participant-a");
+    getFieldQuestionnaireWorkspaceMock.mockResolvedValueOnce({
+      data: firstWorkspace,
+      ok: true
+    });
+
+    const firstRender = render(await FieldHutPage({
+      searchParams: Promise.resolve({
+        folio: "HUT-121",
+        interviewerCode: "JES26",
+        questionCode: "HUT_EVA1_ATRIBUTOS"
+      })
+    }));
+
+    const firstOrder = "ENVASE_COMODO|SEGURIDAD|CANTIDAD_FACIL|INTENSIDAD_ADECUADA|AROMA_AGRADABLE|DIRECCION_FACIL|AROMA_UNICO|AROMA_DURADERO";
+    expect(screen.getByDisplayValue(firstOrder)).toHaveAttribute("name", "HUT_EVA1_ATRIBUTOS.__rowOrder");
+    expect(
+      firstRender.container.querySelector('input[name="HUT_EVA1_ATRIBUTOS.AROMA_AGRADABLE"][value="7"]')
+    ).toBeChecked();
+    firstRender.unmount();
+
+    const secondWorkspace = createMatrixWorkspace("participant-b");
+    getFieldQuestionnaireWorkspaceMock.mockResolvedValueOnce({
+      data: secondWorkspace,
+      ok: true
+    });
+
+    const secondRender = render(await FieldHutPage({
+      searchParams: Promise.resolve({
+        folio: "HUT-121",
+        interviewerCode: "JES26",
+        questionCode: "HUT_EVA1_ATRIBUTOS"
+      })
+    }));
+
+    const secondOrder = "SEGURIDAD|ENVASE_COMODO|DIRECCION_FACIL|AROMA_DURADERO|AROMA_UNICO|INTENSIDAD_ADECUADA|CANTIDAD_FACIL|AROMA_AGRADABLE";
+    expect(secondOrder).not.toBe(firstOrder);
+    expect(screen.getByDisplayValue(secondOrder)).toHaveAttribute("name", "HUT_EVA1_ATRIBUTOS.__rowOrder");
+    expect(
+      secondRender.container.querySelector('input[name="HUT_EVA1_ATRIBUTOS.AROMA_AGRADABLE"][value="7"]')
+    ).toBeChecked();
+  });
+
+  it("usa orden rotado estable para pares de preguntas HUT", async () => {
+    getFieldQuestionnaireWorkspaceMock.mockResolvedValue({
+      data: createPairRotationWorkspace("p1"),
+      ok: true
+    });
+
+    render(await FieldHutPage({
+      searchParams: Promise.resolve({
+        folio: "HUT-121",
+        interviewerCode: "JES26"
+      })
+    }));
+
+    expect(screen.getByRole("link", { name: "Iniciar evaluacion" })).toHaveAttribute(
+      "href",
+      "/field/hut?folio=HUT-121&interviewerCode=JES26&accessType=INTERVIEWER&questionCode=HUT_P9A_DISGUSTO_ABIERTO"
+    );
+  });
+
   it("muestra pantalla de entrevista terminada con motivo", async () => {
     getFieldQuestionnaireWorkspaceMock.mockResolvedValue({
       data: createTerminatedWorkspace(),
@@ -393,6 +456,56 @@ function createScaleWorkspace() {
         "HUT_EVA1_GUSTO",
         "HUT_EVA1_ATRIBUTOS"
       ]
+    }
+  };
+}
+
+function createMatrixWorkspace(participantId: string) {
+  const workspace = createScaleWorkspace();
+  return {
+    ...workspace,
+    participant: {
+      ...workspace.participant,
+      id: participantId
+    },
+    questionnaire: {
+      ...workspace.questionnaire,
+      answers: {
+        ...workspace.questionnaire.answers,
+        HUT_EVA1_ATRIBUTOS: {
+          AROMA_AGRADABLE: "7",
+          AROMA_DURADERO: "4",
+          AROMA_UNICO: "5",
+          CANTIDAD_FACIL: "4",
+          DIRECCION_FACIL: "5",
+          ENVASE_COMODO: "4",
+          INTENSIDAD_ADECUADA: "5",
+          SEGURIDAD: "4"
+        }
+      }
+    }
+  };
+}
+
+function createPairRotationWorkspace(participantId: string) {
+  const workspace = createWorkspace();
+  return {
+    ...workspace,
+    participant: {
+      ...workspace.participant,
+      id: participantId
+    },
+    questionnaire: {
+      ...workspace.questionnaire,
+      answers: {
+        HUT_EVA1_GUSTO: 6
+      },
+      applicableQuestionCodes: [
+        "HUT_EVA1_GUSTO",
+        "HUT_P8A_GUSTO_ABIERTO",
+        "HUT_P9A_DISGUSTO_ABIERTO"
+      ],
+      filterStatus: "COMPLETED"
     }
   };
 }

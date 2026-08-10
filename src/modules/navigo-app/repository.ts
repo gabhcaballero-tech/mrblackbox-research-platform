@@ -2,6 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
 import {
   createOneuiWhatsAppRepository,
+  sendHutParticipantLinkWhatsApp,
+  sendNavigoHutLinksWhatsApp,
   sendNavigoEvaluationLinkWhatsApp,
   sendNavigoEvaluationReminderWhatsApp,
   type OneuiWhatsAppRepository
@@ -279,6 +281,22 @@ export type NavigoEvaluationLinkWhatsAppSendResult = {
   folio: string | null;
   generatedAt: Date;
   phone: string;
+  whatsappError: string | null;
+  whatsappMessageId: string | null;
+  whatsappStatus: "ERROR" | "ENVIADO";
+};
+
+export type NavigoParticipantLinkSendType = "BOTH" | "HUT" | "NAVIGO";
+
+export type NavigoParticipantLinksWhatsAppSendResult = {
+  folio: string | null;
+  generatedAt: Date;
+  hutUrl: string | null;
+  navigoUrl: string | null;
+  phone: string;
+  requestedLinkType: NavigoParticipantLinkSendType;
+  sentLinkType: NavigoParticipantLinkSendType;
+  warnings: string[];
   whatsappError: string | null;
   whatsappMessageId: string | null;
   whatsappStatus: "ERROR" | "ENVIADO";
@@ -657,6 +675,14 @@ export type NavigoAppRepository = {
     studyId: string;
     studyParticipantId: string;
   }) => Promise<NavigoActionResult<NavigoEvaluationLinkWhatsAppSendResult>>;
+  sendParticipantLinksWhatsApp: (input: {
+    actorUserId: string;
+    linkType: NavigoParticipantLinkSendType;
+    now?: Date;
+    requestOrigin: string;
+    studyId: string;
+    studyParticipantId: string;
+  }) => Promise<NavigoActionResult<NavigoParticipantLinksWhatsAppSendResult>>;
   processEvaluationWhatsAppReminders: (input: {
     now?: Date;
     requestOrigin: string;
@@ -731,6 +757,7 @@ type NavigoPrismaClient = PrismaClientLike & {
   $transaction: <T>(callback: (tx: NavigoTransactionClient) => Promise<T>) => Promise<T>;
   activitySchedule: Delegate;
   applicationTimeEvent: Delegate;
+  auditLog?: Delegate;
   participantAccessToken: Delegate;
   participantActivity: Delegate;
   participantActivityEvidence: Delegate;
@@ -958,6 +985,13 @@ const participantSelect = {
     take: 5
   },
   id: true,
+  hutParticipant: {
+    select: {
+      folio: true,
+      id: true,
+      token: true
+    }
+  },
   ctlTriangularRotationAssignment: {
     select: {
       id: true,
@@ -1165,6 +1199,11 @@ type ParticipantRecord = {
     status: "CANCELLED" | "COMPLETED" | "IN_PROGRESS" | "PENDING";
   }>;
   id: string;
+  hutParticipant?: {
+    folio: string | null;
+    id: string;
+    token: string;
+  } | null;
   ctlTriangularRotationAssignment: {
     id: string;
     triangular1Pr1: string;
@@ -2948,6 +2987,172 @@ export function createNavigoAppRepository(
       };
     },
 
+    async sendParticipantLinksWhatsApp(input) {
+      const prisma = await getPrisma();
+      const now = input.now ?? new Date();
+
+      const prepared: NavigoActionResult<{
+        folio: string;
+        hutParticipantId: string | null;
+        hutUrl: string | null;
+        navigoUrl: string | null;
+        participantId: string;
+        participantName: string;
+        phone: string;
+        sentLinkType: NavigoParticipantLinkSendType;
+        studyId: string;
+        warnings: string[];
+      }> = await prisma.$transaction(async (tx) => {
+        const participant = (await tx.studyParticipant.findUnique?.({
+          select: participantWithActivitiesSelect,
+          where: { id: input.studyParticipantId }
+        })) as ParticipantRecord | null;
+
+        if (!participant || participant.study.id !== input.studyId) {
+          return { message: "No encontramos el participante en este estudio.", ok: false as const };
+        }
+
+        if (!participant.participantProfile.phone) {
+          return { message: "El participante no tiene telefono capturado.", ok: false as const };
+        }
+
+        const folio = participant.participantConfirmation?.folio ?? null;
+
+        if (!folio) {
+          return { message: "El participante no tiene folio capturado.", ok: false as const };
+        }
+
+        const wantsNavigo = input.linkType === "NAVIGO" || input.linkType === "BOTH";
+        const wantsHut = input.linkType === "HUT" || input.linkType === "BOTH";
+        let navigoUrl: string | null = null;
+        let hutUrl: string | null = null;
+        const warnings: string[] = [];
+
+        if (wantsNavigo) {
+          const linkToken = await ensureParticipantAccessToken({
+            actorUserId: input.actorUserId,
+            now,
+            participant,
+            prisma: tx
+          });
+          navigoUrl = new URL(`/p/${encodeURIComponent(linkToken)}/activities`, input.requestOrigin).toString();
+        } else {
+          const activeToken = participant.accessTokens?.[0] ?? null;
+          if (activeToken && activeToken.tokenHash === hashToken(activeToken.id) && activeToken.expiresAt.getTime() > now.getTime()) {
+            navigoUrl = new URL(`/p/${encodeURIComponent(activeToken.id)}/activities`, input.requestOrigin).toString();
+          }
+        }
+
+        if (wantsHut || input.linkType === "BOTH") {
+          if (participant.hutParticipant?.token) {
+            hutUrl = new URL(`/hut/p/${encodeURIComponent(participant.hutParticipant.token)}`, input.requestOrigin).toString();
+          } else {
+            warnings.push("El participante no tiene enlace HUT activo.");
+          }
+        } else if (participant.hutParticipant?.token) {
+          hutUrl = new URL(`/hut/p/${encodeURIComponent(participant.hutParticipant.token)}`, input.requestOrigin).toString();
+        }
+
+        const sentLinkType = resolveAvailableLinkType({ hutUrl, navigoUrl, requested: input.linkType });
+
+        if (!sentLinkType) {
+          return {
+            message: input.linkType === "HUT"
+              ? "El participante no tiene enlace HUT activo."
+              : "El participante no tiene enlaces disponibles para enviar.",
+            ok: false as const
+          };
+        }
+
+        if (input.linkType === "BOTH" && sentLinkType !== "BOTH") {
+          warnings.push(
+            sentLinkType === "NAVIGO"
+              ? "Se enviara solo Navigo porque falta enlace HUT."
+              : "Se enviara solo HUT porque falta enlace Navigo."
+          );
+        }
+
+        return {
+          data: {
+            folio,
+            hutParticipantId: participant.hutParticipant?.id ?? null,
+            hutUrl,
+            navigoUrl,
+            participantId: participant.id,
+            participantName: participant.participantProfile.name,
+            phone: participant.participantProfile.phone,
+            sentLinkType,
+            studyId: participant.study.id,
+            warnings
+          },
+          ok: true as const
+        };
+      });
+
+      if (!prepared.ok) {
+        return { message: prepared.message, ok: false };
+      }
+
+      const repository = getWhatsAppRepository();
+      const result = await sendParticipantLinksByType({
+        folio: prepared.data.folio,
+        hutUrl: prepared.data.hutUrl,
+        navigoUrl: prepared.data.navigoUrl,
+        now,
+        participantId: prepared.data.sentLinkType === "HUT"
+          ? prepared.data.hutParticipantId ?? prepared.data.participantId
+          : prepared.data.participantId,
+        participantName: prepared.data.participantName,
+        phone: prepared.data.phone,
+        repository,
+        sentLinkType: prepared.data.sentLinkType,
+        studyId: prepared.data.studyId
+      });
+      const whatsAppMessage = result.ok ? result.data : "data" in result ? result.data : undefined;
+
+      await prisma.auditLog?.create?.({
+        data: {
+          action: "PARTICIPANT_MODIFIED",
+          actorUserId: input.actorUserId,
+          afterJson: {
+            hutParticipantId: prepared.data.hutParticipantId,
+            hutUrlAvailable: Boolean(prepared.data.hutUrl),
+            linkTypeSent: prepared.data.sentLinkType,
+            linkTypeRequested: input.linkType,
+            message: result.ok ? "Enlace enviado por WhatsApp." : result.message,
+            metaMessageId: whatsAppMessage?.metaMessageId ?? null,
+            navigoUrlAvailable: Boolean(prepared.data.navigoUrl),
+            templateName: templateNameForParticipantLinks(prepared.data.sentLinkType),
+            warnings: prepared.data.warnings,
+            whatsappStatus: result.ok ? "ENVIADO" : "ERROR"
+          },
+          beforeJson: null,
+          entityId: prepared.data.participantId,
+          entityType: "StudyParticipant",
+          reason: `Envio manual de enlace ${input.linkType}`
+        }
+      });
+
+      const data: NavigoParticipantLinksWhatsAppSendResult = {
+        folio: prepared.data.folio,
+        generatedAt: now,
+        hutUrl: prepared.data.hutUrl,
+        navigoUrl: prepared.data.navigoUrl,
+        phone: prepared.data.phone,
+        requestedLinkType: input.linkType,
+        sentLinkType: prepared.data.sentLinkType,
+        warnings: prepared.data.warnings,
+        whatsappError: result.ok ? null : result.message,
+        whatsappMessageId: whatsAppMessage?.metaMessageId ?? null,
+        whatsappStatus: result.ok ? "ENVIADO" : "ERROR"
+      };
+
+      return {
+        data,
+        ok: true
+      };
+    },
+
     async processEvaluationWhatsAppReminders(input) {
       const prisma = await getPrisma();
       const now = input.now ?? new Date();
@@ -4391,6 +4596,102 @@ function getNextPendingNavigoActivityCode(
   return NAVIGO_ACTIVITY_CODES.find((code) =>
     activities.some((activity) => activity.activitySchedule.code === code && activity.status !== "COMPLETED")
   ) ?? null;
+}
+
+function resolveAvailableLinkType({
+  hutUrl,
+  navigoUrl,
+  requested
+}: {
+  hutUrl: string | null;
+  navigoUrl: string | null;
+  requested: NavigoParticipantLinkSendType;
+}): NavigoParticipantLinkSendType | null {
+  if (requested === "NAVIGO") {
+    return navigoUrl ? "NAVIGO" : null;
+  }
+
+  if (requested === "HUT") {
+    return hutUrl ? "HUT" : null;
+  }
+
+  if (navigoUrl && hutUrl) {
+    return "BOTH";
+  }
+
+  if (navigoUrl) {
+    return "NAVIGO";
+  }
+
+  return hutUrl ? "HUT" : null;
+}
+
+async function sendParticipantLinksByType({
+  folio,
+  hutUrl,
+  navigoUrl,
+  now,
+  participantId,
+  participantName,
+  phone,
+  repository,
+  sentLinkType,
+  studyId
+}: {
+  folio: string;
+  hutUrl: string | null;
+  navigoUrl: string | null;
+  now: Date;
+  participantId: string;
+  participantName: string;
+  phone: string;
+  repository: OneuiWhatsAppRepository;
+  sentLinkType: NavigoParticipantLinkSendType;
+  studyId: string;
+}) {
+  if (sentLinkType === "BOTH") {
+    return sendNavigoHutLinksWhatsApp({
+      hutUrl: hutUrl ?? "",
+      navigoUrl: navigoUrl ?? "",
+      now,
+      participantId,
+      participantName,
+      phone,
+      repository,
+      studyId
+    });
+  }
+
+  if (sentLinkType === "HUT") {
+    return sendHutParticipantLinkWhatsApp({
+      hutUrl: hutUrl ?? "",
+      now,
+      participantId,
+      participantName,
+      phone,
+      repository,
+      studyId
+    });
+  }
+
+  return sendNavigoEvaluationLinkWhatsApp({
+    evaluationUrl: navigoUrl ?? "",
+    folio,
+    now,
+    participantId,
+    participantName,
+    phone,
+    repository,
+    studyId
+  });
+}
+
+function templateNameForParticipantLinks(linkType: NavigoParticipantLinkSendType): string {
+  if (linkType === "BOTH") {
+    return "navigo_hut_links";
+  }
+
+  return linkType === "HUT" ? "hut_link_participant" : "navigo_acceso_evaluaciones";
 }
 
 async function sendNavigoEvaluationReminderForActivity({

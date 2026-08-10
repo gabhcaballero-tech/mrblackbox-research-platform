@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { getCtlQuestions } from "@/modules/ctl/definition";
 import { createCltOperationsRepository } from "../repository";
-import { buildCltAnswersTsv, buildCltOperationsTsv } from "../service";
+import { buildCltAnswersTsv, buildCltOperationsTsv, resolveCltApplicableProgress } from "../service";
 
 describe("clt operations", () => {
   it("builds a read-only CLT/Navigo/HUT dashboard", async () => {
@@ -58,7 +59,55 @@ describe("clt operations", () => {
     expect(answersExport.body).not.toContain("Marca A\tMarca B");
     expect(answersExport.body).not.toContain("Marca C\r\notra");
   });
+
+  it("counts F11a as applicable when F11 indicates a difference", () => {
+    const progress = resolveCltApplicableProgress(createCompleteCtlAnswers({ f11Value: "1", includeF11A: true }));
+
+    expect(progress.label).toBe("62/62");
+    expect(progress.answeredCount).toBe(62);
+    expect(progress.questionCount).toBe(62);
+  });
+
+  it("does not count F11a as missing when F11 skips it", () => {
+    const progress = resolveCltApplicableProgress(createCompleteCtlAnswers({ f11Value: "2", includeF11A: false }));
+
+    expect(progress.label).toBe("61/61");
+    expect(progress.answeredCount).toBe(61);
+    expect(progress.questionCount).toBe(61);
+  });
 });
+
+function createCompleteCtlAnswers(input: {
+  f11Value: "1" | "2";
+  includeF11A: boolean;
+}): Array<{ answerValue: unknown; questionCode: string }> {
+  return getCtlQuestions()
+    .filter((question) => input.includeF11A || question.code !== "F11A")
+    .map((question) => ({
+      answerValue: question.code === "F11"
+        ? input.f11Value
+        : question.code === "F11A"
+          ? "Mayor frescura"
+          : defaultAnswerForCtlQuestion(question),
+      questionCode: question.code
+    }));
+}
+
+function defaultAnswerForCtlQuestion(question: ReturnType<typeof getCtlQuestions>[number]): unknown {
+  if (question.type === "MATRIX") {
+    return Object.fromEntries(question.rows.map((row) => [row.code, "1"]));
+  }
+
+  if (question.type === "SCALE") {
+    return question.min;
+  }
+
+  if (question.type === "SELECT") {
+    return question.options.find((option) => !option.skipTo)?.value ?? question.options[0]?.value ?? "1";
+  }
+
+  return "Respuesta";
+}
 
 function createFakePrisma(): Parameters<typeof createCltOperationsRepository>[0] {
   const study = {

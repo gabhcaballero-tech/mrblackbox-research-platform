@@ -1,4 +1,9 @@
-import { getCtlDefinition, getCtlQuestions } from "@/modules/ctl/definition";
+import {
+  getCtlApplicableQuestions,
+  getCtlDefinition,
+  getCtlQuestions,
+  type CtlAnswerLookup
+} from "@/modules/ctl/definition";
 import { formatDateTimeMexicoCity, MEXICO_CITY_TIME_ZONE } from "@/shared/utils/date-format";
 import type {
   CltOperationsAnswerGroup,
@@ -18,6 +23,29 @@ export function resolveCltProgress(answeredCount: number, questionCount: number)
   }
 
   return `${answeredCount}/${questionCount}`;
+}
+
+export function resolveCltApplicableProgress(answers: Array<{ questionCode: string; answerValue: unknown }>): {
+  answeredCount: number;
+  label: string;
+  questionCount: number;
+} {
+  const answerLookup = buildCtlAnswerLookup(answers);
+  const applicableQuestions = getCtlApplicableQuestions(getCtlDefinition(), answerLookup);
+  const applicableCodes = new Set(applicableQuestions.map((question) => question.code));
+  const answeredCodes = new Set(
+    answers
+      .filter((answer) => applicableCodes.has(answer.questionCode))
+      .map((answer) => answer.questionCode)
+  );
+  const answeredCount = answeredCodes.size;
+  const questionCount = applicableQuestions.length;
+
+  return {
+    answeredCount,
+    label: resolveCltProgress(answeredCount, questionCount),
+    questionCount
+  };
 }
 
 export function formatOperationsDateTime(value: Date | null | undefined, timeZoneIana = DEFAULT_TIME_ZONE): string {
@@ -186,6 +214,10 @@ function collectAnswerQuestionCodes(details: CltOperationsDetail[]): string[] {
   }
 
   return ordered;
+}
+
+function buildCtlAnswerLookup(answers: Array<{ questionCode: string; answerValue: unknown }>): CtlAnswerLookup {
+  return Object.fromEntries(answers.map((answer) => [answer.questionCode, answer.answerValue]));
 }
 
 function tsvCell(value: string | number | null | undefined): string {

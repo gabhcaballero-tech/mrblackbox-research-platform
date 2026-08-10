@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { sendPublicCtlNavigoEvaluationLinkWhatsAppAction } from "@/modules/ctl/public-actions";
+import { sendPublicCtlParticipantLinksWhatsAppAction } from "@/modules/ctl/public-actions";
+import type { NavigoParticipantLinkSendType } from "@/modules/navigo-app/repository";
 import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 
 export type CtlNavigoPreparedActivity = {
@@ -24,8 +25,12 @@ type CtlNavigoPreparedPanelProps = {
 type SendResult = {
   folio: string;
   generatedAtIso: string;
+  hutUrl?: string | null;
+  navigoUrl?: string | null;
   phone: string;
+  sentLinkType: NavigoParticipantLinkSendType;
   url: string;
+  warnings?: string[];
   whatsappError?: string | null;
   whatsappMessageId?: string | null;
   whatsappStatus: "ENVIADO" | "ERROR";
@@ -42,32 +47,33 @@ export function CtlNavigoPreparedPanel({
   studyCode,
   t0Label
 }: CtlNavigoPreparedPanelProps) {
-  const [copied, setCopied] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittingType, setSubmittingType] = useState<NavigoParticipantLinkSendType | null>(null);
   const [result, setResult] = useState<SendResult | null>(null);
-  const visibleUrl = result?.url ?? evaluationUrl;
+  const visibleNavigoUrl = result?.navigoUrl ?? evaluationUrl;
+  const visibleHutUrl = result?.hutUrl ?? null;
   const sentSuccessfully = result?.whatsappStatus === "ENVIADO";
 
-  async function copyLink() {
-    if (!visibleUrl) {
+  async function copyLink(url: string | null) {
+    if (!url) {
       return;
     }
 
-    await navigator.clipboard.writeText(visibleUrl);
-    setCopied(true);
+    await navigator.clipboard.writeText(url);
+    setCopiedUrl(url);
   }
 
-  async function sendLink() {
-    if (isSubmitting) {
+  async function sendLink(linkType: NavigoParticipantLinkSendType) {
+    if (submittingType) {
       return;
     }
 
     setError(null);
-    setIsSubmitting(true);
+    setSubmittingType(linkType);
 
     try {
-      const response = await sendPublicCtlNavigoEvaluationLinkWhatsAppAction(studyCode, sessionId, requestOrigin);
+      const response = await sendPublicCtlParticipantLinksWhatsAppAction(studyCode, sessionId, requestOrigin, linkType);
 
       if (!response.ok) {
         setError(response.message);
@@ -77,8 +83,12 @@ export function CtlNavigoPreparedPanel({
       setResult({
         folio: response.data.folio ?? folio,
         generatedAtIso: response.data.generatedAtIso,
+        hutUrl: response.data.hutUrl,
+        navigoUrl: response.data.navigoUrl,
         phone: response.data.phone,
-        url: response.data.evaluationUrl,
+        sentLinkType: response.data.sentLinkType,
+        url: response.data.navigoUrl ?? response.data.hutUrl ?? "",
+        warnings: response.data.warnings,
         whatsappError: response.data.whatsappError,
         whatsappMessageId: response.data.whatsappMessageId,
         whatsappStatus: response.data.whatsappStatus
@@ -88,9 +98,9 @@ export function CtlNavigoPreparedPanel({
         setError(response.data.message);
       }
     } catch {
-      setError("No se pudo enviar el enlace. Copia el enlace y compartelo manualmente.");
+      setError("No se pudo enviar el enlace. Copia el enlace disponible y compartelo manualmente.");
     } finally {
-      setIsSubmitting(false);
+      setSubmittingType(null);
     }
   }
 
@@ -99,7 +109,7 @@ export function CtlNavigoPreparedPanel({
       <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">NAVIGO preparado</p>
       <h2 className="mt-2 text-xl font-bold text-emerald-950">Evaluacion sensorial concluida.</h2>
       <p className="mt-2 text-sm leading-6 text-emerald-900">
-        Continua con el envio del enlace unico de evaluacion Navigo al panelista.
+        Continua con el envio de enlaces al panelista. Navigo es para evaluaciones programadas; HUT es solo para seguimiento fotografico.
       </p>
 
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
@@ -118,33 +128,43 @@ export function CtlNavigoPreparedPanel({
         </dl>
       </div>
 
-      <div className="mt-4 rounded-lg border border-white/80 bg-white p-4">
-        <p className="text-sm font-bold text-emerald-950">Enlace personalizado Navigo</p>
-        {visibleUrl ? (
-          <p className="mt-2 break-all rounded-md bg-emerald-50 px-3 py-2 font-mono text-xs text-emerald-950">{visibleUrl}</p>
-        ) : (
-          <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            El enlace de Navigo aun no esta disponible. Revisa la liberacion desde Administracion.
-          </p>
-        )}
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <button
-            className="inline-flex min-h-11 items-center justify-center rounded-md bg-sky-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-600"
-            disabled={!visibleUrl}
-            onClick={copyLink}
-            type="button"
-          >
-            {copied ? "Enlace copiado" : "Copiar enlace"}
-          </button>
-          <button
-            className="inline-flex min-h-11 items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-600"
-            disabled={isSubmitting}
-            onClick={sendLink}
-            type="button"
-          >
-            {isSubmitting ? "Enviando WhatsApp..." : sentSuccessfully ? "✓ Enlace enviado" : "Enviar enlace al panelista"}
-          </button>
-        </div>
+      <LinkCard
+        copied={copiedUrl === visibleNavigoUrl}
+        label="Enlace personalizado Navigo"
+        onCopy={() => copyLink(visibleNavigoUrl)}
+        unavailableMessage="El enlace de Navigo aun no esta disponible. Revisa la liberacion desde Administracion."
+        url={visibleNavigoUrl}
+      />
+
+      {visibleHutUrl ? (
+        <LinkCard
+          copied={copiedUrl === visibleHutUrl}
+          label="Enlace fotografico HUT"
+          onCopy={() => copyLink(visibleHutUrl)}
+          unavailableMessage="El enlace HUT no esta disponible."
+          url={visibleHutUrl}
+        />
+      ) : null}
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <SendButton
+          disabled={Boolean(submittingType)}
+          isSubmitting={submittingType === "NAVIGO"}
+          label={sentSuccessfully ? "Reenviar enlace Navigo" : "Enviar enlace Navigo"}
+          onClick={() => sendLink("NAVIGO")}
+        />
+        <SendButton
+          disabled={Boolean(submittingType)}
+          isSubmitting={submittingType === "HUT"}
+          label={sentSuccessfully ? "Reenviar enlace HUT" : "Enviar enlace HUT"}
+          onClick={() => sendLink("HUT")}
+        />
+        <SendButton
+          disabled={Boolean(submittingType)}
+          isSubmitting={submittingType === "BOTH"}
+          label={sentSuccessfully ? "Reenviar ambos enlaces" : "Enviar ambos enlaces"}
+          onClick={() => sendLink("BOTH")}
+        />
       </div>
 
       {error ? (
@@ -156,12 +176,20 @@ export function CtlNavigoPreparedPanel({
       {result ? (
         <div className="mt-4 rounded-lg border border-white/80 bg-white p-4 text-sm text-emerald-950">
           <p className="font-bold">
-            WhatsApp: {result.whatsappStatus === "ENVIADO" ? "✓ Enviado correctamente" : "No se pudo enviar"}
+            WhatsApp: {result.whatsappStatus === "ENVIADO" ? "Enviado correctamente" : "No se pudo enviar"}
           </p>
+          <p className="mt-1">Tipo enviado: {linkTypeLabel(result.sentLinkType)}</p>
           <p className="mt-1">Fecha: {formatResultDate(result.generatedAtIso)}</p>
           <p className="mt-1">Telefono destino: {result.phone}</p>
           {result.whatsappMessageId ? <p className="mt-1 font-mono text-xs">Meta ID: {result.whatsappMessageId}</p> : null}
           {result.whatsappError ? <p className="mt-1 text-amber-800">{result.whatsappError}</p> : null}
+          {result.warnings?.length ? (
+            <ul className="mt-2 space-y-1 text-amber-800">
+              {result.warnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       ) : null}
     </section>
@@ -177,6 +205,64 @@ function Detail({ label, value }: { label: string; value: string }) {
   );
 }
 
+function LinkCard({
+  copied,
+  label,
+  onCopy,
+  unavailableMessage,
+  url
+}: {
+  copied: boolean;
+  label: string;
+  onCopy: () => void;
+  unavailableMessage: string;
+  url: string | null;
+}) {
+  return (
+    <div className="mt-4 rounded-lg border border-white/80 bg-white p-4">
+      <p className="text-sm font-bold text-emerald-950">{label}</p>
+      {url ? (
+        <p className="mt-2 break-all rounded-md bg-emerald-50 px-3 py-2 font-mono text-xs text-emerald-950">{url}</p>
+      ) : (
+        <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {unavailableMessage}
+        </p>
+      )}
+      <button
+        className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-sky-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-600"
+        disabled={!url}
+        onClick={onCopy}
+        type="button"
+      >
+        {copied ? "Enlace copiado" : "Copiar enlace"}
+      </button>
+    </div>
+  );
+}
+
+function SendButton({
+  disabled,
+  isSubmitting,
+  label,
+  onClick
+}: {
+  disabled: boolean;
+  isSubmitting: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className="inline-flex min-h-11 items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-600"
+      disabled={disabled}
+      onClick={onClick}
+      type="button"
+    >
+      {isSubmitting ? "Enviando WhatsApp..." : label}
+    </button>
+  );
+}
+
 function activityLabel(code: string): string {
   switch (code) {
     case "T3_HORAS":
@@ -188,6 +274,14 @@ function activityLabel(code: string): string {
     default:
       return code;
   }
+}
+
+function linkTypeLabel(linkType: NavigoParticipantLinkSendType): string {
+  if (linkType === "BOTH") {
+    return "Navigo + HUT";
+  }
+
+  return linkType;
 }
 
 function formatResultDate(value: string): string {

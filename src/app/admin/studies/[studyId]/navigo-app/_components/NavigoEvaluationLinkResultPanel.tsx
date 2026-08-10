@@ -6,6 +6,7 @@ type NavigoEvaluationLinkResultPanelProps = {
   folio: string;
   generatedAtLabel: string;
   phone: string;
+  title?: string;
   url: string;
   whatsappError?: string | null;
   whatsappMessageId?: string | null;
@@ -16,6 +17,7 @@ export function NavigoEvaluationLinkResultPanel({
   folio,
   generatedAtLabel,
   phone,
+  title = "Enlace de evaluacion",
   url,
   whatsappError,
   whatsappMessageId,
@@ -30,7 +32,7 @@ export function NavigoEvaluationLinkResultPanel({
 
   return (
     <section className="rounded-md border border-sky-200 bg-sky-50 p-3">
-      <p className="text-sm font-semibold text-sky-950">Enlace de evaluacion</p>
+      <p className="text-sm font-semibold text-sky-950">{title}</p>
       <dl className="mt-3 space-y-1 text-xs text-sky-950">
         <div>
           <dt className="inline font-medium text-sky-700">Folio participante: </dt>

@@ -8,6 +8,7 @@ import {
   progressQuestionsForSection,
   progressSectionTitle,
   isHutOperationalPanelSection,
+  orderHutQuestionsForParticipant,
   resolveHutPhaseCodeSlotTimelineLabel,
   resolveHutPhotoTimelinePhotoLabel,
   resolveHutOperationalStatusLabel,
@@ -978,7 +979,10 @@ function nextQuestionAfterCurrent({
 
 function applicableQuestions(workspace: HutFieldQuestionnaireWorkspace) {
   const applicableCodes = new Set(workspace.questionnaire.applicableQuestionCodes);
-  return getHutQuestions().filter((question) => applicableCodes.has(question.code) && isHutOperationalPanelSection(question.section));
+  return orderHutQuestionsForParticipant(
+    getHutQuestions().filter((question) => applicableCodes.has(question.code) && isHutOperationalPanelSection(question.section)),
+    workspace.participant.id
+  );
 }
 
 function productLabelForQuestion(question: HutQuestionDefinition, workspace: HutFieldQuestionnaireWorkspace): string {
