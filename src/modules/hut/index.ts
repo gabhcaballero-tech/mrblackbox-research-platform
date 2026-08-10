@@ -82,6 +82,7 @@ export {
 } from "./photo-timeline";
 export {
   buildHutQuestionnaireProgress,
+  isHutOperationalPanelSection,
   progressQuestionsForSection,
   progressSectionTitle
 } from "./progress";

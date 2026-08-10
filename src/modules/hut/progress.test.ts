@@ -11,7 +11,7 @@ describe("HUT questionnaire progress", () => {
     });
     const filters = progress.sections.find((section) => section.section === "FILTROS");
 
-    expect(filters?.title).toBe("Filtros");
+    expect(filters?.title).toBe("Filtro de participante");
     expect(filters?.total).toBeGreaterThan(3);
     expect(filters?.pendingQuestionCodes).toContain("HUT_F0_ACEPTA");
     expect(filters?.pendingQuestionCodes).toContain("HUT_F22_IMPORTANCIA_PERFUME");
@@ -31,7 +31,7 @@ describe("HUT questionnaire progress", () => {
         "HUT_F20_TIEMPO_USO_MARCA",
         "HUT_F22_IMPORTANCIA_PERFUME"
       ],
-      title: "Filtros obligatorios",
+      title: "Filtro de participante",
       total: 3
     });
   });
@@ -54,7 +54,7 @@ describe("HUT questionnaire progress", () => {
     expect(withFollowUp.sections.find((section) => section.section === "EVALUACION_PRIMER_PERFUME")?.total).toBe(23);
   });
 
-  it("shows 23 applicable questions for each perfume evaluation when the conditional detail applies", () => {
+  it("shows 23 applicable questions for first perfume evaluation and hides the full second perfume evaluation", () => {
     const progress = buildHutQuestionnaireProgress({
       answers: {
         HUT_P12A_CARACTERISTICA_INCOMODA: "1",
@@ -64,7 +64,11 @@ describe("HUT questionnaire progress", () => {
     });
 
     expect(progress.sections.find((section) => section.section === "EVALUACION_PRIMER_PERFUME")?.total).toBe(23);
-    expect(progress.sections.find((section) => section.section === "EVALUACION_SEGUNDO_PERFUME")?.total).toBe(23);
+    expect(progress.sections.find((section) => section.section === "EVALUACION_SEGUNDO_PERFUME")).toBeUndefined();
+    expect(progress.sections.find((section) => section.section === "SEGUNDA_VISITA")).toMatchObject({
+      title: "Regreso 2 - Confirmacion segundo perfume",
+      total: 1
+    });
   });
 
   it("shows four comparative questions", () => {
@@ -74,7 +78,7 @@ describe("HUT questionnaire progress", () => {
     });
 
     expect(progress.sections.find((section) => section.section === "COMPARATIVA")).toMatchObject({
-      title: "Evaluacion comparativa",
+      title: "Evaluacion comparativa (Regreso 2)",
       total: 4
     });
   });

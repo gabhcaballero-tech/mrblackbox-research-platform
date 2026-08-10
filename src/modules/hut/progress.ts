@@ -24,6 +24,19 @@ export type HutQuestionnaireProgress = {
   total: number;
 };
 
+const HUT_OPERATIONAL_PANEL_SECTIONS = new Set<HutQuestionnaireSectionId>([
+  "DATOS_GENERALES",
+  "FILTROS",
+  "PRIMERA_VISITA",
+  "EVALUACION_PRIMER_PERFUME",
+  "SEGUNDA_VISITA",
+  "COMPARATIVA"
+]);
+
+export function isHutOperationalPanelSection(section: HutQuestionnaireSectionId): boolean {
+  return HUT_OPERATIONAL_PANEL_SECTIONS.has(section);
+}
+
 export function buildHutQuestionnaireProgress({
   answers = {},
   applicableQuestionCodes,
@@ -42,6 +55,7 @@ export function buildHutQuestionnaireProgress({
     definition
   }).filter((question) => !allowedCodes || allowedCodes.has(question.code));
   const sections = definition.sections
+    .filter((section) => isHutOperationalPanelSection(section.id))
     .map((section) => {
       const questions = progressQuestionsForSection({
         answers,
@@ -58,7 +72,7 @@ export function buildHutQuestionnaireProgress({
         pendingQuestionCodes,
         questions,
         section: section.id,
-        title: progressSectionTitle(section.id, participantOrigin),
+        title: progressSectionTitle(section.id),
         total: questions.length
       };
     })
@@ -93,6 +107,10 @@ export function progressQuestionsForSection({
     definition
   });
 
+  if (!isHutOperationalPanelSection(section)) {
+    return [];
+  }
+
   return questions.filter((question) => {
     if (question.section !== section || !question.required) {
       return false;
@@ -106,21 +124,24 @@ export function progressQuestionsForSection({
   });
 }
 
-export function progressSectionTitle(section: HutQuestionnaireSectionId, participantOrigin: HutParticipantOrigin): string {
-  if (section === "FILTROS" && participantOrigin === "CLT_HUT") {
-    return "Filtros obligatorios";
-  }
+export function progressSectionTitle(section: HutQuestionnaireSectionId): string {
   if (section === "FILTROS") {
-    return "Filtros";
+    return "Filtro de participante";
+  }
+  if (section === "PRIMERA_VISITA") {
+    return "Entrega de perfume";
   }
   if (section === "EVALUACION_PRIMER_PERFUME") {
-    return "Evaluacion primer perfume";
+    return "Regreso 1 - Evaluacion primer perfume";
+  }
+  if (section === "SEGUNDA_VISITA") {
+    return "Regreso 2 - Confirmacion segundo perfume";
   }
   if (section === "EVALUACION_SEGUNDO_PERFUME") {
-    return "Evaluacion segundo perfume";
+    return "Evaluacion segundo perfume (historica)";
   }
   if (section === "COMPARATIVA") {
-    return "Evaluacion comparativa";
+    return "Evaluacion comparativa (Regreso 2)";
   }
 
   return getHutV5Definition().sections.find((candidate) => candidate.id === section)?.title ?? section;

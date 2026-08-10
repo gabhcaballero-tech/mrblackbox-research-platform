@@ -93,7 +93,7 @@ describe("FieldHutPage", () => {
     expect(screen.getByTestId("field-hut-secondary-details")).toBeInTheDocument();
     expect(screen.getByText("Filtro pendiente de captura.")).toBeInTheDocument();
     expect(screen.getByText("Filtro")).toBeInTheDocument();
-    expect(screen.getByText("Filtros obligatorios")).toBeInTheDocument();
+    expect(screen.getAllByText("Filtro de participante").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/0\/3/)).toBeInTheDocument();
     expect(screen.getAllByText("Pendiente").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("247").length).toBeGreaterThanOrEqual(1);
@@ -104,6 +104,11 @@ describe("FieldHutPage", () => {
     expect(screen.getAllByText("Producto 1 - Dia 1 (Colocacion)").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Producto 1 - Dia 3 tarde - Evaluacion 1")).toBeInTheDocument();
     expect(screen.getByText("Producto 2 - Dia 3 tarde - Evaluacion 2")).toBeInTheDocument();
+    expect(screen.getAllByText("Entrega de perfume").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Regreso 1 - Evaluacion primer perfume").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Regreso 2 - Confirmacion segundo perfume").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Evaluacion comparativa (Regreso 2)").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Evaluacion segundo perfume")).not.toBeInTheDocument();
     expect(screen.queryByText("Regreso 1")).not.toBeInTheDocument();
     expect(screen.queryByText("Regreso 2")).not.toBeInTheDocument();
     expect(screen.getAllByText("Producto: 247").length).toBeGreaterThanOrEqual(1);
@@ -283,7 +288,10 @@ function createWorkspace() {
         "HUT_F6_PRODUCTOS_7_DIAS",
         "HUT_F20_TIEMPO_USO_MARCA",
         "HUT_F22_IMPORTANCIA_PERFUME",
-        "HUT_V1_CONFIRMACION_ENTREGA"
+        "HUT_V1_CONFIRMACION_ENTREGA",
+        "HUT_EVA1_GUSTO",
+        "HUT_V2_CONFIRMACION_ENTREGA",
+        "HUT_P24_PREFERENCIA_GENERAL"
       ],
       attempt: {
         completedAt: null,

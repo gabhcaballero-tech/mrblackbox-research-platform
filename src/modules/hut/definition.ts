@@ -120,7 +120,7 @@ export type HutSectionDefinition = {
 export type HutDefinition = {
   protocolVersion: "APPLICATION_PHOTO";
   sections: HutSectionDefinition[];
-  version: 5;
+  version: 5 | 6;
 };
 
 export type HutAnswerLookup = Record<string, unknown>;
@@ -1177,19 +1177,19 @@ export const HUT_V5_DEFINITION: HutDefinition = {
       description: "HUT directo aplica filtros completos. CLT + HUT aplica solo los filtros obligatorios marcados como requiredForCltHut.",
       id: "FILTROS",
       questions: filterQuestions,
-      title: "Seccion I - Filtros"
+      title: "Filtro de participante"
     },
     {
       id: "PRIMERA_VISITA",
       instructions: [
         {
-          text: "Discurso de entrega. Tiempo de uso: 3 dias. Entregar hoja de instrucciones al entrevistado.",
-          title: "Instruccion de visita",
+          text: "Registrar entrega de perfume, confirmar clave de producto y entregar instrucciones de uso al participante.",
+          title: "Entrega de perfume",
           type: "SECTION"
         }
       ],
       questions: firstVisitQuestions,
-      title: "Primera visita"
+      title: "Entrega de perfume"
     },
     {
       id: "EVALUACION_PRIMER_PERFUME",
@@ -1201,19 +1201,19 @@ export const HUT_V5_DEFINITION: HutDefinition = {
         }
       ],
       questions: firstPerfumeEvaluationQuestions,
-      title: "Seccion II - Evaluacion de primer perfume"
+      title: "Regreso 1 - Evaluacion primer perfume"
     },
     {
       id: "SEGUNDA_VISITA",
       instructions: [
         {
-          text: "Al terminar la evaluacion 1, confirmar termino de visita y regresar al resumen HUT. No iniciar automaticamente producto 2.",
-          title: "Separacion de visitas",
+          text: "Confirmar uso del segundo perfume, solicitar muestra de envase y registrar validaciones necesarias antes de comparar.",
+          title: "Regreso 2",
           type: "SECTION"
         }
       ],
       questions: secondVisitQuestions,
-      title: "Segunda visita"
+      title: "Regreso 2 - Confirmacion segundo perfume"
     },
     {
       id: "EVALUACION_SEGUNDO_PERFUME",
@@ -1225,7 +1225,7 @@ export const HUT_V5_DEFINITION: HutDefinition = {
         }
       ],
       questions: secondPerfumeEvaluationQuestions,
-      title: "Seccion III - Evaluacion de segundo perfume"
+      title: "Evaluacion segundo perfume (historica)"
     },
     {
       id: "COMPARATIVA",
@@ -1237,10 +1237,10 @@ export const HUT_V5_DEFINITION: HutDefinition = {
         }
       ],
       questions: comparativeQuestions,
-      title: "Seccion IV - Evaluacion comparativa"
+      title: "Evaluacion comparativa (Regreso 2)"
     }
   ],
-  version: 5
+  version: 6
 };
 
 export function getHutV5Definition(): HutDefinition {

@@ -7,6 +7,7 @@ import {
   getHutV5Definition,
   progressQuestionsForSection,
   progressSectionTitle,
+  isHutOperationalPanelSection,
   resolveHutPhaseCodeSlotTimelineLabel,
   resolveHutPhotoTimelinePhotoLabel,
   resolveHutOperationalStatusLabel,
@@ -369,7 +370,7 @@ function FieldHutWorkspace({
           <Fact label="Modo prueba" value={workspace.participant.testMode ? "Activo" : "Inactivo"} />
           <Fact
             label="Evaluacion actual"
-            value={currentEvaluationQuestion ? progressSectionTitle(currentEvaluationQuestion.section, workspace.participant.origin) : "Evaluacion completada"}
+            value={currentEvaluationQuestion ? progressSectionTitle(currentEvaluationQuestion.section) : "Evaluacion completada"}
           />
           <Fact label="Producto" value={currentEvaluationQuestion ? productLabelForQuestion(currentEvaluationQuestion, workspace) : "Sin pendiente"} />
         </div>
@@ -492,7 +493,7 @@ function FieldHutWorkspace({
         ) : nextQuestion ? (
           <div className="mt-5 rounded-md border border-teal-200 bg-teal-50 p-4">
             <p className="text-sm font-semibold text-teal-950">Siguiente evaluacion</p>
-            <p className="mt-1 text-lg font-semibold text-zinc-950">{progressSectionTitle(nextQuestion.section, workspace.participant.origin)}</p>
+            <p className="mt-1 text-lg font-semibold text-zinc-950">{progressSectionTitle(nextQuestion.section)}</p>
             <p className="mt-1 text-sm text-zinc-700">Producto: {productLabelForQuestion(nextQuestion, workspace)}</p>
             <a
               className="mt-4 inline-flex min-h-12 items-center justify-center rounded-md bg-teal-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-800"
@@ -633,7 +634,7 @@ function QuestionnaireForm({
       ) : null}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">
-          {progressSectionTitle(question.section, workspace.participant.origin)}
+          {progressSectionTitle(question.section)}
         </p>
         <p className="text-sm font-semibold text-zinc-600">
           Pregunta {questionIndex >= 0 ? questionIndex + 1 : "-"} de {progressQuestions.length}
@@ -923,7 +924,7 @@ function nextQuestionAfterCurrent({
 
 function applicableQuestions(workspace: HutFieldQuestionnaireWorkspace) {
   const applicableCodes = new Set(workspace.questionnaire.applicableQuestionCodes);
-  return getHutQuestions().filter((question) => applicableCodes.has(question.code));
+  return getHutQuestions().filter((question) => applicableCodes.has(question.code) && isHutOperationalPanelSection(question.section));
 }
 
 function productLabelForQuestion(question: HutQuestionDefinition, workspace: HutFieldQuestionnaireWorkspace): string {

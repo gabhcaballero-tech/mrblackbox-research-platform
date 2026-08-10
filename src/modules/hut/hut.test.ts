@@ -445,12 +445,12 @@ describe("HUT module foundation", () => {
     expect(migration).not.toContain('DROP TABLE "hut_video_submissions"');
   });
 
-  it("defines the HUT v5 application photo questionnaire sections separately from operational phases", () => {
+  it("defines the HUT v6 application photo questionnaire sections separately from operational phases", () => {
     const definition = getHutV5Definition();
 
     expect(definition).toMatchObject({
       protocolVersion: "APPLICATION_PHOTO",
-      version: 5
+      version: 6
     });
     expect(definition.sections.map((section) => section.id)).toEqual([
       "DATOS_GENERALES",
@@ -464,6 +464,12 @@ describe("HUT module foundation", () => {
     expect(definition.sections.map((section) => section.id)).not.toContain("COLOCACION");
     expect(definition.sections.map((section) => section.id)).not.toContain("REGRESO_1");
     expect(definition.sections.map((section) => section.id)).not.toContain("REGRESO_2");
+    expect(definition.sections.find((section) => section.id === "FILTROS")?.title).toBe("Filtro de participante");
+    expect(definition.sections.find((section) => section.id === "PRIMERA_VISITA")?.title).toBe("Entrega de perfume");
+    expect(definition.sections.find((section) => section.id === "EVALUACION_PRIMER_PERFUME")?.title).toBe("Regreso 1 - Evaluacion primer perfume");
+    expect(definition.sections.find((section) => section.id === "SEGUNDA_VISITA")?.title).toBe("Regreso 2 - Confirmacion segundo perfume");
+    expect(definition.sections.find((section) => section.id === "COMPARATIVA")?.title).toBe("Evaluacion comparativa (Regreso 2)");
+    expect(definition.sections.find((section) => section.id === "EVALUACION_SEGUNDO_PERFUME")?.title).toBe("Evaluacion segundo perfume (historica)");
     expect(definition.sections.flatMap((section) => section.questions).map((question) => question.code)).toContain(
       "HUT_PARTICIPO_CLT"
     );
