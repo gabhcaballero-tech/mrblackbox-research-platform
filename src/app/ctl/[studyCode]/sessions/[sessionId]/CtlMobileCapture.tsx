@@ -251,7 +251,7 @@ export function CtlMobileCapture({
         return;
       }
 
-      setMessage("CTL completado correctamente.");
+      setMessage("¡Muchas gracias por su participación! Su entrevista CLT ha finalizado.");
       if (result.redirectTo) {
         window.location.assign(result.redirectTo);
       }

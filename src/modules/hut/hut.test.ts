@@ -2160,7 +2160,37 @@ describe("HUT module foundation", () => {
     });
   });
 
-  it("does not send a HUT photo reminder when HUT exists but the first product delivery is missing", async () => {
+  it("does not send a HUT photo reminder when HUT exists but has not started", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const whatsapp = createFakeWhatsAppRepository();
+    const repository = createHutRepository(prisma as never, whatsapp);
+    stubAcceptedWhatsAppMeta();
+    await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-REM-NOT-STARTED", startDate: null });
+
+    const result = await repository.processPhotoWhatsAppReminders({
+      now: new Date("2026-08-09T16:34:00.000Z"),
+      requestOrigin: "https://example.test",
+      studyId: "study-hut"
+    });
+
+    expect(result.ok ? result.data.sent : -1).toBe(0);
+    expect(result.ok ? result.data.skipped : -1).toBe(1);
+    expect(whatsapp.createOutboundMessage).not.toHaveBeenCalled();
+    expect(prisma.state.auditLogs).toHaveLength(1);
+    expect(prisma.state.auditLogs[0]).toMatchObject({
+      reason: "HUT_PHOTO_REMINDER_CRON_SKIPPED"
+    });
+    expect(prisma.state.auditLogs[0]?.afterJson).toMatchObject({
+      exclusionReason: "NO_STARTED",
+      exclusionReasons: ["NO_STARTED", "WAITING_DELIVERY"],
+      reminderType: "HUT_PHOTO_REMINDER",
+      slotId: "DELIVERY",
+      source: "CRON",
+      whatsappStatus: "OMITIDO"
+    });
+  });
+
+  it("does not send a HUT photo reminder for pending DELIVERY", async () => {
     const { prisma } = createFakeHutPrisma();
     const whatsapp = createFakeWhatsAppRepository();
     const repository = createHutRepository(prisma as never, whatsapp);
@@ -2176,7 +2206,90 @@ describe("HUT module foundation", () => {
     expect(result.ok ? result.data.sent : -1).toBe(0);
     expect(result.ok ? result.data.skipped : -1).toBe(1);
     expect(whatsapp.createOutboundMessage).not.toHaveBeenCalled();
-    expect(prisma.state.auditLogs).toHaveLength(0);
+    expect(prisma.state.auditLogs[0]?.afterJson).toMatchObject({
+      exclusionReason: "WAITING_DELIVERY",
+      reminderType: "HUT_PHOTO_REMINDER",
+      slotId: "DELIVERY",
+      whatsappStatus: "OMITIDO"
+    });
+  });
+
+  it("sends HUT completion message once when all applicable questionnaire sections are closed", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const whatsapp = createFakeWhatsAppRepository();
+    const repository = createHutRepository(prisma as never, whatsapp);
+    stubAcceptedWhatsAppMeta();
+    await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-COMPLETE-001" });
+    const participant = prisma.state.participants[0]!;
+    const formData = createCompleteHutV5FormData({ participantOrigin: "CLT_HUT" });
+    formData.set("HUT_F2_EDAD_EXACTA", "35");
+    formData.set("HUT_F2_RANGO_EDAD", "2");
+    formData.delete("HUT_F6_PRODUCTOS_7_DIAS");
+    formData.append("HUT_F6_PRODUCTOS_7_DIAS", "3");
+    const answers = hutFormDataToAnswerInput(formData);
+    const applicableQuestions = getHutApplicableQuestions({
+      answers,
+      context: { participantOrigin: "CLT_HUT" },
+      definition: getHutV5Definition()
+    }).filter((question) => question.required);
+
+    for (const question of applicableQuestions) {
+      const result = await repository.saveQuestionnaireAnswer({
+        answerInput: { [question.code]: answers[question.code] },
+        participantId: participant.id,
+        questionCode: question.code,
+        studyId: "study-hut"
+      });
+      expect(result.ok).toBe(true);
+    }
+
+    const sections = [...new Set(applicableQuestions.map((question) => question.section))];
+    let lastResult: Awaited<ReturnType<typeof repository.completeQuestionnaireSection>> | null = null;
+    for (const section of sections) {
+      lastResult = await repository.completeQuestionnaireSection({
+        actorUserId: "field-user-1",
+        participantId: participant.id,
+        section,
+        studyId: "study-hut"
+      });
+      expect(lastResult.ok).toBe(true);
+    }
+    const repeated = await repository.completeQuestionnaireSection({
+      actorUserId: "field-user-1",
+      participantId: participant.id,
+      section: sections[sections.length - 1]!,
+      studyId: "study-hut"
+    });
+
+    expect(lastResult?.ok ? lastResult.message : "").toBe("Participacion HUT finalizada correctamente.");
+    expect(repeated.ok).toBe(true);
+    expect(whatsapp.createOutboundMessage).toHaveBeenCalledTimes(1);
+    expect(prisma.state.auditLogs.filter((log) => log.reason === "HUT_COMPLETION_MESSAGE")).toHaveLength(1);
+    expect(prisma.state.auditLogs.find((log) => log.reason === "HUT_COMPLETION_MESSAGE")).toMatchObject({
+      actorUserId: "field-user-1",
+      entityId: participant.id,
+      entityType: "HutParticipant"
+    });
+  });
+
+  it("does not send HUT completion message while questionnaire is incomplete", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const whatsapp = createFakeWhatsAppRepository();
+    const repository = createHutRepository(prisma as never, whatsapp);
+    stubAcceptedWhatsAppMeta();
+    await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-COMPLETE-PENDING" });
+    const participant = prisma.state.participants[0]!;
+    const result = await repository.completeQuestionnaireSection({
+      actorUserId: "field-user-1",
+      participantId: participant.id,
+      section: "DATOS_GENERALES",
+      studyId: "study-hut"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.message : "").toBe("Seccion HUT v5 completada correctamente.");
+    expect(whatsapp.createOutboundMessage).not.toHaveBeenCalled();
+    expect(prisma.state.auditLogs.filter((log) => log.reason === "HUT_COMPLETION_MESSAGE")).toHaveLength(0);
   });
 
   it("does not send a HUT photo reminder to CLT_HUT participants before CLT is completed", async () => {
@@ -2200,6 +2313,12 @@ describe("HUT module foundation", () => {
     expect(result.ok ? result.data.sent : -1).toBe(0);
     expect(result.ok ? result.data.skipped : -1).toBe(1);
     expect(whatsapp.createOutboundMessage).not.toHaveBeenCalled();
+    expect(prisma.state.auditLogs[0]?.afterJson).toMatchObject({
+      exclusionReason: "WAITING_CLT",
+      reminderType: "HUT_PHOTO_REMINDER",
+      source: "CRON",
+      whatsappStatus: "OMITIDO"
+    });
   });
 
   it("sends a HUT photo reminder to HUT_DIRECTO only after filters and delivery are complete", async () => {
@@ -2260,6 +2379,12 @@ describe("HUT module foundation", () => {
     expect(result.ok ? result.data.sent : -1).toBe(0);
     expect(result.ok ? result.data.skipped : -1).toBe(1);
     expect(whatsapp.createOutboundMessage).not.toHaveBeenCalled();
+    expect(prisma.state.auditLogs[0]?.afterJson).toMatchObject({
+      exclusionReason: "SLOT_NOT_AVAILABLE",
+      reminderType: "HUT_PHOTO_REMINDER",
+      source: "CRON",
+      whatsappStatus: "OMITIDO"
+    });
   });
 
   it("does not send a HUT photo reminder when the next slot is still programmed for 4 AM Mexico City", async () => {
@@ -2292,6 +2417,10 @@ describe("HUT module foundation", () => {
     expect(beforeFourAm.ok ? beforeFourAm.data.sent : -1).toBe(0);
     expect(atFourAm.ok ? atFourAm.data.sent : -1).toBe(1);
     expect(prisma.state.auditLogs[0]?.afterJson).toMatchObject({
+      exclusionReason: "SLOT_NOT_AVAILABLE",
+      whatsappStatus: "OMITIDO"
+    });
+    expect(prisma.state.auditLogs.find((log) => (log.afterJson as { whatsappStatus?: string } | undefined)?.whatsappStatus === "ENVIADO")?.afterJson).toMatchObject({
       slotId: "PRODUCT_1_DAY_2"
     });
   });
@@ -2323,6 +2452,10 @@ describe("HUT module foundation", () => {
     expect(second.ok ? second.data.sent : -1).toBe(0);
     expect(second.ok ? second.data.skipped : -1).toBe(1);
     expect(whatsapp.createOutboundMessage).toHaveBeenCalledTimes(1);
+    expect(prisma.state.auditLogs.find((log) => (log.afterJson as { exclusionReason?: string } | undefined)?.exclusionReason === "RECENT_REMINDER")?.afterJson).toMatchObject({
+      reminderType: "HUT_PHOTO_REMINDER",
+      whatsappStatus: "OMITIDO"
+    });
   });
 
   it("records a manual HUT photo reminder with admin audit data", async () => {

@@ -285,6 +285,19 @@ export type HutPhotoReminderProcessResult = {
   skipped: number;
 };
 
+type HutPhotoReminderExclusionReason =
+  | "DELIVERY_NOT_REMINDABLE"
+  | "HUT_COMPLETED"
+  | "HUT_DISQUALIFIED"
+  | "NOT_APPLICATION_PHOTO"
+  | "NO_STARTED"
+  | "PHONE_MISSING"
+  | "QA_PARTICIPANT"
+  | "RECENT_REMINDER"
+  | "SLOT_NOT_AVAILABLE"
+  | "WAITING_CLT"
+  | "WAITING_DELIVERY";
+
 export type HutApplicationPhotoDailyAvailability = {
   available: boolean;
   capturedLocalDate: string;
@@ -2753,6 +2766,12 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
         if (!prepared.ok) {
           summary.skipped += 1;
+          await auditSkippedHutPhotoReminder({
+            decision: prepared,
+            now,
+            participant,
+            prisma
+          });
           continue;
         }
 
@@ -5199,19 +5218,64 @@ async function prepareHutPhotoReminder({
   now: Date;
   participant: HutParticipantRecord;
   prisma: HutPrismaClient;
-}): Promise<HutActionResult<{ slot: NonNullable<ReturnType<typeof availableHutPhotoReminderSlot>> }>> {
-  const slot = availableHutPhotoReminderSlot(participant, now);
+}): Promise<HutPhotoReminderEligibilityDecision> {
+  return evaluateHutPhotoReminderEligibility({ now, participant, prisma });
+}
+
+type HutPhotoReminderEligibilityDecision =
+  | {
+      data: { slot: NonNullable<ReturnType<typeof nextHutPhotoReminderCandidateSlot>> };
+      ok: true;
+    }
+  | {
+      exclusionReason: HutPhotoReminderExclusionReason;
+      exclusionReasons: HutPhotoReminderExclusionReason[];
+      message: string;
+      ok: false;
+      slotId: HutPhotoTimelineSlotId | null;
+      slotTitle: string | null;
+    };
+
+async function evaluateHutPhotoReminderEligibility({
+  now,
+  participant,
+  prisma
+}: {
+  now: Date;
+  participant: HutParticipantRecord;
+  prisma: HutPrismaClient;
+}): Promise<HutPhotoReminderEligibilityDecision> {
+  const statusExclusions = hutPhotoReminderStatusExclusions(participant);
+  if (statusExclusions.length > 0) {
+    return hutPhotoReminderExcluded(participant, now, statusExclusions, hutPhotoReminderExclusionMessage(statusExclusions[0]));
+  }
+
+  const protocolExclusions = hutPhotoReminderProtocolExclusions(participant);
+  if (protocolExclusions.length > 0) {
+    return hutPhotoReminderExcluded(participant, now, protocolExclusions, hutPhotoReminderExclusionMessage(protocolExclusions[0]));
+  }
+
+  const slot = nextHutPhotoReminderCandidateSlot(participant, now);
   if (!slot) {
-    return { message: "Este participante no tiene una fotografia HUT disponible para recordar.", ok: false };
+    return hutPhotoReminderExcluded(participant, now, ["SLOT_NOT_AVAILABLE"], hutPhotoReminderExclusionMessage("SLOT_NOT_AVAILABLE"));
+  }
+  if (slot.id === "DELIVERY") {
+    return hutPhotoReminderExcluded(
+      participant,
+      now,
+      ["DELIVERY_NOT_REMINDABLE", ...protocolExclusions],
+      hutPhotoReminderExclusionMessage("DELIVERY_NOT_REMINDABLE"),
+      slot
+    );
   }
   if (!participant.phone) {
-    return { message: "El participante HUT no tiene telefono capturado.", ok: false };
+    return hutPhotoReminderExcluded(participant, now, ["PHONE_MISSING"], hutPhotoReminderExclusionMessage("PHONE_MISSING"), slot);
   }
   if (participant.qaParticipantRun) {
-    return { message: "Los participantes QA no envian WhatsApp real.", ok: false };
+    return hutPhotoReminderExcluded(participant, now, ["QA_PARTICIPANT"], hutPhotoReminderExclusionMessage("QA_PARTICIPANT"), slot);
   }
   if (await hasRecentHutPhotoReminder(prisma, participant.id, slot.id as HutPhotoTimelineSlotId, now)) {
-    return { message: "Ya se envio un recordatorio HUT para este slot en las ultimas 24 horas.", ok: false };
+    return hutPhotoReminderExcluded(participant, now, ["RECENT_REMINDER"], hutPhotoReminderExclusionMessage("RECENT_REMINDER"), slot);
   }
 
   return { data: { slot }, ok: true };
@@ -5232,7 +5296,7 @@ async function sendHutPhotoReminderForParticipant({
   participant: HutParticipantRecord;
   prisma: HutPrismaClient;
   requestOrigin: string;
-  slot: NonNullable<ReturnType<typeof availableHutPhotoReminderSlot>>;
+  slot: NonNullable<ReturnType<typeof nextHutPhotoReminderCandidateSlot>>;
   source: "CRON" | "MANUAL_ADMIN";
   whatsappRepository?: OneuiWhatsAppRepository;
 }): Promise<HutActionResult<HutPhotoReminderSendResult>> {
@@ -5290,14 +5354,44 @@ async function sendHutPhotoReminderForParticipant({
   };
 }
 
-function availableHutPhotoReminderSlot(participant: HutParticipantRecord, now: Date) {
-  if (!isApplicationPhotoProtocol(participant) || participant.status === "COMPLETED" || participant.status === "DISQUALIFIED") {
-    return null;
-  }
-  if (!isHutPhotoReminderProtocolReady(participant)) {
-    return null;
-  }
+async function auditSkippedHutPhotoReminder({
+  decision,
+  now,
+  participant,
+  prisma
+}: {
+  decision: Extract<HutPhotoReminderEligibilityDecision, { ok: false }>;
+  now: Date;
+  participant: HutParticipantRecord;
+  prisma: HutPrismaClient;
+}) {
+  const templateName = process.env.WHATSAPP_HUT_PHOTO_REMINDER_TEMPLATE ?? "hut_photo_reminder";
 
+  await prisma.auditLog.create?.({
+    data: {
+      action: "PARTICIPANT_MODIFIED",
+      actorUserId: null,
+      afterJson: toAuditJson({
+        exclusionReason: decision.exclusionReason,
+        exclusionReasons: decision.exclusionReasons,
+        message: decision.message,
+        reminderType: "HUT_PHOTO_REMINDER",
+        source: "CRON",
+        slotId: decision.slotId,
+        slotTitle: decision.slotTitle,
+        templateName,
+        whatsappStatus: "OMITIDO"
+      }),
+      beforeJson: null,
+      createdAt: now,
+      entityId: participant.id,
+      entityType: "HutParticipant",
+      reason: "HUT_PHOTO_REMINDER_CRON_SKIPPED"
+    }
+  });
+}
+
+function nextHutPhotoReminderCandidateSlot(participant: HutParticipantRecord, now: Date) {
   return getNextHutPhotoTimelineSlot({
     applicationEvidence: applicationEvidenceSummary(participant),
     dailyEntries: applicationPhotoEntrySummary(participant),
@@ -5312,18 +5406,70 @@ function availableHutPhotoReminderSlot(participant: HutParticipantRecord, now: D
   });
 }
 
-function isHutPhotoReminderProtocolReady(participant: HutParticipantRecord): boolean {
-  if (!hasHutProtocolStarted(participant)) {
-    return false;
+function hutPhotoReminderStatusExclusions(participant: HutParticipantRecord): HutPhotoReminderExclusionReason[] {
+  if (!isApplicationPhotoProtocol(participant)) {
+    return ["NOT_APPLICATION_PHOTO"];
   }
-  if (participantOrigin(participant) === "CLT_HUT" && !hasCompletedCltSession(participant)) {
-    return false;
+  if (participant.status === "COMPLETED") {
+    return ["HUT_COMPLETED"];
   }
-  if (!hasHutDeliveryEvidence(participant)) {
-    return false;
+  if (participant.status === "DISQUALIFIED") {
+    return ["HUT_DISQUALIFIED"];
   }
 
-  return true;
+  return [];
+}
+
+function hutPhotoReminderProtocolExclusions(participant: HutParticipantRecord): HutPhotoReminderExclusionReason[] {
+  const reasons: HutPhotoReminderExclusionReason[] = [];
+  if (!hasHutProtocolStarted(participant)) {
+    reasons.push("NO_STARTED");
+  }
+  if (participantOrigin(participant) === "CLT_HUT" && !hasCompletedCltSession(participant)) {
+    reasons.push("WAITING_CLT");
+  }
+  if (!hasHutDeliveryEvidence(participant)) {
+    reasons.push("WAITING_DELIVERY");
+  }
+
+  return reasons;
+}
+
+function hutPhotoReminderExcluded(
+  participant: HutParticipantRecord,
+  now: Date,
+  exclusionReasons: HutPhotoReminderExclusionReason[],
+  message: string,
+  slot?: ReturnType<typeof nextHutPhotoReminderCandidateSlot>
+): Extract<HutPhotoReminderEligibilityDecision, { ok: false }> {
+  const resolvedSlot = slot ?? nextHutPhotoReminderCandidateSlot(participant, now);
+  const normalizedReasons = [...new Set(exclusionReasons)];
+  return {
+    exclusionReason: normalizedReasons[0] ?? "SLOT_NOT_AVAILABLE",
+    exclusionReasons: normalizedReasons.length > 0 ? normalizedReasons : ["SLOT_NOT_AVAILABLE"],
+    message,
+    ok: false,
+    slotId: resolvedSlot?.id ?? null,
+    slotTitle: resolvedSlot?.title ?? null
+  };
+}
+
+function hutPhotoReminderExclusionMessage(reason: HutPhotoReminderExclusionReason): string {
+  const messages: Record<HutPhotoReminderExclusionReason, string> = {
+    DELIVERY_NOT_REMINDABLE: "Entrega no genera recordatorio fotografico automatico.",
+    HUT_COMPLETED: "La participacion HUT ya esta completada.",
+    HUT_DISQUALIFIED: "El participante HUT esta descalificado.",
+    NOT_APPLICATION_PHOTO: "Este participante no usa el protocolo de fotografia HUT.",
+    NO_STARTED: "El protocolo HUT no ha iniciado.",
+    PHONE_MISSING: "El participante HUT no tiene telefono capturado.",
+    QA_PARTICIPANT: "Los participantes QA no envian WhatsApp real.",
+    RECENT_REMINDER: "Ya se envio un recordatorio HUT para este slot en las ultimas 24 horas.",
+    SLOT_NOT_AVAILABLE: "Este participante no tiene una fotografia HUT disponible para recordar.",
+    WAITING_CLT: "CLT aun no esta completado.",
+    WAITING_DELIVERY: "Aun no existe evidencia de entrega del primer producto."
+  };
+
+  return messages[reason];
 }
 
 function hasHutProtocolStarted(participant: HutParticipantRecord): boolean {

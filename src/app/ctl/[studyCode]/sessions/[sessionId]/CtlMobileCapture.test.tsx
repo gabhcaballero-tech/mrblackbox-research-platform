@@ -232,6 +232,13 @@ describe("CtlMobileCapture", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Finalizar CTL" }));
 
     await waitFor(() => expect(finishMock).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("¡Muchas gracias por su participación! Su entrevista CLT ha finalizado.")).toBeInTheDocument();
+  });
+
+  it("does not show the final CLT message before completion", () => {
+    renderMobileCapture();
+
+    expect(screen.queryByText(/Su entrevista CLT ha finalizado/)).not.toBeInTheDocument();
   });
 
   it("reports pending required questions before finalization", () => {
