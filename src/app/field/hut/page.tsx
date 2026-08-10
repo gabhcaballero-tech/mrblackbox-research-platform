@@ -18,6 +18,9 @@ import {
   completeHutQuestionnaireSectionForFieldAction,
   saveHutQuestionnaireAnswerForFieldAction
 } from "@/modules/hut/actions";
+import { createFieldOperationsRepository } from "@/modules/field-operations";
+import type { FieldOperationsDashboard } from "@/modules/field-operations/types";
+import type { CltOperationsDetail } from "@/modules/clt-operations/types";
 import { requireCapability } from "@/shared/auth/session";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { formatDateMexicoCity, formatDateTimeMexicoCity } from "@/shared/utils/date-format";
@@ -30,17 +33,43 @@ type FieldHutPageProps = {
     folio?: string;
     hutError?: string;
     hutMessage?: string;
+    interviewerCode?: string;
+    mode?: string;
     questionCode?: string;
+    studyId?: string;
   }>;
 };
 
 export default async function FieldHutPage({ searchParams }: FieldHutPageProps) {
-  await requireCapability("field:access");
   const query = await searchParams;
   const folio = String(query?.folio ?? "").trim().toUpperCase();
-  const workspaceResult = folio
+  const isAdminMode = query?.mode === "admin";
+  const dashboard = await resolveFieldHutDashboard({
+    interviewerCode: query?.interviewerCode,
+    isAdminMode,
+    studyId: query?.studyId
+  });
+  const access = dashboard.viewer.mode === "INTERVIEWER_CODE"
+    ? {
+        interviewerCode: dashboard.viewer.code,
+        label: dashboard.viewer.label,
+        mode: "INTERVIEWER_CODE" as const
+      }
+    : dashboard.viewer.mode === "ADMIN"
+      ? {
+          mode: "ADMIN" as const,
+          studyId: dashboard.selectedStudyId
+        }
+      : null;
+  const assignedParticipants = dashboard.viewer.mode === "CODE_REQUIRED"
+    ? []
+    : dashboard.participants.filter((participant) => participant.hut.id || participant.hut.folio);
+  const folioAllowed = !folio || isAdminMode || isAssignedFieldHutFolio(folio, dashboard.participants);
+  const workspaceResult = folio && folioAllowed
     ? await createHutRepository().getFieldQuestionnaireWorkspace({ folio })
-    : null;
+    : folio && !folioAllowed
+      ? { message: "Este participante no esta asignado a este encuestador.", ok: false as const }
+      : null;
 
   return (
     <main className="min-h-screen bg-zinc-50 px-4 py-8">
@@ -53,8 +82,18 @@ export default async function FieldHutPage({ searchParams }: FieldHutPageProps) 
           </p>
         </header>
 
+        {dashboard.viewer.mode === "CODE_REQUIRED" ? (
+          <InterviewerCodeGate error={dashboard.viewer.error} folio={folio} />
+        ) : null}
+
+        {dashboard.viewer.mode !== "CODE_REQUIRED" && access ? (
+          <FieldHutViewerCard access={access} />
+        ) : null}
+
+        {dashboard.viewer.mode !== "CODE_REQUIRED" && access ? (
         <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
           <form className="grid gap-3 sm:grid-cols-[1fr_auto]">
+            <FieldHutAccessHiddenInputs access={access} />
             <label className="flex flex-col gap-2 text-sm font-semibold text-zinc-800">
               Folio NAV/HUT
               <input
@@ -70,6 +109,11 @@ export default async function FieldHutPage({ searchParams }: FieldHutPageProps) 
             </button>
           </form>
         </section>
+        ) : null}
+
+        {dashboard.viewer.mode !== "CODE_REQUIRED" && access && !folio ? (
+          <AssignedHutParticipantsList access={access} participants={assignedParticipants} />
+        ) : null}
 
         {query?.hutMessage ? (
           <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
@@ -91,6 +135,7 @@ export default async function FieldHutPage({ searchParams }: FieldHutPageProps) 
 
         {workspaceResult?.ok ? (
           <FieldHutWorkspace
+            access={access}
             selectedQuestionCode={String(query?.questionCode ?? "").trim()}
             workspace={workspaceResult.data}
             searchedFolio={folio}
@@ -101,11 +146,144 @@ export default async function FieldHutPage({ searchParams }: FieldHutPageProps) 
   );
 }
 
+type FieldHutAccessContext =
+  | {
+      interviewerCode: string;
+      label: string;
+      mode: "INTERVIEWER_CODE";
+    }
+  | {
+      mode: "ADMIN";
+      studyId: string | null;
+    };
+
+async function resolveFieldHutDashboard(input: {
+  interviewerCode?: string | null;
+  isAdminMode: boolean;
+  studyId?: string | null;
+}): Promise<FieldOperationsDashboard> {
+  if (input.isAdminMode) {
+    const actor = await requireCapability("admin:access");
+    return createFieldOperationsRepository().getDashboard({
+      actorName: actor.name,
+      actorRole: "ADMIN",
+      interviewerUserId: actor.id,
+      mode: "ADMIN",
+      studyId: input.studyId
+    });
+  }
+
+  return createFieldOperationsRepository().getDashboard({
+    actorName: "Campo HUT",
+    actorRole: "INTERVIEWER",
+    interviewerCode: input.interviewerCode,
+    interviewerUserId: "field-hut-code",
+    mode: "INTERVIEWER_CODE",
+    studyId: input.studyId
+  });
+}
+
+function InterviewerCodeGate({ error, folio }: { error: string | null; folio: string }) {
+  return (
+    <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+      <h2 className="text-xl font-semibold text-zinc-950">Selecciona tu encuestador</h2>
+      <p className="mt-2 text-sm text-zinc-600">
+        Ingresa tu codigo personal para ver tus participantes asignados y aplicar HUT.
+      </p>
+      {error ? (
+        <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+          {error}
+        </p>
+      ) : null}
+      <form className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
+        {folio ? <input name="folio" type="hidden" value={folio} /> : null}
+        <label className="flex flex-col gap-2 text-sm font-semibold text-zinc-800">
+          Codigo de encuestador
+          <input
+            autoComplete="off"
+            className="min-h-12 rounded-md border border-zinc-300 px-4 py-3 text-base uppercase"
+            name="interviewerCode"
+            placeholder="JES26"
+            required
+          />
+        </label>
+        <button className="self-end rounded-md bg-teal-700 px-5 py-3 text-sm font-semibold text-white" type="submit">
+          Ingresar
+        </button>
+      </form>
+    </section>
+  );
+}
+
+function FieldHutViewerCard({ access }: { access: FieldHutAccessContext }) {
+  if (access.mode === "ADMIN") {
+    return (
+      <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+        <p className="text-sm font-semibold text-zinc-950">Modo administrador HUT</p>
+        <p className="mt-1 text-sm text-zinc-600">Acceso protegido para supervision interna.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-lg border border-teal-200 bg-teal-50 p-4 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-teal-950">Encuestador: {access.label}</p>
+          <p className="mt-1 text-sm text-teal-900">Codigo: {access.interviewerCode}</p>
+        </div>
+        <a className="text-sm font-semibold text-teal-800 hover:text-teal-950" href="/field/hut">
+          Cambiar encuestador
+        </a>
+      </div>
+    </section>
+  );
+}
+
+function AssignedHutParticipantsList({
+  access,
+  participants
+}: {
+  access: FieldHutAccessContext;
+  participants: CltOperationsDetail[];
+}) {
+  return (
+    <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+      <h2 className="text-lg font-semibold text-zinc-950">Participantes asignados</h2>
+      {participants.length ? (
+        <div className="mt-4 grid gap-3">
+          {participants.map((participant) => {
+            const hutFolio = participant.hut.folio ?? null;
+            const navFolio = participant.folio !== "Sin folio" ? participant.folio : null;
+            const targetFolio = hutFolio ?? navFolio;
+            return (
+              <a
+                className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm transition hover:border-teal-300 hover:bg-teal-50"
+                href={targetFolio ? fieldHutHref({ access, folio: targetFolio }) : "#"}
+                key={participant.id}
+              >
+                <span className="font-semibold text-zinc-950">{participant.participantName}</span>
+                <span className="mt-1 block text-zinc-600">
+                  NAV: {navFolio ?? "Sin NAV"} / HUT: {hutFolio ?? "Sin HUT"}
+                </span>
+              </a>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-zinc-600">No hay participantes HUT asignados a este encuestador.</p>
+      )}
+    </section>
+  );
+}
+
 function FieldHutWorkspace({
+  access,
   searchedFolio,
   selectedQuestionCode,
   workspace
 }: {
+  access: FieldHutAccessContext | null;
   searchedFolio: string;
   selectedQuestionCode: string;
   workspace: HutFieldQuestionnaireWorkspace;
@@ -160,7 +338,7 @@ function FieldHutWorkspace({
       </section>
 
       {captureQuestion ? (
-        <QuestionnaireForm question={captureQuestion} searchedFolio={searchedFolio} workspace={workspace} />
+        <QuestionnaireForm access={access} question={captureQuestion} searchedFolio={searchedFolio} workspace={workspace} />
       ) : (
         <>
       <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm" data-testid="field-hut-secondary-details">
@@ -318,7 +496,7 @@ function FieldHutWorkspace({
             <p className="mt-1 text-sm text-zinc-700">Producto: {productLabelForQuestion(nextQuestion, workspace)}</p>
             <a
               className="mt-4 inline-flex min-h-12 items-center justify-center rounded-md bg-teal-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-800"
-              href={`/field/hut?folio=${encodeURIComponent(searchedFolio)}&questionCode=${encodeURIComponent(nextQuestion.code)}`}
+              href={fieldHutHref({ access, folio: searchedFolio, questionCode: nextQuestion.code })}
             >
               Iniciar evaluacion
             </a>
@@ -329,7 +507,7 @@ function FieldHutWorkspace({
             <p className="mt-1 text-sm text-emerald-900">No hay preguntas pendientes para este participante.</p>
           </div>
         )}
-        <SectionProgressControls searchedFolio={searchedFolio} workspace={workspace} />
+        <SectionProgressControls access={access} searchedFolio={searchedFolio} workspace={workspace} />
       </section>
 
       <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
@@ -339,7 +517,7 @@ function FieldHutWorkspace({
             {Object.entries(workspace.questionnaire.answers).map(([code, answer]) => (
               <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3" key={code}>
                 <dt className="font-semibold text-zinc-950">
-                  <a className="text-teal-700 hover:text-teal-800" href={`/field/hut?folio=${encodeURIComponent(searchedFolio)}&questionCode=${encodeURIComponent(code)}`}>
+                  <a className="text-teal-700 hover:text-teal-800" href={fieldHutHref({ access, folio: searchedFolio, questionCode: code })}>
                     {answerLabel(code, workspace)}
                   </a>
                 </dt>
@@ -358,9 +536,11 @@ function FieldHutWorkspace({
 }
 
 function SectionProgressControls({
+  access,
   searchedFolio,
   workspace
 }: {
+  access: FieldHutAccessContext | null;
   searchedFolio: string;
   workspace: HutFieldQuestionnaireWorkspace;
 }) {
@@ -385,7 +565,7 @@ function SectionProgressControls({
             {pendingQuestionCode ? (
               <a
                 className="mt-3 inline-flex rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-800"
-                href={`/field/hut?folio=${encodeURIComponent(searchedFolio)}&questionCode=${encodeURIComponent(pendingQuestionCode)}`}
+                href={fieldHutHref({ access, folio: searchedFolio, questionCode: pendingQuestionCode })}
               >
                 Capturar pendiente
               </a>
@@ -401,6 +581,7 @@ function SectionProgressControls({
                 )}
                 className="mt-3"
               >
+                <FieldHutAccessHiddenInputs access={access} />
                 <button className="rounded-md border border-teal-700 px-3 py-2 text-sm font-semibold text-teal-800" type="submit">
                   Confirmar y cerrar sección
                 </button>
@@ -414,10 +595,12 @@ function SectionProgressControls({
 }
 
 function QuestionnaireForm({
+  access,
   question,
   searchedFolio,
   workspace
 }: {
+  access: FieldHutAccessContext | null;
   question: HutQuestionDefinition;
   searchedFolio: string;
   workspace: HutFieldQuestionnaireWorkspace;
@@ -487,6 +670,7 @@ function QuestionnaireForm({
         )}
         className="mt-5 space-y-4"
       >
+        <FieldHutAccessHiddenInputs access={access} />
         <input name="returnQuestionCode" type="hidden" value={nextQuestion?.code ?? "__HUT_SUMMARY__"} />
         <HutQuestionInput answer={savedAnswer} question={question} workspace={workspace} />
         <HutFieldSubmitButton />
@@ -496,6 +680,57 @@ function QuestionnaireForm({
       </p>
     </section>
   );
+}
+
+function FieldHutAccessHiddenInputs({ access }: { access: FieldHutAccessContext | null }) {
+  if (!access) {
+    return null;
+  }
+  if (access.mode === "ADMIN") {
+    return (
+      <>
+        <input name="mode" type="hidden" value="admin" />
+        {access.studyId ? <input name="studyId" type="hidden" value={access.studyId} /> : null}
+      </>
+    );
+  }
+
+  return <input name="interviewerCode" type="hidden" value={access.interviewerCode} />;
+}
+
+function fieldHutHref({
+  access,
+  folio,
+  questionCode
+}: {
+  access: FieldHutAccessContext | null;
+  folio: string;
+  questionCode?: string | null;
+}) {
+  const params = new URLSearchParams({ folio });
+  if (access?.mode === "INTERVIEWER_CODE") {
+    params.set("interviewerCode", access.interviewerCode);
+  }
+  if (access?.mode === "ADMIN") {
+    params.set("mode", "admin");
+    if (access.studyId) {
+      params.set("studyId", access.studyId);
+    }
+  }
+  if (questionCode) {
+    params.set("questionCode", questionCode);
+  }
+
+  return `/field/hut?${params.toString()}`;
+}
+
+function isAssignedFieldHutFolio(folio: string, participants: CltOperationsDetail[]): boolean {
+  const normalizedFolio = folio.trim().toUpperCase();
+  return participants.some((participant) => {
+    const navFolio = participant.folio.trim().toUpperCase();
+    const hutFolio = participant.hut.folio?.trim().toUpperCase() ?? "";
+    return navFolio === normalizedFolio || hutFolio === normalizedFolio;
+  });
 }
 
 function SectionInstructions({

@@ -2,9 +2,11 @@ import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import FieldHutPage from "./page";
 import { createHutRepository } from "@/modules/hut";
+import { createFieldOperationsRepository } from "@/modules/field-operations";
 import { requireCapability } from "@/shared/auth/session";
 
 const getFieldQuestionnaireWorkspaceMock = vi.fn();
+const getDashboardMock = vi.fn();
 
 vi.mock("@/shared/auth/session", () => ({
   requireCapability: vi.fn()
@@ -20,22 +22,66 @@ vi.mock("@/modules/hut", async () => {
   };
 });
 
+vi.mock("@/modules/field-operations", () => ({
+  createFieldOperationsRepository: vi.fn(() => ({
+    getDashboard: getDashboardMock
+  }))
+}));
+
 describe("FieldHutPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requireCapability).mockResolvedValue({ id: "field-user-1" } as never);
+    vi.mocked(requireCapability).mockResolvedValue({ id: "admin-user-1", name: "Admin", role: "ADMIN" } as never);
+    getDashboardMock.mockResolvedValue(createFieldDashboard());
   });
 
-  it("requiere acceso de campo y permite continuar un cuestionario HUT existente", async () => {
+  it("muestra selector de encuestador sin redirigir a login", async () => {
+    getDashboardMock.mockResolvedValue(createCodeRequiredDashboard());
+
+    render(await FieldHutPage({ searchParams: Promise.resolve({}) }));
+
+    expect(requireCapability).not.toHaveBeenCalled();
+    expect(createFieldOperationsRepository).toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "Selecciona tu encuestador" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Codigo de encuestador")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ingresar" })).toBeInTheDocument();
+    expect(getFieldQuestionnaireWorkspaceMock).not.toHaveBeenCalled();
+  });
+
+  it("bloquea codigo de encuestador invalido", async () => {
+    getDashboardMock.mockResolvedValue(createCodeRequiredDashboard("El codigo de encuestador no es valido."));
+
+    render(await FieldHutPage({ searchParams: Promise.resolve({ interviewerCode: "MAL26" }) }));
+
+    expect(requireCapability).not.toHaveBeenCalled();
+    expect(screen.getByText("El codigo de encuestador no es valido.")).toBeInTheDocument();
+    expect(getFieldQuestionnaireWorkspaceMock).not.toHaveBeenCalled();
+  });
+
+  it("protege el modo administrador con login interno", async () => {
+    getDashboardMock.mockResolvedValue(createAdminDashboard());
+
+    render(await FieldHutPage({ searchParams: Promise.resolve({ mode: "admin" }) }));
+
+    expect(requireCapability).toHaveBeenCalledWith("admin:access");
+    expect(getDashboardMock).toHaveBeenCalledWith(expect.objectContaining({
+      actorRole: "ADMIN",
+      mode: "ADMIN"
+    }));
+    expect(screen.getByText("Modo administrador HUT")).toBeInTheDocument();
+  });
+
+  it("valida codigo de encuestador y permite continuar un cuestionario HUT existente", async () => {
     getFieldQuestionnaireWorkspaceMock.mockResolvedValue({
       data: createWorkspace(),
       ok: true
     });
 
-    render(await FieldHutPage({ searchParams: Promise.resolve({ folio: "HUT-121" }) }));
+    render(await FieldHutPage({ searchParams: Promise.resolve({ folio: "HUT-121", interviewerCode: "JES26" }) }));
 
-    expect(requireCapability).toHaveBeenCalledWith("field:access");
+    expect(requireCapability).not.toHaveBeenCalled();
     expect(createHutRepository).toHaveBeenCalled();
+    expect(screen.getByText("Encuestador: Jesus")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Participante HUT 121" })).toBeInTheDocument();
     const compactHeader = screen.getByTestId("field-hut-compact-header");
     expect(within(compactHeader).getByText("HUT-121")).toBeInTheDocument();
@@ -68,7 +114,7 @@ describe("FieldHutPage", () => {
     expect(screen.getByText(/Participo anteriormente en CLT/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Iniciar evaluacion" })).toHaveAttribute(
       "href",
-      "/field/hut?folio=HUT-121&questionCode=HUT_V1_CONFIRMACION_ENTREGA"
+      "/field/hut?folio=HUT-121&interviewerCode=JES26&questionCode=HUT_V1_CONFIRMACION_ENTREGA"
     );
     expect(screen.queryByText("Confirmar entrega del primer perfume")).not.toBeInTheDocument();
     expect(screen.queryByText("Primer perfume HUT:")).not.toBeInTheDocument();
@@ -88,6 +134,7 @@ describe("FieldHutPage", () => {
     render(await FieldHutPage({
       searchParams: Promise.resolve({
         folio: "HUT-121",
+        interviewerCode: "JES26",
         questionCode: "HUT_EVA1_GUSTO"
       })
     }));
@@ -114,13 +161,74 @@ describe("FieldHutPage", () => {
       ok: true
     });
 
-    render(await FieldHutPage({ searchParams: Promise.resolve({ folio: "HUT-121" }) }));
+    render(await FieldHutPage({ searchParams: Promise.resolve({ folio: "HUT-121", interviewerCode: "JES26" }) }));
 
     expect(screen.getByText("Entrevista terminada")).toBeInTheDocument();
     expect(screen.getByText("Motivo: HUT_F6_PRODUCTOS_7_DIAS: No selecciono Perfume/fragancia")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Iniciar evaluacion" })).not.toBeInTheDocument();
   });
 });
+
+function createCodeRequiredDashboard(error: string | null = null) {
+  return {
+    actorName: "Campo HUT",
+    detail: null,
+    interviewerCodes: [],
+    participants: [],
+    selectedStudyId: null,
+    studies: [],
+    viewer: {
+      error,
+      mode: "CODE_REQUIRED"
+    }
+  };
+}
+
+function createFieldDashboard() {
+  return {
+    actorName: "Campo HUT",
+    detail: null,
+    interviewerCodes: [],
+    participants: [
+      {
+        folio: "NAV-121",
+        hut: {
+          applicationPhotoCount: 1,
+          currentSection: "DATOS_GENERALES",
+          folio: "HUT-121",
+          id: "hut-participant-121",
+          origin: "CLT_HUT",
+          protocolVersion: "APPLICATION_PHOTO",
+          questionnaireStatus: "IN_PROGRESS",
+          status: "BLOCK_1_CALL_PENDING",
+          testMode: false,
+          token: "hut-token-121"
+        },
+        id: "nav:study-participant-121",
+        participantId: "study-participant-121",
+        participantName: "Participante HUT 121"
+      }
+    ],
+    selectedStudyId: "study-hut",
+    studies: [],
+    viewer: {
+      code: "JES26",
+      id: "interviewer-code-1",
+      label: "Jesus",
+      mode: "INTERVIEWER_CODE"
+    }
+  };
+}
+
+function createAdminDashboard() {
+  return {
+    ...createFieldDashboard(),
+    viewer: {
+      filterInterviewerCodeId: null,
+      mode: "ADMIN"
+    }
+  };
+}
 
 function createWorkspace() {
   return {

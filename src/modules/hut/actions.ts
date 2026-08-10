@@ -16,6 +16,8 @@ import type {
 } from "./storage";
 import { requireCapability } from "@/shared/auth/session";
 import type { NavigoFaceVerificationClientResult } from "@/modules/navigo-app/face-verification-contract";
+import { createFieldOperationsRepository } from "@/modules/field-operations";
+import type { CltOperationsDetail } from "@/modules/clt-operations/types";
 
 export async function createHutParticipantAction(studyId: string, formData: FormData) {
   await requireCapability("screening:review");
@@ -445,12 +447,15 @@ export async function saveHutQuestionnaireAnswerForFieldAction(
   questionCode: string,
   formData: FormData
 ) {
-  const actor = await requireCapability("field:access");
+  const fieldAccess = await resolveFieldHutActionAccess(folio, formData);
+  if (!fieldAccess.ok) {
+    redirectToFieldHut(folio, null, fieldAccess.message, questionCode, fieldAccess);
+  }
   const returnQuestionCode = String(formData.get("returnQuestionCode") ?? questionCode).trim();
   const nextQuestionCode = returnQuestionCode === "__HUT_SUMMARY__" ? null : returnQuestionCode || questionCode;
   const result = await createHutRepository().saveQuestionnaireAnswer({
-    actorUserId: actor.id,
-    answerInput: hutFormDataToAnswerInput(formData),
+    actorUserId: fieldAccess.actorUserId,
+    answerInput: hutFormDataToAnswerInput(toHutAnswerOnlyFormData(formData)),
     participantId,
     questionCode,
     studyId
@@ -467,7 +472,8 @@ export async function saveHutQuestionnaireAnswerForFieldAction(
     folio,
     savedMessage,
     result.ok ? null : result.message,
-    result.ok ? (terminated ? null : nextQuestionCode) : questionCode
+    result.ok ? (terminated ? null : nextQuestionCode) : questionCode,
+    fieldAccess
   );
 }
 
@@ -475,15 +481,25 @@ export async function completeHutQuestionnaireSectionForFieldAction(
   folio: string,
   participantId: string,
   studyId: string,
-  section: HutQuestionnaireSectionId
+  section: HutQuestionnaireSectionId,
+  formData: FormData
 ) {
-  await requireCapability("field:access");
+  const fieldAccess = await resolveFieldHutActionAccess(folio, formData);
+  if (!fieldAccess.ok) {
+    redirectToFieldHut(folio, null, fieldAccess.message, null, fieldAccess);
+  }
   const result = await createHutRepository().completeQuestionnaireSection({
     participantId,
     section,
     studyId
   });
-  redirectToFieldHut(folio, result.ok ? result.message ?? "Seccion HUT completada correctamente." : null, result.ok ? null : result.message);
+  redirectToFieldHut(
+    folio,
+    result.ok ? result.message ?? "Seccion HUT completada correctamente." : null,
+    result.ok ? null : result.message,
+    null,
+    fieldAccess
+  );
 }
 
 export async function requestHutRegistrationSelfieUploadAction(
@@ -626,14 +642,99 @@ function redirectWithHutMessage(
   redirect(`/admin/studies/${studyId}/hut?${params.toString()}`);
 }
 
+type FieldHutActionAccess =
+  | {
+      actorUserId: string | null;
+      interviewerCode?: string | null;
+      mode: "ADMIN" | "INTERVIEWER_CODE";
+      ok: true;
+      studyId?: string | null;
+    }
+  | {
+      interviewerCode?: string | null;
+      message: string;
+      mode: "INTERVIEWER_CODE";
+      ok: false;
+    };
+
+async function resolveFieldHutActionAccess(folio: string, formData: FormData): Promise<FieldHutActionAccess> {
+  if (String(formData.get("mode") ?? "") === "admin") {
+    const actor = await requireCapability("admin:access");
+    return {
+      actorUserId: actor.id,
+      mode: "ADMIN",
+      ok: true,
+      studyId: String(formData.get("studyId") ?? "") || null
+    };
+  }
+
+  const interviewerCode = String(formData.get("interviewerCode") ?? "").trim().toUpperCase();
+  const dashboard = await createFieldOperationsRepository().getDashboard({
+    actorName: "Campo HUT",
+    actorRole: "INTERVIEWER",
+    interviewerCode,
+    interviewerUserId: "field-hut-code",
+    mode: "INTERVIEWER_CODE"
+  });
+
+  if (dashboard.viewer.mode !== "INTERVIEWER_CODE") {
+    return {
+      interviewerCode,
+      message: dashboard.viewer.mode === "CODE_REQUIRED" && dashboard.viewer.error
+        ? dashboard.viewer.error
+        : "Ingresa un codigo de encuestador valido.",
+      mode: "INTERVIEWER_CODE",
+      ok: false
+    };
+  }
+
+  if (!isFolioAssignedToFieldViewer(folio, dashboard.participants)) {
+    return {
+      interviewerCode: dashboard.viewer.code,
+      message: "Este participante no esta asignado a este encuestador.",
+      mode: "INTERVIEWER_CODE",
+      ok: false
+    };
+  }
+
+  return {
+    actorUserId: null,
+    interviewerCode: dashboard.viewer.code,
+    mode: "INTERVIEWER_CODE",
+    ok: true
+  };
+}
+
+function toHutAnswerOnlyFormData(formData: FormData): FormData {
+  const answerFormData = new FormData();
+  const metadataKeys = new Set(["interviewerCode", "mode", "returnQuestionCode", "studyId"]);
+  for (const [key, value] of formData.entries()) {
+    if (!metadataKeys.has(key)) {
+      answerFormData.append(key, value);
+    }
+  }
+
+  return answerFormData;
+}
+
 function redirectToFieldHut(
   folio: string,
   message: string | null,
   error: string | null,
-  questionCode?: string | null
+  questionCode?: string | null,
+  access?: FieldHutActionAccess
 ): never {
   revalidatePath("/field/hut");
   const params = new URLSearchParams({ folio });
+  if (access?.mode === "ADMIN") {
+    params.set("mode", "admin");
+    if (access.studyId) {
+      params.set("studyId", access.studyId);
+    }
+  }
+  if (access?.mode === "INTERVIEWER_CODE" && access.interviewerCode) {
+    params.set("interviewerCode", access.interviewerCode);
+  }
   if (message) {
     params.set("hutMessage", message);
   }
@@ -645,6 +746,15 @@ function redirectToFieldHut(
   }
 
   redirect(`/field/hut?${params.toString()}`);
+}
+
+function isFolioAssignedToFieldViewer(folio: string, participants: CltOperationsDetail[]): boolean {
+  const normalizedFolio = folio.trim().toUpperCase();
+  return participants.some((participant) => {
+    const navFolio = participant.folio.trim().toUpperCase();
+    const hutFolio = participant.hut.folio?.trim().toUpperCase() ?? "";
+    return navFolio === normalizedFolio || hutFolio === normalizedFolio;
+  });
 }
 
 function parseOptionalDate(value: FormDataEntryValue | null): Date | null {
