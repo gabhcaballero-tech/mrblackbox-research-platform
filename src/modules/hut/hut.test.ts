@@ -135,6 +135,7 @@ describe("HUT module foundation", () => {
   it("creates a HUT participant and link independent from Navigo", async () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://mrblackbox-research-platform.vercel.app");
     const result = await repository.createParticipant({
       protocolVersion: "LEGACY_VIDEO",
       name: "Participante Uno",
@@ -146,7 +147,7 @@ describe("HUT module foundation", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.ok ? result.data.link : "").toContain("https://example.com/hut/p/");
+    expect(result.ok ? result.data.link : "").toContain("https://mrblackbox-research-platform.vercel.app/hut/p/");
     expect(prisma.state.participants[0]?.status).toBe("BLOCK_1_IN_PROGRESS");
     expect(prisma.state.participants[0]?.blocks).toHaveLength(2);
   });
@@ -2131,6 +2132,7 @@ describe("HUT module foundation", () => {
     const whatsapp = createFakeWhatsAppRepository();
     const repository = createHutRepository(prisma as never, whatsapp);
     stubAcceptedWhatsAppMeta();
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://mrblackbox-research-platform.vercel.app");
     await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-REM-001" });
     const participant = prisma.state.participants[0]!;
     addApplicationPhotoEntry(prisma.state, participant, {
@@ -2140,12 +2142,19 @@ describe("HUT module foundation", () => {
 
     const result = await repository.processPhotoWhatsAppReminders({
       now: new Date("2026-08-09T16:34:00.000Z"),
-      requestOrigin: "https://example.test",
+      requestOrigin: "https://mrblackbox-research-platform-lrndg4do1-oneui.vercel.app",
       studyId: "study-hut"
     });
 
     expect(result.ok ? result.data.sent : 0).toBe(1);
     expect(whatsapp.createOutboundMessage).toHaveBeenCalledTimes(1);
+    const payload = whatsapp.createOutboundMessage.mock.calls[0]?.[0].rawPayload as {
+      request?: { template?: { components?: Array<{ parameters?: Array<{ text?: string }> }>; name?: string } };
+    };
+    expect(payload.request?.template?.name).toBe("hut_photo_reminder");
+    expect(payload.request?.template?.components?.[0]?.parameters?.[1]?.text).toBe(
+      `https://mrblackbox-research-platform.vercel.app/hut/p/${participant.token}`
+    );
     expect(prisma.state.auditLogs[0]).toMatchObject({
       action: "PARTICIPANT_MODIFIED",
       entityType: "HutParticipant",

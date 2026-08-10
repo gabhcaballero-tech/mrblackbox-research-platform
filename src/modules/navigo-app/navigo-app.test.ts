@@ -43,7 +43,7 @@ import {
   NAVIGO_HUT_ACCESS_QUESTION_ID,
   NAVIGO_HUT_ACCESS_YES_VALUE
 } from "@/modules/screener/study-overrides";
-import { resolveRequestOrigin } from "@/shared/utils/request-origin";
+import { resolvePublicLinkOrigin, resolvePublicRequestOrigin, resolveRequestOrigin } from "@/shared/utils/request-origin";
 import {
   appendNavigoTestModeParams,
   createNavigoTestModeParams,
@@ -793,6 +793,22 @@ describe("navigo app MVP rules", () => {
       )
     ).toBe("https://mrblackbox-research-platform.vercel.app");
     expect(resolveRequestOrigin(new Headers({ host: "localhost:3000" }), {})).toBe("http://localhost:3000");
+    expect(
+      resolvePublicRequestOrigin(
+        new Headers({
+          "x-forwarded-host": "mrblackbox-research-platform-lrndg4do1-oneui.vercel.app",
+          "x-forwarded-proto": "https"
+        }),
+        {
+          NEXT_PUBLIC_APP_URL: "https://mrblackbox-research-platform.vercel.app"
+        }
+      )
+    ).toBe("https://mrblackbox-research-platform.vercel.app");
+    expect(
+      resolvePublicLinkOrigin("https://mrblackbox-research-platform-lrndg4do1-oneui.vercel.app", {
+        APP_URL: "https://mrblackbox-research-platform.vercel.app/"
+      })
+    ).toBe("https://mrblackbox-research-platform.vercel.app");
   });
 
   it("shows initial application and the active T3/T4.5/T6 protocol in the participant app", () => {
@@ -1478,6 +1494,7 @@ describe("navigo app MVP rules", () => {
     }
     vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
     vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "phone-number-id");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://mrblackbox-research-platform.vercel.app");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
@@ -1499,14 +1516,14 @@ describe("navigo app MVP rules", () => {
       : null;
 
     expect(result?.ok).toBe(true);
-    expect(result?.ok ? result.data.hutUrl : "").toBe("https://example.test/hut/p/hut-token-1");
+    expect(result?.ok ? result.data.hutUrl : "").toBe("https://mrblackbox-research-platform.vercel.app/hut/p/hut-token-1");
     expect(result?.ok ? result.data.sentLinkType : "").toBe("HUT");
     const payload = whatsApp.messages[0]?.rawPayload as {
       request?: { template?: { components?: Array<{ parameters?: Array<{ text: string }> }>; name?: string } };
     };
     expect(payload.request?.template?.name).toBe("hut_link_participant");
     expect(payload.request?.template?.components?.[0]?.parameters).toHaveLength(2);
-    expect(payload.request?.template?.components?.[0]?.parameters?.[1]?.text).toBe("https://example.test/hut/p/hut-token-1");
+    expect(payload.request?.template?.components?.[0]?.parameters?.[1]?.text).toBe("https://mrblackbox-research-platform.vercel.app/hut/p/hut-token-1");
     expect(state.auditLogs[0]).toMatchObject({
       action: "PARTICIPANT_MODIFIED",
       actorUserId: "admin-1",

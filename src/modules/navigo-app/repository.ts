@@ -2908,6 +2908,7 @@ export function createNavigoAppRepository(
     async sendEvaluationLinkWhatsApp(input) {
       const prisma = await getPrisma();
       const now = input.now ?? new Date();
+      const publicRequestOrigin = resolvePublicLinkOrigin(input.requestOrigin);
 
       const prepared: NavigoActionResult<{
         evaluationUrl: string;
@@ -2942,7 +2943,7 @@ export function createNavigoAppRepository(
           participant,
           prisma: tx
         });
-        const evaluationUrl = new URL(`/p/${encodeURIComponent(linkToken)}/activities`, input.requestOrigin).toString();
+        const evaluationUrl = new URL(`/p/${encodeURIComponent(linkToken)}/activities`, publicRequestOrigin).toString();
 
         return {
           data: {
@@ -2991,6 +2992,7 @@ export function createNavigoAppRepository(
     async sendParticipantLinksWhatsApp(input) {
       const prisma = await getPrisma();
       const now = input.now ?? new Date();
+      const publicRequestOrigin = resolvePublicLinkOrigin(input.requestOrigin);
 
       const prepared: NavigoActionResult<{
         folio: string;
@@ -3036,22 +3038,22 @@ export function createNavigoAppRepository(
             participant,
             prisma: tx
           });
-          navigoUrl = new URL(`/p/${encodeURIComponent(linkToken)}/activities`, input.requestOrigin).toString();
+          navigoUrl = new URL(`/p/${encodeURIComponent(linkToken)}/activities`, publicRequestOrigin).toString();
         } else {
           const activeToken = participant.accessTokens?.[0] ?? null;
           if (activeToken && activeToken.tokenHash === hashToken(activeToken.id) && activeToken.expiresAt.getTime() > now.getTime()) {
-            navigoUrl = new URL(`/p/${encodeURIComponent(activeToken.id)}/activities`, input.requestOrigin).toString();
+            navigoUrl = new URL(`/p/${encodeURIComponent(activeToken.id)}/activities`, publicRequestOrigin).toString();
           }
         }
 
         if (wantsHut || input.linkType === "BOTH") {
           if (participant.hutParticipant?.token) {
-            hutUrl = new URL(`/hut/p/${encodeURIComponent(participant.hutParticipant.token)}`, input.requestOrigin).toString();
+            hutUrl = new URL(`/hut/p/${encodeURIComponent(participant.hutParticipant.token)}`, publicRequestOrigin).toString();
           } else {
             warnings.push("El participante no tiene enlace HUT activo.");
           }
         } else if (participant.hutParticipant?.token) {
-          hutUrl = new URL(`/hut/p/${encodeURIComponent(participant.hutParticipant.token)}`, input.requestOrigin).toString();
+          hutUrl = new URL(`/hut/p/${encodeURIComponent(participant.hutParticipant.token)}`, publicRequestOrigin).toString();
         }
 
         const sentLinkType = resolveAvailableLinkType({ hutUrl, navigoUrl, requested: input.linkType });
@@ -4762,7 +4764,7 @@ async function sendNavigoEvaluationReminderForActivity({
     };
   }
 
-  const evaluationUrl = new URL(`/p/${encodeURIComponent(linkToken)}/activities`, requestOrigin).toString();
+  const evaluationUrl = new URL(`/p/${encodeURIComponent(linkToken)}/activities`, resolvePublicLinkOrigin(requestOrigin)).toString();
   const baseMetadata = {
     activityCode,
     adminUserId: actorUserId,
@@ -7887,6 +7889,7 @@ function buildNavigoLinksRotationTsv({
   participants: ParticipantRecord[];
   requestOrigin: string;
 }): string {
+  const publicRequestOrigin = resolvePublicLinkOrigin(requestOrigin);
   const header = [
     "Folio",
     "Nombre",
@@ -7903,7 +7906,7 @@ function buildNavigoLinksRotationTsv({
     const directMetadata = readDirectMetadata(participant);
     const participantLinkToken = participant.accessTokens?.[0]?.id ?? null;
     const link = participantLinkToken
-      ? new URL(`/p/${encodeURIComponent(participantLinkToken)}/activities`, requestOrigin).toString()
+      ? new URL(`/p/${encodeURIComponent(participantLinkToken)}/activities`, publicRequestOrigin).toString()
       : "";
 
     return [
