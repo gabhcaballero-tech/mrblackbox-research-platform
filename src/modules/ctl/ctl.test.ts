@@ -517,6 +517,12 @@ describe("ctl module", () => {
     expect(correct).toEqual({
       answerValue: {
         correct: 1,
+        deliveryOrder: ["247", "583", "912"],
+        positions: {
+          PR1: "247",
+          PR2: "583",
+          PR3: "912"
+        },
         selectedKey: "583",
         selectedPosition: "PR2"
       },
@@ -525,6 +531,12 @@ describe("ctl module", () => {
     expect(incorrect).toEqual({
       answerValue: {
         correct: 0,
+        deliveryOrder: ["835", "724", "583"],
+        positions: {
+          PR1: "835",
+          PR2: "724",
+          PR3: "583"
+        },
         selectedKey: "835",
         selectedPosition: "PR1"
       },

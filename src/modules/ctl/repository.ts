@@ -153,6 +153,10 @@ type ParticipantRecord = {
   rotationAssignment: {
     arms: Array<{
       applicationOrder: number;
+      studyArm?: {
+        code: string;
+        label: string;
+      };
       studyProduct: {
         internalCode: string;
       };
@@ -461,6 +465,7 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
 
           await upsertAutomaticCtlStartAnswers(tx, {
             participantName: confirmation.studyParticipant.participantProfile.name,
+            rotationAssignment: confirmation.studyParticipant.rotationAssignment,
             sessionId: created.id,
             startedAt: now
           });
@@ -1231,6 +1236,7 @@ export function createCtlRepository(prismaClient?: CtlPrismaClient): CtlReposito
 
       await upsertAutomaticCtlStartAnswers(prisma as CtlTransactionClient, {
         participantName: confirmation.studyParticipant.participantProfile.name,
+        rotationAssignment: confirmation.studyParticipant.rotationAssignment,
         sessionId: created.id,
         startedAt: now
       });
@@ -1354,6 +1360,7 @@ const confirmationSelect = {
             orderBy: { applicationOrder: "asc" },
             select: {
               applicationOrder: true,
+              studyArm: { select: { code: true, label: true } },
               studyProduct: { select: { internalCode: true } }
             }
           }
@@ -1433,6 +1440,7 @@ const sessionSelect = {
             orderBy: { applicationOrder: "asc" },
             select: {
               applicationOrder: true,
+              studyArm: { select: { code: true, label: true } },
               studyProduct: { select: { internalCode: true } }
             }
           }
@@ -1448,6 +1456,7 @@ async function upsertAutomaticCtlStartAnswers(
   tx: CtlTransactionClient,
   input: {
     participantName: string;
+    rotationAssignment: ParticipantRecord["rotationAssignment"];
     sessionId: string;
     startedAt: Date;
   }
@@ -1463,6 +1472,33 @@ async function upsertAutomaticCtlStartAnswers(
   await upsertCtlAnswer(tx, input.sessionId, {
     answerValue: formatCtlTime(input.startedAt),
     questionCode: "DG_HORA_INICIO"
+  });
+
+  for (const trace of buildCtlProductTraceabilityAnswers(input.rotationAssignment)) {
+    await upsertCtlAnswer(tx, input.sessionId, trace);
+  }
+}
+
+function buildCtlProductTraceabilityAnswers(rotationAssignment: ParticipantRecord["rotationAssignment"]): CtlAnswerDraft[] {
+  const arms = rotationAssignment?.arms ?? [];
+
+  return [1, 2].flatMap((order) => {
+    const arm = arms.find((candidate) => candidate.applicationOrder === order);
+    if (!arm?.studyProduct.internalCode) {
+      return [];
+    }
+
+    return [
+      {
+        answerValue: {
+          armCode: arm.studyArm?.code ?? null,
+          armLabel: arm.studyArm?.label ?? null,
+          order,
+          productCode: arm.studyProduct.internalCode
+        },
+        questionCode: `SYS_EVA${order}_TRACE`
+      }
+    ];
   });
 }
 

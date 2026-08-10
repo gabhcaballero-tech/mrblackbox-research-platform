@@ -230,6 +230,7 @@ function createDetail(input: { folio: string; id: string; participantId: string 
     participantName: `Participante ${input.folio}`,
     phaseProgress: [],
     questionCount: 1,
+    rawAnswers: [],
     reminders: [],
     rotation: {
       arms: [],
@@ -238,6 +239,10 @@ function createDetail(input: { folio: string; id: string; participantId: string 
       secondSampleKey: null
     },
     t0: null,
+    triangularRotation: {
+      triangular1: null,
+      triangular2: null
+    },
     whatsapp: {
       lastMessageAt: null,
       lastStatus: null,

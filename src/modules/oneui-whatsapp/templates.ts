@@ -21,6 +21,7 @@ const NAVIGO_EVALUATION_REMINDER_TEMPLATE_NAME = "navigo_recordatorio_evaluacion
 const HUT_PARTICIPANT_LINK_TEMPLATE_NAME = "hut_link_participant";
 const NAVIGO_HUT_LINKS_TEMPLATE_NAME = "navigo_hut_links";
 const HUT_PHOTO_REMINDER_TEMPLATE_NAME = "hut_photo_reminder";
+const HUT_COMPLETION_TEMPLATE_NAME = "hut_completion_message";
 
 export function whatsappAutomationStatusFromMessage(
   message: Pick<OneuiWhatsAppMessageRecord, "createdAt" | "metaMessageId" | "rawPayload" | "status" | "timestamp"> | null
@@ -456,6 +457,51 @@ export function buildHutPhotoReminderWhatsAppBody({
     hutUrl,
     "",
     "Gracias por participar."
+  ].join("\n");
+}
+
+export async function sendHutCompletionWhatsApp(input: {
+  env?: NodeJS.ProcessEnv;
+  now?: Date;
+  participantId: string;
+  participantName: string;
+  phone: string | null;
+  repository?: OneuiWhatsAppRepository;
+  sender?: WhatsAppTemplateSender;
+  studyId: string;
+}): Promise<OneuiWhatsAppSendTemplateResult | { ok: false; code: "SKIPPED"; message: string }> {
+  const env = input.env ?? process.env;
+
+  if (env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
+    return { code: "SKIPPED", message: "Envio automatico HUT desactivado.", ok: false };
+  }
+
+  if (!input.participantName || !input.phone) {
+    return { code: "SKIPPED", message: "Faltan datos para enviar cierre HUT.", ok: false };
+  }
+
+  const sender = input.sender ?? sendOneuiWhatsAppTemplate;
+
+  return sender({
+    bodyText: buildHutCompletionWhatsAppBody(),
+    env,
+    language: env.WHATSAPP_HUT_COMPLETION_LANGUAGE ?? "es_MX",
+    linkedParticipantId: input.participantId,
+    linkedStudyId: input.studyId,
+    now: input.now,
+    parameters: [],
+    profileName: input.participantName,
+    repository: input.repository,
+    sourceModule: "HUT",
+    templateName: env.WHATSAPP_HUT_COMPLETION_TEMPLATE ?? HUT_COMPLETION_TEMPLATE_NAME,
+    toPhone: input.phone
+  });
+}
+
+export function buildHutCompletionWhatsAppBody(): string {
+  return [
+    "Gracias por su apoyo y participacion.",
+    "La persona que lo invito se pondra en contacto con usted para recibir su incentivo."
   ].join("\n");
 }
 

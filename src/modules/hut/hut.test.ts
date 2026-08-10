@@ -2132,6 +2132,11 @@ describe("HUT module foundation", () => {
     const repository = createHutRepository(prisma as never, whatsapp);
     stubAcceptedWhatsAppMeta();
     await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-REM-001" });
+    const participant = prisma.state.participants[0]!;
+    addApplicationPhotoEntry(prisma.state, participant, {
+      capturedAt: new Date("2026-08-09T15:00:00.000Z"),
+      useDayNumber: 0
+    });
 
     const result = await repository.processPhotoWhatsAppReminders({
       now: new Date("2026-08-09T16:34:00.000Z"),
@@ -2148,10 +2153,88 @@ describe("HUT module foundation", () => {
     });
     expect(prisma.state.auditLogs[0]?.afterJson).toMatchObject({
       reminderType: "HUT_PHOTO_REMINDER",
-      slotId: "DELIVERY",
+      slotId: "PRODUCT_1_DAY_1",
       source: "CRON",
       templateName: "hut_photo_reminder",
       whatsappStatus: "ENVIADO"
+    });
+  });
+
+  it("does not send a HUT photo reminder when HUT exists but the first product delivery is missing", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const whatsapp = createFakeWhatsAppRepository();
+    const repository = createHutRepository(prisma as never, whatsapp);
+    stubAcceptedWhatsAppMeta();
+    await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-REM-NO-DELIVERY" });
+
+    const result = await repository.processPhotoWhatsAppReminders({
+      now: new Date("2026-08-09T16:34:00.000Z"),
+      requestOrigin: "https://example.test",
+      studyId: "study-hut"
+    });
+
+    expect(result.ok ? result.data.sent : -1).toBe(0);
+    expect(result.ok ? result.data.skipped : -1).toBe(1);
+    expect(whatsapp.createOutboundMessage).not.toHaveBeenCalled();
+    expect(prisma.state.auditLogs).toHaveLength(0);
+  });
+
+  it("does not send a HUT photo reminder to CLT_HUT participants before CLT is completed", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const whatsapp = createFakeWhatsAppRepository();
+    const repository = createHutRepository(prisma as never, whatsapp);
+    stubAcceptedWhatsAppMeta();
+    await createApplicationPhotoParticipant(repository, prisma.state, { cltCompleted: false, folio: "HUT-REM-CLT-PENDING" });
+    const participant = prisma.state.participants[0]!;
+    addApplicationPhotoEntry(prisma.state, participant, {
+      capturedAt: new Date("2026-08-09T15:00:00.000Z"),
+      useDayNumber: 0
+    });
+
+    const result = await repository.processPhotoWhatsAppReminders({
+      now: new Date("2026-08-09T16:34:00.000Z"),
+      requestOrigin: "https://example.test",
+      studyId: "study-hut"
+    });
+
+    expect(result.ok ? result.data.sent : -1).toBe(0);
+    expect(result.ok ? result.data.skipped : -1).toBe(1);
+    expect(whatsapp.createOutboundMessage).not.toHaveBeenCalled();
+  });
+
+  it("sends a HUT photo reminder to HUT_DIRECTO only after filters and delivery are complete", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const whatsapp = createFakeWhatsAppRepository();
+    const repository = createHutRepository(prisma as never, whatsapp);
+    stubAcceptedWhatsAppMeta();
+    await repository.createParticipant({
+      firstFragranceLeftArm: "247",
+      folio: "HUT-REM-DIRECT",
+      name: "Participante HUT Directo",
+      phone: "5512345678",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.test",
+      secondFragranceRightArm: "583",
+      startDate: new Date("2026-08-09T15:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    completeDirectHutFilters(prisma.state, participant);
+    addApplicationPhotoEntry(prisma.state, participant, {
+      capturedAt: new Date("2026-08-09T15:00:00.000Z"),
+      useDayNumber: 0
+    });
+
+    const result = await repository.processPhotoWhatsAppReminders({
+      now: new Date("2026-08-09T16:34:00.000Z"),
+      requestOrigin: "https://example.test",
+      studyId: "study-hut"
+    });
+
+    expect(result.ok ? result.data.sent : -1).toBe(1);
+    expect(prisma.state.auditLogs[0]?.afterJson).toMatchObject({
+      slotId: "PRODUCT_1_DAY_1",
+      source: "CRON"
     });
   });
 
@@ -2219,6 +2302,11 @@ describe("HUT module foundation", () => {
     const repository = createHutRepository(prisma as never, whatsapp);
     stubAcceptedWhatsAppMeta();
     await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-REM-004" });
+    const participant = prisma.state.participants[0]!;
+    addApplicationPhotoEntry(prisma.state, participant, {
+      capturedAt: new Date("2026-08-09T15:00:00.000Z"),
+      useDayNumber: 0
+    });
 
     const first = await repository.processPhotoWhatsAppReminders({
       now: new Date("2026-08-09T16:34:00.000Z"),
@@ -2244,6 +2332,10 @@ describe("HUT module foundation", () => {
     stubAcceptedWhatsAppMeta();
     await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-REM-005" });
     const participant = prisma.state.participants[0]!;
+    addApplicationPhotoEntry(prisma.state, participant, {
+      capturedAt: new Date("2026-08-09T15:00:00.000Z"),
+      useDayNumber: 0
+    });
 
     const result = await repository.sendPhotoReminderWhatsApp({
       actorUserId: "admin-1",
@@ -2254,7 +2346,7 @@ describe("HUT module foundation", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.ok ? result.data.slotId : "").toBe("DELIVERY");
+    expect(result.ok ? result.data.slotId : "").toBe("PRODUCT_1_DAY_1");
     expect(prisma.state.auditLogs[0]).toMatchObject({
       actorUserId: "admin-1",
       reason: "HUT_PHOTO_REMINDER_MANUAL"
@@ -3803,7 +3895,7 @@ async function uploadNextVideo(
 async function createApplicationPhotoParticipant(
   repository: ReturnType<typeof createHutRepository>,
   state: ReturnType<typeof createFakeHutPrisma>["prisma"]["state"],
-  input: { folio: string }
+  input: { cltCompleted?: boolean; folio: string; startDate?: Date | null }
 ) {
   const result = await repository.createParticipant({
     firstFragranceLeftArm: "247",
@@ -3813,12 +3905,23 @@ async function createApplicationPhotoParticipant(
     protocolVersion: "APPLICATION_PHOTO",
     requestOrigin: "https://example.test",
     secondFragranceRightArm: "583",
+    startDate: input.startDate === undefined ? new Date("2026-08-09T15:00:00.000Z") : input.startDate,
     studyId: "study-hut"
   });
   const participant = state.participants.find((item) => item.folio === input.folio);
   if (participant) {
     participant.origin = "CLT_HUT";
     participant.studyParticipantId = `study-participant-${input.folio}`;
+    participant.studyParticipant = {
+      ctlSessions: input.cltCompleted === false
+        ? [{ completedAt: null, id: `ctl-${input.folio}`, status: "IN_PROGRESS" }]
+        : [{ completedAt: new Date("2026-08-09T14:00:00.000Z"), id: `ctl-${input.folio}`, status: "COMPLETED" }],
+      participantProfile: {
+        email: "participante@example.test",
+        name: "Participante HUT Foto",
+        phone: "5512345678"
+      }
+    };
   }
   return result;
 }
@@ -3840,6 +3943,43 @@ function addApplicationPhotoEntry(
   };
   state.applicationPhotoEntries.push(entry);
   participant.applicationPhotoEntries.push(entry);
+}
+
+function completeDirectHutFilters(
+  state: ReturnType<typeof createFakeHutPrisma>["prisma"]["state"],
+  participant: FakeParticipant
+) {
+  const formData = createCompleteHutV5FormData({ participantOrigin: "HUT_DIRECTO" });
+  const answers = hutFormDataToAnswerInput(formData);
+  const attempt: FakeHutQuestionnaireAttempt = {
+    answers: [],
+    completedAt: null,
+    id: `hut-questionnaire-attempt-${state.nextId++}`,
+    participantId: participant.id,
+    startedAt: new Date("2026-08-09T14:30:00.000Z"),
+    status: "IN_PROGRESS",
+    terminatedAt: null,
+    terminationReason: null,
+    visits: []
+  };
+  const filterQuestionCodes = getHutQuestions(getHutV5Definition())
+    .filter((question) => question.section === "FILTROS" && question.required)
+    .map((question) => question.code);
+
+  for (const questionCode of filterQuestionCodes) {
+    const answer: FakeHutAnswer = {
+      answerJson: answers[questionCode] ?? "1",
+      attemptId: attempt.id,
+      id: `hut-answer-${state.nextId++}`,
+      questionCode,
+      visitProgressId: null
+    };
+    attempt.answers.push(answer);
+    state.answers.push(answer);
+  }
+
+  participant.questionnaireAttempt = attempt;
+  state.questionnaireAttempts.push(attempt);
 }
 
 function stubAcceptedWhatsAppMeta() {
@@ -4026,6 +4166,7 @@ function createFakeHutPrisma() {
             const confirmation = state.confirmations.find((item) => item.studyParticipant.id === args.data.studyParticipantId);
             participant.studyParticipant = confirmation
               ? {
+                  ctlSessions: [{ completedAt: new Date("2026-08-09T14:00:00.000Z"), id: `ctl-${confirmation.studyParticipant.id}`, status: "COMPLETED" }],
                   participantProfile: confirmation.studyParticipant.participantProfile
                 }
               : participant.studyParticipant;
@@ -4584,6 +4725,11 @@ type FakeParticipant = {
   };
   studyId: string;
   studyParticipant: {
+    ctlSessions?: Array<{
+      completedAt: Date | null;
+      id: string;
+      status: string;
+    }>;
     participantProfile: {
       email: string | null;
       name: string;

@@ -12,7 +12,7 @@ describe("clt operations", () => {
     });
 
     expect(dashboard?.study.code).toBe("FMASCULINA-NAVIGO-2026");
-    expect(dashboard?.participants).toHaveLength(1);
+    expect(dashboard?.participants).toHaveLength(2);
     expect(dashboard?.participants[0]).toMatchObject({
       cltStatus: "COMPLETED",
       folio: "NAV-001",
@@ -56,6 +56,16 @@ describe("clt operations", () => {
     expect(operationalExport.body.startsWith("\uFEFF")).toBe(true);
     expect(operationalExport.body).toContain("Folio\tParticipante\tEncuestador");
     expect(answersExport.body).toContain("NAV-001\tFrancisco Ruiz\tCOMPLETED\tJesus");
+    expect(answersExport.body).toContain("TRI1_POS1\tTRI1_POS2\tTRI1_POS3");
+    expect(answersExport.body).toContain("TRI1_SELECTED\tTRI1_SELECTED_POSITION\tTRI1_CORRECT");
+    expect(answersExport.body).toContain("EVA1_PRODUCT\tEVA1_ORDER\tEVA1_ARM\tEVA2_PRODUCT\tEVA2_ORDER\tEVA2_ARM");
+    expect(answersExport.body).toContain("P8A_LIMPIA");
+    expect(answersExport.body).toContain("P9A_FLORAL");
+    expect(answersExport.body).toContain("P8A_ATTRIBUTE_ORDER");
+    expect(answersExport.body).toContain("247\t583\t912\t247|583|912\t583\tPR2\t1");
+    expect(answersExport.body).toContain("247\t1\tBrazo izquierdo\t583\t2\tBrazo derecho");
+    expect(answersExport.body).toContain("NAV-002\tHistorico Sin Trazabilidad\tCOMPLETED\tJesus\t\t\t\t\t583\tPR2\t1");
+    expect(answersExport.body).not.toContain("NAV-002\tHistorico Sin Trazabilidad\tCOMPLETED\tJesus\t247\t583\t912");
     expect(answersExport.body).not.toContain("Marca A\tMarca B");
     expect(answersExport.body).not.toContain("Marca C\r\notra");
   });
@@ -121,7 +131,36 @@ function createFakePrisma(): Parameters<typeof createCltOperationsRepository>[0]
       answers: [
         { answerValue: "1", questionCode: "F0" },
         { answerValue: "Marca A\tMarca B\nMarca C", questionCode: "F6" },
-        { answerValue: { selectedKey: "583", selectedPosition: "PR2" }, questionCode: "P1" }
+        {
+          answerValue: {
+            correct: 1,
+            deliveryOrder: ["247", "583", "912"],
+            positions: { PR1: "247", PR2: "583", PR3: "912" },
+            selectedKey: "583",
+            selectedPosition: "PR2"
+          },
+          questionCode: "P1"
+        },
+        {
+          answerValue: {
+            correct: 0,
+            deliveryOrder: ["835", "724", "583"],
+            positions: { PR1: "835", PR2: "724", PR3: "583" },
+            selectedKey: "835",
+            selectedPosition: "PR1"
+          },
+          questionCode: "P3"
+        },
+        { answerValue: { FRESCA: "5", LIMPIA: "4", MASCULINA: "3" }, questionCode: "P8A" },
+        { answerValue: { FLORAL: "1", FRUTAL: "2" }, questionCode: "P9A" },
+        {
+          answerValue: { armCode: "LEFT", armLabel: "Brazo izquierdo", order: 1, productCode: "247" },
+          questionCode: "SYS_EVA1_TRACE"
+        },
+        {
+          answerValue: { armCode: "RIGHT", armLabel: "Brazo derecho", order: 2, productCode: "583" },
+          questionCode: "SYS_EVA2_TRACE"
+        }
       ],
       claimedAt: new Date("2026-08-08T05:00:00.000Z"),
       completedAt: new Date("2026-08-08T06:00:00.000Z"),
@@ -138,6 +177,21 @@ function createFakePrisma(): Parameters<typeof createCltOperationsRepository>[0]
       ],
       startedAt: new Date("2026-08-08T05:00:00.000Z"),
       status: "COMPLETED",
+      triangularRotationSnapshot: {
+        assignmentId: "triangular-1",
+        triangular1: {
+          pr1: "247",
+          pr2: "583",
+          pr3: "912",
+          verify: "583"
+        },
+        triangular2: {
+          pr1: "835",
+          pr2: "724",
+          pr3: "583",
+          verify: "724"
+        }
+      },
       studyParticipant: {
         accessTokens: [
           {
@@ -215,6 +269,62 @@ function createFakePrisma(): Parameters<typeof createCltOperationsRepository>[0]
         id: "participant-1",
         participantConfirmation: { folio: "NAV-001" },
         participantProfile: { name: "Francisco Ruiz" },
+        rotationAssignment: {
+          rotationCode: "ROT-1",
+          rotationPlan: { name: "Rotacion 1" }
+        }
+      }
+    },
+    {
+      answers: [
+        { answerValue: { correct: 1, selectedKey: "583", selectedPosition: "PR2" }, questionCode: "P1" },
+        { answerValue: { correct: 0, selectedKey: "835", selectedPosition: "PR1" }, questionCode: "P3" }
+      ],
+      claimedAt: new Date("2026-08-08T05:00:00.000Z"),
+      completedAt: new Date("2026-08-08T06:00:00.000Z"),
+      ctlInterviewerCode: { label: "Jesus" },
+      id: "session-2",
+      interviewer: null,
+      phaseProgress: [],
+      startedAt: new Date("2026-08-08T05:00:00.000Z"),
+      status: "COMPLETED",
+      triangularRotationSnapshot: {
+        assignmentId: "triangular-2",
+        triangular1: {
+          pr1: "247",
+          pr2: "583",
+          pr3: "912",
+          verify: "583"
+        },
+        triangular2: {
+          pr1: "835",
+          pr2: "724",
+          pr3: "583",
+          verify: "724"
+        }
+      },
+      studyParticipant: {
+        accessTokens: [],
+        activities: [],
+        applicationStartedAt: null,
+        armAssignments: [
+          {
+            applicationOrder: 1,
+            participantVisibleLabel: "247",
+            studyArm: { code: "LEFT", label: "Brazo izquierdo" },
+            studyProduct: { displayLabel: "Fragancia 247", internalCode: "247" }
+          },
+          {
+            applicationOrder: 2,
+            participantVisibleLabel: "583",
+            studyArm: { code: "RIGHT", label: "Brazo derecho" },
+            studyProduct: { displayLabel: "Fragancia 583", internalCode: "583" }
+          }
+        ],
+        hutParticipant: null,
+        id: "participant-2",
+        participantConfirmation: { folio: "NAV-002" },
+        participantProfile: { name: "Historico Sin Trazabilidad" },
         rotationAssignment: {
           rotationCode: "ROT-1",
           rotationPlan: { name: "Rotacion 1" }

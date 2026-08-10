@@ -558,6 +558,7 @@ function toSyntheticNavigoParticipant(participant: FieldStudyParticipantRecord):
     participantName: participant.participantProfile.name,
     phaseProgress: [],
     questionCount: 0,
+    rawAnswers: [],
     reminders: participant.activities.flatMap((activity) =>
       activity.reminders.map((reminder) => ({
         activityCode: activity.activitySchedule.code,
@@ -568,6 +569,10 @@ function toSyntheticNavigoParticipant(participant: FieldStudyParticipantRecord):
     ),
     rotation: toRotationSummary(participant),
     t0: participant.applicationStartedAt,
+    triangularRotation: {
+      triangular1: null,
+      triangular2: null
+    },
     whatsapp: emptyWhatsAppSummary()
   };
 }
@@ -592,6 +597,7 @@ function toSyntheticHutParticipant(participant: FieldHutParticipantRecord): CltO
     participantName: studyParticipant?.participantProfile.name ?? participant.name,
     phaseProgress: [],
     questionCount: 0,
+    rawAnswers: [],
     reminders: [],
     rotation: {
       arms: [],
@@ -600,6 +606,10 @@ function toSyntheticHutParticipant(participant: FieldHutParticipantRecord): CltO
       secondSampleKey: null
     },
     t0: null,
+    triangularRotation: {
+      triangular1: null,
+      triangular2: null
+    },
     whatsapp: emptyWhatsAppSummary()
   };
 }

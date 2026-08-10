@@ -24,6 +24,7 @@ import {
 } from "./service";
 import {
   buildNavigoCodesWhatsAppBody,
+  sendHutCompletionWhatsApp,
   sendHutParticipantLinkWhatsApp,
   sendHutPhotoReminderWhatsApp,
   sendHutRegistrationWhatsApp,
@@ -557,6 +558,36 @@ describe("ONEUI WhatsApp template sending", () => {
       linkedParticipantId: "hut-participant-1",
       linkedStudyId: "study-1",
       sourceModule: "HUT"
+    });
+  });
+
+  it("arma payload de cierre HUT sin parametros", async () => {
+    const repository = createFakeRepository();
+    const fetcher = viFetch({
+      contacts: [{ wa_id: "5215512345678" }],
+      messages: [{ id: "wamid.hut-completion-1", message_status: "accepted" }]
+    });
+    const result = await sendHutCompletionWhatsApp({
+      env: whatsappEnv(),
+      participantId: "hut-participant-1",
+      participantName: "ANA",
+      phone: "5512345678",
+      repository,
+      sender: (input) => sendOneuiWhatsAppTemplate({ ...input, fetcher }),
+      studyId: "study-1"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(JSON.parse(fetcher.calls[0]?.init.body ?? "{}").template).toMatchObject({
+      language: { code: "es_MX" },
+      name: "hut_completion_message"
+    });
+    expect(JSON.parse(fetcher.calls[0]?.init.body ?? "{}").template).not.toHaveProperty("components");
+    expect(repository.messages[0]).toMatchObject({
+      bodyText: "Gracias por su apoyo y participacion.\nLa persona que lo invito se pondra en contacto con usted para recibir su incentivo.",
+      messageType: "template",
+      metaMessageId: "wamid.hut-completion-1",
+      status: "accepted"
     });
   });
 

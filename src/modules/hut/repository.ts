@@ -60,6 +60,7 @@ import {
 } from "@/modules/navigo-app/face-verification-contract";
 import {
   createOneuiWhatsAppRepository,
+  sendHutCompletionWhatsApp,
   sendHutPhotoReminderWhatsApp,
   sendHutRegistrationWhatsApp,
   type OneuiWhatsAppRepository
@@ -765,6 +766,7 @@ export type HutRepository = {
     token: string;
   }) => Promise<HutActionResult<{ answerValue: unknown; questionCode: string; terminated?: boolean; visitProgressId: string | null }>>;
   completeQuestionnaireSection: (input: {
+    actorUserId?: string | null;
     attemptId?: string;
     now?: Date;
     participantId: string;
@@ -863,6 +865,11 @@ type HutParticipantRecord = {
   study: HutStudySummary;
   studyId: string;
   studyParticipant?: {
+    ctlSessions?: Array<{
+      completedAt: Date | null;
+      id: string;
+      status: string;
+    }>;
     id?: string;
     participantConfirmation?: {
       folio: string;
@@ -1205,6 +1212,14 @@ const participantSelect = {
       participantConfirmation: {
         select: {
           folio: true
+        }
+      },
+      ctlSessions: {
+        orderBy: { completedAt: "desc" },
+        select: {
+          completedAt: true,
+          id: true,
+          status: true
         }
       },
       participantProfile: {
@@ -1739,9 +1754,21 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         }
       })) as HutVisitProgressRecord;
 
+      const completionMessageSent = await sendHutCompletionMessageIfReady({
+        actorUserId: input.actorUserId ?? null,
+        now,
+        participant,
+        prisma,
+        recentlyCompletedSection: input.section,
+        visit,
+        whatsappRepository: getWhatsAppRepository()
+      });
+
       return {
         data: toVisitProgressSummary(visit),
-        message: "Seccion HUT v5 completada correctamente.",
+        message: completionMessageSent
+          ? "Participacion HUT finalizada correctamente."
+          : "Seccion HUT v5 completada correctamente.",
         ok: true
       };
     },
@@ -4898,6 +4925,163 @@ function toAdminQuestionnaireSummary(participant: HutParticipantRecord): HutQues
   };
 }
 
+async function sendHutCompletionMessageIfReady({
+  actorUserId,
+  now,
+  participant,
+  prisma,
+  recentlyCompletedSection,
+  visit,
+  whatsappRepository
+}: {
+  actorUserId: string | null;
+  now: Date;
+  participant: HutParticipantRecord;
+  prisma: HutPrismaClient;
+  recentlyCompletedSection: HutQuestionnaireSectionId;
+  visit: HutVisitProgressRecord;
+  whatsappRepository?: OneuiWhatsAppRepository;
+}): Promise<boolean> {
+  if (!isApplicationPhotoProtocol(participant) || participant.status === "DISQUALIFIED") {
+    return false;
+  }
+  if (await hasHutCompletionMessageAudit(prisma, participant.id)) {
+    return false;
+  }
+
+  const attempt = (await prisma.hutQuestionnaireAttempt.findUnique?.({
+    select: hutQuestionnaireStateSelect,
+    where: { participantId: participant.id }
+  })) as HutQuestionnaireAttemptRecord | null;
+
+  if (!attempt || attempt.status === "TERMINATED") {
+    return false;
+  }
+
+  const answers = Object.fromEntries((attempt.answers ?? []).map((answer) => [answer.questionCode, answer.answerJson]));
+  const applicableQuestions = getHutApplicableQuestions({
+    answers,
+    context: { participantOrigin: participantOrigin(participant) },
+    definition: getHutV5Definition()
+  }).filter((question) => question.required);
+  const pendingQuestion = applicableQuestions.find((question) => !Object.prototype.hasOwnProperty.call(answers, question.code));
+
+  if (pendingQuestion) {
+    return false;
+  }
+
+  const completedSections = new Set(
+    (attempt.visits ?? [])
+      .filter((candidate) => candidate.status === "COMPLETED")
+      .map((candidate) => candidate.section)
+  );
+  if (visit.status === "COMPLETED") {
+    completedSections.add(recentlyCompletedSection);
+  }
+
+  const requiredSections = new Set(applicableQuestions.map((question) => question.section));
+  const hasPendingSection = [...requiredSections].some((section) => !completedSections.has(section));
+  if (hasPendingSection) {
+    return false;
+  }
+
+  const templateName = process.env.WHATSAPP_HUT_COMPLETION_TEMPLATE ?? "hut_completion_message";
+  if (participant.qaParticipantRun) {
+    await createHutCompletionMessageAudit({
+      actorUserId,
+      message: "Participante QA: no se envio WhatsApp real.",
+      metaMessageId: null,
+      now,
+      participant,
+      prisma,
+      status: "SKIPPED",
+      templateName
+    });
+    return true;
+  }
+
+  const result = await sendHutCompletionWhatsApp({
+    now,
+    participantId: participant.id,
+    participantName: participant.name,
+    phone: participant.phone,
+    repository: whatsappRepository ?? createOneuiWhatsAppRepository(),
+    studyId: participant.studyId
+  });
+  const whatsAppMessage = result.ok ? result.data : "data" in result ? result.data : undefined;
+
+  await createHutCompletionMessageAudit({
+    actorUserId,
+    message: result.ok ? "Mensaje de cierre HUT enviado por WhatsApp." : result.message,
+    metaMessageId: whatsAppMessage?.metaMessageId ?? null,
+    now,
+    participant,
+    prisma,
+    status: result.ok ? "ENVIADO" : "ERROR",
+    templateName
+  });
+
+  return true;
+}
+
+async function hasHutCompletionMessageAudit(prisma: HutPrismaClient, participantId: string): Promise<boolean> {
+  const logs = (await prisma.auditLog.findMany?.({
+    where: {
+      entityId: participantId,
+      entityType: "HutParticipant"
+    }
+  })) as Array<{ afterJson?: unknown; reason?: string | null }> | undefined;
+
+  return Boolean(
+    logs?.some((log) => {
+      const metadata = isRecord(log.afterJson) ? log.afterJson : {};
+      return (
+        log.reason === "HUT_COMPLETION_MESSAGE" ||
+        metadata.messageType === "HUT_COMPLETION_MESSAGE"
+      );
+    })
+  );
+}
+
+async function createHutCompletionMessageAudit({
+  actorUserId,
+  message,
+  metaMessageId,
+  now,
+  participant,
+  prisma,
+  status,
+  templateName
+}: {
+  actorUserId: string | null;
+  message: string;
+  metaMessageId: string | null;
+  now: Date;
+  participant: HutParticipantRecord;
+  prisma: HutPrismaClient;
+  status: "ENVIADO" | "ERROR" | "SKIPPED";
+  templateName: string;
+}) {
+  await prisma.auditLog.create?.({
+    data: {
+      action: "PARTICIPANT_MODIFIED",
+      actorUserId,
+      afterJson: toAuditJson({
+        message,
+        messageType: "HUT_COMPLETION_MESSAGE",
+        metaMessageId,
+        templateName,
+        whatsappStatus: status
+      }),
+      beforeJson: null,
+      createdAt: now,
+      entityId: participant.id,
+      entityType: "HutParticipant",
+      reason: "HUT_COMPLETION_MESSAGE"
+    }
+  });
+}
+
 function hutFilterStatusFromParticipant(participant: HutParticipantRecord): HutQuestionnaireState["filterStatus"] {
   const attempt = participant.questionnaireAttempt;
   const answers = Object.fromEntries((attempt?.answers ?? []).map((answer) => [answer.questionCode, answer.answerJson]));
@@ -5110,6 +5294,9 @@ function availableHutPhotoReminderSlot(participant: HutParticipantRecord, now: D
   if (!isApplicationPhotoProtocol(participant) || participant.status === "COMPLETED" || participant.status === "DISQUALIFIED") {
     return null;
   }
+  if (!isHutPhotoReminderProtocolReady(participant)) {
+    return null;
+  }
 
   return getNextHutPhotoTimelineSlot({
     applicationEvidence: applicationEvidenceSummary(participant),
@@ -5123,6 +5310,40 @@ function availableHutPhotoReminderSlot(participant: HutParticipantRecord, now: D
     },
     testMode: participant.testMode
   });
+}
+
+function isHutPhotoReminderProtocolReady(participant: HutParticipantRecord): boolean {
+  if (!hasHutProtocolStarted(participant)) {
+    return false;
+  }
+  if (participantOrigin(participant) === "CLT_HUT" && !hasCompletedCltSession(participant)) {
+    return false;
+  }
+  if (!hasHutDeliveryEvidence(participant)) {
+    return false;
+  }
+
+  return true;
+}
+
+function hasHutProtocolStarted(participant: HutParticipantRecord): boolean {
+  return Boolean(
+    participant.startDate ||
+    participant.status !== "NOT_STARTED" ||
+    participant.applicationPhotoEntries?.length ||
+    participant.applicationEvidence?.length
+  );
+}
+
+function hasCompletedCltSession(participant: HutParticipantRecord): boolean {
+  return Boolean(participant.studyParticipant?.ctlSessions?.some((session) => session.status === "COMPLETED"));
+}
+
+function hasHutDeliveryEvidence(participant: HutParticipantRecord): boolean {
+  return Boolean(
+    participant.applicationPhotoEntries?.some((entry) => entry.useDayNumber === 0) ||
+    participant.applicationEvidence?.some((evidence) => evidence.phase === "COLOCACION")
+  );
 }
 
 async function hasRecentHutPhotoReminder(
@@ -5672,6 +5893,10 @@ function participantOrigin(participant: Pick<HutParticipantRecord, "origin" | "s
 
 function toAuditJson(value: unknown): unknown {
   return JSON.parse(JSON.stringify(value));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function maskFieldAccessCode(code: string): string {

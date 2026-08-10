@@ -310,6 +310,12 @@ export function buildCtlTriangularAnswerValue({
   | {
       answerValue: {
         correct: 0 | 1;
+        deliveryOrder: string[];
+        positions: {
+          PR1: string;
+          PR2: string;
+          PR3: string;
+        };
         selectedKey: string;
         selectedPosition: "PR1" | "PR2" | "PR3";
       };
@@ -349,6 +355,8 @@ export function buildCtlTriangularAnswerValue({
   return {
     answerValue: {
       correct: selectedKey === triangular.verify ? 1 : 0,
+      deliveryOrder: [positions.PR1, positions.PR2, positions.PR3],
+      positions,
       selectedKey,
       selectedPosition
     },

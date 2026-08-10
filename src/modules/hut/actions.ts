@@ -507,6 +507,7 @@ export async function completeHutQuestionnaireSectionForFieldAction(
     redirectToFieldHut(folio, null, fieldAccess.message, null, fieldAccess);
   }
   const result = await createHutRepository().completeQuestionnaireSection({
+    actorUserId: fieldAccess.actorUserId,
     participantId,
     section,
     studyId

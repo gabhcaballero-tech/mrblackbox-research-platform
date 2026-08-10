@@ -10,6 +10,7 @@ import type {
   CltOperationsHutSummary,
   CltOperationsReminderSummary,
   CltOperationsRotationSummary,
+  CltOperationsTriangularRotationSummary,
   CltOperationsWhatsAppSummary
 } from "./types";
 
@@ -114,6 +115,7 @@ const sessionSelect = {
     }
   },
   id: true,
+  triangularRotationSnapshot: true,
   interviewer: {
     select: {
       id: true,
@@ -267,6 +269,7 @@ type SessionRecord = {
   }>;
   startedAt: Date | null;
   status: string;
+  triangularRotationSnapshot: unknown;
   studyParticipant: {
     accessTokens: Array<{
       expiresAt: Date;
@@ -346,6 +349,7 @@ type WhatsAppConversationRecord = {
 function toListItem(session: SessionRecord, whatsapp?: CltOperationsWhatsAppSummary): CltOperationsDetail {
   const progress = resolveCltApplicableProgress(session.answers);
   const rotation = toRotation(session);
+  const triangularRotation = toTriangularRotation(session.triangularRotationSnapshot);
   const hut = toHut(session);
   const navigoActivities = toNavigoActivities(session);
   const activeToken = session.studyParticipant.accessTokens.find((token) => token.status === "ACTIVE") ?? null;
@@ -367,9 +371,11 @@ function toListItem(session: SessionRecord, whatsapp?: CltOperationsWhatsAppSumm
     participantName: session.studyParticipant.participantProfile.name,
     phaseProgress: session.phaseProgress,
     questionCount: progress.questionCount,
+    rawAnswers: session.answers,
     reminders: toReminders(session),
     rotation,
     t0: session.studyParticipant.applicationStartedAt,
+    triangularRotation,
     whatsapp: whatsapp ?? emptyWhatsAppSummary()
   };
 }
@@ -393,6 +399,33 @@ function toRotation(session: SessionRecord): CltOperationsRotationSummary {
     firstSampleKey: arms.find((arm) => arm.order === 1)?.productCode ?? null,
     rotationCode: session.studyParticipant.rotationAssignment?.rotationCode ?? null,
     secondSampleKey: arms.find((arm) => arm.order === 2)?.productCode ?? null
+  };
+}
+
+function toTriangularRotation(value: unknown): CltOperationsTriangularRotationSummary {
+  if (!isRecord(value) || !isRecord(value.triangular1) || !isRecord(value.triangular2)) {
+    return {
+      triangular1: null,
+      triangular2: null
+    };
+  }
+
+  const triangular1 = {
+    pr1: String(value.triangular1.pr1 ?? ""),
+    pr2: String(value.triangular1.pr2 ?? ""),
+    pr3: String(value.triangular1.pr3 ?? ""),
+    verify: String(value.triangular1.verify ?? "")
+  };
+  const triangular2 = {
+    pr1: String(value.triangular2.pr1 ?? ""),
+    pr2: String(value.triangular2.pr2 ?? ""),
+    pr3: String(value.triangular2.pr3 ?? ""),
+    verify: String(value.triangular2.verify ?? "")
+  };
+
+  return {
+    triangular1: triangular1.pr1 && triangular1.pr2 && triangular1.pr3 ? triangular1 : null,
+    triangular2: triangular2.pr1 && triangular2.pr2 && triangular2.pr3 ? triangular2 : null
   };
 }
 
@@ -547,4 +580,8 @@ function emptyWhatsAppSummary(): CltOperationsWhatsAppSummary {
     messageCount: 0,
     templateNames: []
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }

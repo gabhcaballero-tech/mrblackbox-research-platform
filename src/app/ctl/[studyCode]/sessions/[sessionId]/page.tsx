@@ -60,6 +60,13 @@ export default async function CtlPublicCapturePage({ params, searchParams }: Ctl
 
         <Messages error={query?.ctlError} message={query?.ctlMessage} />
 
+        {session.status === "COMPLETED" ? (
+          <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950 shadow-sm">
+            <p className="text-lg font-bold">¡Muchas gracias por su participación!</p>
+            <p className="mt-1 text-sm font-semibold">Su entrevista CLT ha finalizado.</p>
+          </section>
+        ) : null}
+
         <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold">Participante validado</h2>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">

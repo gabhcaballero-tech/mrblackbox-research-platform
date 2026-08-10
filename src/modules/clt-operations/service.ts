@@ -2,7 +2,8 @@ import {
   getCtlApplicableQuestions,
   getCtlDefinition,
   getCtlQuestions,
-  type CtlAnswerLookup
+  type CtlAnswerLookup,
+  type CtlMatrixQuestionDefinition
 } from "@/modules/ctl/definition";
 import { formatDateTimeMexicoCity, MEXICO_CITY_TIME_ZONE } from "@/shared/utils/date-format";
 import type {
@@ -136,18 +137,29 @@ export function buildCltAnswersTsv(input: {
   now?: Date;
 }): CltOperationsExport {
   const questionCodes = collectAnswerQuestionCodes(input.details);
+  const traceabilityColumns = buildCltTraceabilityColumns();
   const rows = [
-    ["Folio", "Participante", "Estado CTL", "Encuestador", ...questionCodes],
+    [
+      "Folio",
+      "Participante",
+      "Estado CTL",
+      "Encuestador",
+      ...traceabilityColumns.map((column) => column.header),
+      ...questionCodes
+    ],
     ...input.details.map((detail) => {
       const answerByCode = new Map(
         detail.answerGroups.flatMap((group) => group.answers.map((answer) => [answer.code, answer.value] as const))
       );
+      const rawAnswerByCode = new Map(detail.rawAnswers.map((answer) => [answer.questionCode, answer.answerValue] as const));
+      const traceabilityValues = buildCltTraceabilityValues(detail, rawAnswerByCode, traceabilityColumns);
 
       return [
         detail.folio,
         detail.participantName,
         detail.cltStatus,
         detail.interviewer ?? "",
+        ...traceabilityValues,
         ...questionCodes.map((code) => answerByCode.get(code) ?? "")
       ];
     })
@@ -216,8 +228,222 @@ function collectAnswerQuestionCodes(details: CltOperationsDetail[]): string[] {
   return ordered;
 }
 
+type CltTraceabilityColumn = {
+  header: string;
+  read: (input: {
+    detail: CltOperationsDetail;
+    rawAnswerByCode: Map<string, unknown>;
+  }) => string | number | null | undefined;
+};
+
+function buildCltTraceabilityColumns(): CltTraceabilityColumn[] {
+  const definition = getCtlDefinition();
+  const matrixColumns: CltTraceabilityColumn[] = getCtlQuestions(definition)
+    .filter((question): question is CtlMatrixQuestionDefinition => question.type === "MATRIX")
+    .flatMap((question) => [
+      {
+        header: `${question.code}_ATTRIBUTE_ORDER`,
+        read: ({ detail }: { detail: CltOperationsDetail }) => getShownMatrixRowCodes(question, detail.id).join("|")
+      },
+      ...question.rows.map((row) => ({
+        header: `${question.code}_${row.code}`,
+        read: ({ rawAnswerByCode }: { rawAnswerByCode: Map<string, unknown> }) =>
+          readMatrixCell(rawAnswerByCode.get(question.code), row.code)
+      }))
+    ]);
+
+  return [
+    {
+      header: "TRI1_POS1",
+      read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P1"), "PR1")
+    },
+    {
+      header: "TRI1_POS2",
+      read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P1"), "PR2")
+    },
+    {
+      header: "TRI1_POS3",
+      read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P1"), "PR3")
+    },
+    {
+      header: "TRI1_DELIVERY_ORDER",
+      read: ({ rawAnswerByCode }) => readTriangularDeliveryOrder(rawAnswerByCode.get("P1"))
+    },
+    {
+      header: "TRI1_SELECTED",
+      read: ({ rawAnswerByCode }) => readTriangularSelectedKey(rawAnswerByCode.get("P1"))
+    },
+    {
+      header: "TRI1_SELECTED_POSITION",
+      read: ({ rawAnswerByCode }) => readTriangularSelectedPosition(rawAnswerByCode.get("P1"))
+    },
+    {
+      header: "TRI1_CORRECT",
+      read: ({ rawAnswerByCode }) => readTriangularCorrect(rawAnswerByCode.get("P1"))
+    },
+    {
+      header: "TRI2_POS1",
+      read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P3"), "PR1")
+    },
+    {
+      header: "TRI2_POS2",
+      read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P3"), "PR2")
+    },
+    {
+      header: "TRI2_POS3",
+      read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P3"), "PR3")
+    },
+    {
+      header: "TRI2_DELIVERY_ORDER",
+      read: ({ rawAnswerByCode }) => readTriangularDeliveryOrder(rawAnswerByCode.get("P3"))
+    },
+    {
+      header: "TRI2_SELECTED",
+      read: ({ rawAnswerByCode }) => readTriangularSelectedKey(rawAnswerByCode.get("P3"))
+    },
+    {
+      header: "TRI2_SELECTED_POSITION",
+      read: ({ rawAnswerByCode }) => readTriangularSelectedPosition(rawAnswerByCode.get("P3"))
+    },
+    {
+      header: "TRI2_CORRECT",
+      read: ({ rawAnswerByCode }) => readTriangularCorrect(rawAnswerByCode.get("P3"))
+    },
+    {
+      header: "EVA1_PRODUCT",
+      read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get("SYS_EVA1_TRACE"), "productCode")
+    },
+    {
+      header: "EVA1_ORDER",
+      read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get("SYS_EVA1_TRACE"), "order")
+    },
+    {
+      header: "EVA1_ARM",
+      read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get("SYS_EVA1_TRACE"), "armLabel")
+    },
+    {
+      header: "EVA2_PRODUCT",
+      read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get("SYS_EVA2_TRACE"), "productCode")
+    },
+    {
+      header: "EVA2_ORDER",
+      read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get("SYS_EVA2_TRACE"), "order")
+    },
+    {
+      header: "EVA2_ARM",
+      read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get("SYS_EVA2_TRACE"), "armLabel")
+    },
+    ...matrixColumns
+  ];
+}
+
+function buildCltTraceabilityValues(
+  detail: CltOperationsDetail,
+  rawAnswerByCode: Map<string, unknown>,
+  columns: CltTraceabilityColumn[]
+): Array<string | number | null | undefined> {
+  return columns.map((column) => column.read({ detail, rawAnswerByCode }));
+}
+
+function readTriangularSelectedPosition(value: unknown): string {
+  if (isRecord(value)) {
+    return normalizeExportValue(value.selectedPosition);
+  }
+
+  return normalizeExportValue(value);
+}
+
+function readTriangularSelectedKey(value: unknown): string {
+  if (isRecord(value) && typeof value.selectedKey !== "undefined") {
+    return normalizeExportValue(value.selectedKey);
+  }
+
+  return "";
+}
+
+function readTriangularPosition(value: unknown, position: "PR1" | "PR2" | "PR3"): string {
+  if (!isRecord(value) || !isRecord(value.positions)) {
+    return "";
+  }
+
+  return normalizeExportValue(value.positions[position]);
+}
+
+function readTriangularDeliveryOrder(value: unknown): string {
+  if (!isRecord(value) || !Array.isArray(value.deliveryOrder)) {
+    return "";
+  }
+
+  return value.deliveryOrder.map(normalizeExportValue).filter(Boolean).join("|");
+}
+
+function readTriangularCorrect(value: unknown): string | number {
+  if (isRecord(value) && (value.correct === 0 || value.correct === 1 || value.correct === "0" || value.correct === "1")) {
+    return String(value.correct);
+  }
+
+  return "";
+}
+
+function readProductTraceValue(value: unknown, key: "armLabel" | "order" | "productCode"): string | number {
+  if (!isRecord(value)) {
+    return "";
+  }
+
+  const field = value[key];
+  if (key === "order" && typeof field === "number") {
+    return field;
+  }
+
+  return normalizeExportValue(field);
+}
+
+function readMatrixCell(value: unknown, rowCode: string): string {
+  if (!isRecord(value)) {
+    return "";
+  }
+
+  return normalizeExportValue(value[rowCode]);
+}
+
+function getShownMatrixRowCodes(question: CtlMatrixQuestionDefinition, sessionId: string): string[] {
+  const rows = question.randomizeRows ? stableShuffle(question.rows, `${sessionId}:${question.code}`) : question.rows;
+  return rows.map((row) => row.code);
+}
+
+function stableShuffle<T>(items: T[], seed: string): T[] {
+  return [...items]
+    .map((item, index) => ({
+      item,
+      sortKey: stableHash(`${seed}:${index}`)
+    }))
+    .sort((left, right) => left.sortKey - right.sortKey)
+    .map(({ item }) => item);
+}
+
+function stableHash(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
 function buildCtlAnswerLookup(answers: Array<{ questionCode: string; answerValue: unknown }>): CtlAnswerLookup {
   return Object.fromEntries(answers.map((answer) => [answer.questionCode, answer.answerValue]));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function normalizeExportValue(value: unknown): string {
+  if (value === null || typeof value === "undefined") {
+    return "";
+  }
+
+  return String(value);
 }
 
 function tsvCell(value: string | number | null | undefined): string {

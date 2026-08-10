@@ -44,6 +44,21 @@ export type CltOperationsRotationSummary = {
   secondSampleKey: string | null;
 };
 
+export type CltOperationsTriangularRotationSummary = {
+  triangular1: {
+    pr1: string;
+    pr2: string;
+    pr3: string;
+    verify: string;
+  } | null;
+  triangular2: {
+    pr1: string;
+    pr2: string;
+    pr3: string;
+    verify: string;
+  } | null;
+};
+
 export type CltOperationsHutSummary = {
   applicationPhotoCount: number;
   currentSection: string | null;
@@ -88,6 +103,10 @@ export type CltOperationsAnswerGroup = {
 
 export type CltOperationsDetail = CltOperationsListItem & {
   answerGroups: CltOperationsAnswerGroup[];
+  rawAnswers: Array<{
+    questionCode: string;
+    answerValue: unknown;
+  }>;
   phaseProgress: Array<{
     completedAt: Date | null;
     phase: string;
@@ -96,6 +115,7 @@ export type CltOperationsDetail = CltOperationsListItem & {
   }>;
   reminders: CltOperationsReminderSummary[];
   rotation: CltOperationsRotationSummary;
+  triangularRotation: CltOperationsTriangularRotationSummary;
 };
 
 export type CltOperationsDashboard = {
