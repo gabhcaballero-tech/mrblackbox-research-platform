@@ -126,6 +126,7 @@ export async function sendHutPhotoReminderWhatsAppAction(studyId: string, partic
   const result = await createHutRepository().sendPhotoReminderWhatsApp({
     actorUserId: actor.id,
     participantId,
+    reason: String(formData.get("reason") ?? "Recordatorio HUT manual desde Admin"),
     requestOrigin: String(formData.get("requestOrigin") ?? ""),
     studyId
   });

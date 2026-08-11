@@ -162,6 +162,7 @@ export function createWhatsAppParticipantSupportService(dependencies: WhatsAppPa
         const result = await repository.sendPhotoReminderWhatsApp({
           actorUserId: input.actorUserId,
           participantId: input.hutParticipantId ?? "",
+          reason,
           requestOrigin: getStablePublicOrigin(),
           source: "MANUAL_SUPPORT",
           studyId: input.studyId

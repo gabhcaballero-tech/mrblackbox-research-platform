@@ -2740,6 +2740,7 @@ describe("HUT module foundation", () => {
       actorUserId: "admin-1",
       now: new Date("2026-08-09T16:34:00.000Z"),
       participantId: participant.id,
+      reason: "Soporte manual solicitado por campo",
       requestOrigin: "https://example.test",
       studyId: "study-hut"
     });
@@ -2751,8 +2752,49 @@ describe("HUT module foundation", () => {
       reason: "HUT_PHOTO_REMINDER_MANUAL"
     });
     expect(prisma.state.auditLogs[0]?.afterJson).toMatchObject({
+      manualReason: "Soporte manual solicitado por campo",
       source: "MANUAL_ADMIN",
       templateName: "hut_photo_reminder"
+    });
+  });
+
+  it("allows a manual HUT photo reminder even when cron sent the same slot recently", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const whatsapp = createFakeWhatsAppRepository();
+    const repository = createHutRepository(prisma as never, whatsapp);
+    stubAcceptedWhatsAppMeta();
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://mrblackbox-research-platform.vercel.app");
+    await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-REM-MANUAL-RETRY" });
+    const participant = prisma.state.participants[0]!;
+    addApplicationPhotoEntry(prisma.state, participant, {
+      capturedAt: new Date("2026-08-09T15:00:00.000Z"),
+      useDayNumber: 0
+    });
+
+    const cron = await repository.processPhotoWhatsAppReminders({
+      now: new Date("2026-08-09T21:34:00.000Z"),
+      requestOrigin: "https://example.test",
+      studyId: "study-hut"
+    });
+    const manual = await repository.sendPhotoReminderWhatsApp({
+      actorUserId: "admin-1",
+      now: new Date("2026-08-09T22:00:00.000Z"),
+      participantId: participant.id,
+      reason: "Reenvio autorizado desde soporte",
+      requestOrigin: "https://example.test",
+      source: "MANUAL_SUPPORT",
+      studyId: "study-hut"
+    });
+
+    expect(cron.ok ? cron.data.sent : -1).toBe(1);
+    expect(manual.ok).toBe(true);
+    expect(whatsapp.createOutboundMessage).toHaveBeenCalledTimes(2);
+    expect(prisma.state.auditLogs.filter((log) => log.reason === "HUT_PHOTO_REMINDER_MANUAL")).toHaveLength(1);
+    expect(prisma.state.auditLogs.find((log) => log.reason === "HUT_PHOTO_REMINDER_MANUAL")?.afterJson).toMatchObject({
+      manualReason: "Reenvio autorizado desde soporte",
+      source: "MANUAL_SUPPORT",
+      slotId: "PRODUCT_1_DAY_1",
+      whatsappStatus: "ENVIADO"
     });
   });
 

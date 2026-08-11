@@ -672,6 +672,7 @@ export type HutRepository = {
     actorUserId: string;
     now?: Date;
     participantId: string;
+    reason?: string;
     requestOrigin: string;
     source?: "MANUAL_ADMIN" | "MANUAL_SUPPORT";
     studyId: string;
@@ -2998,6 +2999,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       }
 
       const prepared = await prepareHutPhotoReminder({
+        enforceRecentDedupe: false,
         now,
         participant,
         prisma
@@ -3008,6 +3010,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
       const result = await sendHutPhotoReminderForParticipant({
         actorUserId: input.actorUserId,
+        manualReason: input.reason,
         participant,
         requestOrigin: input.requestOrigin,
         source: input.source ?? "MANUAL_ADMIN",
@@ -3063,6 +3066,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         }
 
         const prepared = await prepareHutPhotoReminder({
+          enforceRecentDedupe: true,
           now,
           participant,
           prisma
@@ -5563,15 +5567,17 @@ async function sendHutRegistrationWhatsAppForParticipant({
 }
 
 async function prepareHutPhotoReminder({
+  enforceRecentDedupe,
   now,
   participant,
   prisma
 }: {
+  enforceRecentDedupe: boolean;
   now: Date;
   participant: HutParticipantRecord;
   prisma: HutPrismaClient;
 }): Promise<HutPhotoReminderEligibilityDecision> {
-  return evaluateHutPhotoReminderEligibility({ now, participant, prisma });
+  return evaluateHutPhotoReminderEligibility({ enforceRecentDedupe, now, participant, prisma });
 }
 
 type HutPhotoReminderEligibilityDecision =
@@ -5589,10 +5595,12 @@ type HutPhotoReminderEligibilityDecision =
     };
 
 async function evaluateHutPhotoReminderEligibility({
+  enforceRecentDedupe,
   now,
   participant,
   prisma
 }: {
+  enforceRecentDedupe: boolean;
   now: Date;
   participant: HutParticipantRecord;
   prisma: HutPrismaClient;
@@ -5626,7 +5634,7 @@ async function evaluateHutPhotoReminderEligibility({
   if (participant.qaParticipantRun) {
     return hutPhotoReminderExcluded(participant, now, ["QA_PARTICIPANT"], hutPhotoReminderExclusionMessage("QA_PARTICIPANT"), slot);
   }
-  if (await hasRecentHutPhotoReminder(prisma, participant.id, slot.id as HutPhotoTimelineSlotId, now)) {
+  if (enforceRecentDedupe && await hasRecentHutPhotoReminder(prisma, participant.id, slot.id as HutPhotoTimelineSlotId, now)) {
     return hutPhotoReminderExcluded(participant, now, ["RECENT_REMINDER"], hutPhotoReminderExclusionMessage("RECENT_REMINDER"), slot);
   }
 
@@ -5635,6 +5643,7 @@ async function evaluateHutPhotoReminderEligibility({
 
 async function sendHutPhotoReminderForParticipant({
   actorUserId,
+  manualReason,
   now,
   participant,
   prisma,
@@ -5643,6 +5652,7 @@ async function sendHutPhotoReminderForParticipant({
   whatsappRepository
 }: {
   actorUserId: string | null;
+  manualReason?: string;
   now: Date;
   participant: HutParticipantRecord;
   prisma: HutPrismaClient;
@@ -5678,6 +5688,7 @@ async function sendHutPhotoReminderForParticipant({
         hutUrlDomain,
         message: result.ok ? "Recordatorio HUT enviado por WhatsApp." : result.message,
         metaMessageId: whatsAppMessage?.metaMessageId ?? null,
+        manualReason: source === "CRON" ? null : manualReason?.trim() || null,
         reminderReason: "PHOTO_SLOT_AVAILABLE",
         reminderType: "HUT_PHOTO_REMINDER",
         sentAtMexicoCity: formatDateTimeMexicoCity(now),
