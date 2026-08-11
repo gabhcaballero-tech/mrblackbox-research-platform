@@ -673,6 +673,7 @@ export type HutRepository = {
     now?: Date;
     participantId: string;
     requestOrigin: string;
+    source?: "MANUAL_ADMIN" | "MANUAL_SUPPORT";
     studyId: string;
   }) => Promise<HutActionResult<HutPhotoReminderSendResult>>;
   processPhotoWhatsAppReminders: (input: {
@@ -3009,7 +3010,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         actorUserId: input.actorUserId,
         participant,
         requestOrigin: input.requestOrigin,
-        source: "MANUAL_ADMIN",
+        source: input.source ?? "MANUAL_ADMIN",
         ...prepared.data,
         now,
         prisma,
@@ -5647,7 +5648,7 @@ async function sendHutPhotoReminderForParticipant({
   prisma: HutPrismaClient;
   requestOrigin: string;
   slot: NonNullable<ReturnType<typeof nextHutPhotoReminderCandidateSlot>>;
-  source: "CRON" | "MANUAL_ADMIN";
+  source: "CRON" | "MANUAL_ADMIN" | "MANUAL_SUPPORT";
   whatsappRepository?: OneuiWhatsAppRepository;
 }): Promise<HutActionResult<HutPhotoReminderSendResult>> {
   const hutUrl = hutWhatsAppParticipantLink(participant.token);
@@ -5690,7 +5691,7 @@ async function sendHutPhotoReminderForParticipant({
       createdAt: now,
       entityId: participant.id,
       entityType: "HutParticipant",
-      reason: source === "MANUAL_ADMIN" ? "HUT_PHOTO_REMINDER_MANUAL" : "HUT_PHOTO_REMINDER_CRON"
+      reason: source === "CRON" ? "HUT_PHOTO_REMINDER_CRON" : "HUT_PHOTO_REMINDER_MANUAL"
     }
   });
 

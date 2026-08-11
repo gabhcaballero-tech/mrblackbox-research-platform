@@ -4,6 +4,10 @@ import {
   isWithinOneuiWhatsAppCustomerServiceWindow,
   ONEUI_WHATSAPP_SOURCE_LABELS
 } from "@/modules/oneui-whatsapp";
+import {
+  createWhatsAppParticipantSupportService,
+  type WhatsAppParticipantSupportSearchResult
+} from "@/modules/oneui-whatsapp/participant-support";
 import type {
   OneuiWhatsAppConversationDetail,
   OneuiWhatsAppConversationSummary,
@@ -14,6 +18,7 @@ import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { ParticipantSupportActions } from "./ParticipantSupportActions";
 import { ReplyForm } from "./ReplyForm";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +30,7 @@ type OneuiWhatsAppPageProps = {
 export default async function OneuiWhatsAppPage({ searchParams }: OneuiWhatsAppPageProps) {
   const search = (await searchParams) ?? {};
   const selectedConversationId = firstParam(search.conversationId) ?? null;
+  const participantSearch = firstParam(search.participantSearch)?.trim() ?? "";
   const actor = await requireInternalUser();
 
   if (actor.role !== "ADMIN" && actor.role !== "SUPERVISOR") {
@@ -41,6 +47,9 @@ export default async function OneuiWhatsAppPage({ searchParams }: OneuiWhatsAppP
   }
 
   const { conversations, selectedConversation } = inbox.data;
+  const participantResults = participantSearch
+    ? await createWhatsAppParticipantSupportService().searchParticipants(participantSearch)
+    : [];
 
   return (
     <AppShell>
@@ -51,6 +60,8 @@ export default async function OneuiWhatsAppPage({ searchParams }: OneuiWhatsAppP
         title="ONEUI Research WhatsApp"
       />
 
+      <ParticipantSupportSearchPanel query={participantSearch} results={participantResults} />
+
       <div className="grid gap-6 lg:grid-cols-[minmax(280px,0.42fr)_minmax(0,1fr)]">
         <ConversationList
           conversations={conversations}
@@ -59,6 +70,82 @@ export default async function OneuiWhatsAppPage({ searchParams }: OneuiWhatsAppP
         <ConversationDetail conversation={selectedConversation} />
       </div>
     </AppShell>
+  );
+}
+
+function ParticipantSupportSearchPanel({
+  query,
+  results
+}: {
+  query: string;
+  results: WhatsAppParticipantSupportSearchResult[];
+}) {
+  return (
+    <section className="mb-6 rounded-lg border border-zinc-200 bg-white p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-zinc-950">BÃºsqueda y envÃ­o manual</h2>
+          <p className="mt-1 text-sm text-zinc-600">
+            Busca por folio NAV, folio HUT, telÃ©fono o nombre para enviar enlaces desde soporte.
+          </p>
+        </div>
+        <form className="flex w-full gap-2 sm:max-w-xl">
+          <input
+            className="min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-950"
+            defaultValue={query}
+            name="participantSearch"
+            placeholder="NAV-001, HUT-001, telefono o nombre"
+          />
+          <button className="rounded-md bg-zinc-950 px-4 py-2 text-sm font-semibold text-white" type="submit">
+            Buscar
+          </button>
+        </form>
+      </div>
+
+      {query ? (
+        results.length === 0 ? (
+          <p className="mt-4 rounded-md bg-zinc-50 px-3 py-3 text-sm text-zinc-600">
+            No encontramos participantes para &quot;{query}&quot;.
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-3">
+            {results.map((participant) => (
+              <article
+                className="rounded-lg border border-zinc-200 bg-zinc-50 p-4"
+                key={participant.studyParticipantId ?? participant.hutParticipantId}
+              >
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold text-zinc-950">{participant.name}</h3>
+                    <p className="mt-1 text-xs text-zinc-600">
+                      {participant.phone ?? "Sin telefono"} / {participant.email ?? "Sin correo"}
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-500">{participant.studyName ?? participant.studyId}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-md bg-white px-2.5 py-1 font-semibold text-zinc-800">
+                      NAV: {participant.navFolio ?? "No disponible"}
+                    </span>
+                    <span className="rounded-md bg-white px-2.5 py-1 font-semibold text-zinc-800">
+                      HUT: {participant.hutFolio ?? "No disponible"}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-3 grid gap-2 text-xs text-zinc-700 md:grid-cols-2">
+                  <p>
+                    <span className="font-semibold">Navigo:</span> {participant.navigoStatus}
+                  </p>
+                  <p>
+                    <span className="font-semibold">HUT:</span> {participant.hutStatus ?? "No disponible"}
+                  </p>
+                </div>
+                <ParticipantSupportActions participant={participant} />
+              </article>
+            ))}
+          </div>
+        )
+      ) : null}
+    </section>
   );
 }
 
