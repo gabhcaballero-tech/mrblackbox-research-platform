@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
+import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 import { resolvePublicLinkOrigin } from "@/shared/utils/request-origin";
 import {
   createOneuiWhatsAppRepository,
@@ -3118,13 +3119,19 @@ export function createNavigoAppRepository(
           action: "PARTICIPANT_MODIFIED",
           actorUserId: input.actorUserId,
           afterJson: {
+            deploymentEnvironment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? null,
+            deploymentUrl: process.env.VERCEL_URL ?? null,
+            folio: prepared.data.folio,
             hutParticipantId: prepared.data.hutParticipantId,
             hutUrlAvailable: Boolean(prepared.data.hutUrl),
+            hutUrlDomain: prepared.data.hutUrl ? new URL(prepared.data.hutUrl).origin : null,
             linkTypeSent: prepared.data.sentLinkType,
             linkTypeRequested: input.linkType,
             message: result.ok ? "Enlace enviado por WhatsApp." : result.message,
             metaMessageId: whatsAppMessage?.metaMessageId ?? null,
             navigoUrlAvailable: Boolean(prepared.data.navigoUrl),
+            origin: "MANUAL",
+            sentAtMexicoCity: formatDateTimeMexicoCity(now),
             templateName: templateNameForParticipantLinks(prepared.data.sentLinkType),
             warnings: prepared.data.warnings,
             whatsappStatus: result.ok ? "ENVIADO" : "ERROR"

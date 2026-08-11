@@ -4,6 +4,7 @@ import {
   type OneuiWhatsAppTemplateParameter
 } from "./service";
 import type { OneuiWhatsAppMessageRecord, OneuiWhatsAppRepository } from "./repository";
+import { resolveConfiguredPublicOrigin } from "@/shared/utils/request-origin";
 
 export type WhatsAppAutomationStatus = {
   error: string | null;
@@ -22,6 +23,7 @@ const HUT_PARTICIPANT_LINK_TEMPLATE_NAME = "hut_link_participant";
 const NAVIGO_HUT_LINKS_TEMPLATE_NAME = "navigo_hut_links";
 const HUT_PHOTO_REMINDER_TEMPLATE_NAME = "hut_photo_reminder";
 const HUT_COMPLETION_TEMPLATE_NAME = "hut_completion_message";
+export const HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN = "HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN";
 
 export function whatsappAutomationStatusFromMessage(
   message: Pick<OneuiWhatsAppMessageRecord, "createdAt" | "metaMessageId" | "rawPayload" | "status" | "timestamp"> | null
@@ -236,6 +238,10 @@ export async function sendHutParticipantLinkWhatsApp(input: {
   if (!input.participantName || !input.phone || !input.hutUrl) {
     return { code: "SKIPPED", message: "Faltan datos para enviar enlace HUT.", ok: false };
   }
+  const originValidation = validateHutWhatsAppPublicOrigin(input.hutUrl, env);
+  if (!originValidation.ok) {
+    return { code: "SKIPPED", message: HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN, ok: false };
+  }
 
   const sender = input.sender ?? sendOneuiWhatsAppTemplate;
 
@@ -281,6 +287,10 @@ export async function sendNavigoHutLinksWhatsApp(input: {
 
   if (!input.participantName || !input.phone || !input.navigoUrl || !input.hutUrl) {
     return { code: "SKIPPED", message: "Faltan datos para enviar enlaces Navigo/HUT.", ok: false };
+  }
+  const originValidation = validateHutWhatsAppPublicOrigin(input.hutUrl, env);
+  if (!originValidation.ok) {
+    return { code: "SKIPPED", message: HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN, ok: false };
   }
 
   const sender = input.sender ?? sendOneuiWhatsAppTemplate;
@@ -416,6 +426,10 @@ export async function sendHutPhotoReminderWhatsApp(input: {
   if (!input.participantName || !input.phone || !input.hutUrl) {
     return { code: "SKIPPED", message: "Faltan datos para enviar recordatorio HUT.", ok: false };
   }
+  const originValidation = validateHutWhatsAppPublicOrigin(input.hutUrl, env);
+  if (!originValidation.ok) {
+    return { code: "SKIPPED", message: HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN, ok: false };
+  }
 
   const sender = input.sender ?? sendOneuiWhatsAppTemplate;
 
@@ -458,6 +472,28 @@ export function buildHutPhotoReminderWhatsAppBody({
     "",
     "Gracias por participar."
   ].join("\n");
+}
+
+export function validateHutWhatsAppPublicOrigin(
+  hutUrl: string,
+  env: Partial<NodeJS.ProcessEnv> = process.env
+): { ok: true; origin: string } | { expectedOrigin: string | null; ok: false; origin: string | null } {
+  const expectedOrigin = resolveConfiguredPublicOrigin(env);
+  const origin = readUrlOrigin(hutUrl);
+
+  if (!expectedOrigin || !origin || origin !== expectedOrigin) {
+    return { expectedOrigin, ok: false, origin };
+  }
+
+  return { ok: true, origin };
+}
+
+function readUrlOrigin(value: string): string | null {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
 }
 
 export async function sendHutCompletionWhatsApp(input: {
@@ -584,6 +620,10 @@ export async function sendHutRegistrationWhatsApp(input: {
 
   if (required.some((value) => !value)) {
     return { code: "SKIPPED", message: "Faltan datos para enviar WhatsApp HUT.", ok: false };
+  }
+  const originValidation = validateHutWhatsAppPublicOrigin(input.link, env);
+  if (!originValidation.ok) {
+    return { code: "SKIPPED", message: HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN, ok: false };
   }
 
   const sender = input.sender ?? sendOneuiWhatsAppTemplate;

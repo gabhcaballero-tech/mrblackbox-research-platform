@@ -1492,6 +1492,7 @@ describe("navigo app MVP rules", () => {
         token: "hut-token-1"
       });
     }
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://mrblackbox-research-platform.vercel.app");
     vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
     vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "phone-number-id");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://mrblackbox-research-platform.vercel.app");
@@ -1559,6 +1560,7 @@ describe("navigo app MVP rules", () => {
         token: "hut-token-1"
       });
     }
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://mrblackbox-research-platform.vercel.app");
     vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
     vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "phone-number-id");
     vi.stubGlobal(
@@ -1583,14 +1585,14 @@ describe("navigo app MVP rules", () => {
 
     expect(result?.ok).toBe(true);
     expect(result?.ok ? result.data.sentLinkType : "").toBe("BOTH");
-    expect(result?.ok ? result.data.navigoUrl : "").toContain("https://example.test/p/");
-    expect(result?.ok ? result.data.hutUrl : "").toBe("https://example.test/hut/p/hut-token-1");
+    expect(result?.ok ? result.data.navigoUrl : "").toContain("https://mrblackbox-research-platform.vercel.app/p/");
+    expect(result?.ok ? result.data.hutUrl : "").toBe("https://mrblackbox-research-platform.vercel.app/hut/p/hut-token-1");
     const payload = whatsApp.messages[0]?.rawPayload as {
       request?: { template?: { components?: Array<{ parameters?: Array<{ text: string }> }>; name?: string } };
     };
     expect(payload.request?.template?.name).toBe("navigo_hut_links");
     expect(payload.request?.template?.components?.[0]?.parameters?.[1]?.text).toBe(result?.ok ? result.data.navigoUrl : "");
-    expect(payload.request?.template?.components?.[0]?.parameters?.[2]?.text).toBe("https://example.test/hut/p/hut-token-1");
+    expect(payload.request?.template?.components?.[0]?.parameters?.[2]?.text).toBe("https://mrblackbox-research-platform.vercel.app/hut/p/hut-token-1");
     expect(state.auditLogs[0]?.afterJson).toMatchObject({
       linkTypeRequested: "BOTH",
       linkTypeSent: "BOTH",

@@ -424,6 +424,7 @@ describe("HutPhotoTimeline", () => {
         }
       ],
       now: new Date("2026-08-12T18:00:00.000Z"),
+      product2GateOpen: true,
       rotation: {
         eva1: "247",
         eva2: "583"
@@ -443,6 +444,57 @@ describe("HutPhotoTimeline", () => {
       availableAt: null,
       availableDate: null,
       status: "BLOCKED"
+    });
+  });
+
+  it("blocks product 2 day 1 until Regreso 1 and the second product are released", () => {
+    const baseInput = {
+      dailyEntries: [
+        {
+          capturedAt: new Date("2026-08-09T15:00:00.000Z"),
+          capturedLocalDate: "2026-08-09",
+          productCode: null,
+          useDayNumber: 0
+        },
+        {
+          capturedAt: new Date("2026-08-09T16:00:00.000Z"),
+          capturedLocalDate: "2026-08-09",
+          productCode: "247",
+          useDayNumber: 1
+        },
+        {
+          capturedAt: new Date("2026-08-10T10:10:00.000Z"),
+          capturedLocalDate: "2026-08-10",
+          productCode: "247",
+          useDayNumber: 2
+        },
+        {
+          capturedAt: new Date("2026-08-11T10:10:00.000Z"),
+          capturedLocalDate: "2026-08-11",
+          productCode: "247",
+          useDayNumber: 3
+        }
+      ],
+      now: new Date("2026-08-12T21:00:00.000Z"),
+      rotation: {
+        eva1: "247",
+        eva2: "583"
+      }
+    };
+    const blockedTimeline = buildHutPhotoTimeline(baseInput);
+    const releasedTimeline = buildHutPhotoTimeline({
+      ...baseInput,
+      product2GateOpen: true
+    });
+
+    expect(blockedTimeline.find((slot) => slot.id === "PRODUCT_2_DAY_1")).toMatchObject({
+      availableAt: null,
+      availableDate: null,
+      status: "BLOCKED"
+    });
+    expect(releasedTimeline.find((slot) => slot.id === "PRODUCT_2_DAY_1")).toMatchObject({
+      productCode: "583",
+      status: "AVAILABLE"
     });
   });
 
@@ -468,7 +520,7 @@ describe("HutPhotoTimeline", () => {
       timeline
         .filter((slot) => slot.participantTask && !slot.evidence)
         .map((slot) => slot.status)
-    ).toEqual(["AVAILABLE", "AVAILABLE", "AVAILABLE", "AVAILABLE", "AVAILABLE", "AVAILABLE"]);
+    ).toEqual(["AVAILABLE", "AVAILABLE", "AVAILABLE", "BLOCKED", "BLOCKED", "BLOCKED"]);
   });
 
   it("hides legacy call pending labels in the operational presentation", () => {

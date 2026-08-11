@@ -1043,6 +1043,7 @@ function buildFieldPhotoTimeline(workspace: HutFieldQuestionnaireWorkspace): Hut
         useDayNumber: photo.useDayNumber
       })),
     legacyMirroredPlacementPhoto: workspace.legacyMirroredPlacementPhoto,
+    product2GateOpen: workspace.product2GateOpen,
     rotation: {
       eva1: workspace.rotation.eva1,
       eva2: workspace.rotation.eva2

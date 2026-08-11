@@ -62,6 +62,7 @@ import {
 } from "@/modules/navigo-app/face-verification-contract";
 import {
   createOneuiWhatsAppRepository,
+  HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN,
   sendHutCompletionWhatsApp,
   sendHutPhotoReminderWhatsApp,
   sendHutRegistrationWhatsApp,
@@ -142,6 +143,7 @@ export type HutAdminParticipant = {
   name: string;
   phone: string | null;
   origin: "CLT_HUT" | "HUT_DIRECTO";
+  product2GateOpen: boolean;
   recruiter: string | null;
   phaseCodes: HutPhaseCodeAdmin[];
   protocolVersion: "APPLICATION_PHOTO" | "LEGACY_VIDEO";
@@ -338,6 +340,7 @@ export type HutFieldQuestionnaireWorkspace = {
   };
   phaseCodes: HutPhaseCodeAdmin[];
   photos: HutFieldPhotoSummary[];
+  product2GateOpen: boolean;
   questionnaire: HutQuestionnaireState;
   legacyMirroredPlacementPhoto: boolean;
   rotation: {
@@ -467,6 +470,7 @@ export type HutPortalView = {
   } | null;
   participantId: string;
   origin: "CLT_HUT" | "HUT_DIRECTO";
+  product2GateOpen: boolean;
   protocolVersion: "APPLICATION_PHOTO" | "LEGACY_VIDEO";
   status: HutParticipantStatus;
   studyName: string;
@@ -2156,6 +2160,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           },
           phaseCodes: toAdminPhaseCodes(participant),
           photos: await toFieldPhotoSummaries(participant, input.storage),
+          product2GateOpen: isHutProduct2GateOpen(participant),
           questionnaire: questionnaire.data,
           legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
           rotation: {
@@ -5166,6 +5171,7 @@ async function toAdminParticipant(
     origin: participantOrigin(participant),
     phaseCodes: toAdminPhaseCodes(participant),
     phone: participant.phone,
+    product2GateOpen: isHutProduct2GateOpen(participant),
     protocolVersion: participant.protocolVersion ?? "LEGACY_VIDEO",
     questionnaire,
     recruiter: participant.recruiter,
@@ -5677,12 +5683,16 @@ async function sendHutPhotoReminderForParticipant({
   const whatsAppMessage = result.ok ? result.data : "data" in result ? result.data : undefined;
   const whatsappStatus = result.ok ? "ENVIADO" : "ERROR";
   const whatsappError = result.ok ? null : result.message;
+  const invalidOrigin = !result.ok && result.message === HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN;
 
   await prisma.auditLog.create?.({
     data: {
       action: "PARTICIPANT_MODIFIED",
       actorUserId,
       afterJson: {
+        deploymentEnvironment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? null,
+        deploymentUrl: process.env.VERCEL_URL ?? null,
+        folio: participant.folio,
         hutUrlAvailable: true,
         hutUrl,
         hutUrlDomain,
@@ -5702,7 +5712,9 @@ async function sendHutPhotoReminderForParticipant({
       createdAt: now,
       entityId: participant.id,
       entityType: "HutParticipant",
-      reason: source === "CRON" ? "HUT_PHOTO_REMINDER_CRON" : "HUT_PHOTO_REMINDER_MANUAL"
+      reason: invalidOrigin
+        ? HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN
+        : source === "CRON" ? "HUT_PHOTO_REMINDER_CRON" : "HUT_PHOTO_REMINDER_MANUAL"
     }
   });
 
@@ -5766,6 +5778,7 @@ function nextHutPhotoReminderCandidateSlot(participant: HutParticipantRecord, no
     legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
     now,
     photoCaptureBlocked: participantOrigin(participant) === "HUT_DIRECTO" && hutFilterStatusFromParticipant(participant) !== "COMPLETED",
+    product2GateOpen: isHutProduct2GateOpen(participant),
     rotation: {
       eva1: participant.firstFragranceLeftArm,
       eva2: participant.secondFragranceRightArm
@@ -5859,6 +5872,18 @@ function hasHutDeliveryEvidence(participant: HutParticipantRecord): boolean {
     participant.applicationPhotoEntries?.some((entry) => entry.useDayNumber === 0) ||
     participant.applicationEvidence?.some((evidence) => evidence.phase === "COLOCACION")
   );
+}
+
+function isHutProduct2GateOpen(participant: HutParticipantRecord): boolean {
+  const regreso1Code = participant.phaseCodes?.find((code) => code.phase === "REGRESO_1") ?? null;
+  const secondProductReleased = regreso1Code ? ["USED", "VALIDATED"].includes(regreso1Code.status) : false;
+  const firstEvaluationCompleted = Boolean(
+    participant.questionnaireAttempt?.visits?.some(
+      (visit) => visit.section === "EVALUACION_PRIMER_PERFUME" && visit.status === "COMPLETED"
+    )
+  );
+
+  return secondProductReleased && firstEvaluationCompleted;
 }
 
 function isWithinHutPhotoReminderOperationalWindow(now: Date): boolean {
@@ -5978,6 +6003,7 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
       origin: participantOrigin(participant),
       phaseGate,
       participantId: participant.id,
+      product2GateOpen: false,
       protocolVersion: "LEGACY_VIDEO",
       rotation: hutParticipantRotation(participant),
       status: participant.status,
@@ -6014,6 +6040,7 @@ function toPortalView(participant: HutParticipantRecord): HutPortalView {
     origin: participantOrigin(participant),
     phaseGate,
     participantId: participant.id,
+    product2GateOpen: false,
     protocolVersion: "LEGACY_VIDEO",
     rotation: hutParticipantRotation(participant),
     status: participant.status,
@@ -6029,6 +6056,7 @@ function toApplicationPhotoPortalView(participant: HutParticipantRecord): HutPor
   const entries = applicationPhotoEntrySummary(participant);
   const filterBlocksPhotoCapture = participantOrigin(participant) === "HUT_DIRECTO" && hutFilterStatusFromParticipant(participant) !== "COMPLETED";
   const legacyMirroredPlacementPhoto = hasLegacyMirroredPlacementPhoto(participant);
+  const product2GateOpen = isHutProduct2GateOpen(participant);
   const nextAvailableSlot = filterBlocksPhotoCapture ? null : expectedApplicationPhotoSlot(participant, now);
   const nextPendingSlot = filterBlocksPhotoCapture ? null : nextPendingApplicationPhotoSlot(participant, now);
   const availableApplicationPhoto = nextAvailableSlot
@@ -6039,6 +6067,7 @@ function toApplicationPhotoPortalView(participant: HutParticipantRecord): HutPor
       }
     : null;
   const nextAvailableAt = nextPendingSlot?.status === "PROGRAMMED" ? nextPendingSlot.availableAt : null;
+  const waitingProduct2Gate = Boolean(nextPendingSlot && !availableApplicationPhoto && !nextAvailableAt);
 
   return {
     applicationEvidence: evidence,
@@ -6049,10 +6078,12 @@ function toApplicationPhotoPortalView(participant: HutParticipantRecord): HutPor
       nextAvailableAt,
       reason: filterBlocksPhotoCapture
         ? "FILTER_PENDING"
-        : availableApplicationPhoto
+          : availableApplicationPhoto
           ? "AVAILABLE_FOR_APPLICATION_PHOTO"
           : nextAvailableAt
             ? "WAIT_UNTIL_NEXT_DAY"
+            : waitingProduct2Gate
+              ? "WAITING_PRODUCT_2_GATE"
             : "COMPLETE"
     },
     block1: null,
@@ -6064,6 +6095,7 @@ function toApplicationPhotoPortalView(participant: HutParticipantRecord): HutPor
     origin: participantOrigin(participant),
     phaseGate: null,
     participantId: participant.id,
+    product2GateOpen,
     protocolVersion: "APPLICATION_PHOTO",
     rotation: hutParticipantRotation(participant),
     status: participant.status,
@@ -6203,6 +6235,7 @@ function expectedApplicationPhotoSlot(participant: HutParticipantRecord, now = n
     dailyEntries: applicationPhotoEntrySummary(participant),
     legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
     now,
+    product2GateOpen: isHutProduct2GateOpen(participant),
     rotation: {
       eva1: participant.firstFragranceLeftArm,
       eva2: participant.secondFragranceRightArm
@@ -6217,6 +6250,7 @@ function nextPendingApplicationPhotoSlot(participant: HutParticipantRecord, now 
     dailyEntries: applicationPhotoEntrySummary(participant),
     legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
     now,
+    product2GateOpen: isHutProduct2GateOpen(participant),
     rotation: {
       eva1: participant.firstFragranceLeftArm,
       eva2: participant.secondFragranceRightArm
@@ -6237,6 +6271,7 @@ function resolveRequestedApplicationPhotoSlot(
     dailyEntries: applicationPhotoEntrySummary(participant),
     legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
     now,
+    product2GateOpen: isHutProduct2GateOpen(participant),
     rotation: {
       eva1: participant.firstFragranceLeftArm,
       eva2: participant.secondFragranceRightArm

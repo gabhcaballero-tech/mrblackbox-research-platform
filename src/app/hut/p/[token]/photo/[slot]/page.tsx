@@ -32,6 +32,7 @@ export default async function HutPhotoSlotPage({ params }: HutPhotoSlotPageProps
     availableSlotId: view.availableApplicationPhoto?.slotId ?? null,
     dailyEntries: view.applicationPhotoEntries,
     legacyMirroredPlacementPhoto: view.legacyMirroredPlacementPhoto,
+    product2GateOpen: view.product2GateOpen,
     rotation: {
       eva1: view.rotation.firstFragranceLeftArm,
       eva2: view.rotation.secondFragranceRightArm

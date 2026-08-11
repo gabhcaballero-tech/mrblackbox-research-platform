@@ -63,6 +63,7 @@ export type HutPhotoTimelineInput = {
   nextAvailableAt?: Date | null;
   photoCaptureBlocked?: boolean;
   now?: Date;
+  product2GateOpen?: boolean;
   rotation: {
     eva1: string | null;
     eva2: string | null;
@@ -243,6 +244,7 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
     : explicitAvailableSlotId ?? firstMissingCapturable?.id ?? null;
   let blockedByPrevious = false;
   const now = input.now ?? new Date();
+  const product2GateOpen = input.product2GateOpen ?? false;
 
   return preliminarySlots.map((slot) => {
     const isCurrentPendingSlot = Boolean(slot.participantTask && !slot.evidence && slot.id === availableSlotId);
@@ -266,6 +268,9 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
     if (input.photoCaptureBlocked) {
       return { ...slotWithAvailability, status: "BLOCKED" };
     }
+    if (isProduct2PhotoSlot(slotWithAvailability.id) && !product2GateOpen) {
+      return { ...slotWithAvailability, availableAt: null, availableDate: null, status: "BLOCKED" };
+    }
     if (input.testMode) {
       return { ...slotWithAvailability, status: "AVAILABLE" };
     }
@@ -283,6 +288,10 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
     blockedByPrevious = true;
     return { ...slotWithAvailability, status: "BLOCKED" };
   });
+}
+
+function isProduct2PhotoSlot(slotId: HutPhotoTimelineSlotId): boolean {
+  return slotId === "PRODUCT_2_DAY_1" || slotId === "PRODUCT_2_DAY_2" || slotId === "PRODUCT_2_DAY_3_MORNING";
 }
 
 export function resolveHutOperationalStatusLabel(status: string): string {

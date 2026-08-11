@@ -482,7 +482,10 @@ async function auditManualSupportSend({
       action: "PARTICIPANT_MODIFIED",
       actorUserId,
       afterJson: {
+        deploymentEnvironment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? null,
+        deploymentUrl: process.env.VERCEL_URL ?? null,
         hutUrlAvailable: Boolean(hutUrl),
+        hutUrlDomain: hutUrl ? new URL(hutUrl).origin : null,
         linkDomain: hutUrl ? new URL(hutUrl).origin : navigoUrl ? new URL(navigoUrl).origin : null,
         linkTypeSent: sentKind,
         navigoUrlAvailable: Boolean(navigoUrl),

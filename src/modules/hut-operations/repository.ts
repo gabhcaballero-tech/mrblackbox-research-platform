@@ -285,6 +285,7 @@ function toDetail(participant: HutParticipantRecord): HutOperationsDetail {
     applicationEvidence: participant.applicationEvidence,
     dailyEntries: participant.applicationPhotoEntries,
     legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
+    product2GateOpen: isHutProduct2GateOpen(participant),
     rotation: {
       eva1: participant.firstFragranceLeftArm,
       eva2: participant.secondFragranceRightArm
@@ -329,6 +330,10 @@ function resolveCurrentPhase(participant: HutParticipantRecord): string {
 
   if (pendingPhase) {
     const timeline = buildHutPhotoTimeline({
+      applicationEvidence: participant.applicationEvidence,
+      dailyEntries: participant.applicationPhotoEntries,
+      legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
+      product2GateOpen: isHutProduct2GateOpen(participant),
       rotation: {
         eva1: participant.firstFragranceLeftArm,
         eva2: participant.secondFragranceRightArm
@@ -365,6 +370,18 @@ function hasLegacyMirroredPlacementPhoto(participant: HutParticipantRecord): boo
       deliveryEntry
     })
   );
+}
+
+function isHutProduct2GateOpen(participant: HutParticipantRecord): boolean {
+  const regreso1Code = participant.phaseCodes.find((code) => code.phase === "REGRESO_1") ?? null;
+  const secondProductReleased = regreso1Code ? ["USED", "VALIDATED"].includes(regreso1Code.status) : false;
+  const firstEvaluationCompleted = Boolean(
+    participant.questionnaireAttempt?.visits.some(
+      (visit) => visit.section === "EVALUACION_PRIMER_PERFUME" && visit.status === "COMPLETED"
+    )
+  );
+
+  return secondProductReleased && firstEvaluationCompleted;
 }
 
 function toPhotos(participant: HutParticipantRecord): HutOperationsPhotoSummary[] {

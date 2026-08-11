@@ -24,6 +24,7 @@ import {
 } from "./service";
 import {
   buildNavigoCodesWhatsAppBody,
+  HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN,
   sendHutCompletionWhatsApp,
   sendHutParticipantLinkWhatsApp,
   sendHutPhotoReminderWhatsApp,
@@ -421,7 +422,7 @@ describe("ONEUI WhatsApp template sending", () => {
     });
     const result = await sendHutParticipantLinkWhatsApp({
       env: whatsappEnv(),
-      hutUrl: "https://example.test/hut/p/hut-token",
+      hutUrl: "https://mrblackbox-research-platform.vercel.app/hut/p/hut-token",
       participantId: "hut-participant-1",
       participantName: "ANA",
       phone: "5512345678",
@@ -436,7 +437,7 @@ describe("ONEUI WhatsApp template sending", () => {
         {
           parameters: [
             { text: "ANA", type: "text" },
-            { text: "https://example.test/hut/p/hut-token", type: "text" }
+            { text: "https://mrblackbox-research-platform.vercel.app/hut/p/hut-token", type: "text" }
           ],
           type: "body"
         }
@@ -459,7 +460,7 @@ describe("ONEUI WhatsApp template sending", () => {
     });
     const result = await sendNavigoHutLinksWhatsApp({
       env: whatsappEnv(),
-      hutUrl: "https://example.test/hut/p/hut-token",
+      hutUrl: "https://mrblackbox-research-platform.vercel.app/hut/p/hut-token",
       navigoUrl: "https://example.test/p/token/activities",
       participantId: "participant-1",
       participantName: "ANA",
@@ -476,7 +477,7 @@ describe("ONEUI WhatsApp template sending", () => {
           parameters: [
             { text: "ANA", type: "text" },
             { text: "https://example.test/p/token/activities", type: "text" },
-            { text: "https://example.test/hut/p/hut-token", type: "text" }
+            { text: "https://mrblackbox-research-platform.vercel.app/hut/p/hut-token", type: "text" }
           ],
           type: "body"
         }
@@ -531,7 +532,7 @@ describe("ONEUI WhatsApp template sending", () => {
     });
     const result = await sendHutPhotoReminderWhatsApp({
       env: whatsappEnv(),
-      hutUrl: "https://example.test/hut/p/hut-token",
+      hutUrl: "https://mrblackbox-research-platform.vercel.app/hut/p/hut-token",
       participantId: "hut-participant-1",
       participantName: "ANA",
       phone: "5512345678",
@@ -546,7 +547,7 @@ describe("ONEUI WhatsApp template sending", () => {
         {
           parameters: [
             { text: "ANA", type: "text" },
-            { text: "https://example.test/hut/p/hut-token", type: "text" }
+            { text: "https://mrblackbox-research-platform.vercel.app/hut/p/hut-token", type: "text" }
           ],
           type: "body"
         }
@@ -559,6 +560,32 @@ describe("ONEUI WhatsApp template sending", () => {
       linkedStudyId: "study-1",
       sourceModule: "HUT"
     });
+  });
+
+  it("bloquea plantillas HUT con dominio preview de Vercel", async () => {
+    const repository = createFakeRepository();
+    const fetcher = viFetch({
+      contacts: [{ wa_id: "5215512345678" }],
+      messages: [{ id: "wamid.hut-photo-reminder-1", message_status: "accepted" }]
+    });
+    const result = await sendHutPhotoReminderWhatsApp({
+      env: whatsappEnv(),
+      hutUrl: "https://mrblackbox-research-platform-2dozm0xm7-oneui.vercel.app/hut/p/hut-token",
+      participantId: "hut-participant-1",
+      participantName: "ANA",
+      phone: "5512345678",
+      repository,
+      sender: (input) => sendOneuiWhatsAppTemplate({ ...input, fetcher }),
+      studyId: "study-1"
+    });
+
+    expect(result).toMatchObject({
+      code: "SKIPPED",
+      message: HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN,
+      ok: false
+    });
+    expect(fetcher.calls).toHaveLength(0);
+    expect(repository.messages).toHaveLength(0);
   });
 
   it("arma payload de cierre HUT sin parametros", async () => {
@@ -765,9 +792,10 @@ describe("ONEUI WhatsApp template sending", () => {
   it("prepara variables de template HUT", async () => {
     const calls: unknown[] = [];
     const result = await sendHutRegistrationWhatsApp({
+      env: whatsappEnv(),
       firstFragranceLeftArm: "Fragancia A",
       folio: "HUT-001",
-      link: "https://example.com/hut/p/token",
+      link: "https://mrblackbox-research-platform.vercel.app/hut/p/token",
       participantId: "hut-1",
       participantName: "ANA",
       phone: "5512345678",
@@ -1104,6 +1132,7 @@ function viFetch(payload: unknown, ok = true, status = 200) {
 function whatsappEnv(): NodeJS.ProcessEnv {
   return {
     ...process.env,
+    NEXT_PUBLIC_APP_URL: "https://mrblackbox-research-platform.vercel.app",
     WHATSAPP_ACCESS_TOKEN: "secret-token",
     WHATSAPP_PHONE_NUMBER_ID: "1230538790140150"
   };

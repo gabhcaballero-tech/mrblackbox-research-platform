@@ -2263,6 +2263,7 @@ describe("HUT module foundation", () => {
     const { prisma } = createFakeHutPrisma();
     const whatsapp = createFakeWhatsAppRepository();
     const repository = createHutRepository(prisma as never, whatsapp);
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://mrblackbox-research-platform.vercel.app");
     const created = await repository.createParticipant({
       protocolVersion: "APPLICATION_PHOTO",
       firstFragranceLeftArm: "Fragancia A",
@@ -2329,6 +2330,78 @@ describe("HUT module foundation", () => {
       slotId: "PRODUCT_1_DAY_1",
       source: "CRON",
       templateName: "hut_photo_reminder",
+      whatsappStatus: "ENVIADO"
+    });
+  });
+
+  it("does not send a product 2 day 1 reminder after product 1 day 3 without Regreso 1 and second product release", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const whatsapp = createFakeWhatsAppRepository();
+    const repository = createHutRepository(prisma as never, whatsapp);
+    stubAcceptedWhatsAppMeta();
+    await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-041" });
+    const participant = prisma.state.participants[0]!;
+    for (const [index, capturedAt] of [
+      "2026-08-09T15:00:00.000Z",
+      "2026-08-09T16:00:00.000Z",
+      "2026-08-10T10:10:00.000Z",
+      "2026-08-11T10:10:00.000Z"
+    ].entries()) {
+      addApplicationPhotoEntry(prisma.state, participant, {
+        capturedAt: new Date(capturedAt),
+        useDayNumber: index
+      });
+    }
+
+    const result = await repository.processPhotoWhatsAppReminders({
+      now: new Date("2026-08-12T21:00:00.000Z"),
+      requestOrigin: "https://example.test",
+      studyId: "study-hut"
+    });
+
+    expect(result.ok ? result.data.sent : -1).toBe(0);
+    expect(result.ok ? result.data.skipped : -1).toBe(1);
+    expect(whatsapp.createOutboundMessage).not.toHaveBeenCalled();
+    expect(prisma.state.auditLogs[0]?.afterJson).toMatchObject({
+      exclusionReason: "SLOT_NOT_AVAILABLE",
+      reminderType: "HUT_PHOTO_REMINDER",
+      whatsappStatus: "OMITIDO"
+    });
+  });
+
+  it("sends a product 2 day 1 reminder when Regreso 1 and second product release are completed", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const whatsapp = createFakeWhatsAppRepository();
+    const repository = createHutRepository(prisma as never, whatsapp);
+    stubAcceptedWhatsAppMeta();
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://mrblackbox-research-platform.vercel.app");
+    await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-REM-PRODUCT-2" });
+    const participant = prisma.state.participants[0]!;
+    for (const [index, capturedAt] of [
+      "2026-08-09T15:00:00.000Z",
+      "2026-08-09T16:00:00.000Z",
+      "2026-08-10T10:10:00.000Z",
+      "2026-08-11T10:10:00.000Z"
+    ].entries()) {
+      addApplicationPhotoEntry(prisma.state, participant, {
+        capturedAt: new Date(capturedAt),
+        useDayNumber: index
+      });
+    }
+    completeProduct1EvaluationAndReleaseProduct2(prisma.state, participant);
+
+    const result = await repository.processPhotoWhatsAppReminders({
+      now: new Date("2026-08-12T21:00:00.000Z"),
+      requestOrigin: "https://example.test",
+      studyId: "study-hut"
+    });
+
+    expect(result.ok ? result.data.sent : -1).toBe(1);
+    expect(whatsapp.createOutboundMessage).toHaveBeenCalledTimes(1);
+    expect(prisma.state.auditLogs[0]?.afterJson).toMatchObject({
+      reminderType: "HUT_PHOTO_REMINDER",
+      slotId: "PRODUCT_2_DAY_1",
+      source: "CRON",
       whatsappStatus: "ENVIADO"
     });
   });
@@ -2802,6 +2875,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const whatsapp = createFakeWhatsAppRepository();
     const repository = createHutRepository(prisma as never, whatsapp);
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://mrblackbox-research-platform.vercel.app");
     await repository.createParticipant({
       protocolVersion: "LEGACY_VIDEO",
       firstFragranceLeftArm: "Fragancia A",
@@ -2857,6 +2931,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const whatsapp = createFakeWhatsAppRepository();
     const repository = createHutRepository(prisma as never, whatsapp);
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://mrblackbox-research-platform.vercel.app");
     await repository.createParticipant({
       protocolVersion: "LEGACY_VIDEO",
       firstFragranceLeftArm: "Fragancia A",
@@ -2959,6 +3034,7 @@ describe("HUT module foundation", () => {
     const { prisma, storage } = createFakeHutPrisma();
     const whatsapp = createFakeWhatsAppRepository();
     const repository = createHutRepository(prisma as never, whatsapp);
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://mrblackbox-research-platform.vercel.app");
     await repository.createRegistrationSlot({
       firstFragranceLeftArm: "Fragancia A",
       folio: "HUT-020",
@@ -4384,6 +4460,51 @@ function addApplicationPhotoEntry(
   };
   state.applicationPhotoEntries.push(entry);
   participant.applicationPhotoEntries.push(entry);
+}
+
+function completeProduct1EvaluationAndReleaseProduct2(
+  state: ReturnType<typeof createFakeHutPrisma>["prisma"]["state"],
+  participant: FakeParticipant
+) {
+  const now = new Date("2026-08-12T20:00:00.000Z");
+  const regreso1Code: FakeHutPhaseCode = {
+    codeHash: "regreso-1-hash",
+    encryptedCode: "regreso-1-encrypted",
+    id: `hut-phase-code-${state.nextId++}`,
+    participantId: participant.id,
+    phase: "REGRESO_1",
+    slot: 2,
+    status: "USED",
+    usedAt: now,
+    validatedAt: now
+  };
+  const attempt: FakeHutQuestionnaireAttempt = participant.questionnaireAttempt ?? {
+    answers: [],
+    completedAt: null,
+    id: `hut-questionnaire-attempt-${state.nextId++}`,
+    participantId: participant.id,
+    startedAt: now,
+    status: "IN_PROGRESS",
+    terminatedAt: null,
+    terminationReason: null,
+    visits: []
+  };
+
+  if (!participant.questionnaireAttempt) {
+    participant.questionnaireAttempt = attempt;
+    state.questionnaireAttempts.push(attempt);
+  }
+
+  attempt.visits.push({
+    attemptId: attempt.id,
+    completedAt: now,
+    id: `hut-visit-progress-${state.nextId++}`,
+    section: "EVALUACION_PRIMER_PERFUME",
+    startedAt: now,
+    status: "COMPLETED"
+  });
+  state.phaseCodes.push(regreso1Code);
+  participant.phaseCodes.push(regreso1Code);
 }
 
 function completeDirectHutFilters(

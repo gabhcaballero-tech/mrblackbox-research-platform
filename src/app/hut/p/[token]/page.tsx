@@ -273,6 +273,7 @@ function buildPortalPhotoTimeline(view: HutPortalView): HutPhotoTimelineSlot[] {
     legacyMirroredPlacementPhoto: view.legacyMirroredPlacementPhoto,
     nextAvailableAt: view.availability.nextAvailableAt,
     photoCaptureBlocked: view.availability.reason === "FILTER_PENDING",
+    product2GateOpen: view.product2GateOpen,
     rotation: {
       eva1: view.rotation.firstFragranceLeftArm,
       eva2: view.rotation.secondFragranceRightArm
