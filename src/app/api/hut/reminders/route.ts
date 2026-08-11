@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createHutRepository } from "@/modules/hut";
-import { resolvePublicLinkOrigin } from "@/shared/utils/request-origin";
+import { DEFAULT_PUBLIC_APP_ORIGIN, resolveConfiguredPublicOrigin } from "@/shared/utils/request-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +28,7 @@ async function processHutRemindersRequest(request: NextRequest) {
     return NextResponse.json({ message: "Cron secret not configured", ok: false }, { status: 500 });
   }
 
-  const requestOrigin = resolvePublicLinkOrigin(request.nextUrl.origin);
+  const requestOrigin = resolveConfiguredPublicOrigin() ?? DEFAULT_PUBLIC_APP_ORIGIN;
   const studyId = request.nextUrl.searchParams.get("studyId") ?? undefined;
   const result = await createHutRepository().processPhotoWhatsAppReminders({
     requestOrigin,

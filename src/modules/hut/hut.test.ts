@@ -2302,7 +2302,7 @@ describe("HUT module foundation", () => {
     });
 
     const result = await repository.processPhotoWhatsAppReminders({
-      now: new Date("2026-08-09T16:34:00.000Z"),
+      now: new Date("2026-08-09T21:34:00.000Z"),
       requestOrigin: "https://mrblackbox-research-platform-lrndg4do1-oneui.vercel.app",
       studyId: "study-hut"
     });
@@ -2322,7 +2322,10 @@ describe("HUT module foundation", () => {
       reason: "HUT_PHOTO_REMINDER_CRON"
     });
     expect(prisma.state.auditLogs[0]?.afterJson).toMatchObject({
+      hutUrlDomain: "https://mrblackbox-research-platform.vercel.app",
       reminderType: "HUT_PHOTO_REMINDER",
+      reminderReason: "PHOTO_SLOT_AVAILABLE",
+      sentAtMexicoCity: "09/08/2026, 15:34 hrs CDMX",
       slotId: "PRODUCT_1_DAY_1",
       source: "CRON",
       templateName: "hut_photo_reminder",
@@ -2338,7 +2341,7 @@ describe("HUT module foundation", () => {
     await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-REM-NOT-STARTED", startDate: null });
 
     const result = await repository.processPhotoWhatsAppReminders({
-      now: new Date("2026-08-09T16:34:00.000Z"),
+      now: new Date("2026-08-09T21:34:00.000Z"),
       requestOrigin: "https://example.test",
       studyId: "study-hut"
     });
@@ -2368,7 +2371,7 @@ describe("HUT module foundation", () => {
     await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-REM-NO-DELIVERY" });
 
     const result = await repository.processPhotoWhatsAppReminders({
-      now: new Date("2026-08-09T16:34:00.000Z"),
+      now: new Date("2026-08-09T21:34:00.000Z"),
       requestOrigin: "https://example.test",
       studyId: "study-hut"
     });
@@ -2400,7 +2403,7 @@ describe("HUT module foundation", () => {
     }
 
     const result = await repository.processPhotoWhatsAppReminders({
-      now: new Date("2026-08-18T16:34:00.000Z"),
+      now: new Date("2026-08-18T21:34:00.000Z"),
       requestOrigin: "https://example.test",
       studyId: "study-hut"
     });
@@ -2558,7 +2561,7 @@ describe("HUT module foundation", () => {
     });
 
     const result = await repository.processPhotoWhatsAppReminders({
-      now: new Date("2026-08-09T16:34:00.000Z"),
+      now: new Date("2026-08-09T21:34:00.000Z"),
       requestOrigin: "https://example.test",
       studyId: "study-hut"
     });
@@ -2579,6 +2582,7 @@ describe("HUT module foundation", () => {
     const whatsapp = createFakeWhatsAppRepository();
     const repository = createHutRepository(prisma as never, whatsapp);
     stubAcceptedWhatsAppMeta();
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://mrblackbox-research-platform.vercel.app");
     await repository.createParticipant({
       firstFragranceLeftArm: "247",
       folio: "HUT-REM-DIRECT",
@@ -2598,7 +2602,7 @@ describe("HUT module foundation", () => {
     });
 
     const result = await repository.processPhotoWhatsAppReminders({
-      now: new Date("2026-08-09T16:34:00.000Z"),
+      now: new Date("2026-08-09T21:34:00.000Z"),
       requestOrigin: "https://example.test",
       studyId: "study-hut"
     });
@@ -2624,7 +2628,7 @@ describe("HUT module foundation", () => {
     }
 
     const result = await repository.processPhotoWhatsAppReminders({
-      now: new Date("2026-08-16T16:00:00.000Z"),
+      now: new Date("2026-08-16T21:00:00.000Z"),
       requestOrigin: "https://example.test",
       studyId: "study-hut"
     });
@@ -2640,10 +2644,11 @@ describe("HUT module foundation", () => {
     });
   });
 
-  it("does not send a HUT photo reminder when the next slot is still programmed for 4 AM Mexico City", async () => {
+  it("does not send a HUT photo reminder at 4 AM and waits for the afternoon window", async () => {
     const { prisma } = createFakeHutPrisma();
     const whatsapp = createFakeWhatsAppRepository();
     const repository = createHutRepository(prisma as never, whatsapp);
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://mrblackbox-research-platform.vercel.app");
     await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-REM-003" });
     const participant = prisma.state.participants[0]!;
     addApplicationPhotoEntry(prisma.state, participant, {
@@ -2666,11 +2671,17 @@ describe("HUT module foundation", () => {
       requestOrigin: "https://example.test",
       studyId: "study-hut"
     });
+    const afternoon = await repository.processPhotoWhatsAppReminders({
+      now: new Date("2026-08-10T21:00:00.000Z"),
+      requestOrigin: "https://example.test",
+      studyId: "study-hut"
+    });
 
     expect(beforeFourAm.ok ? beforeFourAm.data.sent : -1).toBe(0);
-    expect(atFourAm.ok ? atFourAm.data.sent : -1).toBe(1);
+    expect(atFourAm.ok ? atFourAm.data.sent : -1).toBe(0);
+    expect(afternoon.ok ? afternoon.data.sent : -1).toBe(1);
     expect(prisma.state.auditLogs[0]?.afterJson).toMatchObject({
-      exclusionReason: "SLOT_NOT_AVAILABLE",
+      exclusionReason: "OUTSIDE_OPERATIONAL_WINDOW",
       whatsappStatus: "OMITIDO"
     });
     expect(prisma.state.auditLogs.find((log) => (log.afterJson as { whatsappStatus?: string } | undefined)?.whatsappStatus === "ENVIADO")?.afterJson).toMatchObject({
@@ -2683,6 +2694,7 @@ describe("HUT module foundation", () => {
     const whatsapp = createFakeWhatsAppRepository();
     const repository = createHutRepository(prisma as never, whatsapp);
     stubAcceptedWhatsAppMeta();
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://mrblackbox-research-platform.vercel.app");
     await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-REM-004" });
     const participant = prisma.state.participants[0]!;
     addApplicationPhotoEntry(prisma.state, participant, {
@@ -2691,12 +2703,12 @@ describe("HUT module foundation", () => {
     });
 
     const first = await repository.processPhotoWhatsAppReminders({
-      now: new Date("2026-08-09T16:34:00.000Z"),
+      now: new Date("2026-08-09T21:34:00.000Z"),
       requestOrigin: "https://example.test",
       studyId: "study-hut"
     });
     const second = await repository.processPhotoWhatsAppReminders({
-      now: new Date("2026-08-09T18:34:00.000Z"),
+      now: new Date("2026-08-09T23:34:00.000Z"),
       requestOrigin: "https://example.test",
       studyId: "study-hut"
     });
@@ -2716,6 +2728,7 @@ describe("HUT module foundation", () => {
     const whatsapp = createFakeWhatsAppRepository();
     const repository = createHutRepository(prisma as never, whatsapp);
     stubAcceptedWhatsAppMeta();
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://mrblackbox-research-platform.vercel.app");
     await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-REM-005" });
     const participant = prisma.state.participants[0]!;
     addApplicationPhotoEntry(prisma.state, participant, {

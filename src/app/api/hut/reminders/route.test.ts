@@ -70,6 +70,25 @@ describe("HUT photo reminder cron route", () => {
     });
   });
 
+  it("uses the configured production origin even when Vercel cron hits a preview deployment", async () => {
+    process.env.HUT_REMINDER_CRON_SECRET = "hut-secret";
+    process.env.NEXT_PUBLIC_APP_URL = "https://mrblackbox-research-platform.vercel.app";
+
+    const response = await GET(
+      new NextRequest("https://mrblackbox-research-platform-2dozm0xm7-oneui.vercel.app/api/hut/reminders", {
+        headers: {
+          authorization: "Bearer hut-secret"
+        }
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(processRemindersMock).toHaveBeenCalledWith({
+      requestOrigin: "https://mrblackbox-research-platform.vercel.app",
+      studyId: undefined
+    });
+  });
+
   it("also accepts the standard Vercel CRON_SECRET header", async () => {
     process.env.HUT_REMINDER_CRON_SECRET = "hut-secret";
     process.env.CRON_SECRET = "vercel-secret";

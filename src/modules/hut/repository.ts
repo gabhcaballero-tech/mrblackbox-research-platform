@@ -1,5 +1,6 @@
 import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
-import { resolvePublicLinkOrigin } from "@/shared/utils/request-origin";
+import { formatDateTimeMexicoCity, MEXICO_CITY_TIME_ZONE } from "@/shared/utils/date-format";
+import { DEFAULT_PUBLIC_APP_ORIGIN, resolveConfiguredPublicOrigin, resolvePublicLinkOrigin } from "@/shared/utils/request-origin";
 import {
   applyHutMissedDay,
   applyHutVideoSubmission,
@@ -294,6 +295,7 @@ type HutPhotoReminderExclusionReason =
   | "HUT_DISQUALIFIED"
   | "NOT_APPLICATION_PHOTO"
   | "NO_STARTED"
+  | "OUTSIDE_OPERATIONAL_WINDOW"
   | "PHONE_MISSING"
   | "QA_PARTICIPANT"
   | "RECENT_REMINDER"
@@ -3043,6 +3045,22 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       };
 
       for (const participant of participants) {
+        if (!isWithinHutPhotoReminderOperationalWindow(now)) {
+          summary.skipped += 1;
+          await auditSkippedHutPhotoReminder({
+            decision: hutPhotoReminderExcluded(
+              participant,
+              now,
+              ["OUTSIDE_OPERATIONAL_WINDOW"],
+              hutPhotoReminderExclusionMessage("OUTSIDE_OPERATIONAL_WINDOW")
+            ),
+            now,
+            participant,
+            prisma
+          });
+          continue;
+        }
+
         const prepared = await prepareHutPhotoReminder({
           now,
           participant,
@@ -5619,7 +5637,6 @@ async function sendHutPhotoReminderForParticipant({
   now,
   participant,
   prisma,
-  requestOrigin,
   slot,
   source,
   whatsappRepository
@@ -5633,8 +5650,9 @@ async function sendHutPhotoReminderForParticipant({
   source: "CRON" | "MANUAL_ADMIN";
   whatsappRepository?: OneuiWhatsAppRepository;
 }): Promise<HutActionResult<HutPhotoReminderSendResult>> {
-  const hutUrl = participantLink(requestOrigin, participant.token);
+  const hutUrl = hutWhatsAppParticipantLink(participant.token);
   const templateName = process.env.WHATSAPP_HUT_PHOTO_REMINDER_TEMPLATE ?? "hut_photo_reminder";
+  const hutUrlDomain = new URL(hutUrl).origin;
 
   const result = await sendHutPhotoReminderWhatsApp({
     hutUrl,
@@ -5655,9 +5673,13 @@ async function sendHutPhotoReminderForParticipant({
       actorUserId,
       afterJson: {
         hutUrlAvailable: true,
+        hutUrl,
+        hutUrlDomain,
         message: result.ok ? "Recordatorio HUT enviado por WhatsApp." : result.message,
         metaMessageId: whatsAppMessage?.metaMessageId ?? null,
+        reminderReason: "PHOTO_SLOT_AVAILABLE",
         reminderType: "HUT_PHOTO_REMINDER",
+        sentAtMexicoCity: formatDateTimeMexicoCity(now),
         source,
         slotId: slot.id,
         slotTitle: slot.title,
@@ -5713,6 +5735,7 @@ async function auditSkippedHutPhotoReminder({
         slotId: decision.slotId,
         slotTitle: decision.slotTitle,
         templateName,
+        evaluatedAtMexicoCity: formatDateTimeMexicoCity(now),
         whatsappStatus: "OMITIDO"
       }),
       beforeJson: null,
@@ -5794,6 +5817,7 @@ function hutPhotoReminderExclusionMessage(reason: HutPhotoReminderExclusionReaso
     HUT_DISQUALIFIED: "El participante HUT esta descalificado.",
     NOT_APPLICATION_PHOTO: "Este participante no usa el protocolo de fotografia HUT.",
     NO_STARTED: "El protocolo HUT no ha iniciado.",
+    OUTSIDE_OPERATIONAL_WINDOW: "El recordatorio HUT automatico solo se envia de 15:00 a 18:00 hrs CDMX.",
     PHONE_MISSING: "El participante HUT no tiene telefono capturado.",
     QA_PARTICIPANT: "Los participantes QA no envian WhatsApp real.",
     RECENT_REMINDER: "Ya se envio un recordatorio HUT para este slot en las ultimas 24 horas.",
@@ -5823,6 +5847,16 @@ function hasHutDeliveryEvidence(participant: HutParticipantRecord): boolean {
     participant.applicationPhotoEntries?.some((entry) => entry.useDayNumber === 0) ||
     participant.applicationEvidence?.some((evidence) => evidence.phase === "COLOCACION")
   );
+}
+
+function isWithinHutPhotoReminderOperationalWindow(now: Date): boolean {
+  const hour = Number(new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    hourCycle: "h23",
+    timeZone: MEXICO_CITY_TIME_ZONE
+  }).format(now));
+
+  return hour >= 15 && hour < 18;
 }
 
 async function hasRecentHutPhotoReminder(
@@ -7021,6 +7055,11 @@ async function disqualifyParticipant(
 
 function participantLink(requestOrigin: string, token: string) {
   return new URL(`/hut/p/${encodeURIComponent(token)}`, resolvePublicLinkOrigin(requestOrigin)).toString();
+}
+
+function hutWhatsAppParticipantLink(token: string): string {
+  const origin = resolveConfiguredPublicOrigin() ?? DEFAULT_PUBLIC_APP_ORIGIN;
+  return new URL(`/hut/p/${encodeURIComponent(token)}`, origin).toString();
 }
 
 function registrationLink(requestOrigin: string, token: string) {

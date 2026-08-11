@@ -1,4 +1,5 @@
 const LOCAL_ORIGIN = "http://localhost:3000";
+export const DEFAULT_PUBLIC_APP_ORIGIN = "https://mrblackbox-research-platform.vercel.app";
 
 export function resolveRequestOrigin(headers: Headers, env: Partial<NodeJS.ProcessEnv> = process.env): string {
   const forwardedHost = headers.get("x-forwarded-host")?.split(",")[0]?.trim();
@@ -33,7 +34,7 @@ export function resolvePublicLinkOrigin(fallbackOrigin: string, env: Partial<Nod
   return resolveConfiguredPublicOrigin(env) ?? normalizeOrigin(fallbackOrigin) ?? LOCAL_ORIGIN;
 }
 
-function resolveConfiguredPublicOrigin(env: Partial<NodeJS.ProcessEnv>): string | null {
+export function resolveConfiguredPublicOrigin(env: Partial<NodeJS.ProcessEnv> = process.env): string | null {
   return (
     normalizeOrigin(env.NEXT_PUBLIC_APP_URL) ??
     normalizeOrigin(env.APP_URL) ??
