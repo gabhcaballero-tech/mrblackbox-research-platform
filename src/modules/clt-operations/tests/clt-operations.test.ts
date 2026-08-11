@@ -58,26 +58,39 @@ describe("clt operations", () => {
     expect(answersExport.body).toContain("NAV-001\tFrancisco Ruiz\tCOMPLETED\tJesus");
     expect(answersExport.body).toContain("TRI1_POS1\tTRI1_POS2\tTRI1_POS3");
     expect(answersExport.body).toContain("TRI1_SELECTED\tTRI1_SELECTED_POSITION\tTRI1_CORRECT");
-    expect(answersExport.body).toContain("EVA1_PRODUCT\tEVA1_ORDER\tEVA1_ARM\tEVA2_PRODUCT\tEVA2_ORDER\tEVA2_ARM");
+    expect(answersExport.body).toContain("EVA1_PRODUCT\tEVA1_ORDER\tEVA1_ARM\tEVA1_CONFIRMED_PRODUCT\tEVA1_CONFIRMED_ARM\tEVA1_CONFIRMED_ORDER");
+    expect(answersExport.body).toContain("EVA2_PRODUCT\tEVA2_ORDER\tEVA2_ARM\tEVA2_CONFIRMED_PRODUCT\tEVA2_CONFIRMED_ARM\tEVA2_CONFIRMED_ORDER");
     expect(answersExport.body).toContain("P8A_LIMPIA");
     expect(answersExport.body).toContain("P9A_FLORAL");
     expect(answersExport.body).toContain("P8A_ATTRIBUTE_ORDER");
     const [headerLine, firstRowLine, secondRowLine] = answersExport.body.replace(/^\uFEFF/, "").split("\r\n");
     const header = headerLine!.split("\t");
-    expect(header.slice(4, 17)).toEqual([
+    expect(header.slice(4, 29)).toEqual([
       "ROTATION_CODE",
       "ROTATION_PLAN",
       "ROTATION_EVA1",
       "ROTATION_EVA2",
       "EVA_APPLICATION_ORDER",
       "TRI1_DELIVERY_ORDER",
+      "TRI1_CONFIRMED_POS1",
+      "TRI1_CONFIRMED_POS2",
+      "TRI1_CONFIRMED_POS3",
       "TRI2_DELIVERY_ORDER",
+      "TRI2_CONFIRMED_POS1",
+      "TRI2_CONFIRMED_POS2",
+      "TRI2_CONFIRMED_POS3",
       "EVA1_PRODUCT",
       "EVA1_ORDER",
       "EVA1_ARM",
+      "EVA1_CONFIRMED_PRODUCT",
+      "EVA1_CONFIRMED_ARM",
+      "EVA1_CONFIRMED_ORDER",
       "EVA2_PRODUCT",
       "EVA2_ORDER",
-      "EVA2_ARM"
+      "EVA2_ARM",
+      "EVA2_CONFIRMED_PRODUCT",
+      "EVA2_CONFIRMED_ARM",
+      "EVA2_CONFIRMED_ORDER"
     ]);
     expect(header).not.toContain("P8A");
     expect(header).not.toContain("P9A");
@@ -96,13 +109,31 @@ describe("clt operations", () => {
     const secondRow = secondRowLine!.split("\t");
     expect(firstRow[header.indexOf("ROTATION_CODE")]).toBe("ROT-1");
     expect(firstRow[header.indexOf("ROTATION_PLAN")]).toBe("Rotacion 1");
+    expect(firstRow[header.indexOf("EVA1_PRODUCT")]).toBe("247");
+    expect(firstRow[header.indexOf("EVA1_CONFIRMED_PRODUCT")]).toBe("247");
+    expect(firstRow[header.indexOf("EVA1_CONFIRMED_ARM")]).toBe("Brazo izquierdo");
+    expect(firstRow[header.indexOf("EVA1_CONFIRMED_ORDER")]).toBe("1");
+    expect(firstRow[header.indexOf("EVA2_PRODUCT")]).toBe("583");
+    expect(firstRow[header.indexOf("EVA2_CONFIRMED_PRODUCT")]).toBe("583");
+    expect(firstRow[header.indexOf("EVA2_CONFIRMED_ARM")]).toBe("Brazo derecho");
+    expect(firstRow[header.indexOf("EVA2_CONFIRMED_ORDER")]).toBe("2");
     expect(firstRow[header.indexOf("TRI1_DELIVERY_ORDER")]).toBe("247|583|912");
+    expect(firstRow[header.indexOf("TRI1_CONFIRMED_POS1")]).toBe("247");
+    expect(firstRow[header.indexOf("TRI1_CONFIRMED_POS2")]).toBe("583");
+    expect(firstRow[header.indexOf("TRI1_CONFIRMED_POS3")]).toBe("912");
+    expect(firstRow[header.indexOf("TRI2_DELIVERY_ORDER")]).toBe("835|724|583");
+    expect(firstRow[header.indexOf("TRI2_CONFIRMED_POS1")]).toBe("835");
+    expect(firstRow[header.indexOf("TRI2_CONFIRMED_POS2")]).toBe("724");
+    expect(firstRow[header.indexOf("TRI2_CONFIRMED_POS3")]).toBe("583");
     expect(firstRow[header.indexOf("TRI1_POS1")]).toBe("247");
     expect(firstRow[header.indexOf("TRI1_SELECTED")]).toBe("583");
     expect(firstRow[header.indexOf("TRI1_SELECTED_POSITION")]).toBe("PR2");
     expect(firstRow[header.indexOf("TRI1_CORRECT")]).toBe("1");
-    expect(answersExport.body).toContain("247\t1\tBrazo izquierdo\t583\t2\tBrazo derecho");
     expect(secondRow[header.indexOf("EVA1_PRODUCT")]).toBe("");
+    expect(secondRow[header.indexOf("EVA1_CONFIRMED_PRODUCT")]).toBe("");
+    expect(secondRow[header.indexOf("EVA2_CONFIRMED_PRODUCT")]).toBe("");
+    expect(secondRow[header.indexOf("TRI1_CONFIRMED_POS1")]).toBe("");
+    expect(secondRow[header.indexOf("TRI2_CONFIRMED_POS1")]).toBe("");
     expect(secondRow[header.indexOf("TRI1_POS1")]).toBe("");
     expect(secondRow[header.indexOf("TRI1_SELECTED")]).toBe("583");
     expect(secondRow[header.indexOf("TRI1_SELECTED_POSITION")]).toBe("PR2");
@@ -115,17 +146,17 @@ describe("clt operations", () => {
   it("counts F11a as applicable when F11 indicates a difference", () => {
     const progress = resolveCltApplicableProgress(createCompleteCtlAnswers({ f11Value: "1", includeF11A: true }));
 
-    expect(progress.label).toBe("62/62");
-    expect(progress.answeredCount).toBe(62);
-    expect(progress.questionCount).toBe(62);
+    expect(progress.label).toBe("74/74");
+    expect(progress.answeredCount).toBe(74);
+    expect(progress.questionCount).toBe(74);
   });
 
   it("does not count F11a as missing when F11 skips it", () => {
     const progress = resolveCltApplicableProgress(createCompleteCtlAnswers({ f11Value: "2", includeF11A: false }));
 
-    expect(progress.label).toBe("61/61");
-    expect(progress.answeredCount).toBe(61);
-    expect(progress.questionCount).toBe(61);
+    expect(progress.label).toBe("73/73");
+    expect(progress.answeredCount).toBe(73);
+    expect(progress.questionCount).toBe(73);
   });
 });
 
@@ -173,6 +204,9 @@ function createFakePrisma(): Parameters<typeof createCltOperationsRepository>[0]
       answers: [
         { answerValue: "1", questionCode: "F0" },
         { answerValue: "Marca A\tMarca B\nMarca C", questionCode: "F6" },
+        { answerValue: "247", questionCode: "TRI1_CONFIRMED_POS1" },
+        { answerValue: "583", questionCode: "TRI1_CONFIRMED_POS2" },
+        { answerValue: "912", questionCode: "TRI1_CONFIRMED_POS3" },
         {
           answerValue: {
             correct: 1,
@@ -183,6 +217,9 @@ function createFakePrisma(): Parameters<typeof createCltOperationsRepository>[0]
           },
           questionCode: "P1"
         },
+        { answerValue: "835", questionCode: "TRI2_CONFIRMED_POS1" },
+        { answerValue: "724", questionCode: "TRI2_CONFIRMED_POS2" },
+        { answerValue: "583", questionCode: "TRI2_CONFIRMED_POS3" },
         {
           answerValue: {
             correct: 0,
@@ -199,10 +236,16 @@ function createFakePrisma(): Parameters<typeof createCltOperationsRepository>[0]
           answerValue: { armCode: "LEFT", armLabel: "Brazo izquierdo", order: 1, productCode: "247" },
           questionCode: "SYS_EVA1_TRACE"
         },
+        { answerValue: "247", questionCode: "EVA1_CONFIRMED_PRODUCT" },
+        { answerValue: "Brazo izquierdo", questionCode: "EVA1_CONFIRMED_ARM" },
+        { answerValue: "1", questionCode: "EVA1_CONFIRMED_ORDER" },
         {
           answerValue: { armCode: "RIGHT", armLabel: "Brazo derecho", order: 2, productCode: "583" },
           questionCode: "SYS_EVA2_TRACE"
-        }
+        },
+        { answerValue: "583", questionCode: "EVA2_CONFIRMED_PRODUCT" },
+        { answerValue: "Brazo derecho", questionCode: "EVA2_CONFIRMED_ARM" },
+        { answerValue: "2", questionCode: "EVA2_CONFIRMED_ORDER" }
       ],
       claimedAt: new Date("2026-08-08T05:00:00.000Z"),
       completedAt: new Date("2026-08-08T06:00:00.000Z"),

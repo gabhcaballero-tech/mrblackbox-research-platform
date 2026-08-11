@@ -536,11 +536,40 @@ const comparative15MinQuestions: CtlQuestionDefinition[] = [
 
 function makeFragranceQuestions(suffix: "A" | "B", labelSuffix: string): CtlQuestionDefinition[] {
   const letter = suffix.toLowerCase();
+  const evaNumber = suffix === "A" ? 1 : 2;
+  const expectedArm = suffix === "A" ? "Brazo izquierdo" : "Brazo derecho";
+  const expectedProductToken = suffix === "A" ? "FIRST_SAMPLE" : "SECOND_SAMPLE";
   const sampleReference: CtlQuestionReference = suffix === "A"
     ? { label: "Fragancia aplicada anteriormente", source: "FIRST_SAMPLE" }
     : { label: "Segunda fragancia aplicada", source: "SECOND_SAMPLE" };
 
   return [
+    {
+      code: `EVA${evaNumber}_CONFIRMED_PRODUCT`,
+      instructions: [
+        {
+          text: "Confirma contra la caratula de rotacion y registra lo que realmente fue aplicado.",
+          title: "CONFIRMACION DE APLICACION",
+          type: "BEFORE_QUESTION"
+        }
+      ],
+      label: `Confirmacion EVA${evaNumber}. Producto aplicado: {{${expectedProductToken}}}`,
+      references: [sampleReference],
+      required: true,
+      type: "SHORT_TEXT"
+    },
+    {
+      code: `EVA${evaNumber}_CONFIRMED_ARM`,
+      label: `Confirmacion EVA${evaNumber}. Brazo de aplicacion: ${expectedArm}`,
+      required: true,
+      type: "SHORT_TEXT"
+    },
+    {
+      code: `EVA${evaNumber}_CONFIRMED_ORDER`,
+      label: `Confirmacion EVA${evaNumber}. Orden de aplicacion: ${evaNumber}`,
+      required: true,
+      type: "SHORT_TEXT"
+    },
     {
       code: `P5${suffix}`,
       label: suffix === "A"
@@ -836,6 +865,31 @@ export const CTL_DEFINITION: CtlDefinition = {
       ],
       questions: [
         {
+          code: "TRI1_CONFIRMED_POS1",
+          instructions: [
+            {
+              text: "Confirma contra la caratula de rotacion y registra las tiras realmente entregadas.",
+              title: "CONFIRMACION DE ENTREGA",
+              type: "BEFORE_QUESTION"
+            }
+          ],
+          label: "Confirmacion Triangular 1. Tira posicion 1 entregada: {{TRIANGULAR_1_PR1}}",
+          required: true,
+          type: "SHORT_TEXT"
+        },
+        {
+          code: "TRI1_CONFIRMED_POS2",
+          label: "Confirmacion Triangular 1. Tira posicion 2 entregada: {{TRIANGULAR_1_PR2}}",
+          required: true,
+          type: "SHORT_TEXT"
+        },
+        {
+          code: "TRI1_CONFIRMED_POS3",
+          label: "Confirmacion Triangular 1. Tira posicion 3 entregada: {{TRIANGULAR_1_PR3}}",
+          required: true,
+          type: "SHORT_TEXT"
+        },
+        {
           code: "P1",
           label: "P1. Ahora, le pediremos que por favor huela estas tres tiras con fragancia, una de ellas es diferente, por favor, indíquenos: ¿Cuál de ellas es diferente a las otras 2?",
           options: [
@@ -866,6 +920,31 @@ export const CTL_DEFINITION: CtlDefinition = {
         }
       ],
       questions: [
+        {
+          code: "TRI2_CONFIRMED_POS1",
+          instructions: [
+            {
+              text: "Confirma contra la caratula de rotacion y registra las tiras realmente entregadas.",
+              title: "CONFIRMACION DE ENTREGA",
+              type: "BEFORE_QUESTION"
+            }
+          ],
+          label: "Confirmacion Triangular 2. Tira posicion 1 entregada: {{TRIANGULAR_2_PR1}}",
+          required: true,
+          type: "SHORT_TEXT"
+        },
+        {
+          code: "TRI2_CONFIRMED_POS2",
+          label: "Confirmacion Triangular 2. Tira posicion 2 entregada: {{TRIANGULAR_2_PR2}}",
+          required: true,
+          type: "SHORT_TEXT"
+        },
+        {
+          code: "TRI2_CONFIRMED_POS3",
+          label: "Confirmacion Triangular 2. Tira posicion 3 entregada: {{TRIANGULAR_2_PR3}}",
+          required: true,
+          type: "SHORT_TEXT"
+        },
         {
           code: "P3",
           label: "P3. Ahora, le pediremos que por favor huela estas tres tiras con fragancia, una de ellas es diferente, por favor, indíquenos: ¿Cuál de ellas es diferente a las otras 2?",

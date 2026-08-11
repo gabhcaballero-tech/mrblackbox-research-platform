@@ -389,6 +389,65 @@ function AutomaticDetail({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ProductApplicationConfirmationInput({
+  answer,
+  disabled,
+  onConfirm,
+  participant,
+  questionCode
+}: {
+  answer: unknown;
+  disabled: boolean;
+  onConfirm: (value: string) => void;
+  participant: {
+    firstSampleKey?: string | null;
+    secondSampleKey?: string | null;
+    triangularRotation?: CtlTriangularRotationDisplay | null;
+  };
+  questionCode: string;
+}) {
+  const expectedValue = productApplicationConfirmationExpectedValue(questionCode, participant);
+  const confirmedValue = String(answer ?? "").trim();
+  const isConfirmed = Boolean(expectedValue && confirmedValue === expectedValue);
+
+  if (!expectedValue) {
+    return (
+      <input
+        className={textInputClass}
+        disabled={disabled}
+        onChange={(event) => onConfirm(event.target.value)}
+        type="text"
+        value={confirmedValue}
+      />
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+      <p className="text-sm font-semibold text-zinc-700">Valor esperado de rotacion</p>
+      <p className="mt-2 text-2xl font-bold text-zinc-950">{expectedValue}</p>
+      {isConfirmed ? (
+        <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
+          Confirmado por encuestador.
+        </p>
+      ) : null}
+      <button
+        aria-pressed={isConfirmed}
+        className={`mt-4 min-h-14 w-full rounded-xl border px-4 py-3 text-base font-bold transition ${
+          isConfirmed
+            ? "border-emerald-700 bg-emerald-700 text-white"
+            : "border-teal-700 bg-white text-teal-800 hover:bg-teal-50"
+        }`}
+        disabled={disabled}
+        onClick={() => onConfirm(expectedValue)}
+        type="button"
+      >
+        {isConfirmed ? `Confirmado: ${expectedValue}` : `Confirmar ${expectedValue}`}
+      </button>
+    </div>
+  );
+}
+
 function QuestionStep({
   answers,
   answer,
@@ -464,6 +523,18 @@ function renderMobileQuestionInput(
   readOnly: boolean,
   sessionId: string
 ) {
+  if (isProductApplicationConfirmationQuestion(question.code)) {
+    return (
+      <ProductApplicationConfirmationInput
+        answer={answer}
+        disabled={readOnly}
+        onConfirm={(value) => onAnswer(question.code, value)}
+        questionCode={question.code}
+        participant={participant}
+      />
+    );
+  }
+
   if (question.code === "F2") {
     return (
       <AgeRangeInput
@@ -1391,6 +1462,47 @@ function getSelectAnswerValue(answer: unknown): string {
   }
 
   return String(answer ?? "");
+}
+
+function isProductApplicationConfirmationQuestion(questionCode: string): boolean {
+  return questionCode === "TRI1_CONFIRMED_POS1"
+    || questionCode === "TRI1_CONFIRMED_POS2"
+    || questionCode === "TRI1_CONFIRMED_POS3"
+    || questionCode === "TRI2_CONFIRMED_POS1"
+    || questionCode === "TRI2_CONFIRMED_POS2"
+    || questionCode === "TRI2_CONFIRMED_POS3"
+    || questionCode === "EVA1_CONFIRMED_PRODUCT"
+    || questionCode === "EVA1_CONFIRMED_ARM"
+    || questionCode === "EVA1_CONFIRMED_ORDER"
+    || questionCode === "EVA2_CONFIRMED_PRODUCT"
+    || questionCode === "EVA2_CONFIRMED_ARM"
+    || questionCode === "EVA2_CONFIRMED_ORDER";
+}
+
+function productApplicationConfirmationExpectedValue(
+  questionCode: string,
+  participant: {
+    firstSampleKey?: string | null;
+    secondSampleKey?: string | null;
+    triangularRotation?: CtlTriangularRotationDisplay | null;
+  }
+): string {
+  const values: Record<string, string | null | undefined> = {
+    EVA1_CONFIRMED_ARM: "Brazo izquierdo",
+    EVA1_CONFIRMED_ORDER: "1",
+    EVA1_CONFIRMED_PRODUCT: participant.firstSampleKey,
+    EVA2_CONFIRMED_ARM: "Brazo derecho",
+    EVA2_CONFIRMED_ORDER: "2",
+    EVA2_CONFIRMED_PRODUCT: participant.secondSampleKey,
+    TRI1_CONFIRMED_POS1: participant.triangularRotation?.triangular1.pr1,
+    TRI1_CONFIRMED_POS2: participant.triangularRotation?.triangular1.pr2,
+    TRI1_CONFIRMED_POS3: participant.triangularRotation?.triangular1.pr3,
+    TRI2_CONFIRMED_POS1: participant.triangularRotation?.triangular2.pr1,
+    TRI2_CONFIRMED_POS2: participant.triangularRotation?.triangular2.pr2,
+    TRI2_CONFIRMED_POS3: participant.triangularRotation?.triangular2.pr3
+  };
+
+  return String(values[questionCode] ?? "").trim();
 }
 
 function isTriangularQuestionCode(questionCode: string): boolean {

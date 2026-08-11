@@ -373,6 +373,30 @@ describe("CtlMobileCapture", () => {
     expect((saveQuestionMock.mock.calls[0]?.[3] as FormData).get("P1")).toBe("PR2");
   });
 
+  it("saves triangular strip delivery confirmation from the assigned rotation", async () => {
+    renderMobileCapture({ definition: triangularConfirmationDefinition });
+
+    expect(screen.getByText("247")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar 247" }));
+    fireEvent.click(screen.getByRole("button", { name: "Revisar respuestas" }));
+
+    await waitFor(() => expect(saveQuestionMock).toHaveBeenCalledTimes(1));
+    expect(saveQuestionMock.mock.calls[0]?.[2]).toBe("TRI1_CONFIRMED_POS1");
+    expect((saveQuestionMock.mock.calls[0]?.[3] as FormData).get("TRI1_CONFIRMED_POS1")).toBe("247");
+  });
+
+  it("saves product application confirmation from the assigned rotation", async () => {
+    renderMobileCapture({ definition: productConfirmationDefinition });
+
+    expect(screen.getByText("247")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar 247" }));
+    fireEvent.click(screen.getByRole("button", { name: "Revisar respuestas" }));
+
+    await waitFor(() => expect(saveQuestionMock).toHaveBeenCalledTimes(1));
+    expect(saveQuestionMock.mock.calls[0]?.[2]).toBe("EVA1_CONFIRMED_PRODUCT");
+    expect((saveQuestionMock.mock.calls[0]?.[3] as FormData).get("EVA1_CONFIRMED_PRODUCT")).toBe("247");
+  });
+
   it("shows triangular section instructions only on the first question of each section", async () => {
     renderMobileCapture({ definition: triangularInstructionDefinition });
 
@@ -997,6 +1021,42 @@ const triangularDefinition: CtlDefinition = {
         }
       ],
       title: "Triangular"
+    }
+  ],
+  version: 2
+};
+
+const triangularConfirmationDefinition: CtlDefinition = {
+  sections: [
+    {
+      id: "TRIANGULAR_1",
+      questions: [
+        {
+          code: "TRI1_CONFIRMED_POS1",
+          label: "Confirmacion tira {{TRIANGULAR_1_PR1}}",
+          required: true,
+          type: "SHORT_TEXT"
+        }
+      ],
+      title: "Triangular 1"
+    }
+  ],
+  version: 2
+};
+
+const productConfirmationDefinition: CtlDefinition = {
+  sections: [
+    {
+      id: "FRAGRANCIA_1",
+      questions: [
+        {
+          code: "EVA1_CONFIRMED_PRODUCT",
+          label: "Confirmacion producto {{FIRST_SAMPLE}}",
+          required: true,
+          type: "SHORT_TEXT"
+        }
+      ],
+      title: "Evaluacion primera fragancia"
     }
   ],
   version: 2

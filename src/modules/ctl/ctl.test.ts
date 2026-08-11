@@ -41,7 +41,7 @@ describe("ctl module", () => {
       "COMPARATIVA_15_MIN",
       "DEMOGRAFICOS"
     ]);
-    expect(questions).toHaveLength(62);
+    expect(questions).toHaveLength(74);
     expect(definition.sections.every((section) => Array.isArray(section.questions))).toBe(true);
     expect(questions.map((question) => question.code)).toEqual(expect.arrayContaining([
       "F0",
@@ -49,9 +49,21 @@ describe("ctl module", () => {
       "F11",
       "F11A",
       "F14",
+      "TRI1_CONFIRMED_POS1",
+      "TRI1_CONFIRMED_POS2",
+      "TRI1_CONFIRMED_POS3",
       "P1",
+      "TRI2_CONFIRMED_POS1",
+      "TRI2_CONFIRMED_POS2",
+      "TRI2_CONFIRMED_POS3",
       "P3",
+      "EVA1_CONFIRMED_PRODUCT",
+      "EVA1_CONFIRMED_ARM",
+      "EVA1_CONFIRMED_ORDER",
       "P5A",
+      "EVA2_CONFIRMED_PRODUCT",
+      "EVA2_CONFIRMED_ARM",
+      "EVA2_CONFIRMED_ORDER",
       "P5B",
       "P8A",
       "P8B",
@@ -77,8 +89,20 @@ describe("ctl module", () => {
     expect(questions.findIndex((question) => question.code === "DG_NOMBRE")).toBeLessThan(
       questions.findIndex((question) => question.code === "F0")
     );
+    expect(questions.findIndex((question) => question.code === "TRI1_CONFIRMED_POS1")).toBeLessThan(
+      questions.findIndex((question) => question.code === "P1")
+    );
+    expect(questions.findIndex((question) => question.code === "TRI2_CONFIRMED_POS1")).toBeLessThan(
+      questions.findIndex((question) => question.code === "P3")
+    );
     expect(questions.findIndex((question) => question.code === "P14")).toBeGreaterThan(
       questions.findIndex((question) => question.code === "P13B")
+    );
+    expect(questions.findIndex((question) => question.code === "EVA1_CONFIRMED_PRODUCT")).toBeLessThan(
+      questions.findIndex((question) => question.code === "P5A")
+    );
+    expect(questions.findIndex((question) => question.code === "EVA2_CONFIRMED_PRODUCT")).toBeLessThan(
+      questions.findIndex((question) => question.code === "P5B")
     );
     expect(questions.findIndex((question) => question.code === "P20")).toBeLessThan(
       questions.findIndex((question) => question.code === "D1_ESCOLARIDAD_JEFE_HOGAR")
@@ -553,6 +577,62 @@ describe("ctl module", () => {
         answerValue: 7,
         questionCode: "P5A_GUSTO"
       }
+    ]);
+  });
+
+  it("parses manual product application confirmation answers", () => {
+    const parsed = parseCtlAnswers({
+      EVA1_CONFIRMED_ARM: "Brazo izquierdo",
+      EVA1_CONFIRMED_ORDER: "1",
+      EVA1_CONFIRMED_PRODUCT: "247"
+    }, {
+      sections: [
+        {
+          id: "CONFIRMACION",
+          questions: [
+            { code: "EVA1_CONFIRMED_PRODUCT", label: "Producto aplicado", required: true, type: "SHORT_TEXT" },
+            { code: "EVA1_CONFIRMED_ARM", label: "Brazo", required: true, type: "SHORT_TEXT" },
+            { code: "EVA1_CONFIRMED_ORDER", label: "Orden", required: true, type: "SHORT_TEXT" }
+          ],
+          title: "Confirmacion"
+        }
+      ],
+      version: 2
+    });
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.ok ? parsed.answers : []).toEqual([
+      { answerValue: "247", questionCode: "EVA1_CONFIRMED_PRODUCT" },
+      { answerValue: "BRAZO IZQUIERDO", questionCode: "EVA1_CONFIRMED_ARM" },
+      { answerValue: "1", questionCode: "EVA1_CONFIRMED_ORDER" }
+    ]);
+  });
+
+  it("parses manual triangular strip delivery confirmation answers", () => {
+    const parsed = parseCtlAnswers({
+      TRI1_CONFIRMED_POS1: "247",
+      TRI1_CONFIRMED_POS2: "583",
+      TRI1_CONFIRMED_POS3: "912"
+    }, {
+      sections: [
+        {
+          id: "TRIANGULAR_CONFIRMACION",
+          questions: [
+            { code: "TRI1_CONFIRMED_POS1", label: "Tira 1", required: true, type: "SHORT_TEXT" },
+            { code: "TRI1_CONFIRMED_POS2", label: "Tira 2", required: true, type: "SHORT_TEXT" },
+            { code: "TRI1_CONFIRMED_POS3", label: "Tira 3", required: true, type: "SHORT_TEXT" }
+          ],
+          title: "Confirmacion triangular"
+        }
+      ],
+      version: 2
+    });
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.ok ? parsed.answers : []).toEqual([
+      { answerValue: "247", questionCode: "TRI1_CONFIRMED_POS1" },
+      { answerValue: "583", questionCode: "TRI1_CONFIRMED_POS2" },
+      { answerValue: "912", questionCode: "TRI1_CONFIRMED_POS3" }
     ]);
   });
 
@@ -1533,11 +1613,23 @@ function createValidCtlAnswerInput(): CtlAnswerInput {
     F12: "2",
     F13: "1",
     F14: "2",
+    TRI1_CONFIRMED_POS1: "247",
+    TRI1_CONFIRMED_POS2: "583",
+    TRI1_CONFIRMED_POS3: "912",
     P1: "PR1",
     P2: "1",
+    TRI2_CONFIRMED_POS1: "835",
+    TRI2_CONFIRMED_POS2: "724",
+    TRI2_CONFIRMED_POS3: "583",
     P3: "PR1",
     P4: "1",
+    EVA1_CONFIRMED_PRODUCT: "247",
+    EVA1_CONFIRMED_ARM: "Brazo izquierdo",
+    EVA1_CONFIRMED_ORDER: "1",
     P5A: "4",
+    EVA2_CONFIRMED_PRODUCT: "583",
+    EVA2_CONFIRMED_ARM: "Brazo derecho",
+    EVA2_CONFIRMED_ORDER: "2",
     P5B: "5",
     P6A: "3",
     P6B: "3",

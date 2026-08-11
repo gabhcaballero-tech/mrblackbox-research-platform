@@ -271,8 +271,32 @@ function buildCltOpeningAuditColumns(): CltAnswerExportColumn[] {
       read: ({ rawAnswerByCode }) => readTriangularDeliveryOrder(rawAnswerByCode.get("P1"))
     },
     {
+      header: "TRI1_CONFIRMED_POS1",
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("TRI1_CONFIRMED_POS1"))
+    },
+    {
+      header: "TRI1_CONFIRMED_POS2",
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("TRI1_CONFIRMED_POS2"))
+    },
+    {
+      header: "TRI1_CONFIRMED_POS3",
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("TRI1_CONFIRMED_POS3"))
+    },
+    {
       header: "TRI2_DELIVERY_ORDER",
       read: ({ rawAnswerByCode }) => readTriangularDeliveryOrder(rawAnswerByCode.get("P3"))
+    },
+    {
+      header: "TRI2_CONFIRMED_POS1",
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("TRI2_CONFIRMED_POS1"))
+    },
+    {
+      header: "TRI2_CONFIRMED_POS2",
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("TRI2_CONFIRMED_POS2"))
+    },
+    {
+      header: "TRI2_CONFIRMED_POS3",
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("TRI2_CONFIRMED_POS3"))
     },
     ...buildCltProductTraceabilityColumns()
   ];
@@ -380,6 +404,18 @@ function buildCltProductTraceabilityColumns(): CltAnswerExportColumn[] {
       read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get("SYS_EVA1_TRACE"), "armLabel")
     },
     {
+      header: "EVA1_CONFIRMED_PRODUCT",
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("EVA1_CONFIRMED_PRODUCT"))
+    },
+    {
+      header: "EVA1_CONFIRMED_ARM",
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("EVA1_CONFIRMED_ARM"))
+    },
+    {
+      header: "EVA1_CONFIRMED_ORDER",
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("EVA1_CONFIRMED_ORDER"))
+    },
+    {
       header: "EVA2_PRODUCT",
       read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get("SYS_EVA2_TRACE"), "productCode")
     },
@@ -390,6 +426,18 @@ function buildCltProductTraceabilityColumns(): CltAnswerExportColumn[] {
     {
       header: "EVA2_ARM",
       read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get("SYS_EVA2_TRACE"), "armLabel")
+    },
+    {
+      header: "EVA2_CONFIRMED_PRODUCT",
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("EVA2_CONFIRMED_PRODUCT"))
+    },
+    {
+      header: "EVA2_CONFIRMED_ARM",
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("EVA2_CONFIRMED_ARM"))
+    },
+    {
+      header: "EVA2_CONFIRMED_ORDER",
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("EVA2_CONFIRMED_ORDER"))
     }
   ];
 }
