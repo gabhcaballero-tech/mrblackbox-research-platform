@@ -271,6 +271,18 @@ function buildCltOpeningAuditColumns(): CltAnswerExportColumn[] {
       read: ({ rawAnswerByCode }) => readTriangularDeliveryOrder(rawAnswerByCode.get("P1"))
     },
     {
+      header: "TRI1_SYSTEM_POS1",
+      read: ({ detail }) => detail.triangularRotation.triangular1?.pr1 ?? ""
+    },
+    {
+      header: "TRI1_SYSTEM_POS2",
+      read: ({ detail }) => detail.triangularRotation.triangular1?.pr2 ?? ""
+    },
+    {
+      header: "TRI1_SYSTEM_POS3",
+      read: ({ detail }) => detail.triangularRotation.triangular1?.pr3 ?? ""
+    },
+    {
       header: "TRI1_CONFIRMED_POS1",
       read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("TRI1_CONFIRMED_POS1"))
     },
@@ -285,6 +297,18 @@ function buildCltOpeningAuditColumns(): CltAnswerExportColumn[] {
     {
       header: "TRI2_DELIVERY_ORDER",
       read: ({ rawAnswerByCode }) => readTriangularDeliveryOrder(rawAnswerByCode.get("P3"))
+    },
+    {
+      header: "TRI2_SYSTEM_POS1",
+      read: ({ detail }) => detail.triangularRotation.triangular2?.pr1 ?? ""
+    },
+    {
+      header: "TRI2_SYSTEM_POS2",
+      read: ({ detail }) => detail.triangularRotation.triangular2?.pr2 ?? ""
+    },
+    {
+      header: "TRI2_SYSTEM_POS3",
+      read: ({ detail }) => detail.triangularRotation.triangular2?.pr3 ?? ""
     },
     {
       header: "TRI2_CONFIRMED_POS1",
@@ -310,18 +334,6 @@ function columnsForQuestion(question: ReturnType<typeof getCtlQuestions>[number]
   if (question.code === "P1") {
     return [
       {
-        header: "TRI1_POS1",
-        read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P1"), "PR1")
-      },
-      {
-        header: "TRI1_POS2",
-        read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P1"), "PR2")
-      },
-      {
-        header: "TRI1_POS3",
-        read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P1"), "PR3")
-      },
-      {
         header: "TRI1_SELECTED",
         read: ({ rawAnswerByCode }) => readTriangularSelectedKey(rawAnswerByCode.get("P1"))
       },
@@ -338,18 +350,6 @@ function columnsForQuestion(question: ReturnType<typeof getCtlQuestions>[number]
 
   if (question.code === "P3") {
     return [
-      {
-        header: "TRI2_POS1",
-        read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P3"), "PR1")
-      },
-      {
-        header: "TRI2_POS2",
-        read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P3"), "PR2")
-      },
-      {
-        header: "TRI2_POS3",
-        read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P3"), "PR3")
-      },
       {
         header: "TRI2_SELECTED",
         read: ({ rawAnswerByCode }) => readTriangularSelectedKey(rawAnswerByCode.get("P3"))
@@ -467,14 +467,6 @@ function readTriangularSelectedKey(value: unknown): string {
   }
 
   return "";
-}
-
-function readTriangularPosition(value: unknown, position: "PR1" | "PR2" | "PR3"): string {
-  if (!isRecord(value) || !isRecord(value.positions)) {
-    return "";
-  }
-
-  return normalizeExportValue(value.positions[position]);
 }
 
 function readTriangularDeliveryOrder(value: unknown): string {
