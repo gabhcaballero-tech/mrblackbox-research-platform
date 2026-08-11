@@ -110,7 +110,12 @@ describe("clt operations", () => {
     expect(header.indexOf("P13A")).toBeLessThan(header.indexOf("EVA2_SYSTEM_PRODUCT"));
     expect(header.indexOf("EVA2_CONFIRMED_ORDER")).toBeLessThan(header.indexOf("P5B"));
     expect(header.indexOf("P13B")).toBeLessThan(header.indexOf("P14"));
+    expect(header.indexOf("P13B")).toBeLessThan(header.indexOf("P14_FIRST_PRODUCT"));
+    expect(header.indexOf("P14_FIRST_PRODUCT")).toBeLessThan(header.indexOf("P14_SECOND_PRODUCT"));
+    expect(header.indexOf("P14_SECOND_PRODUCT")).toBeLessThan(header.indexOf("P14"));
     expect(header.indexOf("P20")).toBeLessThan(header.indexOf("D1_ESCOLARIDAD_JEFE_HOGAR"));
+    expect(header.indexOf("--- NAVIGO ---")).toBeGreaterThan(header.indexOf("D_NSE_CLASIFICACION"));
+    expect(header.indexOf("--- NAVIGO ---")).toBeLessThan(header.indexOf("NAVIGO_T3_HORAS_STATUS"));
     expect(header.indexOf("P8A_ATTRIBUTE_ORDER")).toBeLessThan(header.indexOf("P8A_LIMPIA"));
     expect(header.indexOf("P9A_ATTRIBUTE_ORDER")).toBeLessThan(header.indexOf("P9A_FLORAL"));
     const firstRow = firstRowLine!.split("\t");
@@ -130,6 +135,8 @@ describe("clt operations", () => {
     expect(firstRow[header.indexOf("EVA2_CONFIRMED_PRODUCT")]).toBe("583");
     expect(firstRow[header.indexOf("EVA2_CONFIRMED_ARM")]).toBe("Brazo derecho");
     expect(firstRow[header.indexOf("EVA2_CONFIRMED_ORDER")]).toBe("2");
+    expect(firstRow[header.indexOf("P14_FIRST_PRODUCT")]).toBe("247");
+    expect(firstRow[header.indexOf("P14_SECOND_PRODUCT")]).toBe("583");
     expect(firstRow[header.indexOf("TRI1_DELIVERY_ORDER")]).toBe("247|583|912");
     expect(firstRow[header.indexOf("TRI1_SYSTEM_POS1")]).toBe("247");
     expect(firstRow[header.indexOf("TRI1_SYSTEM_POS2")]).toBe("583");
@@ -147,9 +154,15 @@ describe("clt operations", () => {
     expect(firstRow[header.indexOf("TRI1_SELECTED_KEY")]).toBe("583");
     expect(firstRow[header.indexOf("TRI1_SELECTED_POSITION")]).toBe("PR2");
     expect(firstRow[header.indexOf("TRI1_CORRECT")]).toBe("1");
+    expect(firstRow[header.indexOf("NAVIGO_T3_HORAS_STATUS")]).toBe("PENDING");
+    expect(firstRow[header.indexOf("NAVIGO_T3_HORAS_AP1_PREFERENCIA_GENERAL")]).toBe("PRIMERA_IZQUIERDA");
+    expect(firstRow[header.indexOf("NAVIGO_T3_HORAS_AP3_INTENSIDAD_PRIMERA")]).toBe("6");
+    expect(firstRow[header.indexOf("NAVIGO_T4_5_HORAS_AP2_PREFERENCIA_INTENSIDAD")]).toBe("SEGUNDA");
     expect(secondRow[header.indexOf("EVA1_SYSTEM_PRODUCT")]).toBe("");
     expect(secondRow[header.indexOf("EVA1_CONFIRMED_PRODUCT")]).toBe("");
     expect(secondRow[header.indexOf("EVA2_CONFIRMED_PRODUCT")]).toBe("");
+    expect(secondRow[header.indexOf("P14_FIRST_PRODUCT")]).toBe("247");
+    expect(secondRow[header.indexOf("P14_SECOND_PRODUCT")]).toBe("583");
     expect(secondRow[header.indexOf("TRI1_CONFIRMED_POS1")]).toBe("");
     expect(secondRow[header.indexOf("TRI2_CONFIRMED_POS1")]).toBe("");
     expect(secondRow[header.indexOf("TRI1_SYSTEM_POS1")]).toBe("247");
@@ -264,7 +277,8 @@ function createFakePrisma(): Parameters<typeof createCltOperationsRepository>[0]
         },
         { answerValue: "583", questionCode: "EVA2_CONFIRMED_PRODUCT" },
         { answerValue: "Brazo derecho", questionCode: "EVA2_CONFIRMED_ARM" },
-        { answerValue: "2", questionCode: "EVA2_CONFIRMED_ORDER" }
+        { answerValue: "2", questionCode: "EVA2_CONFIRMED_ORDER" },
+        { answerValue: "1", questionCode: "P14" }
       ],
       claimedAt: new Date("2026-08-08T05:00:00.000Z"),
       completedAt: new Date("2026-08-08T06:00:00.000Z"),
@@ -323,6 +337,10 @@ function createFakePrisma(): Parameters<typeof createCltOperationsRepository>[0]
                 status: "COMPLETED"
               }
             ],
+            responses: [
+              { answerJson: { value: "PRIMERA_IZQUIERDA" }, questionId: "AP1_PREFERENCIA_GENERAL" },
+              { answerJson: { value: 6 }, questionId: "AP3_INTENSIDAD_PRIMERA" }
+            ],
             scheduledAt: new Date("2026-08-08T09:00:00.000Z"),
             status: "PENDING"
           },
@@ -337,6 +355,9 @@ function createFakePrisma(): Parameters<typeof createCltOperationsRepository>[0]
             id: "activity-2",
             participantActivityEvidence: [],
             reminders: [],
+            responses: [
+              { answerJson: { value: "SEGUNDA" }, questionId: "AP2_PREFERENCIA_INTENSIDAD" }
+            ],
             scheduledAt: new Date("2026-08-08T10:30:00.000Z"),
             status: "PENDING"
           }

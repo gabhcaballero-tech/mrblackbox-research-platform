@@ -497,6 +497,7 @@ function QuestionStep({
             references={question.references}
           />
         ) : null}
+        {question.code === "P14" ? <P14EvaluationOrder answers={answers} participant={participant} /> : null}
         <h3 className="mt-2 text-lg font-bold leading-7 text-zinc-950">
           {displayLabel}
           {question.required ? <span className="text-rose-700"> *</span> : null}
@@ -910,6 +911,26 @@ function ReferenceList({
           )}
         </p>
       ))}
+    </div>
+  );
+}
+
+function P14EvaluationOrder({
+  answers,
+  participant
+}: {
+  answers: Record<string, unknown>;
+  participant: { firstSampleKey?: string | null; secondSampleKey?: string | null };
+}) {
+  return (
+    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+      <p className="font-bold">Orden de evaluación</p>
+      <p className="mt-1">
+        <span className="font-semibold">Primero:</span> {resolveP14EvaluationProduct(1, answers, participant) || "Pendiente"}
+      </p>
+      <p>
+        <span className="font-semibold">Segundo:</span> {resolveP14EvaluationProduct(2, answers, participant) || "Pendiente"}
+      </p>
     </div>
   );
 }
@@ -1350,6 +1371,24 @@ function resolveReferenceValue(
   if (source === "TRIANGULAR_2_PR3") return participant.triangularRotation?.triangular2.pr3;
 
   return answers[source];
+}
+
+function resolveP14EvaluationProduct(
+  evaNumber: 1 | 2,
+  answers: Record<string, unknown>,
+  participant: { firstSampleKey?: string | null; secondSampleKey?: string | null }
+): string {
+  const prefix = `EVA${evaNumber}`;
+  const confirmed = normalizeDisplayValue(answers[`${prefix}_CONFIRMED_PRODUCT`]);
+  if (confirmed) {
+    return confirmed;
+  }
+
+  return normalizeDisplayValue(evaNumber === 1 ? participant.firstSampleKey : participant.secondSampleKey);
+}
+
+function normalizeDisplayValue(value: unknown): string {
+  return String(value ?? "").trim();
 }
 
 function formatContextValue(

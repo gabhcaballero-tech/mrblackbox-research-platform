@@ -12,6 +12,10 @@ export type CltOperationsActivitySummary = {
   evidenceCount: number;
   id: string;
   name: string;
+  responses: Array<{
+    answerJson: unknown;
+    questionId: string;
+  }>;
   scheduledAt: Date;
   status: string;
 };

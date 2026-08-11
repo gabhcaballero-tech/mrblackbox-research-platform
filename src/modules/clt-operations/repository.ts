@@ -172,6 +172,13 @@ const sessionSelect = {
               status: true
             }
           },
+          responses: {
+            orderBy: { questionId: "asc" },
+            select: {
+              answerJson: true,
+              questionId: true
+            }
+          },
           scheduledAt: true,
           status: true
         }
@@ -291,6 +298,10 @@ type SessionRecord = {
         scheduledFor: Date | null;
         sentAt: Date | null;
         status: string;
+      }>;
+      responses: Array<{
+        answerJson: unknown;
+        questionId: string;
       }>;
       scheduledAt: Date;
       status: string;
@@ -472,6 +483,7 @@ function toNavigoActivities(session: SessionRecord): CltOperationsActivitySummar
     evidenceCount: activity.participantActivityEvidence.length,
     id: activity.id,
     name: activity.activitySchedule.name,
+    responses: activity.responses,
     scheduledAt: activity.scheduledAt,
     status: activity.status
   }));

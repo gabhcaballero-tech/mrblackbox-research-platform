@@ -257,6 +257,20 @@ describe("CtlMobileCapture", () => {
     expect(screen.getByText("247")).toBeInTheDocument();
   });
 
+  it("shows the P14 evaluation order using confirmed products before rotation fallback", () => {
+    renderMobileCapture({
+      answers: {
+        EVA1_CONFIRMED_PRODUCT: "583",
+        EVA2_CONFIRMED_PRODUCT: "247"
+      },
+      definition: contextualAnswerDefinition
+    });
+
+    expect(screen.getByText("Orden de evaluación")).toBeInTheDocument();
+    expect(screen.getByText((_content, element) => element?.textContent === "Primero: 583")).toBeInTheDocument();
+    expect(screen.getByText((_content, element) => element?.textContent === "Segundo: 247")).toBeInTheDocument();
+  });
+
   it("shows previous coded answers as their visible option labels", () => {
     renderMobileCapture({
       answers: { P14: "2" },

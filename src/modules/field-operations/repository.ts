@@ -623,6 +623,7 @@ function toActivitySummary(activity: FieldActivityRecord): CltOperationsActivity
     evidenceCount: activity.participantActivityEvidence.length,
     id: activity.id,
     name: activity.activitySchedule.name,
+    responses: [],
     scheduledAt: activity.scheduledAt,
     status: activity.status
   };

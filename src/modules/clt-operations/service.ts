@@ -6,6 +6,7 @@ import {
   type CtlAnswerLookup,
   type CtlMatrixQuestionDefinition
 } from "@/modules/ctl/definition";
+import { createNavigoMeasurementDefinition, NAVIGO_ACTIVITY_CODES } from "@/modules/navigo-app/definition";
 import { formatDateTimeMexicoCity, MEXICO_CITY_TIME_ZONE } from "@/shared/utils/date-format";
 import type {
   CltOperationsAnswerGroup,
@@ -236,6 +237,7 @@ function buildCltAnswerExportColumns(details: CltOperationsDetail[]): CltAnswerE
   return dedupeColumns([
     ...buildCltOpeningAuditColumns(),
     ...definition.sections.flatMap((section) => section.questions.flatMap((question) => columnsForQuestion(question))),
+    ...buildNavigoAnswerExportColumns(),
     ...extraColumns
   ]);
 }
@@ -322,6 +324,20 @@ function columnsForQuestion(question: ReturnType<typeof getCtlQuestions>[number]
 
   if (question.code === "EVA2_CONFIRMED_ARM" || question.code === "EVA2_CONFIRMED_ORDER") {
     return [];
+  }
+
+  if (question.code === "P14") {
+    return [
+      {
+        header: "P14_FIRST_PRODUCT",
+        read: ({ detail, rawAnswerByCode }) => readP14ProductOrder(1, detail, rawAnswerByCode)
+      },
+      {
+        header: "P14_SECOND_PRODUCT",
+        read: ({ detail, rawAnswerByCode }) => readP14ProductOrder(2, detail, rawAnswerByCode)
+      },
+      questionAnswerColumn(question.code)
+    ];
   }
 
   return [questionAnswerColumn(question.code)];
@@ -429,6 +445,77 @@ function buildCltProductTraceabilityColumns(evaNumber: 1 | 2): CltAnswerExportCo
       read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get(`${prefix}_CONFIRMED_ORDER`))
     }
   ];
+}
+
+function buildNavigoAnswerExportColumns(): CltAnswerExportColumn[] {
+  const questions = createNavigoMeasurementDefinition().questions;
+
+  return [
+    {
+      header: "--- NAVIGO ---",
+      read: () => ""
+    },
+    ...NAVIGO_ACTIVITY_CODES.flatMap((activityCode) => [
+      {
+        header: `NAVIGO_${activityCode}_STATUS`,
+        read: ({ detail }: { detail: CltOperationsDetail }) => findNavigoActivity(detail, activityCode)?.status ?? ""
+      },
+      {
+        header: `NAVIGO_${activityCode}_AVAILABLE_FROM`,
+        read: ({ detail }: { detail: CltOperationsDetail }) =>
+          formatOperationsDateTime(findNavigoActivity(detail, activityCode)?.availableFrom, DEFAULT_TIME_ZONE)
+      },
+      {
+        header: `NAVIGO_${activityCode}_COMPLETED_AT`,
+        read: ({ detail }: { detail: CltOperationsDetail }) =>
+          formatOperationsDateTime(findNavigoActivity(detail, activityCode)?.completedAt, DEFAULT_TIME_ZONE)
+      },
+      ...questions.map((question) => ({
+        header: `NAVIGO_${activityCode}_${question.id}`,
+        read: ({ detail }: { detail: CltOperationsDetail }) =>
+          stringifyAnswerValue(readNavigoActivityAnswer(findNavigoActivity(detail, activityCode), question.id))
+      }))
+    ])
+  ];
+}
+
+function findNavigoActivity(detail: CltOperationsDetail, activityCode: string) {
+  return detail.navigoActivities.find((activity) => activity.code === activityCode) ?? null;
+}
+
+function readNavigoActivityAnswer(
+  activity: CltOperationsDetail["navigoActivities"][number] | null,
+  questionId: string
+): unknown {
+  const response = activity?.responses.find((item) => item.questionId === questionId);
+  if (!response) {
+    return "";
+  }
+
+  if (isRecord(response.answerJson) && "value" in response.answerJson) {
+    return response.answerJson.value;
+  }
+
+  return response.answerJson;
+}
+
+function readP14ProductOrder(
+  evaNumber: 1 | 2,
+  detail: CltOperationsDetail,
+  rawAnswerByCode: Map<string, unknown>
+): string | number {
+  const prefix = `EVA${evaNumber}`;
+  const confirmed = normalizeExportValue(rawAnswerByCode.get(`${prefix}_CONFIRMED_PRODUCT`));
+  if (confirmed) {
+    return confirmed;
+  }
+
+  const system = readProductTraceValue(rawAnswerByCode.get(`SYS_${prefix}_TRACE`), "productCode");
+  if (system) {
+    return system;
+  }
+
+  return evaNumber === 1 ? detail.rotation.firstSampleKey ?? "" : detail.rotation.secondSampleKey ?? "";
 }
 
 function dedupeColumns(columns: CltAnswerExportColumn[]): CltAnswerExportColumn[] {
