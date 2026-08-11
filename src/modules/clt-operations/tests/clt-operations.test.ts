@@ -57,69 +57,76 @@ describe("clt operations", () => {
     expect(operationalExport.body).toContain("Folio\tParticipante\tEncuestador");
     expect(answersExport.body).toContain("NAV-001\tFrancisco Ruiz\tCOMPLETED\tJesus");
     expect(answersExport.body).toContain("TRI1_SYSTEM_POS1\tTRI1_SYSTEM_POS2\tTRI1_SYSTEM_POS3");
-    expect(answersExport.body).toContain("TRI1_SELECTED\tTRI1_SELECTED_POSITION\tTRI1_CORRECT");
-    expect(answersExport.body).toContain("EVA1_PRODUCT\tEVA1_ORDER\tEVA1_ARM\tEVA1_CONFIRMED_PRODUCT\tEVA1_CONFIRMED_ARM\tEVA1_CONFIRMED_ORDER");
-    expect(answersExport.body).toContain("EVA2_PRODUCT\tEVA2_ORDER\tEVA2_ARM\tEVA2_CONFIRMED_PRODUCT\tEVA2_CONFIRMED_ARM\tEVA2_CONFIRMED_ORDER");
+    expect(answersExport.body).toContain("TRI1_SELECTED_KEY\tTRI1_SELECTED_POSITION\tTRI1_CORRECT");
+    expect(answersExport.body).toContain("EVA1_SYSTEM_PRODUCT\tEVA1_SYSTEM_ARM\tEVA1_SYSTEM_ORDER\tEVA1_CONFIRMED_PRODUCT\tEVA1_CONFIRMED_ARM\tEVA1_CONFIRMED_ORDER");
+    expect(answersExport.body).toContain("EVA2_SYSTEM_PRODUCT\tEVA2_SYSTEM_ARM\tEVA2_SYSTEM_ORDER\tEVA2_CONFIRMED_PRODUCT\tEVA2_CONFIRMED_ARM\tEVA2_CONFIRMED_ORDER");
     expect(answersExport.body).toContain("P8A_LIMPIA");
     expect(answersExport.body).toContain("P9A_FLORAL");
     expect(answersExport.body).toContain("P8A_ATTRIBUTE_ORDER");
     const [headerLine, firstRowLine, secondRowLine] = answersExport.body.replace(/^\uFEFF/, "").split("\r\n");
     const header = headerLine!.split("\t");
-    expect(header.slice(4, 35)).toEqual([
-      "ROTATION_CODE",
+    expect(header.slice(4, 12)).toEqual([
       "ROTATION_PLAN",
-      "ROTATION_EVA1",
-      "ROTATION_EVA2",
-      "EVA_APPLICATION_ORDER",
-      "TRI1_DELIVERY_ORDER",
-      "TRI1_SYSTEM_POS1",
-      "TRI1_SYSTEM_POS2",
-      "TRI1_SYSTEM_POS3",
-      "TRI1_CONFIRMED_POS1",
-      "TRI1_CONFIRMED_POS2",
-      "TRI1_CONFIRMED_POS3",
-      "TRI2_DELIVERY_ORDER",
-      "TRI2_SYSTEM_POS1",
-      "TRI2_SYSTEM_POS2",
-      "TRI2_SYSTEM_POS3",
-      "TRI2_CONFIRMED_POS1",
-      "TRI2_CONFIRMED_POS2",
-      "TRI2_CONFIRMED_POS3",
-      "EVA1_PRODUCT",
-      "EVA1_ORDER",
-      "EVA1_ARM",
-      "EVA1_CONFIRMED_PRODUCT",
-      "EVA1_CONFIRMED_ARM",
-      "EVA1_CONFIRMED_ORDER",
-      "EVA2_PRODUCT",
-      "EVA2_ORDER",
-      "EVA2_ARM",
-      "EVA2_CONFIRMED_PRODUCT",
-      "EVA2_CONFIRMED_ARM",
-      "EVA2_CONFIRMED_ORDER"
+      "DG_NOMBRE",
+      "DG_DIRECCION",
+      "DG_COLONIA",
+      "DG_MUNICIPIO",
+      "DG_TELEFONO",
+      "DG_FECHA",
+      "DG_HORA_INICIO"
     ]);
+    expect(header).not.toContain("ROTATION_CODE");
+    expect(header).not.toContain("ROTATION_EVA1");
+    expect(header).not.toContain("ROTATION_EVA2");
+    expect(header).not.toContain("EVA_APPLICATION_ORDER");
+    expect(header).not.toContain("EVA1_PRODUCT");
+    expect(header).not.toContain("EVA1_ORDER");
+    expect(header).not.toContain("EVA1_ARM");
+    expect(header).not.toContain("EVA2_PRODUCT");
+    expect(header).not.toContain("EVA2_ORDER");
+    expect(header).not.toContain("EVA2_ARM");
+    expect(header).not.toContain("TRI1_SELECTED");
+    expect(header).not.toContain("TRI2_SELECTED");
     expect(header).not.toContain("P8A");
     expect(header).not.toContain("P9A");
     expect(header).not.toContain("P8B");
     expect(header).not.toContain("P9B");
     expect(header.indexOf("DG_NOMBRE")).toBeLessThan(header.indexOf("F0"));
-    expect(header.indexOf("F14")).toBeLessThan(header.indexOf("TRI1_SELECTED"));
-    expect(header.indexOf("TRI1_CORRECT")).toBeLessThan(header.indexOf("TRI2_SELECTED"));
+    expect(header.indexOf("F1")).toBeLessThan(header.indexOf("EDAD_EXACTA"));
+    expect(header.indexOf("EDAD_EXACTA")).toBeLessThan(header.indexOf("RANGO_EDAD"));
+    expect(header.indexOf("RANGO_EDAD")).toBeLessThan(header.indexOf("F3"));
+    expect(header.indexOf("F14")).toBeLessThan(header.indexOf("TRI1_SYSTEM_POS1"));
+    expect(header.indexOf("TRI1_SYSTEM_POS1")).toBeLessThan(header.indexOf("TRI1_CONFIRMED_POS1"));
+    expect(header.indexOf("TRI1_CONFIRMED_POS3")).toBeLessThan(header.indexOf("TRI1_DELIVERY_ORDER"));
+    expect(header.indexOf("TRI1_DELIVERY_ORDER")).toBeLessThan(header.indexOf("TRI1_SELECTED_KEY"));
+    expect(header.indexOf("TRI1_SELECTED_KEY")).toBeLessThan(header.indexOf("P2"));
+    expect(header.indexOf("P2")).toBeLessThan(header.indexOf("TRI2_SYSTEM_POS1"));
+    expect(header.indexOf("TRI2_DELIVERY_ORDER")).toBeLessThan(header.indexOf("TRI2_SELECTED_KEY"));
+    expect(header.indexOf("TRI2_SELECTED_KEY")).toBeLessThan(header.indexOf("P4"));
     expect(header.indexOf("TRI2_CORRECT")).toBeLessThan(header.indexOf("P5A"));
+    expect(header.indexOf("P4")).toBeLessThan(header.indexOf("EVA1_SYSTEM_PRODUCT"));
+    expect(header.indexOf("EVA1_CONFIRMED_ORDER")).toBeLessThan(header.indexOf("P5A"));
     expect(header.indexOf("P13A")).toBeLessThan(header.indexOf("P5B"));
+    expect(header.indexOf("P13A")).toBeLessThan(header.indexOf("EVA2_SYSTEM_PRODUCT"));
+    expect(header.indexOf("EVA2_CONFIRMED_ORDER")).toBeLessThan(header.indexOf("P5B"));
     expect(header.indexOf("P13B")).toBeLessThan(header.indexOf("P14"));
     expect(header.indexOf("P20")).toBeLessThan(header.indexOf("D1_ESCOLARIDAD_JEFE_HOGAR"));
     expect(header.indexOf("P8A_ATTRIBUTE_ORDER")).toBeLessThan(header.indexOf("P8A_LIMPIA"));
     expect(header.indexOf("P9A_ATTRIBUTE_ORDER")).toBeLessThan(header.indexOf("P9A_FLORAL"));
     const firstRow = firstRowLine!.split("\t");
     const secondRow = secondRowLine!.split("\t");
-    expect(firstRow[header.indexOf("ROTATION_CODE")]).toBe("ROT-1");
     expect(firstRow[header.indexOf("ROTATION_PLAN")]).toBe("Rotacion 1");
-    expect(firstRow[header.indexOf("EVA1_PRODUCT")]).toBe("247");
+    expect(firstRow[header.indexOf("EDAD_EXACTA")]).toBe("33");
+    expect(firstRow[header.indexOf("RANGO_EDAD")]).toBe("30 a 45 aÃ±os");
+    expect(firstRow[header.indexOf("EVA1_SYSTEM_PRODUCT")]).toBe("247");
+    expect(firstRow[header.indexOf("EVA1_SYSTEM_ARM")]).toBe("Brazo izquierdo");
+    expect(firstRow[header.indexOf("EVA1_SYSTEM_ORDER")]).toBe("1");
     expect(firstRow[header.indexOf("EVA1_CONFIRMED_PRODUCT")]).toBe("247");
     expect(firstRow[header.indexOf("EVA1_CONFIRMED_ARM")]).toBe("Brazo izquierdo");
     expect(firstRow[header.indexOf("EVA1_CONFIRMED_ORDER")]).toBe("1");
-    expect(firstRow[header.indexOf("EVA2_PRODUCT")]).toBe("583");
+    expect(firstRow[header.indexOf("EVA2_SYSTEM_PRODUCT")]).toBe("583");
+    expect(firstRow[header.indexOf("EVA2_SYSTEM_ARM")]).toBe("Brazo derecho");
+    expect(firstRow[header.indexOf("EVA2_SYSTEM_ORDER")]).toBe("2");
     expect(firstRow[header.indexOf("EVA2_CONFIRMED_PRODUCT")]).toBe("583");
     expect(firstRow[header.indexOf("EVA2_CONFIRMED_ARM")]).toBe("Brazo derecho");
     expect(firstRow[header.indexOf("EVA2_CONFIRMED_ORDER")]).toBe("2");
@@ -137,16 +144,16 @@ describe("clt operations", () => {
     expect(firstRow[header.indexOf("TRI2_CONFIRMED_POS1")]).toBe("835");
     expect(firstRow[header.indexOf("TRI2_CONFIRMED_POS2")]).toBe("724");
     expect(firstRow[header.indexOf("TRI2_CONFIRMED_POS3")]).toBe("583");
-    expect(firstRow[header.indexOf("TRI1_SELECTED")]).toBe("583");
+    expect(firstRow[header.indexOf("TRI1_SELECTED_KEY")]).toBe("583");
     expect(firstRow[header.indexOf("TRI1_SELECTED_POSITION")]).toBe("PR2");
     expect(firstRow[header.indexOf("TRI1_CORRECT")]).toBe("1");
-    expect(secondRow[header.indexOf("EVA1_PRODUCT")]).toBe("");
+    expect(secondRow[header.indexOf("EVA1_SYSTEM_PRODUCT")]).toBe("");
     expect(secondRow[header.indexOf("EVA1_CONFIRMED_PRODUCT")]).toBe("");
     expect(secondRow[header.indexOf("EVA2_CONFIRMED_PRODUCT")]).toBe("");
     expect(secondRow[header.indexOf("TRI1_CONFIRMED_POS1")]).toBe("");
     expect(secondRow[header.indexOf("TRI2_CONFIRMED_POS1")]).toBe("");
     expect(secondRow[header.indexOf("TRI1_SYSTEM_POS1")]).toBe("247");
-    expect(secondRow[header.indexOf("TRI1_SELECTED")]).toBe("583");
+    expect(secondRow[header.indexOf("TRI1_SELECTED_KEY")]).toBe("583");
     expect(secondRow[header.indexOf("TRI1_SELECTED_POSITION")]).toBe("PR2");
     expect(secondRow[header.indexOf("TRI1_CORRECT")]).toBe("1");
     expect(answersExport.body).not.toContain("NAV-002\tHistorico Sin Trazabilidad\tCOMPLETED\tJesus\t247\t583\t912");
@@ -214,6 +221,7 @@ function createFakePrisma(): Parameters<typeof createCltOperationsRepository>[0]
     {
       answers: [
         { answerValue: "1", questionCode: "F0" },
+        { answerValue: { exactAge: 33, rangeCode: "2", rangeLabel: "30 a 45 aÃ±os" }, questionCode: "F2" },
         { answerValue: "Marca A\tMarca B\nMarca C", questionCode: "F6" },
         { answerValue: "247", questionCode: "TRI1_CONFIRMED_POS1" },
         { answerValue: "583", questionCode: "TRI1_CONFIRMED_POS2" },

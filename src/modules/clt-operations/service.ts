@@ -1,4 +1,5 @@
 import {
+  CTL_AGE_RANGE_OPTIONS,
   getCtlApplicableQuestions,
   getCtlDefinition,
   getCtlQuestions,
@@ -242,99 +243,41 @@ function buildCltAnswerExportColumns(details: CltOperationsDetail[]): CltAnswerE
 function buildCltOpeningAuditColumns(): CltAnswerExportColumn[] {
   return [
     {
-      header: "ROTATION_CODE",
-      read: ({ detail }) => detail.rotation.rotationCode ?? ""
-    },
-    {
       header: "ROTATION_PLAN",
       read: ({ detail }) => detail.rotation.rotationPlanName ?? ""
-    },
-    {
-      header: "ROTATION_EVA1",
-      read: ({ detail }) => detail.rotation.firstSampleKey ?? ""
-    },
-    {
-      header: "ROTATION_EVA2",
-      read: ({ detail }) => detail.rotation.secondSampleKey ?? ""
-    },
-    {
-      header: "EVA_APPLICATION_ORDER",
-      read: ({ detail }) =>
-        detail.rotation.arms
-          .slice()
-          .sort((left, right) => left.order - right.order)
-          .map((arm) => `${arm.order}:${arm.productCode}:${arm.armLabel}`)
-          .join("|")
-    },
-    {
-      header: "TRI1_DELIVERY_ORDER",
-      read: ({ rawAnswerByCode }) => readTriangularDeliveryOrder(rawAnswerByCode.get("P1"))
-    },
-    {
-      header: "TRI1_SYSTEM_POS1",
-      read: ({ detail }) => detail.triangularRotation.triangular1?.pr1 ?? ""
-    },
-    {
-      header: "TRI1_SYSTEM_POS2",
-      read: ({ detail }) => detail.triangularRotation.triangular1?.pr2 ?? ""
-    },
-    {
-      header: "TRI1_SYSTEM_POS3",
-      read: ({ detail }) => detail.triangularRotation.triangular1?.pr3 ?? ""
-    },
-    {
-      header: "TRI1_CONFIRMED_POS1",
-      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("TRI1_CONFIRMED_POS1"))
-    },
-    {
-      header: "TRI1_CONFIRMED_POS2",
-      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("TRI1_CONFIRMED_POS2"))
-    },
-    {
-      header: "TRI1_CONFIRMED_POS3",
-      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("TRI1_CONFIRMED_POS3"))
-    },
-    {
-      header: "TRI2_DELIVERY_ORDER",
-      read: ({ rawAnswerByCode }) => readTriangularDeliveryOrder(rawAnswerByCode.get("P3"))
-    },
-    {
-      header: "TRI2_SYSTEM_POS1",
-      read: ({ detail }) => detail.triangularRotation.triangular2?.pr1 ?? ""
-    },
-    {
-      header: "TRI2_SYSTEM_POS2",
-      read: ({ detail }) => detail.triangularRotation.triangular2?.pr2 ?? ""
-    },
-    {
-      header: "TRI2_SYSTEM_POS3",
-      read: ({ detail }) => detail.triangularRotation.triangular2?.pr3 ?? ""
-    },
-    {
-      header: "TRI2_CONFIRMED_POS1",
-      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("TRI2_CONFIRMED_POS1"))
-    },
-    {
-      header: "TRI2_CONFIRMED_POS2",
-      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("TRI2_CONFIRMED_POS2"))
-    },
-    {
-      header: "TRI2_CONFIRMED_POS3",
-      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("TRI2_CONFIRMED_POS3"))
-    },
-    ...buildCltProductTraceabilityColumns()
+    }
   ];
 }
 
 function columnsForQuestion(question: ReturnType<typeof getCtlQuestions>[number]): CltAnswerExportColumn[] {
+  if (question.code === "F2") {
+    return buildCltAgeColumns();
+  }
+
   if (question.type === "MATRIX") {
     return matrixQuestionColumns(question);
+  }
+
+  if (question.code === "TRI1_CONFIRMED_POS1") {
+    return buildTriangularTraceabilityColumns(1);
+  }
+
+  if (question.code === "TRI1_CONFIRMED_POS2" || question.code === "TRI1_CONFIRMED_POS3") {
+    return [];
+  }
+
+  if (question.code === "TRI2_CONFIRMED_POS1") {
+    return buildTriangularTraceabilityColumns(2);
+  }
+
+  if (question.code === "TRI2_CONFIRMED_POS2" || question.code === "TRI2_CONFIRMED_POS3") {
+    return [];
   }
 
   if (question.code === "P1") {
     return [
       {
-        header: "TRI1_SELECTED",
+        header: "TRI1_SELECTED_KEY",
         read: ({ rawAnswerByCode }) => readTriangularSelectedKey(rawAnswerByCode.get("P1"))
       },
       {
@@ -351,7 +294,7 @@ function columnsForQuestion(question: ReturnType<typeof getCtlQuestions>[number]
   if (question.code === "P3") {
     return [
       {
-        header: "TRI2_SELECTED",
+        header: "TRI2_SELECTED_KEY",
         read: ({ rawAnswerByCode }) => readTriangularSelectedKey(rawAnswerByCode.get("P3"))
       },
       {
@@ -365,7 +308,74 @@ function columnsForQuestion(question: ReturnType<typeof getCtlQuestions>[number]
     ];
   }
 
+  if (question.code === "EVA1_CONFIRMED_PRODUCT") {
+    return buildCltProductTraceabilityColumns(1);
+  }
+
+  if (question.code === "EVA1_CONFIRMED_ARM" || question.code === "EVA1_CONFIRMED_ORDER") {
+    return [];
+  }
+
+  if (question.code === "EVA2_CONFIRMED_PRODUCT") {
+    return buildCltProductTraceabilityColumns(2);
+  }
+
+  if (question.code === "EVA2_CONFIRMED_ARM" || question.code === "EVA2_CONFIRMED_ORDER") {
+    return [];
+  }
+
   return [questionAnswerColumn(question.code)];
+}
+
+function buildCltAgeColumns(): CltAnswerExportColumn[] {
+  return [
+    {
+      header: "EDAD_EXACTA",
+      read: ({ rawAnswerByCode }) => readCtlExactAge(rawAnswerByCode.get("F2"))
+    },
+    {
+      header: "RANGO_EDAD",
+      read: ({ rawAnswerByCode }) => readCtlAgeRange(rawAnswerByCode.get("F2"))
+    }
+  ];
+}
+
+function buildTriangularTraceabilityColumns(triangularNumber: 1 | 2): CltAnswerExportColumn[] {
+  const prefix = `TRI${triangularNumber}`;
+  const questionCode = triangularNumber === 1 ? "P1" : "P3";
+  const readRotation = (detail: CltOperationsDetail) =>
+    triangularNumber === 1 ? detail.triangularRotation.triangular1 : detail.triangularRotation.triangular2;
+
+  return [
+    {
+      header: `${prefix}_SYSTEM_POS1`,
+      read: ({ detail }) => readRotation(detail)?.pr1 ?? ""
+    },
+    {
+      header: `${prefix}_SYSTEM_POS2`,
+      read: ({ detail }) => readRotation(detail)?.pr2 ?? ""
+    },
+    {
+      header: `${prefix}_SYSTEM_POS3`,
+      read: ({ detail }) => readRotation(detail)?.pr3 ?? ""
+    },
+    {
+      header: `${prefix}_CONFIRMED_POS1`,
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get(`${prefix}_CONFIRMED_POS1`))
+    },
+    {
+      header: `${prefix}_CONFIRMED_POS2`,
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get(`${prefix}_CONFIRMED_POS2`))
+    },
+    {
+      header: `${prefix}_CONFIRMED_POS3`,
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get(`${prefix}_CONFIRMED_POS3`))
+    },
+    {
+      header: `${prefix}_DELIVERY_ORDER`,
+      read: ({ rawAnswerByCode }) => readTriangularDeliveryOrder(rawAnswerByCode.get(questionCode))
+    }
+  ];
 }
 
 function matrixQuestionColumns(question: CtlMatrixQuestionDefinition): CltAnswerExportColumn[] {
@@ -389,55 +399,34 @@ function questionAnswerColumn(code: string): CltAnswerExportColumn {
   };
 }
 
-function buildCltProductTraceabilityColumns(): CltAnswerExportColumn[] {
+function buildCltProductTraceabilityColumns(evaNumber: 1 | 2): CltAnswerExportColumn[] {
+  const prefix = `EVA${evaNumber}`;
+  const traceQuestionCode = `SYS_${prefix}_TRACE`;
+
   return [
     {
-      header: "EVA1_PRODUCT",
-      read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get("SYS_EVA1_TRACE"), "productCode")
+      header: `${prefix}_SYSTEM_PRODUCT`,
+      read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get(traceQuestionCode), "productCode")
     },
     {
-      header: "EVA1_ORDER",
-      read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get("SYS_EVA1_TRACE"), "order")
+      header: `${prefix}_SYSTEM_ARM`,
+      read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get(traceQuestionCode), "armLabel")
     },
     {
-      header: "EVA1_ARM",
-      read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get("SYS_EVA1_TRACE"), "armLabel")
+      header: `${prefix}_SYSTEM_ORDER`,
+      read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get(traceQuestionCode), "order")
     },
     {
-      header: "EVA1_CONFIRMED_PRODUCT",
-      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("EVA1_CONFIRMED_PRODUCT"))
+      header: `${prefix}_CONFIRMED_PRODUCT`,
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get(`${prefix}_CONFIRMED_PRODUCT`))
     },
     {
-      header: "EVA1_CONFIRMED_ARM",
-      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("EVA1_CONFIRMED_ARM"))
+      header: `${prefix}_CONFIRMED_ARM`,
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get(`${prefix}_CONFIRMED_ARM`))
     },
     {
-      header: "EVA1_CONFIRMED_ORDER",
-      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("EVA1_CONFIRMED_ORDER"))
-    },
-    {
-      header: "EVA2_PRODUCT",
-      read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get("SYS_EVA2_TRACE"), "productCode")
-    },
-    {
-      header: "EVA2_ORDER",
-      read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get("SYS_EVA2_TRACE"), "order")
-    },
-    {
-      header: "EVA2_ARM",
-      read: ({ rawAnswerByCode }) => readProductTraceValue(rawAnswerByCode.get("SYS_EVA2_TRACE"), "armLabel")
-    },
-    {
-      header: "EVA2_CONFIRMED_PRODUCT",
-      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("EVA2_CONFIRMED_PRODUCT"))
-    },
-    {
-      header: "EVA2_CONFIRMED_ARM",
-      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("EVA2_CONFIRMED_ARM"))
-    },
-    {
-      header: "EVA2_CONFIRMED_ORDER",
-      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get("EVA2_CONFIRMED_ORDER"))
+      header: `${prefix}_CONFIRMED_ORDER`,
+      read: ({ rawAnswerByCode }) => stringifyAnswerValue(rawAnswerByCode.get(`${prefix}_CONFIRMED_ORDER`))
     }
   ];
 }
@@ -451,6 +440,63 @@ function dedupeColumns(columns: CltAnswerExportColumn[]): CltAnswerExportColumn[
     seen.add(column.header);
     return true;
   });
+}
+
+function readCtlExactAge(value: unknown): string {
+  if (isRecord(value)) {
+    return normalizeExportValue(value.exactAge);
+  }
+
+  const normalized = normalizeExportValue(value);
+  return /^\d{1,3}$/.test(normalized) ? normalized : "";
+}
+
+function readCtlAgeRange(value: unknown): string {
+  if (isRecord(value)) {
+    const rangeLabel = normalizeExportValue(value.rangeLabel);
+    if (rangeLabel) {
+      return rangeLabel;
+    }
+
+    const rangeCode = normalizeExportValue(value.rangeCode);
+    const rangeOption = CTL_AGE_RANGE_OPTIONS.find((option) => option.value === rangeCode);
+    if (rangeOption) {
+      return rangeOption.label;
+    }
+
+    const exactAge = Number(normalizeExportValue(value.exactAge));
+    if (Number.isInteger(exactAge)) {
+      return deriveCtlAgeRangeLabel(exactAge);
+    }
+  }
+
+  const normalized = normalizeExportValue(value);
+  const rangeOption = CTL_AGE_RANGE_OPTIONS.find((option) => option.value === normalized);
+  if (rangeOption) {
+    return rangeOption.label;
+  }
+
+  if (/^\d{1,3}$/.test(normalized)) {
+    return deriveCtlAgeRangeLabel(Number(normalized));
+  }
+
+  return normalized;
+}
+
+function deriveCtlAgeRangeLabel(exactAge: number): string {
+  if (exactAge <= 29) {
+    return CTL_AGE_RANGE_OPTIONS[0].label;
+  }
+
+  if (exactAge <= 45) {
+    return CTL_AGE_RANGE_OPTIONS[1].label;
+  }
+
+  if (exactAge <= 55) {
+    return CTL_AGE_RANGE_OPTIONS[2].label;
+  }
+
+  return CTL_AGE_RANGE_OPTIONS[3].label;
 }
 
 function readTriangularSelectedPosition(value: unknown): string {
