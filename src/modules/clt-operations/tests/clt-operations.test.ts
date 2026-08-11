@@ -62,9 +62,51 @@ describe("clt operations", () => {
     expect(answersExport.body).toContain("P8A_LIMPIA");
     expect(answersExport.body).toContain("P9A_FLORAL");
     expect(answersExport.body).toContain("P8A_ATTRIBUTE_ORDER");
-    expect(answersExport.body).toContain("247\t583\t912\t247|583|912\t583\tPR2\t1");
+    const [headerLine, firstRowLine, secondRowLine] = answersExport.body.replace(/^\uFEFF/, "").split("\r\n");
+    const header = headerLine!.split("\t");
+    expect(header.slice(4, 17)).toEqual([
+      "ROTATION_CODE",
+      "ROTATION_PLAN",
+      "ROTATION_EVA1",
+      "ROTATION_EVA2",
+      "EVA_APPLICATION_ORDER",
+      "TRI1_DELIVERY_ORDER",
+      "TRI2_DELIVERY_ORDER",
+      "EVA1_PRODUCT",
+      "EVA1_ORDER",
+      "EVA1_ARM",
+      "EVA2_PRODUCT",
+      "EVA2_ORDER",
+      "EVA2_ARM"
+    ]);
+    expect(header).not.toContain("P8A");
+    expect(header).not.toContain("P9A");
+    expect(header).not.toContain("P8B");
+    expect(header).not.toContain("P9B");
+    expect(header.indexOf("DG_NOMBRE")).toBeLessThan(header.indexOf("F0"));
+    expect(header.indexOf("F14")).toBeLessThan(header.indexOf("TRI1_POS1"));
+    expect(header.indexOf("TRI1_CORRECT")).toBeLessThan(header.indexOf("TRI2_POS1"));
+    expect(header.indexOf("TRI2_CORRECT")).toBeLessThan(header.indexOf("P5A"));
+    expect(header.indexOf("P13A")).toBeLessThan(header.indexOf("P5B"));
+    expect(header.indexOf("P13B")).toBeLessThan(header.indexOf("P14"));
+    expect(header.indexOf("P20")).toBeLessThan(header.indexOf("D1_ESCOLARIDAD_JEFE_HOGAR"));
+    expect(header.indexOf("P8A_ATTRIBUTE_ORDER")).toBeLessThan(header.indexOf("P8A_LIMPIA"));
+    expect(header.indexOf("P9A_ATTRIBUTE_ORDER")).toBeLessThan(header.indexOf("P9A_FLORAL"));
+    const firstRow = firstRowLine!.split("\t");
+    const secondRow = secondRowLine!.split("\t");
+    expect(firstRow[header.indexOf("ROTATION_CODE")]).toBe("ROT-1");
+    expect(firstRow[header.indexOf("ROTATION_PLAN")]).toBe("Rotacion 1");
+    expect(firstRow[header.indexOf("TRI1_DELIVERY_ORDER")]).toBe("247|583|912");
+    expect(firstRow[header.indexOf("TRI1_POS1")]).toBe("247");
+    expect(firstRow[header.indexOf("TRI1_SELECTED")]).toBe("583");
+    expect(firstRow[header.indexOf("TRI1_SELECTED_POSITION")]).toBe("PR2");
+    expect(firstRow[header.indexOf("TRI1_CORRECT")]).toBe("1");
     expect(answersExport.body).toContain("247\t1\tBrazo izquierdo\t583\t2\tBrazo derecho");
-    expect(answersExport.body).toContain("NAV-002\tHistorico Sin Trazabilidad\tCOMPLETED\tJesus\t\t\t\t\t583\tPR2\t1");
+    expect(secondRow[header.indexOf("EVA1_PRODUCT")]).toBe("");
+    expect(secondRow[header.indexOf("TRI1_POS1")]).toBe("");
+    expect(secondRow[header.indexOf("TRI1_SELECTED")]).toBe("583");
+    expect(secondRow[header.indexOf("TRI1_SELECTED_POSITION")]).toBe("PR2");
+    expect(secondRow[header.indexOf("TRI1_CORRECT")]).toBe("1");
     expect(answersExport.body).not.toContain("NAV-002\tHistorico Sin Trazabilidad\tCOMPLETED\tJesus\t247\t583\t912");
     expect(answersExport.body).not.toContain("Marca A\tMarca B");
     expect(answersExport.body).not.toContain("Marca C\r\notra");

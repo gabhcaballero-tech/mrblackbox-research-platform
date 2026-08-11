@@ -273,7 +273,8 @@ function buildCltOpeningAuditColumns(): CltAnswerExportColumn[] {
     {
       header: "TRI2_DELIVERY_ORDER",
       read: ({ rawAnswerByCode }) => readTriangularDeliveryOrder(rawAnswerByCode.get("P3"))
-    }
+    },
+    ...buildCltProductTraceabilityColumns()
   ];
 }
 
@@ -284,59 +285,59 @@ function columnsForQuestion(question: ReturnType<typeof getCtlQuestions>[number]
 
   if (question.code === "P1") {
     return [
-    {
-      header: "TRI1_POS1",
-      read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P1"), "PR1")
-    },
-    {
-      header: "TRI1_POS2",
-      read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P1"), "PR2")
-    },
-    {
-      header: "TRI1_POS3",
-      read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P1"), "PR3")
-    },
-    {
-      header: "TRI1_SELECTED",
-      read: ({ rawAnswerByCode }) => readTriangularSelectedKey(rawAnswerByCode.get("P1"))
-    },
-    {
-      header: "TRI1_SELECTED_POSITION",
-      read: ({ rawAnswerByCode }) => readTriangularSelectedPosition(rawAnswerByCode.get("P1"))
-    },
-    {
-      header: "TRI1_CORRECT",
-      read: ({ rawAnswerByCode }) => readTriangularCorrect(rawAnswerByCode.get("P1"))
-    }
+      {
+        header: "TRI1_POS1",
+        read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P1"), "PR1")
+      },
+      {
+        header: "TRI1_POS2",
+        read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P1"), "PR2")
+      },
+      {
+        header: "TRI1_POS3",
+        read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P1"), "PR3")
+      },
+      {
+        header: "TRI1_SELECTED",
+        read: ({ rawAnswerByCode }) => readTriangularSelectedKey(rawAnswerByCode.get("P1"))
+      },
+      {
+        header: "TRI1_SELECTED_POSITION",
+        read: ({ rawAnswerByCode }) => readTriangularSelectedPosition(rawAnswerByCode.get("P1"))
+      },
+      {
+        header: "TRI1_CORRECT",
+        read: ({ rawAnswerByCode }) => readTriangularCorrect(rawAnswerByCode.get("P1"))
+      }
     ];
   }
 
   if (question.code === "P3") {
     return [
-    {
-      header: "TRI2_POS1",
-      read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P3"), "PR1")
-    },
-    {
-      header: "TRI2_POS2",
-      read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P3"), "PR2")
-    },
-    {
-      header: "TRI2_POS3",
-      read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P3"), "PR3")
-    },
-    {
-      header: "TRI2_SELECTED",
-      read: ({ rawAnswerByCode }) => readTriangularSelectedKey(rawAnswerByCode.get("P3"))
-    },
-    {
-      header: "TRI2_SELECTED_POSITION",
-      read: ({ rawAnswerByCode }) => readTriangularSelectedPosition(rawAnswerByCode.get("P3"))
-    },
-    {
-      header: "TRI2_CORRECT",
-      read: ({ rawAnswerByCode }) => readTriangularCorrect(rawAnswerByCode.get("P3"))
-    }
+      {
+        header: "TRI2_POS1",
+        read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P3"), "PR1")
+      },
+      {
+        header: "TRI2_POS2",
+        read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P3"), "PR2")
+      },
+      {
+        header: "TRI2_POS3",
+        read: ({ rawAnswerByCode }) => readTriangularPosition(rawAnswerByCode.get("P3"), "PR3")
+      },
+      {
+        header: "TRI2_SELECTED",
+        read: ({ rawAnswerByCode }) => readTriangularSelectedKey(rawAnswerByCode.get("P3"))
+      },
+      {
+        header: "TRI2_SELECTED_POSITION",
+        read: ({ rawAnswerByCode }) => readTriangularSelectedPosition(rawAnswerByCode.get("P3"))
+      },
+      {
+        header: "TRI2_CORRECT",
+        read: ({ rawAnswerByCode }) => readTriangularCorrect(rawAnswerByCode.get("P3"))
+      }
     ];
   }
 
@@ -364,7 +365,7 @@ function questionAnswerColumn(code: string): CltAnswerExportColumn {
   };
 }
 
-function buildCltTraceabilityColumns(): CltAnswerExportColumn[] {
+function buildCltProductTraceabilityColumns(): CltAnswerExportColumn[] {
   return [
     {
       header: "EVA1_PRODUCT",

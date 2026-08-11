@@ -236,6 +236,7 @@ function createDetail(input: { folio: string; id: string; participantId: string 
       arms: [],
       firstSampleKey: null,
       rotationCode: null,
+      rotationPlanName: null,
       secondSampleKey: null
     },
     t0: null,

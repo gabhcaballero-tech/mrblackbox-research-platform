@@ -603,6 +603,7 @@ function toSyntheticHutParticipant(participant: FieldHutParticipantRecord): CltO
       arms: [],
       firstSampleKey: null,
       rotationCode: null,
+      rotationPlanName: null,
       secondSampleKey: null
     },
     t0: null,
@@ -641,6 +642,7 @@ function toRotationSummary(participant: FieldStudyParticipantRecord): CltOperati
     arms,
     firstSampleKey: arms.find((arm) => arm.order === 1)?.productCode ?? null,
     rotationCode: participant.rotationAssignment?.rotationCode ?? null,
+    rotationPlanName: participant.rotationAssignment?.rotationPlan.name ?? null,
     secondSampleKey: arms.find((arm) => arm.order === 2)?.productCode ?? null
   };
 }
