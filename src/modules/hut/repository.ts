@@ -62,7 +62,6 @@ import {
 } from "@/modules/navigo-app/face-verification-contract";
 import {
   createOneuiWhatsAppRepository,
-  HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN,
   publicOriginValidationAuditMetadata,
   sendHutCompletionWhatsApp,
   sendHutPhotoReminderWhatsApp,

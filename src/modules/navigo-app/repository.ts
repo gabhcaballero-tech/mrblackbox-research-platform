@@ -9,6 +9,7 @@ import {
   sendNavigoHutLinksWhatsApp,
   sendNavigoEvaluationLinkWhatsApp,
   sendNavigoEvaluationReminderWhatsApp,
+  type OneuiWhatsAppMessageRecord,
   type OneuiWhatsAppRepository
 } from "@/modules/oneui-whatsapp";
 import {
@@ -303,6 +304,10 @@ export type NavigoParticipantLinksWhatsAppSendResult = {
   whatsappError: string | null;
   whatsappMessageId: string | null;
   whatsappStatus: "ERROR" | "ENVIADO";
+};
+
+type OneuiWhatsAppResultWithOptionalMessage = {
+  data?: OneuiWhatsAppMessageRecord | null;
 };
 
 export type NavigoConfigureRotationInput = {
@@ -3113,7 +3118,11 @@ export function createNavigoAppRepository(
         sentLinkType: prepared.data.sentLinkType,
         studyId: prepared.data.studyId
       });
-      const whatsAppMessage = result.ok ? result.data : "data" in result ? result.data : undefined;
+      const whatsAppMessage: OneuiWhatsAppMessageRecord | null = result.ok
+        ? result.data
+        : "data" in result
+          ? (result as OneuiWhatsAppResultWithOptionalMessage).data ?? null
+          : null;
       const publicOriginAudit = publicOriginValidationAuditMetadata(prepared.data.hutUrl);
 
       await prisma.auditLog?.create?.({
