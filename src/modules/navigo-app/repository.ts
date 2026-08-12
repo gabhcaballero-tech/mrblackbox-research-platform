@@ -4,6 +4,7 @@ import { formatDateTimeMexicoCity } from "@/shared/utils/date-format";
 import { resolvePublicLinkOrigin } from "@/shared/utils/request-origin";
 import {
   createOneuiWhatsAppRepository,
+  publicOriginValidationAuditMetadata,
   sendHutParticipantLinkWhatsApp,
   sendNavigoHutLinksWhatsApp,
   sendNavigoEvaluationLinkWhatsApp,
@@ -3113,6 +3114,7 @@ export function createNavigoAppRepository(
         studyId: prepared.data.studyId
       });
       const whatsAppMessage = result.ok ? result.data : "data" in result ? result.data : undefined;
+      const publicOriginAudit = publicOriginValidationAuditMetadata(prepared.data.hutUrl);
 
       await prisma.auditLog?.create?.({
         data: {
@@ -3122,6 +3124,8 @@ export function createNavigoAppRepository(
             deploymentEnvironment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? null,
             deploymentUrl: process.env.VERCEL_URL ?? null,
             folio: prepared.data.folio,
+            generatedHutUrl: prepared.data.hutUrl,
+            generatedNavigoUrl: prepared.data.navigoUrl,
             hutParticipantId: prepared.data.hutParticipantId,
             hutUrlAvailable: Boolean(prepared.data.hutUrl),
             hutUrlDomain: prepared.data.hutUrl ? new URL(prepared.data.hutUrl).origin : null,
@@ -3131,6 +3135,11 @@ export function createNavigoAppRepository(
             metaMessageId: whatsAppMessage?.metaMessageId ?? null,
             navigoUrlAvailable: Boolean(prepared.data.navigoUrl),
             origin: "MANUAL",
+            participantId: prepared.data.participantId,
+            publicOriginDetected: publicOriginAudit.publicOriginDetected,
+            publicOriginExpected: publicOriginAudit.publicOriginExpected,
+            publicOriginFailureCode: result.ok ? null : publicOriginAudit.publicOriginFailureCode,
+            publicOriginFailureMessage: result.ok ? null : publicOriginAudit.publicOriginFailureMessage,
             sentAtMexicoCity: formatDateTimeMexicoCity(now),
             templateName: templateNameForParticipantLinks(prepared.data.sentLinkType),
             warnings: prepared.data.warnings,

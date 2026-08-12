@@ -8,6 +8,7 @@ import {
 } from "@/modules/navigo-app/repository";
 import { createOneuiWhatsAppRepository } from "./repository";
 import {
+  publicOriginValidationAuditMetadata,
   sendHutParticipantLinkWhatsApp
 } from "./templates";
 
@@ -477,6 +478,8 @@ async function auditManualSupportSend({
   whatsappMessageId: string | null;
   whatsappStatus: "ENVIADO" | "ERROR";
 }) {
+  const publicOriginAudit = publicOriginValidationAuditMetadata(hutUrl);
+
   await prisma.auditLog.create({
     data: {
       action: "PARTICIPANT_MODIFIED",
@@ -484,12 +487,18 @@ async function auditManualSupportSend({
       afterJson: {
         deploymentEnvironment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? null,
         deploymentUrl: process.env.VERCEL_URL ?? null,
+        generatedHutUrl: hutUrl,
+        generatedNavigoUrl: navigoUrl,
         hutUrlAvailable: Boolean(hutUrl),
         hutUrlDomain: hutUrl ? new URL(hutUrl).origin : null,
         linkDomain: hutUrl ? new URL(hutUrl).origin : navigoUrl ? new URL(navigoUrl).origin : null,
         linkTypeSent: sentKind,
         navigoUrlAvailable: Boolean(navigoUrl),
         phone,
+        publicOriginDetected: publicOriginAudit.publicOriginDetected,
+        publicOriginExpected: publicOriginAudit.publicOriginExpected,
+        publicOriginFailureCode: whatsappStatus === "ERROR" ? publicOriginAudit.publicOriginFailureCode : null,
+        publicOriginFailureMessage: whatsappStatus === "ERROR" ? publicOriginAudit.publicOriginFailureMessage : null,
         sentAtMexicoCity: formatDateTimeMexicoCity(now),
         source: "MANUAL_SUPPORT",
         templateName,

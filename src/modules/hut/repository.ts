@@ -63,9 +63,12 @@ import {
 import {
   createOneuiWhatsAppRepository,
   HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN,
+  publicOriginValidationAuditMetadata,
   sendHutCompletionWhatsApp,
   sendHutPhotoReminderWhatsApp,
   sendHutRegistrationWhatsApp,
+  WHATSAPP_CONFIGURATION_MISSING_PUBLIC_ORIGIN,
+  WHATSAPP_INVALID_PUBLIC_ORIGIN,
   type OneuiWhatsAppRepository
 } from "@/modules/oneui-whatsapp";
 import { whatsappAutomationStatusFromMessage, type WhatsAppAutomationStatus } from "@/modules/oneui-whatsapp/templates";
@@ -5683,7 +5686,12 @@ async function sendHutPhotoReminderForParticipant({
   const whatsAppMessage = result.ok ? result.data : "data" in result ? result.data : undefined;
   const whatsappStatus = result.ok ? "ENVIADO" : "ERROR";
   const whatsappError = result.ok ? null : result.message;
-  const invalidOrigin = !result.ok && result.message === HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN;
+  const publicOriginAudit = publicOriginValidationAuditMetadata(hutUrl);
+  const publicOriginFailureCode = !result.ok && "code" in result && (
+    result.code === WHATSAPP_CONFIGURATION_MISSING_PUBLIC_ORIGIN || result.code === WHATSAPP_INVALID_PUBLIC_ORIGIN
+  )
+    ? result.code
+    : null;
 
   await prisma.auditLog.create?.({
     data: {
@@ -5693,6 +5701,7 @@ async function sendHutPhotoReminderForParticipant({
         deploymentEnvironment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? null,
         deploymentUrl: process.env.VERCEL_URL ?? null,
         folio: participant.folio,
+        generatedHutUrl: hutUrl,
         hutUrlAvailable: true,
         hutUrl,
         hutUrlDomain,
@@ -5701,6 +5710,11 @@ async function sendHutPhotoReminderForParticipant({
         manualReason: source === "CRON" ? null : manualReason?.trim() || null,
         reminderReason: "PHOTO_SLOT_AVAILABLE",
         reminderType: "HUT_PHOTO_REMINDER",
+        participantId: participant.id,
+        publicOriginDetected: publicOriginAudit.publicOriginDetected,
+        publicOriginExpected: publicOriginAudit.publicOriginExpected,
+        publicOriginFailureCode,
+        publicOriginFailureMessage: publicOriginFailureCode ? publicOriginAudit.publicOriginFailureMessage : null,
         sentAtMexicoCity: formatDateTimeMexicoCity(now),
         source,
         slotId: slot.id,
@@ -5712,8 +5726,8 @@ async function sendHutPhotoReminderForParticipant({
       createdAt: now,
       entityId: participant.id,
       entityType: "HutParticipant",
-      reason: invalidOrigin
-        ? HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN
+      reason: publicOriginFailureCode
+        ? publicOriginFailureCode
         : source === "CRON" ? "HUT_PHOTO_REMINDER_CRON" : "HUT_PHOTO_REMINDER_MANUAL"
     }
   });

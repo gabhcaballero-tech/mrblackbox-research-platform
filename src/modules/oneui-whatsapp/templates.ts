@@ -23,7 +23,19 @@ const HUT_PARTICIPANT_LINK_TEMPLATE_NAME = "hut_link_participant";
 const NAVIGO_HUT_LINKS_TEMPLATE_NAME = "navigo_hut_links";
 const HUT_PHOTO_REMINDER_TEMPLATE_NAME = "hut_photo_reminder";
 const HUT_COMPLETION_TEMPLATE_NAME = "hut_completion_message";
-export const HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN = "HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN";
+export const WHATSAPP_CONFIGURATION_MISSING_PUBLIC_ORIGIN = "CONFIGURATION_MISSING_PUBLIC_ORIGIN";
+export const WHATSAPP_INVALID_PUBLIC_ORIGIN = "INVALID_PUBLIC_ORIGIN";
+export const HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN = WHATSAPP_INVALID_PUBLIC_ORIGIN;
+
+export type PublicOriginValidationFailureCode =
+  | typeof WHATSAPP_CONFIGURATION_MISSING_PUBLIC_ORIGIN
+  | typeof WHATSAPP_INVALID_PUBLIC_ORIGIN;
+
+export type WhatsAppTemplateSkippedResult = {
+  code: string;
+  message: string;
+  ok: false;
+};
 
 export function whatsappAutomationStatusFromMessage(
   message: Pick<OneuiWhatsAppMessageRecord, "createdAt" | "metaMessageId" | "rawPayload" | "status" | "timestamp"> | null
@@ -228,7 +240,7 @@ export async function sendHutParticipantLinkWhatsApp(input: {
   repository?: OneuiWhatsAppRepository;
   sender?: WhatsAppTemplateSender;
   studyId: string;
-}): Promise<OneuiWhatsAppSendTemplateResult | { ok: false; code: "SKIPPED"; message: string }> {
+}): Promise<OneuiWhatsAppSendTemplateResult | WhatsAppTemplateSkippedResult> {
   const env = input.env ?? process.env;
 
   if (env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
@@ -240,7 +252,11 @@ export async function sendHutParticipantLinkWhatsApp(input: {
   }
   const originValidation = validateHutWhatsAppPublicOrigin(input.hutUrl, env);
   if (!originValidation.ok) {
-    return { code: "SKIPPED", message: HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN, ok: false };
+    return {
+      code: originValidation.code,
+      message: publicOriginValidationFailureMessage(originValidation.code),
+      ok: false
+    };
   }
 
   const sender = input.sender ?? sendOneuiWhatsAppTemplate;
@@ -278,7 +294,7 @@ export async function sendNavigoHutLinksWhatsApp(input: {
   repository?: OneuiWhatsAppRepository;
   sender?: WhatsAppTemplateSender;
   studyId: string;
-}): Promise<OneuiWhatsAppSendTemplateResult | { ok: false; code: "SKIPPED"; message: string }> {
+}): Promise<OneuiWhatsAppSendTemplateResult | WhatsAppTemplateSkippedResult> {
   const env = input.env ?? process.env;
 
   if (env.WHATSAPP_NAVIGO_AUTO_SEND_ENABLED === "false" || env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
@@ -290,7 +306,11 @@ export async function sendNavigoHutLinksWhatsApp(input: {
   }
   const originValidation = validateHutWhatsAppPublicOrigin(input.hutUrl, env);
   if (!originValidation.ok) {
-    return { code: "SKIPPED", message: HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN, ok: false };
+    return {
+      code: originValidation.code,
+      message: publicOriginValidationFailureMessage(originValidation.code),
+      ok: false
+    };
   }
 
   const sender = input.sender ?? sendOneuiWhatsAppTemplate;
@@ -368,7 +388,7 @@ export async function sendNavigoEvaluationReminderWhatsApp(input: {
   repository?: OneuiWhatsAppRepository;
   sender?: WhatsAppTemplateSender;
   studyId: string;
-}): Promise<OneuiWhatsAppSendTemplateResult | { ok: false; code: "SKIPPED"; message: string }> {
+}): Promise<OneuiWhatsAppSendTemplateResult | WhatsAppTemplateSkippedResult> {
   const env = input.env ?? process.env;
 
   if (env.WHATSAPP_NAVIGO_AUTO_SEND_ENABLED === "false") {
@@ -416,7 +436,7 @@ export async function sendHutPhotoReminderWhatsApp(input: {
   repository?: OneuiWhatsAppRepository;
   sender?: WhatsAppTemplateSender;
   studyId: string;
-}): Promise<OneuiWhatsAppSendTemplateResult | { ok: false; code: "SKIPPED"; message: string }> {
+}): Promise<OneuiWhatsAppSendTemplateResult | WhatsAppTemplateSkippedResult> {
   const env = input.env ?? process.env;
 
   if (env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
@@ -428,7 +448,11 @@ export async function sendHutPhotoReminderWhatsApp(input: {
   }
   const originValidation = validateHutWhatsAppPublicOrigin(input.hutUrl, env);
   if (!originValidation.ok) {
-    return { code: "SKIPPED", message: HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN, ok: false };
+    return {
+      code: originValidation.code,
+      message: publicOriginValidationFailureMessage(originValidation.code),
+      ok: false
+    };
   }
 
   const sender = input.sender ?? sendOneuiWhatsAppTemplate;
@@ -477,15 +501,75 @@ export function buildHutPhotoReminderWhatsAppBody({
 export function validateHutWhatsAppPublicOrigin(
   hutUrl: string,
   env: Partial<NodeJS.ProcessEnv> = process.env
-): { ok: true; origin: string } | { expectedOrigin: string | null; ok: false; origin: string | null } {
+):
+  | { expectedOrigin: string; ok: true; origin: string }
+  | {
+      code: PublicOriginValidationFailureCode;
+      expectedOrigin: string | null;
+      message: string;
+      ok: false;
+      origin: string | null;
+    } {
   const expectedOrigin = resolveConfiguredPublicOrigin(env);
   const origin = readUrlOrigin(hutUrl);
 
-  if (!expectedOrigin || !origin || origin !== expectedOrigin) {
-    return { expectedOrigin, ok: false, origin };
+  if (!expectedOrigin) {
+    return {
+      code: WHATSAPP_CONFIGURATION_MISSING_PUBLIC_ORIGIN,
+      expectedOrigin,
+      message: publicOriginValidationFailureMessage(WHATSAPP_CONFIGURATION_MISSING_PUBLIC_ORIGIN),
+      ok: false,
+      origin
+    };
   }
 
-  return { ok: true, origin };
+  if (!origin || origin !== expectedOrigin) {
+    return {
+      code: WHATSAPP_INVALID_PUBLIC_ORIGIN,
+      expectedOrigin,
+      message: publicOriginValidationFailureMessage(WHATSAPP_INVALID_PUBLIC_ORIGIN),
+      ok: false,
+      origin
+    };
+  }
+
+  return { expectedOrigin, ok: true, origin };
+}
+
+export function publicOriginValidationFailureMessage(code: PublicOriginValidationFailureCode): string {
+  if (code === WHATSAPP_CONFIGURATION_MISSING_PUBLIC_ORIGIN) {
+    return "No existe dominio publico configurado para envios WhatsApp.";
+  }
+
+  return "El dominio generado no coincide con el dominio publico permitido.";
+}
+
+export function publicOriginValidationAuditMetadata(
+  hutUrl: string | null | undefined,
+  env: Partial<NodeJS.ProcessEnv> = process.env
+): {
+  publicOriginExpected: string | null;
+  publicOriginDetected: string | null;
+  publicOriginFailureCode: PublicOriginValidationFailureCode | null;
+  publicOriginFailureMessage: string | null;
+} {
+  if (!hutUrl) {
+    return {
+      publicOriginDetected: null,
+      publicOriginExpected: resolveConfiguredPublicOrigin(env),
+      publicOriginFailureCode: null,
+      publicOriginFailureMessage: null
+    };
+  }
+
+  const validation = validateHutWhatsAppPublicOrigin(hutUrl, env);
+
+  return {
+    publicOriginDetected: validation.origin,
+    publicOriginExpected: validation.expectedOrigin,
+    publicOriginFailureCode: validation.ok ? null : validation.code,
+    publicOriginFailureMessage: validation.ok ? null : validation.message
+  };
 }
 
 function readUrlOrigin(value: string): string | null {
@@ -505,7 +589,7 @@ export async function sendHutCompletionWhatsApp(input: {
   repository?: OneuiWhatsAppRepository;
   sender?: WhatsAppTemplateSender;
   studyId: string;
-}): Promise<OneuiWhatsAppSendTemplateResult | { ok: false; code: "SKIPPED"; message: string }> {
+}): Promise<OneuiWhatsAppSendTemplateResult | WhatsAppTemplateSkippedResult> {
   const env = input.env ?? process.env;
 
   if (env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
@@ -598,7 +682,7 @@ export async function sendHutRegistrationWhatsApp(input: {
   secondFragranceRightArm: string | null;
   sender?: WhatsAppTemplateSender;
   studyId: string;
-}): Promise<OneuiWhatsAppSendTemplateResult | { ok: false; code: "SKIPPED"; message: string }> {
+}): Promise<OneuiWhatsAppSendTemplateResult | WhatsAppTemplateSkippedResult> {
   const env = input.env ?? process.env;
 
   if (env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
@@ -623,7 +707,11 @@ export async function sendHutRegistrationWhatsApp(input: {
   }
   const originValidation = validateHutWhatsAppPublicOrigin(input.link, env);
   if (!originValidation.ok) {
-    return { code: "SKIPPED", message: HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN, ok: false };
+    return {
+      code: originValidation.code,
+      message: publicOriginValidationFailureMessage(originValidation.code),
+      ok: false
+    };
   }
 
   const sender = input.sender ?? sendOneuiWhatsAppTemplate;
