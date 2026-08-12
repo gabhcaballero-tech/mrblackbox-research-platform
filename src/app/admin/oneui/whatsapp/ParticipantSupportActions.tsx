@@ -78,9 +78,10 @@ export function ParticipantSupportActions({ participant }: { participant: WhatsA
         </div>
       ) : null}
       {state.error ? (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">
-          {state.error}
-        </p>
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+          <p className="font-semibold">{state.error}</p>
+          {state.errorReason ? <p className="mt-1 font-mono">{state.errorReason}</p> : null}
+        </div>
       ) : null}
     </form>
   );

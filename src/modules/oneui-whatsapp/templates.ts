@@ -23,12 +23,13 @@ const HUT_PARTICIPANT_LINK_TEMPLATE_NAME = "hut_link_participant";
 const NAVIGO_HUT_LINKS_TEMPLATE_NAME = "navigo_hut_links";
 const HUT_PHOTO_REMINDER_TEMPLATE_NAME = "hut_photo_reminder";
 const HUT_COMPLETION_TEMPLATE_NAME = "hut_completion_message";
-export const WHATSAPP_CONFIGURATION_MISSING_PUBLIC_ORIGIN = "CONFIGURATION_MISSING_PUBLIC_ORIGIN";
+export const WHATSAPP_MISSING_PUBLIC_ORIGIN_CONFIG = "MISSING_PUBLIC_ORIGIN_CONFIG";
+export const WHATSAPP_CONFIGURATION_MISSING_PUBLIC_ORIGIN = WHATSAPP_MISSING_PUBLIC_ORIGIN_CONFIG;
 export const WHATSAPP_INVALID_PUBLIC_ORIGIN = "INVALID_PUBLIC_ORIGIN";
 export const HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN = WHATSAPP_INVALID_PUBLIC_ORIGIN;
 
 export type PublicOriginValidationFailureCode =
-  | typeof WHATSAPP_CONFIGURATION_MISSING_PUBLIC_ORIGIN
+  | typeof WHATSAPP_MISSING_PUBLIC_ORIGIN_CONFIG
   | typeof WHATSAPP_INVALID_PUBLIC_ORIGIN;
 
 export type WhatsAppTemplateSkippedResult = {
@@ -515,9 +516,9 @@ export function validateHutWhatsAppPublicOrigin(
 
   if (!expectedOrigin) {
     return {
-      code: WHATSAPP_CONFIGURATION_MISSING_PUBLIC_ORIGIN,
+      code: WHATSAPP_MISSING_PUBLIC_ORIGIN_CONFIG,
       expectedOrigin,
-      message: publicOriginValidationFailureMessage(WHATSAPP_CONFIGURATION_MISSING_PUBLIC_ORIGIN),
+      message: publicOriginValidationFailureMessage(WHATSAPP_MISSING_PUBLIC_ORIGIN_CONFIG),
       ok: false,
       origin
     };
@@ -537,7 +538,7 @@ export function validateHutWhatsAppPublicOrigin(
 }
 
 export function publicOriginValidationFailureMessage(code: PublicOriginValidationFailureCode): string {
-  if (code === WHATSAPP_CONFIGURATION_MISSING_PUBLIC_ORIGIN) {
+  if (code === WHATSAPP_MISSING_PUBLIC_ORIGIN_CONFIG) {
     return "No existe dominio publico configurado para envios WhatsApp.";
   }
 

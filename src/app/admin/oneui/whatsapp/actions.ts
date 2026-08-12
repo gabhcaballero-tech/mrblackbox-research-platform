@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { sendOneuiWhatsAppTextReply } from "@/modules/oneui-whatsapp";
+import {
+  sendOneuiWhatsAppTextReply,
+  WHATSAPP_INVALID_PUBLIC_ORIGIN,
+  WHATSAPP_MISSING_PUBLIC_ORIGIN_CONFIG
+} from "@/modules/oneui-whatsapp";
 import {
   createWhatsAppParticipantSupportService,
   type WhatsAppParticipantSupportSendKind
@@ -68,17 +72,24 @@ export async function sendOneuiWhatsAppParticipantSupportAction(
     return supportActionError("Selecciona un participante y una accion valida.");
   }
 
-  const result = await createWhatsAppParticipantSupportService().sendManualSupportMessage({
-    actorUserId: actor.id,
-    hutParticipantId,
-    reason,
-    sendKind,
-    studyId,
-    studyParticipantId
-  });
+  let result: Awaited<ReturnType<ReturnType<typeof createWhatsAppParticipantSupportService>["sendManualSupportMessage"]>>;
+
+  try {
+    result = await createWhatsAppParticipantSupportService().sendManualSupportMessage({
+      actorUserId: actor.id,
+      hutParticipantId,
+      reason,
+      sendKind,
+      studyId,
+      studyParticipantId
+    });
+  } catch (error) {
+    console.error("Fallo no controlado al enviar WhatsApp desde soporte.", error);
+    return supportActionError("No se pudo enviar WhatsApp. Intenta nuevamente o revisa la configuracion.", "UNHANDLED_ERROR");
+  }
 
   if (!result.ok) {
-    return supportActionError(result.message);
+    return supportActionError(friendlySupportActionError(result.message, result.reason), result.reason ?? null);
   }
 
   try {
@@ -89,6 +100,7 @@ export async function sendOneuiWhatsAppParticipantSupportAction(
 
   return {
     error: null,
+    errorReason: null,
     hutUrl: result.data.hutUrl,
     message: result.data.message,
     navigoUrl: result.data.navigoUrl,
@@ -107,9 +119,10 @@ function isValidSupportSendKind(value: string): value is WhatsAppParticipantSupp
   return value === "BOTH" || value === "HUT" || value === "HUT_REMINDER" || value === "NAVIGO";
 }
 
-function supportActionError(error: string): OneuiWhatsAppParticipantSupportActionState {
+function supportActionError(error: string, errorReason: string | null = null): OneuiWhatsAppParticipantSupportActionState {
   return {
     error,
+    errorReason,
     hutUrl: null,
     message: null,
     navigoUrl: null,
@@ -118,4 +131,20 @@ function supportActionError(error: string): OneuiWhatsAppParticipantSupportActio
     templateName: null,
     whatsappStatus: null
   };
+}
+
+function friendlySupportActionError(message: string, reason?: string | null): string {
+  if (reason === WHATSAPP_MISSING_PUBLIC_ORIGIN_CONFIG) {
+    return "El envío fue bloqueado porque falta configurar el dominio público de producción para WhatsApp.";
+  }
+
+  if (reason === WHATSAPP_INVALID_PUBLIC_ORIGIN || reason === "HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN") {
+    return "El envío fue bloqueado por configuración de dominio público WhatsApp.";
+  }
+
+  if (reason === "AUDIT_LOG_FAILED") {
+    return "No se pudo registrar la auditoría del envío WhatsApp. No se reintentó automáticamente.";
+  }
+
+  return message;
 }

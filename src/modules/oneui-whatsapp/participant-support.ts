@@ -8,6 +8,8 @@ import {
 } from "@/modules/navigo-app/repository";
 import { createOneuiWhatsAppRepository } from "./repository";
 import {
+  WHATSAPP_INVALID_PUBLIC_ORIGIN,
+  WHATSAPP_MISSING_PUBLIC_ORIGIN_CONFIG,
   publicOriginValidationAuditMetadata,
   sendHutParticipantLinkWhatsApp
 } from "./templates";
@@ -61,6 +63,7 @@ export type WhatsAppParticipantSupportSendResult =
   | {
       message: string;
       ok: false;
+      reason?: string | null;
     };
 
 type WhatsAppParticipantSupportDependencies = {
@@ -194,20 +197,29 @@ export function createWhatsAppParticipantSupportService(dependencies: WhatsAppPa
         return { message: "El participante seleccionado no tiene folio NAV para este envio.", ok: false };
       }
 
-      const repository = dependencies.navigoRepository ?? createNavigoAppRepository();
-      const result = await repository.sendParticipantLinksWhatsApp({
-        actorUserId: input.actorUserId,
-        linkType: input.sendKind,
-        requestOrigin: getStablePublicOrigin(),
-        studyId: input.studyId,
-        studyParticipantId: input.studyParticipantId
-      });
+      let result: Awaited<ReturnType<ReturnType<typeof createNavigoAppRepository>["sendParticipantLinksWhatsApp"]>>;
 
-      if (!result.ok) {
-        return { message: result.message, ok: false };
+      try {
+        const repository = dependencies.navigoRepository ?? createNavigoAppRepository();
+        result = await repository.sendParticipantLinksWhatsApp({
+          actorUserId: input.actorUserId,
+          linkType: input.sendKind,
+          requestOrigin: getStablePublicOrigin(),
+          studyId: input.studyId,
+          studyParticipantId: input.studyParticipantId
+        });
+      } catch (error) {
+        return supportFailure(
+          "No se pudo enviar WhatsApp desde soporte.",
+          readSupportFailureReason(error)
+        );
       }
 
-      await auditManualSupportSend({
+      if (!result.ok) {
+        return supportFailure(result.message, readSupportFailureReason(result.message));
+      }
+
+      const auditResult = await safeAuditManualSupportSend({
         actorUserId: input.actorUserId,
         entityId: input.studyParticipantId,
         entityType: "StudyParticipant",
@@ -223,6 +235,17 @@ export function createWhatsAppParticipantSupportService(dependencies: WhatsAppPa
         whatsappMessageId: result.data.whatsappMessageId,
         whatsappStatus: result.data.whatsappStatus
       });
+
+      if (!auditResult.ok) {
+        return supportFailure(auditResult.message, auditResult.reason);
+      }
+
+      if (result.data.whatsappStatus === "ERROR") {
+        return supportFailure(
+          "No se pudo enviar WhatsApp.",
+          result.data.whatsappErrorReason ?? readSupportFailureReason(result.data.whatsappError)
+        );
+      }
 
       return {
         data: {
@@ -411,7 +434,7 @@ async function sendHutLinkFromSelectedParticipant({
   const whatsappStatus = result.ok ? "ENVIADO" : "ERROR";
   const whatsappError = result.ok ? null : result.message;
 
-  await auditManualSupportSend({
+  const auditResult = await safeAuditManualSupportSend({
     actorUserId,
     entityId: participant.id,
     entityType: "HutParticipant",
@@ -428,13 +451,23 @@ async function sendHutLinkFromSelectedParticipant({
     whatsappStatus
   });
 
+  if (!auditResult.ok) {
+    return supportFailure(auditResult.message, auditResult.reason);
+  }
+
+  if (whatsappStatus === "ERROR") {
+    const failedResult = result as { code?: string; message?: string };
+    return supportFailure(
+      "No se pudo enviar WhatsApp.",
+      failedResult.code ?? readSupportFailureReason(failedResult.message)
+    );
+  }
+
   return {
     data: {
       generatedAtIso: now.toISOString(),
       hutUrl,
-      message: result.ok
-        ? "Enlace HUT enviado desde soporte WhatsApp."
-        : "Enlace HUT preparado. WhatsApp fallo; revisa el detalle.",
+      message: "Enlace HUT enviado desde soporte WhatsApp.",
       navigoUrl: null,
       phone: phone ?? "",
       sentKind: "HUT",
@@ -513,6 +546,66 @@ async function auditManualSupportSend({
       reason
     }
   });
+}
+
+async function safeAuditManualSupportSend(
+  input: Parameters<typeof auditManualSupportSend>[0]
+): Promise<{ ok: true } | { message: string; ok: false; reason: string }> {
+  try {
+    await auditManualSupportSend(input);
+    return { ok: true };
+  } catch (error) {
+    console.error("No se pudo registrar auditoria de envio manual WhatsApp.", error);
+    return {
+      message: "No se pudo registrar la auditoria del envio WhatsApp.",
+      ok: false,
+      reason: "AUDIT_LOG_FAILED"
+    };
+  }
+}
+
+function supportFailure(message: string, reason?: string | null): WhatsAppParticipantSupportSendResult {
+  return {
+    message,
+    ok: false,
+    reason: reason ?? null
+  };
+}
+
+function readSupportFailureReason(error: unknown): string | null {
+  if (!error) {
+    return null;
+  }
+
+  if (typeof error === "string") {
+    return knownSupportFailureReason(error);
+  }
+
+  if (error instanceof Error) {
+    return knownSupportFailureReason(error.message);
+  }
+
+  if (typeof error === "object" && "code" in error && typeof (error as { code?: unknown }).code === "string") {
+    return (error as { code: string }).code;
+  }
+
+  return null;
+}
+
+function knownSupportFailureReason(value: string): string | null {
+  if (value.includes(WHATSAPP_MISSING_PUBLIC_ORIGIN_CONFIG) || value.includes("No existe dominio publico configurado")) {
+    return WHATSAPP_MISSING_PUBLIC_ORIGIN_CONFIG;
+  }
+
+  if (
+    value.includes(WHATSAPP_INVALID_PUBLIC_ORIGIN) ||
+    value.includes("HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN") ||
+    value.includes("El dominio generado no coincide")
+  ) {
+    return WHATSAPP_INVALID_PUBLIC_ORIGIN;
+  }
+
+  return null;
 }
 
 function mapStudyParticipantSearchResult(row: StudyParticipantSearchRow): WhatsAppParticipantSupportSearchResult {

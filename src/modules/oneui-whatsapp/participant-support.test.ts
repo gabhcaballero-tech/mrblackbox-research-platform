@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createWhatsAppParticipantSupportService } from "./participant-support";
+import { WHATSAPP_INVALID_PUBLIC_ORIGIN } from "./templates";
 
 describe("WhatsApp participant support", () => {
   it("busca participantes por folio NAV", async () => {
@@ -143,6 +144,63 @@ describe("WhatsApp participant support", () => {
         studyParticipantId: "study-participant-1"
       })
     );
+  });
+
+  it("devuelve error controlado cuando enviar ambos enlaces es bloqueado por dominio publico", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://expected.example.com");
+    const sendParticipantLinksWhatsApp = vi.fn().mockResolvedValue({
+      data: {
+        folio: "NAV-137",
+        generatedAt: new Date("2026-08-12T22:15:00.000Z"),
+        hutUrl: "https://mrblackbox-research-platform.vercel.app/hut/p/hut-token",
+        navigoUrl: "https://mrblackbox-research-platform.vercel.app/p/navigo-token/activities",
+        phone: "+525585178901",
+        requestedLinkType: "BOTH",
+        sentLinkType: "BOTH",
+        warnings: [],
+        whatsappError: "El dominio generado no coincide con el dominio publico permitido.",
+        whatsappErrorReason: WHATSAPP_INVALID_PUBLIC_ORIGIN,
+        whatsappMessageId: null,
+        whatsappStatus: "ERROR"
+      },
+      ok: true
+    });
+    const auditCreate = vi.fn().mockResolvedValue({});
+    const prisma = createPrismaMock({ auditCreate });
+    const service = createWhatsAppParticipantSupportService({
+      navigoRepository: { sendParticipantLinksWhatsApp } as never,
+      now: () => new Date("2026-08-12T22:15:00.000Z"),
+      prisma
+    });
+
+    const result = await service.sendManualSupportMessage({
+      actorUserId: "admin-1",
+      reason: "Soporte manual",
+      sendKind: "BOTH",
+      studyId: "study-1",
+      studyParticipantId: "study-participant-137"
+    });
+
+    expect(result).toMatchObject({
+      message: "No se pudo enviar WhatsApp.",
+      ok: false,
+      reason: WHATSAPP_INVALID_PUBLIC_ORIGIN
+    });
+    expect(auditCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        actorUserId: "admin-1",
+        entityId: "study-participant-137",
+        entityType: "StudyParticipant",
+        afterJson: expect.objectContaining({
+          publicOriginFailureCode: WHATSAPP_INVALID_PUBLIC_ORIGIN,
+          source: "MANUAL_SUPPORT",
+          templateName: "navigo_hut_links",
+          whatsappError: "El dominio generado no coincide con el dominio publico permitido.",
+          whatsappStatus: "ERROR"
+        })
+      })
+    });
+    vi.unstubAllEnvs();
   });
 });
 

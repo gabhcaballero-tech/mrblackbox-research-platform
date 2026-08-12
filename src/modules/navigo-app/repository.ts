@@ -302,6 +302,7 @@ export type NavigoParticipantLinksWhatsAppSendResult = {
   sentLinkType: NavigoParticipantLinkSendType;
   warnings: string[];
   whatsappError: string | null;
+  whatsappErrorReason?: string | null;
   whatsappMessageId: string | null;
   whatsappStatus: "ERROR" | "ENVIADO";
 };
@@ -3149,6 +3150,7 @@ export function createNavigoAppRepository(
             publicOriginExpected: publicOriginAudit.publicOriginExpected,
             publicOriginFailureCode: result.ok ? null : publicOriginAudit.publicOriginFailureCode,
             publicOriginFailureMessage: result.ok ? null : publicOriginAudit.publicOriginFailureMessage,
+            whatsappErrorReason: result.ok ? null : "code" in result ? result.code : null,
             sentAtMexicoCity: formatDateTimeMexicoCity(now),
             templateName: templateNameForParticipantLinks(prepared.data.sentLinkType),
             warnings: prepared.data.warnings,
@@ -3171,6 +3173,7 @@ export function createNavigoAppRepository(
         sentLinkType: prepared.data.sentLinkType,
         warnings: prepared.data.warnings,
         whatsappError: result.ok ? null : result.message,
+        whatsappErrorReason: result.ok ? null : "code" in result ? result.code : null,
         whatsappMessageId: whatsAppMessage?.metaMessageId ?? null,
         whatsappStatus: result.ok ? "ENVIADO" : "ERROR"
       };

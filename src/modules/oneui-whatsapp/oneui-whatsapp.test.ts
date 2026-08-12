@@ -25,6 +25,7 @@ import {
 import {
   buildNavigoCodesWhatsAppBody,
   HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN,
+  WHATSAPP_MISSING_PUBLIC_ORIGIN_CONFIG,
   sendHutCompletionWhatsApp,
   sendHutParticipantLinkWhatsApp,
   sendHutPhotoReminderWhatsApp,
@@ -580,8 +581,39 @@ describe("ONEUI WhatsApp template sending", () => {
     });
 
     expect(result).toMatchObject({
-      code: "SKIPPED",
-      message: HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN,
+      code: HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN,
+      message: "El dominio generado no coincide con el dominio publico permitido.",
+      ok: false
+    });
+    expect(fetcher.calls).toHaveLength(0);
+    expect(repository.messages).toHaveLength(0);
+  });
+
+  it("distingue configuracion faltante de dominio publico para plantillas HUT", async () => {
+    const repository = createFakeRepository();
+    const fetcher = viFetch({
+      contacts: [{ wa_id: "5215512345678" }],
+      messages: [{ id: "wamid.hut-photo-reminder-1", message_status: "accepted" }]
+    });
+    const env = {
+      NODE_ENV: "test",
+      WHATSAPP_ACCESS_TOKEN: "secret-token",
+      WHATSAPP_PHONE_NUMBER_ID: "1230538790140150"
+    } as unknown as NodeJS.ProcessEnv;
+    const result = await sendHutPhotoReminderWhatsApp({
+      env,
+      hutUrl: "https://mrblackbox-research-platform.vercel.app/hut/p/hut-token",
+      participantId: "hut-participant-1",
+      participantName: "ANA",
+      phone: "5512345678",
+      repository,
+      sender: (input) => sendOneuiWhatsAppTemplate({ ...input, fetcher }),
+      studyId: "study-1"
+    });
+
+    expect(result).toMatchObject({
+      code: WHATSAPP_MISSING_PUBLIC_ORIGIN_CONFIG,
+      message: "No existe dominio publico configurado para envios WhatsApp.",
       ok: false
     });
     expect(fetcher.calls).toHaveLength(0);

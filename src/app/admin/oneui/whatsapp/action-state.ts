@@ -10,6 +10,7 @@ export const initialOneuiWhatsAppReplyActionState: OneuiWhatsAppReplyActionState
 
 export type OneuiWhatsAppParticipantSupportActionState = {
   error: string | null;
+  errorReason: string | null;
   hutUrl: string | null;
   message: string | null;
   navigoUrl: string | null;
@@ -21,6 +22,7 @@ export type OneuiWhatsAppParticipantSupportActionState = {
 
 export const initialOneuiWhatsAppParticipantSupportActionState: OneuiWhatsAppParticipantSupportActionState = {
   error: null,
+  errorReason: null,
   hutUrl: null,
   message: null,
   navigoUrl: null,
