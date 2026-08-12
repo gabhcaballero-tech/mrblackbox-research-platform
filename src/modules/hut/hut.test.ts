@@ -1924,6 +1924,57 @@ describe("HUT module foundation", () => {
     expect(prisma.state.participants[0]?.applicationEvidence).toHaveLength(1);
   });
 
+  it("keeps reserved HUT folios without operational identity from starting capture or validating codes", async () => {
+    vi.stubEnv("HUT_PHASE_CODE_SECRET", "hut-phase-secret-for-tests");
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      folio: "HUT-143",
+      firstFragranceLeftArm: "247",
+      name: "HUT-143",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    participant.phaseCodes.push({
+      codeHash: hashHutPhaseCode("A7K4", "hut-phase-secret-for-tests"),
+      encryptedCode: "encrypted-reserved-code",
+      id: "phase-reserved-colocacion",
+      participantId: participant.id,
+      phase: "COLOCACION",
+      slot: 1,
+      status: "GENERATED"
+    });
+
+    const view = await repository.getPortalView(participant.token);
+    const upload = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      slotId: "DELIVERY",
+      storage,
+      token: participant.token
+    });
+    const validation = await repository.validatePhaseCode({
+      code: "A7K4",
+      phase: "COLOCACION",
+      token: participant.token
+    });
+
+    expect(view.ok ? view.data.operationalIdentityMissing : null).toBe(true);
+    expect(view.ok ? view.data.availableApplicationPhoto : "not-ok").toBeNull();
+    expect(upload).toMatchObject({
+      message: "Este folio HUT esta reservado y aun no tiene identidad operativa asignada. Contacta al equipo del estudio para activarlo.",
+      ok: false
+    });
+    expect(validation).toMatchObject({
+      message: "Este folio HUT esta reservado y aun no tiene identidad operativa asignada. Contacta al equipo del estudio para activarlo.",
+      ok: false
+    });
+    expect(participant.phaseCodes[0]?.status).toBe("GENERATED");
+    expect(prisma.state.participants[0]?.applicationEvidence).toHaveLength(0);
+  });
+
   it("shows historical COLOCACION evidence as delivery and offers product 1 day 1 next", async () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);

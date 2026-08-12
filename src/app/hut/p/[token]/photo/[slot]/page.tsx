@@ -27,6 +27,23 @@ export default async function HutPhotoSlotPage({ params }: HutPhotoSlotPageProps
   }
 
   const view = result.data;
+  if (view.operationalIdentityMissing) {
+    return (
+      <main className="min-h-screen bg-zinc-50 px-4 py-8">
+        <div className="mx-auto w-full max-w-2xl space-y-6">
+          <header className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">{view.folio ?? "HUT"}</p>
+            <h1 className="mt-2 text-2xl font-semibold text-zinc-950">Actividad HUT aun no activada</h1>
+          </header>
+          <PhotoSlotMessage
+            href={`/hut/p/${encodeURIComponent(token)}`}
+            message="Este folio esta reservado y todavia no tiene participante asignado. Contacta al equipo del estudio para activarlo."
+            title="Folio reservado"
+          />
+        </div>
+      </main>
+    );
+  }
   const timeline = buildHutPhotoTimeline({
     applicationEvidence: view.applicationEvidence,
     availableSlotId: view.availableApplicationPhoto?.slotId ?? null,

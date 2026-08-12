@@ -69,6 +69,7 @@ describe("HutPhotoSlotPage", () => {
         folio: "HUT-121",
         message: "Seguimiento fotografico",
         name: "Participante HUT",
+        operationalIdentityMissing: false,
         origin: "CLT_HUT",
         participantId: "participant-1",
         phaseGate: null,
@@ -95,5 +96,54 @@ describe("HutPhotoSlotPage", () => {
     expect(createHutRepository).toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: "Entrega del producto" })).toBeInTheDocument();
     expect(screen.getByText("Formulario DELIVERY Entrega del producto")).toBeInTheDocument();
+  });
+
+  it("no abre camara para un folio HUT reservado sin identidad operativa", async () => {
+    getPortalViewMock.mockResolvedValue({
+      data: {
+        applicationEvidence: [],
+        applicationPhotoEntries: [],
+        availableApplicationPhoto: {
+          phase: "COLOCACION",
+          productCode: null,
+          slotId: "DELIVERY"
+        },
+        availableUpload: null,
+        availability: {
+          nextAvailableAt: null,
+          reason: "RESERVED_WITHOUT_OPERATIONAL_IDENTITY"
+        },
+        block1: null,
+        block2: null,
+        folio: "HUT-143",
+        message: "Folio reservado",
+        name: "HUT-143",
+        operationalIdentityMissing: true,
+        origin: "HUT_DIRECTO",
+        participantId: "participant-143",
+        phaseGate: null,
+        protocolVersion: "APPLICATION_PHOTO",
+        rotation: {
+          firstFragranceLeftArm: "247",
+          secondFragranceRightArm: "583"
+        },
+        status: "NOT_STARTED",
+        studyName: "Estudio HUT",
+        testMode: false,
+        token: "token-reserved"
+      },
+      ok: true
+    });
+
+    render(await HutPhotoSlotPage({
+      params: Promise.resolve({
+        slot: "DELIVERY",
+        token: "token-reserved"
+      })
+    }));
+
+    expect(screen.getByText("Folio reservado")).toBeInTheDocument();
+    expect(screen.getByText("Actividad HUT aun no activada")).toBeInTheDocument();
+    expect(screen.queryByText(/Formulario DELIVERY/)).not.toBeInTheDocument();
   });
 });

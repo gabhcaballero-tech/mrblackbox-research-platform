@@ -119,6 +119,37 @@ describe("HutParticipantPage", () => {
     expect(screen.queryByText("Formulario HUT")).not.toBeInTheDocument();
   });
 
+  it("bloquea folios HUT reservados sin identidad operativa", async () => {
+    getPortalViewMock.mockResolvedValue({
+      data: createPortalView({
+        availability: {
+          nextAvailableAt: null,
+          reason: "RESERVED_WITHOUT_OPERATIONAL_IDENTITY"
+        },
+        availableApplicationPhoto: {
+          phase: "COLOCACION",
+          productCode: "247",
+          slotId: "DELIVERY"
+        },
+        block1: null,
+        block2: null,
+        message: "Este folio HUT esta reservado y aun no tiene identidad operativa asignada.",
+        name: "HUT-143",
+        operationalIdentityMissing: true,
+        protocolVersion: "APPLICATION_PHOTO",
+        status: "NOT_STARTED"
+      }),
+      ok: true
+    });
+
+    render(await HutParticipantPage({ params: Promise.resolve({ token: "reserved-token" }) }));
+
+    expect(screen.getByText("Folio reservado")).toBeInTheDocument();
+    expect(screen.getByText("Actividad HUT aun no activada")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Validar codigo" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Registra la foto indicada por el equipo")).not.toBeInTheDocument();
+  });
+
   it("muestra foto de aplicacion en protocolo nuevo sin selfie ni video legacy", async () => {
     getPortalViewMock.mockResolvedValue({
       data: createPortalView({
@@ -453,6 +484,7 @@ function createPortalView(overrides: Partial<PortalViewForTest> = {}): PortalVie
     message: "Tu participacion HUT esta completa. Gracias por tu tiempo.",
     folio: "HUT-001",
     name: "Participante HUT",
+    operationalIdentityMissing: false,
     origin: "HUT_DIRECTO",
     phaseGate: null,
     participantId: "participant-1",
@@ -499,6 +531,7 @@ type PortalViewForTest = {
   folio: string | null;
   message: string;
   name: string;
+  operationalIdentityMissing: boolean;
   origin: "CLT_HUT" | "HUT_DIRECTO";
   phaseGate: {
     label: string;

@@ -315,7 +315,13 @@ export type HutApplicationPhotoDailyAvailability = {
   capturedLocalDate: string;
   existingEntry: HutApplicationPhotoEntrySummary | null;
   nextAvailableLocalDate: string | null;
-  reason: "AVAILABLE" | "FILTER_PENDING" | "LEGACY_PROTOCOL" | "PHOTO_ALREADY_CAPTURED_TODAY" | "WAIT_UNTIL_NEXT_DAY";
+  reason:
+    | "AVAILABLE"
+    | "FILTER_PENDING"
+    | "LEGACY_PROTOCOL"
+    | "PHOTO_ALREADY_CAPTURED_TODAY"
+    | "RESERVED_WITHOUT_OPERATIONAL_IDENTITY"
+    | "WAIT_UNTIL_NEXT_DAY";
   slotId: HutPhotoTimelineSlotId | null;
 };
 
@@ -468,6 +474,7 @@ export type HutPortalView = {
   message: string;
   name: string;
   legacyMirroredPlacementPhoto: boolean;
+  operationalIdentityMissing: boolean;
   phaseGate: {
     label: string;
     phase: HutPhase;
@@ -1765,6 +1772,13 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
     async ensureQuestionnaireAttempt(input) {
       const prisma = await getPrisma();
+      const participant = await findParticipant(prisma, input.participantId);
+      if (!participant || participant.studyId !== input.studyId) {
+        return { message: "No encontramos el participante HUT.", ok: false };
+      }
+      if (isReservedHutWithoutOperationalIdentity(participant)) {
+        return { message: reservedHutOperationalIdentityMessage(), ok: false };
+      }
       const prepared = await ensureHutQuestionnaireAttemptForParticipant(prisma, input);
 
       if (!prepared.ok) {
@@ -1780,6 +1794,13 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
     async ensureQuestionnaireSectionProgress(input) {
       const prisma = await getPrisma();
+      const participant = await findParticipant(prisma, input.participantId);
+      if (!participant || participant.studyId !== input.studyId) {
+        return { message: "No encontramos el participante HUT.", ok: false };
+      }
+      if (isReservedHutWithoutOperationalIdentity(participant)) {
+        return { message: reservedHutOperationalIdentityMessage(), ok: false };
+      }
       return ensureHutQuestionnaireSectionProgressInternal(prisma, input);
     },
 
@@ -1789,6 +1810,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
       if (!participant || participant.studyId !== input.studyId) {
         return { message: "No encontramos el participante HUT.", ok: false };
+      }
+      if (isReservedHutWithoutOperationalIdentity(participant)) {
+        return { message: reservedHutOperationalIdentityMessage(), ok: false };
       }
       if (
         participantOrigin(participant) === "HUT_DIRECTO"
@@ -1888,6 +1912,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
       if (!participant || participant.studyId !== input.studyId) {
         return { message: "No encontramos el participante HUT.", ok: false };
+      }
+      if (isReservedHutWithoutOperationalIdentity(participant)) {
+        return { message: reservedHutOperationalIdentityMessage(), ok: false };
       }
       if (!isApplicationPhotoProtocol(participant)) {
         return { message: "Este participante conserva el flujo HUT historico.", ok: false };
@@ -2089,6 +2116,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       if (!participant || participant.studyId !== input.studyId) {
         return { message: "No encontramos el participante HUT.", ok: false };
       }
+      if (isReservedHutWithoutOperationalIdentity(participant)) {
+        return { message: reservedHutOperationalIdentityMessage(), ok: false };
+      }
       if (!isApplicationPhotoProtocol(participant)) {
         return { message: "Este participante conserva el flujo HUT historico.", ok: false };
       }
@@ -2158,6 +2188,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       if (!participant) {
         return { message: "No encontramos un participante HUT con ese folio.", ok: false };
       }
+      if (isReservedHutWithoutOperationalIdentity(participant)) {
+        return { message: reservedHutOperationalIdentityMessage(), ok: false };
+      }
       if (!isApplicationPhotoProtocol(participant)) {
         return { message: "Este participante conserva el flujo HUT historico.", ok: false };
       }
@@ -2207,8 +2240,21 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       if (!participant || participant.studyId !== input.studyId) {
         return { message: "No encontramos el participante HUT.", ok: false };
       }
-
       const capturedLocalDate = hutLocalDateKey(input.now ?? new Date());
+      if (isReservedHutWithoutOperationalIdentity(participant)) {
+        return {
+          data: {
+            available: false,
+            capturedLocalDate,
+            existingEntry: null,
+            nextAvailableLocalDate: null,
+            reason: "RESERVED_WITHOUT_OPERATIONAL_IDENTITY",
+            slotId: null
+          },
+          ok: true
+        };
+      }
+
       if (!isApplicationPhotoProtocol(participant)) {
         return {
           data: {
@@ -2298,6 +2344,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         if (!participant || participant.studyId !== input.studyId) {
           return { message: "No encontramos el participante HUT.", ok: false };
         }
+        if (isReservedHutWithoutOperationalIdentity(participant)) {
+          return { message: reservedHutOperationalIdentityMessage(), ok: false };
+        }
         if (!isApplicationPhotoProtocol(participant)) {
           return { message: "Este participante conserva el flujo HUT historico.", ok: false };
         }
@@ -2365,6 +2414,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       if (!participant || participant.studyId !== input.studyId) {
         return { message: "No encontramos el participante HUT.", ok: false };
       }
+      if (isReservedHutWithoutOperationalIdentity(participant)) {
+        return { message: reservedHutOperationalIdentityMessage(), ok: false };
+      }
       if (!isApplicationPhotoProtocol(participant)) {
         return { message: "La recuperacion de entrega aplica solo al protocolo APPLICATION_PHOTO.", ok: false };
       }
@@ -2402,6 +2454,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
         if (!participant || participant.studyId !== input.studyId) {
           return { message: "No encontramos el participante HUT.", ok: false };
+        }
+        if (isReservedHutWithoutOperationalIdentity(participant)) {
+          return { message: reservedHutOperationalIdentityMessage(), ok: false };
         }
         if (!isApplicationPhotoProtocol(participant)) {
           return { message: "La recuperacion de entrega aplica solo al protocolo APPLICATION_PHOTO.", ok: false };
@@ -2503,6 +2558,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         if (!participant || participant.studyId !== input.studyId) {
           return { message: "No encontramos el participante HUT.", ok: false };
         }
+        if (isReservedHutWithoutOperationalIdentity(participant)) {
+          return { message: reservedHutOperationalIdentityMessage(), ok: false };
+        }
         if (!isApplicationPhotoProtocol(participant)) {
           return { message: "La regularizacion de entrega aplica solo al protocolo APPLICATION_PHOTO.", ok: false };
         }
@@ -2593,6 +2651,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       if (!participant || participant.studyId !== input.studyId) {
         return { message: "No encontramos el participante HUT.", ok: false };
       }
+      if (isReservedHutWithoutOperationalIdentity(participant)) {
+        return { message: reservedHutOperationalIdentityMessage(), ok: false };
+      }
       if (!isApplicationPhotoProtocol(participant)) {
         return { message: "El control manual de slots aplica solo a APPLICATION_PHOTO.", ok: false };
       }
@@ -2630,6 +2691,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       const participant = await findParticipant(prisma, input.participantId);
       if (!participant || participant.studyId !== input.studyId) {
         return { message: "No encontramos el participante HUT.", ok: false };
+      }
+      if (isReservedHutWithoutOperationalIdentity(participant)) {
+        return { message: reservedHutOperationalIdentityMessage(), ok: false };
       }
       if (!isApplicationPhotoProtocol(participant)) {
         return { message: "El control manual de slots aplica solo a APPLICATION_PHOTO.", ok: false };
@@ -2692,6 +2756,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
         if (!participant || participant.studyId !== input.studyId) {
           return { message: "No encontramos el participante HUT.", ok: false };
+        }
+        if (isReservedHutWithoutOperationalIdentity(participant)) {
+          return { message: reservedHutOperationalIdentityMessage(), ok: false };
         }
 
         if (participant.status === "DISQUALIFIED" || participant.status === "COMPLETED") {
@@ -3080,6 +3147,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       if (!participant || participant.studyId !== input.studyId) {
         return { message: "No encontramos el participante HUT.", ok: false };
       }
+      if (isReservedHutWithoutOperationalIdentity(participant)) {
+        return { message: reservedHutOperationalIdentityMessage(), ok: false };
+      }
 
       const link = participantLink(input.requestOrigin, participant.token);
       const result = await sendHutRegistrationWhatsAppForParticipant({
@@ -3108,6 +3178,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
       if (!participant || participant.studyId !== input.studyId) {
         return { message: "No encontramos el participante HUT.", ok: false };
+      }
+      if (isReservedHutWithoutOperationalIdentity(participant)) {
+        return { message: reservedHutOperationalIdentityMessage(), ok: false };
       }
 
       const prepared = await prepareHutPhotoReminder({
@@ -4075,6 +4148,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       if (!participant) {
         return { message: "Este enlace HUT no es valido.", ok: false };
       }
+      if (isReservedHutWithoutOperationalIdentity(participant)) {
+        return { message: reservedHutOperationalIdentityMessage(), ok: false };
+      }
       if (!isApplicationPhotoProtocol(participant)) {
         return { message: "Este participante conserva el flujo HUT historico.", ok: false };
       }
@@ -4138,6 +4214,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
         if (!participant) {
           return { message: "Este enlace HUT no es valido.", ok: false };
+        }
+        if (isReservedHutWithoutOperationalIdentity(participant)) {
+          return { message: reservedHutOperationalIdentityMessage(), ok: false };
         }
         if (!isApplicationPhotoProtocol(participant)) {
           return { message: "Este participante conserva el flujo HUT historico.", ok: false };
@@ -4840,6 +4919,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
         if (!participant) {
           return { message: "Este enlace HUT no es valido.", ok: false };
+        }
+        if (isReservedHutWithoutOperationalIdentity(participant)) {
+          return { message: reservedHutOperationalIdentityMessage(), ok: false };
         }
         const expectedPhase = expectedHutPhaseForParticipant(participant);
         if (expectedPhase !== input.phase) {
@@ -6280,6 +6362,7 @@ function toPortalView(
       message:
         "Gracias por tu participacion. Por las reglas del estudio, no es posible continuar con esta etapa. El equipo podra contactarte si requiere informacion adicional.",
       name: hutParticipantDisplayName(participant),
+      operationalIdentityMissing: isReservedHutWithoutOperationalIdentity(participant),
       origin: participantOrigin(participant),
       phaseGate,
       participantId: participant.id,
@@ -6318,6 +6401,7 @@ function toPortalView(
     legacyMirroredPlacementPhoto: false,
     message: hutPortalMessage(participant),
     name: hutParticipantDisplayName(participant),
+    operationalIdentityMissing: isReservedHutWithoutOperationalIdentity(participant),
     origin: participantOrigin(participant),
     phaseGate,
     participantId: participant.id,
@@ -6339,11 +6423,12 @@ function toApplicationPhotoPortalView(
   const now = new Date();
   const evidence = applicationEvidenceSummary(participant);
   const entries = applicationPhotoEntrySummary(participant);
+  const operationalIdentityMissing = isReservedHutWithoutOperationalIdentity(participant);
   const filterBlocksPhotoCapture = participantOrigin(participant) === "HUT_DIRECTO" && hutFilterStatusFromParticipant(participant) !== "COMPLETED";
   const legacyMirroredPlacementPhoto = hasLegacyMirroredPlacementPhoto(participant);
   const product2GateOpen = isHutProduct2GateOpen(participant);
-  const nextAvailableSlot = filterBlocksPhotoCapture ? null : expectedApplicationPhotoSlot(participant, now, manualOverrides);
-  const nextPendingSlot = filterBlocksPhotoCapture ? null : nextPendingApplicationPhotoSlot(participant, now, manualOverrides);
+  const nextAvailableSlot = operationalIdentityMissing || filterBlocksPhotoCapture ? null : expectedApplicationPhotoSlot(participant, now, manualOverrides);
+  const nextPendingSlot = operationalIdentityMissing || filterBlocksPhotoCapture ? null : nextPendingApplicationPhotoSlot(participant, now, manualOverrides);
   const availableApplicationPhoto = nextAvailableSlot
     ? {
         phase: storagePhaseForApplicationPhotoSlot(nextAvailableSlot.id),
@@ -6361,7 +6446,9 @@ function toApplicationPhotoPortalView(
     availableUpload: null,
     availability: {
       nextAvailableAt,
-      reason: filterBlocksPhotoCapture
+      reason: operationalIdentityMissing
+        ? "RESERVED_WITHOUT_OPERATIONAL_IDENTITY"
+        : filterBlocksPhotoCapture
         ? "FILTER_PENDING"
           : availableApplicationPhoto
           ? "AVAILABLE_FOR_APPLICATION_PHOTO"
@@ -6375,8 +6462,9 @@ function toApplicationPhotoPortalView(
     block2: null,
     folio: participant.folio,
     legacyMirroredPlacementPhoto,
-    message: applicationPhotoPortalMessage(participant),
+    message: operationalIdentityMissing ? reservedHutOperationalIdentityMessage() : applicationPhotoPortalMessage(participant),
     name: hutParticipantDisplayName(participant),
+    operationalIdentityMissing,
     origin: participantOrigin(participant),
     phaseGate: null,
     participantId: participant.id,
@@ -6393,6 +6481,19 @@ function toApplicationPhotoPortalView(
 
 function hutParticipantDisplayName(participant: HutParticipantRecord): string {
   return participant.studyParticipant?.participantProfile.name ?? participant.name;
+}
+
+function isReservedHutWithoutOperationalIdentity(participant: HutParticipantRecord): boolean {
+  const name = normalizeHutText(participant.name);
+  return participantOrigin(participant) === "HUT_DIRECTO"
+    && !participant.studyParticipant?.id
+    && !normalizeHutPhone(participant.phone)
+    && !normalizeHutEmail(participant.email)
+    && /^HUT-\d+$/i.test(name);
+}
+
+function reservedHutOperationalIdentityMessage(): string {
+  return "Este folio HUT esta reservado y aun no tiene identidad operativa asignada. Contacta al equipo del estudio para activarlo.";
 }
 
 function hutParticipantRotation(participant: HutParticipantRecord): HutPortalView["rotation"] {

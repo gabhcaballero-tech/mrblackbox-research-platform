@@ -83,15 +83,17 @@ export default async function HutParticipantPage({ params, searchParams }: HutPa
 
         {view.status === "COMPLETED" ? <CompletionMessage /> : null}
 
-        {view.status !== "COMPLETED" && view.phaseGate?.required ? (
+        {view.status !== "COMPLETED" && view.operationalIdentityMissing ? <ReservedHutNotice /> : null}
+
+        {view.status !== "COMPLETED" && !view.operationalIdentityMissing && view.phaseGate?.required ? (
           <HutPhaseCodeForm token={view.token} view={view} />
         ) : null}
 
-        {view.protocolVersion === "APPLICATION_PHOTO" && view.status !== "COMPLETED" && !view.phaseGate?.required ? (
+        {view.protocolVersion === "APPLICATION_PHOTO" && view.status !== "COMPLETED" && !view.operationalIdentityMissing && !view.phaseGate?.required ? (
           <ApplicationPhotoInstructions />
         ) : null}
 
-        {view.protocolVersion === "LEGACY_VIDEO" && view.status !== "COMPLETED" && !view.phaseGate?.required && view.availability.reason === "AVAILABLE_FOR_SELFIE" ? (
+        {view.protocolVersion === "LEGACY_VIDEO" && view.status !== "COMPLETED" && !view.operationalIdentityMissing && !view.phaseGate?.required && view.availability.reason === "AVAILABLE_FOR_SELFIE" ? (
           <HutVideoUploadForm
             blockNumber={view.availability.blockNumber ?? view.availableUpload?.blockNumber ?? 1}
             mode="selfie"
@@ -100,7 +102,7 @@ export default async function HutParticipantPage({ params, searchParams }: HutPa
           />
         ) : null}
 
-        {view.protocolVersion === "LEGACY_VIDEO" && view.status !== "COMPLETED" && !view.phaseGate?.required && view.availableUpload ? (
+        {view.protocolVersion === "LEGACY_VIDEO" && view.status !== "COMPLETED" && !view.operationalIdentityMissing && !view.phaseGate?.required && view.availableUpload ? (
           <HutVideoUploadForm
             blockNumber={view.availableUpload.blockNumber}
             mode="video"
@@ -109,7 +111,7 @@ export default async function HutParticipantPage({ params, searchParams }: HutPa
           />
         ) : null}
 
-        {view.protocolVersion !== "APPLICATION_PHOTO" && view.status !== "COMPLETED" && !view.phaseGate?.required && !view.availableApplicationPhoto && !view.availableUpload && view.availability.reason !== "AVAILABLE_FOR_SELFIE" ? (
+        {view.protocolVersion !== "APPLICATION_PHOTO" && view.status !== "COMPLETED" && !view.operationalIdentityMissing && !view.phaseGate?.required && !view.availableApplicationPhoto && !view.availableUpload && view.availability.reason !== "AVAILABLE_FOR_SELFIE" ? (
           <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-zinc-950">Actividad no disponible</h2>
             <p className="mt-2 text-sm leading-6 text-zinc-600">{availabilityMessage(view.availability.reason, view.availability.nextAvailableAt)}</p>
@@ -117,6 +119,19 @@ export default async function HutParticipantPage({ params, searchParams }: HutPa
         ) : null}
       </main>
     </div>
+  );
+}
+
+function ReservedHutNotice() {
+  return (
+    <section className="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
+      <p className="text-sm font-semibold uppercase tracking-wide text-amber-700">Folio reservado</p>
+      <h2 className="mt-2 text-xl font-semibold text-amber-950">Actividad HUT aun no activada</h2>
+      <p className="mt-3 text-sm leading-6 text-amber-900">
+        Este folio esta apartado para operacion, pero todavia no tiene participante asignado. Cuando el equipo active el
+        registro, podras continuar con las instrucciones correspondientes.
+      </p>
+    </section>
   );
 }
 
