@@ -40,6 +40,8 @@ vi.mock("@/modules/hut/actions", () => {
     moveHutInitialEvidenceToDeliveryAction: action,
     reactivateHutParticipantAction: action,
     reconcileReservedHutNavParticipantsAction: action,
+    releaseHutApplicationPhotoSlotAction: action,
+    requestHutApplicationPhotoSlotRepeatAction: action,
     reviewHutVisualVerificationAction: action,
     resetHutApplicationPhotoEvidenceAction: action,
     revokeHutPhaseCodeAction: action,

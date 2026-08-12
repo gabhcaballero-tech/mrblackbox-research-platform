@@ -439,7 +439,7 @@ describe("HUT module foundation", () => {
     expect(schema).toContain("model HutApplicationPhotoEntry");
     expect(schema).toContain("questionnaireAttempt    HutQuestionnaireAttempt?");
     expect(schema).toContain("applicationPhotoEntries HutApplicationPhotoEntry[]");
-    expect(schema).toContain('@@unique([participantId, capturedLocalDate])');
+    expect(schema).toContain('@@index([participantId, capturedLocalDate])');
     expect(schema).toContain("model HutBlock");
     expect(schema).toContain("model HutVideoSubmission");
     expect(migration).toContain('CREATE TABLE "hut_questionnaire_attempts"');
@@ -1483,6 +1483,136 @@ describe("HUT module foundation", () => {
         productCode: "247"
       },
       ok: true
+    });
+  });
+
+  it("lets an admin manually release a blocked photo slot and records audit", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const created = await repository.createParticipant({
+      email: "manual-release@example.test",
+      firstFragranceLeftArm: "247",
+      folio: "HUT-MANUAL-RELEASE",
+      name: "Participante Liberacion Manual",
+      phone: "5555555555",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const participantId = created.ok ? created.data.participantId : "";
+    const participant = prisma.state.participants.find((item) => item.id === participantId)!;
+    participant.origin = "CLT_HUT";
+
+    async function uploadSlot(slotId: "DELIVERY" | "PRODUCT_1_DAY_1", now: Date) {
+      const upload = await repository.requestApplicationPhotoUpload({
+        metadata: selfieMetadata(),
+        now,
+        slotId,
+        storage,
+        token: participant.token
+      });
+      expect(upload.ok).toBe(true);
+
+      return repository.confirmApplicationPhotoUpload({
+        metadata: {
+          ...selfieMetadata(),
+          privateStorageKey: upload.ok ? upload.data.privateStorageKey : "",
+          storageBucket: upload.ok ? upload.data.storageBucket : ""
+        },
+        now,
+        slotId,
+        token: participant.token
+      });
+    }
+
+    await expect(uploadSlot("DELIVERY", new Date("2026-08-09T15:00:00.000Z"))).resolves.toMatchObject({ ok: true });
+    await expect(uploadSlot("PRODUCT_1_DAY_1", new Date("2026-08-09T16:00:00.000Z"))).resolves.toMatchObject({ ok: true });
+    const release = await repository.releaseApplicationPhotoSlot({
+      actorUserId: "admin-1",
+      participantId,
+      reason: "Permitir captura adelantada por excepcion de campo",
+      slotId: "PRODUCT_1_DAY_2",
+      studyId: "study-hut"
+    });
+    const upload = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      now: new Date("2026-08-09T18:00:00.000Z"),
+      slotId: "PRODUCT_1_DAY_2",
+      storage,
+      token: participant.token
+    });
+
+    expect(release).toMatchObject({ ok: true });
+    expect(upload).toMatchObject({ ok: true });
+    expect(prisma.state.auditLogs.find((log) => log.reason === "HUT_PHOTO_SLOT_MANUAL_RELEASE")?.afterJson).toMatchObject({
+      overrideType: "RELEASE",
+      reasonDetail: "Permitir captura adelantada por excepcion de campo",
+      slotId: "PRODUCT_1_DAY_2"
+    });
+  });
+
+  it("lets an admin request a repeat without deleting the historical photo", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const created = await repository.createParticipant({
+      email: "repeat-slot@example.test",
+      firstFragranceLeftArm: "247",
+      folio: "HUT-REPEAT",
+      name: "Participante Repeticion",
+      phone: "5566666666",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      studyId: "study-hut"
+    });
+    const participantId = created.ok ? created.data.participantId : "";
+    const participant = prisma.state.participants.find((item) => item.id === participantId)!;
+    participant.origin = "CLT_HUT";
+    participant.applicationPhotoEntries.push({
+      capturedAt: new Date("2026-08-09T15:00:00.000Z"),
+      capturedLocalDate: "2026-08-09",
+      capturedLocalTimezone: "America/Mexico_City",
+      id: "existing-day-2",
+      participantId,
+      privateStorageKey: "existing/day-2.jpg",
+      productCode: "247",
+      storageBucket: "participant-evidence",
+      useDayNumber: 2
+    });
+
+    const repeat = await repository.requestApplicationPhotoSlotRepeat({
+      actorUserId: "admin-1",
+      participantId,
+      reason: "Foto borrosa",
+      slotId: "PRODUCT_1_DAY_2",
+      studyId: "study-hut"
+    });
+    const upload = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      now: new Date("2026-08-09T18:00:00.000Z"),
+      slotId: "PRODUCT_1_DAY_2",
+      storage,
+      token: participant.token
+    });
+    const confirmed = await repository.confirmApplicationPhotoUpload({
+      metadata: {
+        ...selfieMetadata(),
+        privateStorageKey: upload.ok ? upload.data.privateStorageKey : "",
+        storageBucket: upload.ok ? upload.data.storageBucket : ""
+      },
+      now: new Date("2026-08-09T18:05:00.000Z"),
+      slotId: "PRODUCT_1_DAY_2",
+      token: participant.token
+    });
+
+    expect(repeat).toMatchObject({ ok: true });
+    expect(upload).toMatchObject({ ok: true });
+    expect(confirmed).toMatchObject({ ok: true });
+    expect(participant.applicationPhotoEntries.filter((entry) => entry.useDayNumber === 2)).toHaveLength(2);
+    expect(prisma.state.auditLogs.find((log) => log.reason === "HUT_PHOTO_SLOT_OVERRIDE_USED")?.afterJson).toMatchObject({
+      overrideType: "REPEAT",
+      slotId: "PRODUCT_1_DAY_2"
     });
   });
 
@@ -2683,6 +2813,54 @@ describe("HUT module foundation", () => {
     expect(result.ok ? result.data.sent : -1).toBe(1);
     expect(prisma.state.auditLogs[0]?.afterJson).toMatchObject({
       slotId: "PRODUCT_1_DAY_1",
+      source: "CRON"
+    });
+  });
+
+  it("lets the automatic HUT photo reminder respect a manual slot release", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const whatsapp = createFakeWhatsAppRepository();
+    const repository = createHutRepository(prisma as never, whatsapp);
+    stubAcceptedWhatsAppMeta();
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://mrblackbox-research-platform.vercel.app");
+    await repository.createParticipant({
+      firstFragranceLeftArm: "247",
+      folio: "HUT-REM-MANUAL",
+      name: "Participante Reminder Manual",
+      phone: "5512345678",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.test",
+      secondFragranceRightArm: "583",
+      startDate: new Date("2026-08-09T15:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    completeDirectHutFilters(prisma.state, participant);
+    addApplicationPhotoEntry(prisma.state, participant, {
+      capturedAt: new Date("2026-08-09T15:00:00.000Z"),
+      useDayNumber: 0
+    });
+    addApplicationPhotoEntry(prisma.state, participant, {
+      capturedAt: new Date("2026-08-09T16:00:00.000Z"),
+      useDayNumber: 1
+    });
+
+    await repository.releaseApplicationPhotoSlot({
+      actorUserId: "admin-1",
+      participantId: participant.id,
+      reason: "Adelantar dia 2 por excepcion operativa",
+      slotId: "PRODUCT_1_DAY_2",
+      studyId: "study-hut"
+    });
+    const result = await repository.processPhotoWhatsAppReminders({
+      now: new Date("2026-08-09T21:34:00.000Z"),
+      requestOrigin: "https://example.test",
+      studyId: "study-hut"
+    });
+
+    expect(result.ok ? result.data.sent : -1).toBe(1);
+    expect(prisma.state.auditLogs.find((log) => (log.afterJson as { whatsappStatus?: string } | undefined)?.whatsappStatus === "ENVIADO")?.afterJson).toMatchObject({
+      slotId: "PRODUCT_1_DAY_2",
       source: "CRON"
     });
   });
@@ -4602,6 +4780,7 @@ function createFakeHutPrisma() {
         return record;
       },
       async findMany(args: {
+        orderBy?: { createdAt?: "asc" | "desc" };
         where: {
           action?: string;
           createdAt?: { gte?: Date };
@@ -4609,12 +4788,15 @@ function createFakeHutPrisma() {
           entityType?: string;
         };
       }) {
-        return state.auditLogs.filter((log) =>
+        const results = state.auditLogs.filter((log) =>
           (!args.where.action || log.action === args.where.action) &&
           (!args.where.entityId || log.entityId === args.where.entityId) &&
           (!args.where.entityType || log.entityType === args.where.entityType) &&
           (!args.where.createdAt?.gte || (log.createdAt?.getTime() ?? 0) >= args.where.createdAt.gte.getTime())
         );
+        return args.orderBy?.createdAt === "desc"
+          ? [...results].sort((left, right) => (right.createdAt?.getTime() ?? 0) - (left.createdAt?.getTime() ?? 0))
+          : results;
       }
     },
     study: {

@@ -271,6 +271,7 @@ function buildPortalPhotoTimeline(view: HutPortalView): HutPhotoTimelineSlot[] {
     availableSlotId: view.availableApplicationPhoto?.slotId ?? null,
     currentPhase: view.phaseGate?.phase ?? null,
     legacyMirroredPlacementPhoto: view.legacyMirroredPlacementPhoto,
+    manualOverrides: view.photoSlotOverrides,
     nextAvailableAt: view.availability.nextAvailableAt,
     photoCaptureBlocked: view.availability.reason === "FILTER_PENDING",
     product2GateOpen: view.product2GateOpen,

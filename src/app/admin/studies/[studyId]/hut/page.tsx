@@ -11,6 +11,8 @@ import {
   moveHutInitialEvidenceToDeliveryAction,
   reactivateHutParticipantAction,
   reconcileReservedHutNavParticipantsAction,
+  releaseHutApplicationPhotoSlotAction,
+  requestHutApplicationPhotoSlotRepeatAction,
   reviewHutVisualVerificationAction,
   resetHutApplicationPhotoEvidenceAction,
   resetHutCallEvaluationAction,
@@ -879,6 +881,7 @@ function ApplicationPhotoProtocolCard({
       useDayNumber: entry.useDayNumber
     })),
     legacyMirroredPlacementPhoto: participant.legacyMirroredPlacementPhoto,
+    manualOverrides: participant.photoSlotOverrides,
     product2GateOpen: participant.product2GateOpen,
     rotation: {
       eva1: participant.firstFragranceLeftArm,
@@ -891,6 +894,7 @@ function ApplicationPhotoProtocolCard({
   const phaseLabel = applicationPhotoCurrentPhaseLabel(participant);
   const deliverySlot = photoSlots.find((slot) => slot.id === "DELIVERY") ?? null;
   const hasColocacionEvidence = applicationEvidence.some((evidence) => evidence.phase === "COLOCACION");
+  const photoSlotOverrides = participant.photoSlotOverrides ?? [];
 
   return (
     <section className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
@@ -919,8 +923,15 @@ function ApplicationPhotoProtocolCard({
                   <p className="mt-1 text-xs text-zinc-600">
                     {slot.evidence ? `Capturada: ${formatDateTime(slot.evidence.capturedAt, studyTimeZone)}` : "Foto pendiente"}
                   </p>
+                  {slot.manualOverride ? (
+                    <p className="mt-1 text-xs font-semibold text-sky-700">
+                      Excepcion manual activa: {slot.manualOverride.type === "REPEAT" ? "repetir captura" : "slot liberado"}
+                    </p>
+                  ) : null}
                 </div>
-                <StatusBadge status={slot.evidence ? "ready" : "planned"}>{slot.evidence ? "Registrada" : "Pendiente"}</StatusBadge>
+                <StatusBadge status={slot.manualOverride ? "ready" : slot.evidence ? "ready" : "planned"}>
+                  {slot.manualOverride ? "Excepcion" : slot.evidence ? "Registrada" : "Pendiente"}
+                </StatusBadge>
               </div>
               {slot.evidence?.source === "PHASE_EVIDENCE" ? (
                 <AdminPhaseEvidenceLink evidence={applicationEvidence.find((item) => item.phase === slot.evidence?.phase) ?? null} />
@@ -969,6 +980,61 @@ function ApplicationPhotoProtocolCard({
                 <SubmitButton disabled={Boolean(deliverySlot?.evidence) || !hasColocacionEvidence} pendingLabel="Regularizando entrega...">
                   Mover evidencia a Entrega
                 </SubmitButton>
+              </form>
+            </div>
+          </details>
+          <details className="rounded-md border border-sky-200 bg-sky-50 p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-sky-950">Control manual de slots HUT</summary>
+            <div className="mt-3 space-y-3">
+              <p className="text-xs leading-5 text-sky-900">
+                Usa estas acciones solo para excepciones operativas: adelantar una captura, permitir dos fotos el mismo dia o pedir repetir una foto
+                sin borrar la evidencia historica.
+              </p>
+              {photoSlotOverrides.length > 0 ? (
+                <div className="rounded-md border border-sky-200 bg-white p-3 text-xs text-sky-950">
+                  <p className="font-semibold">Excepciones activas</p>
+                  <ul className="mt-2 space-y-1">
+                    {photoSlotOverrides.map((override) => (
+                      <li key={`${override.slotId}-${override.type}`}>
+                        {override.type === "REPEAT" ? "Repeticion" : "Liberacion"}: {formatHutPhotoTimelineSlotTitle({
+                          dayLabel: "",
+                          id: override.slotId,
+                          title: ""
+                        })} {override.reason ? `- ${override.reason}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              <form action={releaseHutApplicationPhotoSlotAction.bind(null, studyId, participant.id)} className="space-y-2 rounded-md border border-sky-200 bg-white p-3">
+                <h5 className="text-sm font-semibold text-sky-950">Liberar siguiente slot fotografico manualmente</h5>
+                <label className="flex flex-col gap-1 text-xs font-semibold text-sky-950">
+                  Slot
+                  <select className={inputClass} name="slotId" required>
+                    {photoSlots.map((slot) => (
+                      <option key={slot.id} value={slot.id}>
+                        {formatHutPhotoTimelineSlotTitle(slot)} - {slot.status === "COMPLETED" ? "completado" : slot.status.toLowerCase()}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <textarea className={inputClass} name="reason" placeholder="Motivo obligatorio" required rows={2} />
+                <SubmitButton pendingLabel="Liberando slot...">Liberar slot</SubmitButton>
+              </form>
+              <form action={requestHutApplicationPhotoSlotRepeatAction.bind(null, studyId, participant.id)} className="space-y-2 rounded-md border border-sky-200 bg-white p-3">
+                <h5 className="text-sm font-semibold text-sky-950">Solicitar repeticion de un slot completado</h5>
+                <label className="flex flex-col gap-1 text-xs font-semibold text-sky-950">
+                  Slot
+                  <select className={inputClass} name="slotId" required>
+                    {photoSlots.map((slot) => (
+                      <option key={slot.id} value={slot.id}>
+                        {formatHutPhotoTimelineSlotTitle(slot)} - {slot.evidence ? "con evidencia" : "sin evidencia"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <textarea className={inputClass} name="reason" placeholder="Motivo obligatorio" required rows={2} />
+                <SubmitButton pendingLabel="Solicitando repeticion...">Solicitar repeticion</SubmitButton>
               </form>
             </div>
           </details>

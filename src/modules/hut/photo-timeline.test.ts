@@ -498,6 +498,83 @@ describe("HutPhotoTimeline", () => {
     });
   });
 
+  it("makes a blocked photo slot available with a manual release override", () => {
+    const timeline = buildHutPhotoTimeline({
+      dailyEntries: [
+        {
+          capturedAt: new Date("2026-08-09T15:00:00.000Z"),
+          capturedLocalDate: "2026-08-09",
+          productCode: null,
+          useDayNumber: 0
+        },
+        {
+          capturedAt: new Date("2026-08-09T16:00:00.000Z"),
+          capturedLocalDate: "2026-08-09",
+          productCode: "247",
+          useDayNumber: 1
+        }
+      ],
+      manualOverrides: [
+        {
+          actorUserId: "admin-1",
+          createdAt: new Date("2026-08-09T17:00:00.000Z"),
+          reason: "Excepcion operativa",
+          slotId: "PRODUCT_1_DAY_2",
+          type: "RELEASE"
+        }
+      ],
+      now: new Date("2026-08-09T18:00:00.000Z"),
+      rotation: {
+        eva1: "247",
+        eva2: "583"
+      }
+    });
+
+    expect(timeline.find((slot) => slot.id === "PRODUCT_1_DAY_2")).toMatchObject({
+      manualOverride: {
+        reason: "Excepcion operativa",
+        type: "RELEASE"
+      },
+      status: "AVAILABLE"
+    });
+  });
+
+  it("allows a completed slot to be shown as available when a repeat is requested", () => {
+    const timeline = buildHutPhotoTimeline({
+      dailyEntries: [
+        {
+          capturedAt: new Date("2026-08-09T15:00:00.000Z"),
+          capturedLocalDate: "2026-08-09",
+          productCode: "247",
+          useDayNumber: 2
+        }
+      ],
+      manualOverrides: [
+        {
+          actorUserId: "admin-1",
+          createdAt: new Date("2026-08-09T17:00:00.000Z"),
+          reason: "Foto borrosa",
+          slotId: "PRODUCT_1_DAY_2",
+          type: "REPEAT"
+        }
+      ],
+      now: new Date("2026-08-09T18:00:00.000Z"),
+      rotation: {
+        eva1: "247",
+        eva2: "583"
+      }
+    });
+
+    expect(timeline.find((slot) => slot.id === "PRODUCT_1_DAY_2")).toMatchObject({
+      evidence: expect.objectContaining({ useDayNumber: 2 }),
+      manualOverride: {
+        reason: "Foto borrosa",
+        type: "REPEAT"
+      },
+      status: "AVAILABLE"
+    });
+  });
+
   it("makes every pending photo slot available in test mode", () => {
     const timeline = buildHutPhotoTimeline({
       dailyEntries: [

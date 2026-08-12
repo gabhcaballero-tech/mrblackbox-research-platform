@@ -918,7 +918,7 @@ model HutApplicationPhotoEntry {
 
   participant HutParticipant @relation(fields: [participantId], references: [id])
 
-  @@unique([participantId, capturedLocalDate])
+  @@index([participantId, capturedLocalDate])
   @@index([participantId, productCode, useDayNumber])
   @@index([capturedLocalDate])
   @@map("hut_application_photo_entries")

@@ -261,6 +261,32 @@ export async function moveHutInitialEvidenceToDeliveryAction(studyId: string, pa
   redirectWithHutMessage(studyId, result, participantId);
 }
 
+export async function releaseHutApplicationPhotoSlotAction(studyId: string, participantId: string, formData: FormData) {
+  const actor = await requireCapability("admin:access");
+  const result = await createHutRepository().releaseApplicationPhotoSlot({
+    actorUserId: actor.id,
+    participantId,
+    reason: String(formData.get("reason") ?? ""),
+    slotId: String(formData.get("slotId") ?? "") as HutPhotoTimelineSlotId,
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
+export async function requestHutApplicationPhotoSlotRepeatAction(studyId: string, participantId: string, formData: FormData) {
+  const actor = await requireCapability("admin:access");
+  const result = await createHutRepository().requestApplicationPhotoSlotRepeat({
+    actorUserId: actor.id,
+    participantId,
+    reason: String(formData.get("reason") ?? ""),
+    slotId: String(formData.get("slotId") ?? "") as HutPhotoTimelineSlotId,
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
 export async function resetHutQuestionnaireAttemptAction(studyId: string, participantId: string, formData: FormData) {
   const actor = await requireCapability("admin:access");
   const result = await createHutRepository().resetQuestionnaireAttempt({

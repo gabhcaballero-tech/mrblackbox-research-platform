@@ -15,6 +15,14 @@ export type HutPhotoTimelinePhoto = {
 
 export type HutPhotoTimelineSlotStatus = "BLOCKED" | "COMPLETED" | "AVAILABLE" | "PROGRAMMED";
 
+export type HutPhotoTimelineManualOverride = {
+  actorUserId?: string | null;
+  createdAt: Date;
+  reason: string | null;
+  slotId: HutPhotoTimelineSlotId;
+  type: "RELEASE" | "REPEAT";
+};
+
 export type HutPhotoTimelineSlot = {
   availableAt: Date | null;
   availableDate: string | null;
@@ -23,6 +31,7 @@ export type HutPhotoTimelineSlot = {
   id: HutPhotoTimelineSlotId;
   interviewerTask: string | null;
   isCapturableWithCurrentModel: boolean;
+  manualOverride: HutPhotoTimelineManualOverride | null;
   note: string;
   participantTask: string | null;
   productCode: string | null;
@@ -60,6 +69,7 @@ export type HutPhotoTimelineInput = {
     useDayNumber?: number | null;
   }>;
   legacyMirroredPlacementPhoto?: boolean;
+  manualOverrides?: HutPhotoTimelineManualOverride[];
   nextAvailableAt?: Date | null;
   photoCaptureBlocked?: boolean;
   now?: Date;
@@ -225,6 +235,9 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
     });
   }
   const explicitAvailableSlotId = input.availableSlotId ?? null;
+  const manualOverrideBySlot = new Map(
+    (input.manualOverrides ?? []).map((override) => [override.slotId, override])
+  );
   const preliminarySlots = HUT_PHOTO_TIMELINE_DEFINITIONS.map((definition) => {
     const evidence = resolveEvidenceForDefinition(definition, phaseEvidence, dailyByUseDay, legacyMirroredPlacementPhoto);
     return buildTimelineSlot({
@@ -247,6 +260,8 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
   const product2GateOpen = input.product2GateOpen ?? false;
 
   return preliminarySlots.map((slot) => {
+    const manualOverride = manualOverrideBySlot.get(slot.id) ?? null;
+    const manuallyAvailable = Boolean(slot.participantTask && manualOverride);
     const isCurrentPendingSlot = Boolean(slot.participantTask && !slot.evidence && slot.id === availableSlotId);
     const scheduledAvailableAt = !input.testMode && isCurrentPendingSlot
       ? scheduledAvailability.get(slot.id) ?? input.nextAvailableAt ?? null
@@ -259,6 +274,16 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
       availableDate: availableAt ? formatHutTimelineDateTime(availableAt) : null
     };
 
+    if (manuallyAvailable && manualOverride) {
+      return {
+        ...slotWithAvailability,
+        availableAt: null,
+        availableDate: null,
+        manualOverride,
+        note: appendManualOverrideNote(slotWithAvailability.note, manualOverride),
+        status: "AVAILABLE"
+      };
+    }
     if (slotWithAvailability.evidence) {
       return { ...slotWithAvailability, status: "COMPLETED" };
     }
@@ -292,6 +317,15 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
 
 function isProduct2PhotoSlot(slotId: HutPhotoTimelineSlotId): boolean {
   return slotId === "PRODUCT_2_DAY_1" || slotId === "PRODUCT_2_DAY_2" || slotId === "PRODUCT_2_DAY_3_MORNING";
+}
+
+function appendManualOverrideNote(note: string, override: HutPhotoTimelineManualOverride): string {
+  const action = override.type === "REPEAT"
+    ? "Repeticion solicitada manualmente"
+    : "Slot liberado manualmente";
+  const reason = override.reason ? ` Motivo: ${override.reason}` : "";
+
+  return `${note} Excepcion admin: ${action}.${reason}`;
 }
 
 export function resolveHutOperationalStatusLabel(status: string): string {
@@ -448,6 +482,7 @@ function buildTimelineSlot(input: {
     id: input.definition.id,
     interviewerTask: input.definition.interviewerTask,
     isCapturableWithCurrentModel: Boolean(input.definition.participantTask),
+    manualOverride: null,
     note: input.definition.note,
     participantTask: input.definition.participantTask,
     productCode: input.evidence?.productCode ?? input.productCode,
