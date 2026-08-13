@@ -1183,7 +1183,7 @@ function isQuestionAvailableForCurrentHutStage(question: HutQuestionDefinition, 
 }
 
 function requiresThirdStageAuthorizationForQuestion(question: HutQuestionDefinition): boolean {
-  return question.section === "CONFIRMACION_USO_SEGUNDO_PERFUME" || question.section === "COMPARATIVA";
+  return question.section === "EVALUACION_SEGUNDO_PERFUME" || question.section === "COMPARATIVA";
 }
 
 function isFieldProduct1PhotoCycleComplete(timeline: HutPhotoTimelineSlot[]): boolean {
@@ -1198,7 +1198,6 @@ function productLabelForQuestion(question: HutQuestionDefinition, workspace: Hut
     return workspace.rotation.eva1 ?? "EVA1 no asignado";
   }
   if (
-    question.section === "CONFIRMACION_USO_SEGUNDO_PERFUME" ||
     question.section === "EVALUACION_SEGUNDO_PERFUME" ||
     question.section === "SEGUNDA_VISITA"
   ) {

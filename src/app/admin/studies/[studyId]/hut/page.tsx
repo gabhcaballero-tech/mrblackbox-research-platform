@@ -1315,13 +1315,12 @@ function hutPhaseLabel(phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2") {
 function hutQuestionnaireSectionLabel(section: NonNullable<HutAdminParticipant["questionnaire"]>["visits"][number]["section"]): string {
   const labels: Record<NonNullable<HutAdminParticipant["questionnaire"]>["visits"][number]["section"], string> = {
     COMPARATIVA: "Comparativa",
-    CONFIRMACION_USO_SEGUNDO_PERFUME: "Confirmacion uso segundo perfume",
     DATOS_GENERALES: "Datos generales",
     EVALUACION_PRIMER_PERFUME: "Evaluacion primer perfume",
-    EVALUACION_SEGUNDO_PERFUME: "Evaluacion segundo perfume",
+    EVALUACION_SEGUNDO_PERFUME: "Confirmacion uso segundo perfume",
     FILTROS: "Filtros",
     PRIMERA_VISITA: "Primera visita",
-    SEGUNDA_VISITA: "Segunda visita"
+    SEGUNDA_VISITA: "Entrega segundo producto"
   };
 
   return labels[section];

@@ -30,7 +30,7 @@ export function isThirdStageAuthorized(participant: HutThirdStageAuthorizationPa
 export function hasLegacyThirdStageProgress(participant: HutThirdStageAuthorizationParticipant): boolean {
   return Boolean(
     participant.questionnaireAttempt?.visits?.some((visit) =>
-      ["CONFIRMACION_USO_SEGUNDO_PERFUME", "SEGUNDA_VISITA", "COMPARATIVA"].includes(visit.section)
+      ["EVALUACION_SEGUNDO_PERFUME", "COMPARATIVA"].includes(visit.section)
     ) ||
       participant.questionnaireAttempt?.answers?.some((answer) => isThirdStageQuestionCode(answer.questionCode))
   );
@@ -48,8 +48,7 @@ export function getThirdStageAuthorizationWarnings(
 function isThirdStageQuestionCode(questionCode: string): boolean {
   return (
     /^HUT_P(?:[1-9]|1[0-9]|2[0-3])B(?:_|$)/.test(questionCode) ||
-    /^HUT_P2[4-7](?:_|$)/.test(questionCode) ||
-    questionCode.startsWith("HUT_V2_")
+    /^HUT_P2[4-7](?:_|$)/.test(questionCode)
   );
 }
 

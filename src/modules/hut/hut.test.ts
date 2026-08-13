@@ -462,7 +462,6 @@ describe("HUT module foundation", () => {
       "FILTROS",
       "PRIMERA_VISITA",
       "EVALUACION_PRIMER_PERFUME",
-      "CONFIRMACION_USO_SEGUNDO_PERFUME",
       "SEGUNDA_VISITA",
       "EVALUACION_SEGUNDO_PERFUME",
       "COMPARATIVA"
@@ -473,10 +472,9 @@ describe("HUT module foundation", () => {
     expect(definition.sections.find((section) => section.id === "FILTROS")?.title).toBe("Filtro de participante");
     expect(definition.sections.find((section) => section.id === "PRIMERA_VISITA")?.title).toBe("Entrega de perfume");
     expect(definition.sections.find((section) => section.id === "EVALUACION_PRIMER_PERFUME")?.title).toBe("Regreso 1 - Evaluacion primer perfume");
-    expect(definition.sections.find((section) => section.id === "CONFIRMACION_USO_SEGUNDO_PERFUME")?.title).toBe("Confirmacion uso segundo perfume");
-    expect(definition.sections.find((section) => section.id === "SEGUNDA_VISITA")?.title).toBe("Regreso 2 - entrega segundo perfume (historica)");
+    expect(definition.sections.find((section) => section.id === "SEGUNDA_VISITA")?.title).toBe("Entrega segundo producto");
     expect(definition.sections.find((section) => section.id === "COMPARATIVA")?.title).toBe("Evaluacion comparativa (Regreso 2)");
-    expect(definition.sections.find((section) => section.id === "EVALUACION_SEGUNDO_PERFUME")?.title).toBe("Evaluacion segundo perfume (historica)");
+    expect(definition.sections.find((section) => section.id === "EVALUACION_SEGUNDO_PERFUME")?.title).toBe("Confirmacion uso segundo perfume");
     expect(definition.sections.flatMap((section) => section.questions).map((question) => question.code)).toContain(
       "HUT_PARTICIPO_CLT"
     );
@@ -3027,8 +3025,7 @@ describe("HUT module foundation", () => {
     stubAcceptedWhatsAppMeta();
     await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-COMPLETE-NO-COMP" });
     const participant = prisma.state.participants[0]!;
-    completeProduct1EvaluationAndReleaseProduct2(prisma.state, participant);
-    authorizeThirdStageForTest(prisma.state, participant);
+    completeProduct1AndAuthorizeSecondStageForTest(prisma.state, participant);
     const formData = createCompleteHutV5FormData({ participantOrigin: "CLT_HUT" });
     formData.set("HUT_F2_EDAD_EXACTA", "35");
     formData.set("HUT_F2_RANGO_EDAD", "2");
@@ -3041,29 +3038,39 @@ describe("HUT module foundation", () => {
       definition: getHutV5Definition()
     }).filter((question) => question.required);
 
-    for (const question of applicableQuestions) {
-      const result = await repository.saveQuestionnaireAnswer({
-        answerInput: { [question.code]: answers[question.code] },
-        participantId: participant.id,
-        questionCode: question.code,
-        studyId: "study-hut"
-      });
-      expect(result.ok).toBe(true);
-    }
+    const saveSections = async (sectionsToSave: string[]) => {
+      for (const question of applicableQuestions.filter((candidate) => sectionsToSave.includes(candidate.section))) {
+        const result = await repository.saveQuestionnaireAnswer({
+          answerInput: { [question.code]: answers[question.code] },
+          participantId: participant.id,
+          questionCode: question.code,
+          studyId: "study-hut"
+        });
+        expect(result.ok, `${question.code}: ${result.message}`).toBe(true);
+      }
+    };
+    const completeSections = async (sectionsToComplete: string[]) => {
+      let lastSectionResult: Awaited<ReturnType<typeof repository.completeQuestionnaireSection>> | null = null;
+      for (const section of sectionsToComplete) {
+        lastSectionResult = await repository.completeQuestionnaireSection({
+          actorUserId: "field-user-1",
+          participantId: participant.id,
+          section: section as (typeof applicableQuestions)[number]["section"],
+          studyId: "study-hut"
+        });
+        expect(lastSectionResult.ok).toBe(true);
+      }
+      return lastSectionResult;
+    };
 
-    const sections = [...new Set(applicableQuestions.map((question) => question.section))].filter(
-      (section) => section !== "COMPARATIVA"
-    );
-    let lastResult: Awaited<ReturnType<typeof repository.completeQuestionnaireSection>> | null = null;
-    for (const section of sections) {
-      lastResult = await repository.completeQuestionnaireSection({
-        actorUserId: "field-user-1",
-        participantId: participant.id,
-        section,
-        studyId: "study-hut"
-      });
-      expect(lastResult.ok).toBe(true);
-    }
+    const firstStageSections = ["DATOS_GENERALES", "FILTROS", "PRIMERA_VISITA", "EVALUACION_PRIMER_PERFUME"];
+    await saveSections(firstStageSections);
+    await completeSections(firstStageSections);
+    await saveSections(["SEGUNDA_VISITA"]);
+    await completeSections(["SEGUNDA_VISITA"]);
+    authorizeThirdStageForTest(prisma.state, participant);
+    await saveSections(["EVALUACION_SEGUNDO_PERFUME"]);
+    const lastResult = await completeSections(["EVALUACION_SEGUNDO_PERFUME"]);
 
     expect(lastResult?.ok ? lastResult.message : "").toBe("Seccion HUT v5 completada correctamente.");
     expect(prisma.state.questionnaireAttempts[0]).toMatchObject({ status: "IN_PROGRESS" });
@@ -3079,8 +3086,7 @@ describe("HUT module foundation", () => {
     stubAcceptedWhatsAppMeta();
     await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-COMPLETE-001" });
     const participant = prisma.state.participants[0]!;
-    completeProduct1EvaluationAndReleaseProduct2(prisma.state, participant);
-    authorizeThirdStageForTest(prisma.state, participant);
+    completeProduct1AndAuthorizeSecondStageForTest(prisma.state, participant);
     const formData = createCompleteHutV5FormData({ participantOrigin: "CLT_HUT" });
     formData.set("HUT_F2_EDAD_EXACTA", "35");
     formData.set("HUT_F2_RANGO_EDAD", "2");
@@ -3093,31 +3099,45 @@ describe("HUT module foundation", () => {
       definition: getHutV5Definition()
     }).filter((question) => question.required);
 
-    for (const question of applicableQuestions) {
-      const result = await repository.saveQuestionnaireAnswer({
-        answerInput: { [question.code]: answers[question.code] },
-        participantId: participant.id,
-        questionCode: question.code,
-        studyId: "study-hut"
-      });
-      expect(result.ok).toBe(true);
-    }
+    const saveSections = async (sectionsToSave: string[]) => {
+      for (const question of applicableQuestions.filter((candidate) => sectionsToSave.includes(candidate.section))) {
+        const result = await repository.saveQuestionnaireAnswer({
+          answerInput: { [question.code]: answers[question.code] },
+          participantId: participant.id,
+          questionCode: question.code,
+          studyId: "study-hut"
+        });
+        expect(result.ok, `${question.code}: ${result.message}`).toBe(true);
+      }
+    };
+    const completeSections = async (sectionsToComplete: string[]) => {
+      let lastSectionResult: Awaited<ReturnType<typeof repository.completeQuestionnaireSection>> | null = null;
+      for (const section of sectionsToComplete) {
+        lastSectionResult = await repository.completeQuestionnaireSection({
+          actorUserId: "field-user-1",
+          participantId: participant.id,
+          section: section as (typeof applicableQuestions)[number]["section"],
+          studyId: "study-hut"
+        });
+        expect(lastSectionResult.ok).toBe(true);
+      }
+      return lastSectionResult;
+    };
 
-    const sections = [...new Set(applicableQuestions.map((question) => question.section))];
-    let lastResult: Awaited<ReturnType<typeof repository.completeQuestionnaireSection>> | null = null;
-    for (const section of sections) {
-      lastResult = await repository.completeQuestionnaireSection({
-        actorUserId: "field-user-1",
-        participantId: participant.id,
-        section,
-        studyId: "study-hut"
-      });
-      expect(lastResult.ok).toBe(true);
-    }
+    const firstStageSections = ["DATOS_GENERALES", "FILTROS", "PRIMERA_VISITA", "EVALUACION_PRIMER_PERFUME"];
+    await saveSections(firstStageSections);
+    await completeSections(firstStageSections);
+    await saveSections(["SEGUNDA_VISITA"]);
+    await completeSections(["SEGUNDA_VISITA"]);
+    authorizeThirdStageForTest(prisma.state, participant);
+    await saveSections(["EVALUACION_SEGUNDO_PERFUME"]);
+    await completeSections(["EVALUACION_SEGUNDO_PERFUME"]);
+    await saveSections(["COMPARATIVA"]);
+    const lastResult = await completeSections(["COMPARATIVA"]);
     const repeated = await repository.completeQuestionnaireSection({
       actorUserId: "field-user-1",
       participantId: participant.id,
-      section: sections[sections.length - 1]!,
+      section: "COMPARATIVA",
       studyId: "study-hut"
     });
 

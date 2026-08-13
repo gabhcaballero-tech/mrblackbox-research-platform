@@ -4,7 +4,6 @@ export type HutParticipantOrigin = "CLT_HUT" | "HUT_DIRECTO";
 
 export type HutQuestionnaireSectionId =
   | "COMPARATIVA"
-  | "CONFIRMACION_USO_SEGUNDO_PERFUME"
   | "DATOS_GENERALES"
   | "EVALUACION_PRIMER_PERFUME"
   | "EVALUACION_SEGUNDO_PERFUME"
@@ -817,7 +816,7 @@ function productEvaluationQuestions({
   productReference
 }: {
   productReference: HutQuestionReference;
-  section: "CONFIRMACION_USO_SEGUNDO_PERFUME" | "EVALUACION_PRIMER_PERFUME" | "EVALUACION_SEGUNDO_PERFUME";
+  section: "EVALUACION_PRIMER_PERFUME" | "EVALUACION_SEGUNDO_PERFUME";
   suffix: "A" | "B";
 }): HutQuestionDefinition[] {
   const productLabel = suffix === "A" ? "primer perfume" : "segundo perfume";
@@ -1111,17 +1110,11 @@ const firstPerfumeEvaluationQuestions = productEvaluationQuestions({
 
 const secondPerfumeEvaluationQuestions = productEvaluationQuestions({
   productReference: secondPerfumeReference,
-  section: "CONFIRMACION_USO_SEGUNDO_PERFUME",
+  section: "EVALUACION_SEGUNDO_PERFUME",
   suffix: "B"
 }).filter((question) =>
   ["HUT_P1B_USO_PERFUME", "HUT_P2B_RAZON_NO_USO", "HUT_P3B_MOSTRO_ENVASE"].includes(question.code)
 );
-
-const legacySecondPerfumeEvaluationQuestions = productEvaluationQuestions({
-  productReference: secondPerfumeReference,
-  section: "EVALUACION_SEGUNDO_PERFUME",
-  suffix: "B"
-});
 
 const comparativeQuestions: HutQuestionDefinition[] = [
   {
@@ -1220,7 +1213,19 @@ export const HUT_V5_DEFINITION: HutDefinition = {
       title: "Regreso 1 - Evaluacion primer perfume"
     },
     {
-      id: "CONFIRMACION_USO_SEGUNDO_PERFUME",
+      id: "SEGUNDA_VISITA",
+      instructions: [
+        {
+          text: "Confirmar que el segundo perfume fue entregado fisicamente al participante. Esta confirmacion registra la liberacion operativa del segundo producto.",
+          title: "Entrega segundo producto",
+          type: "SECTION"
+        }
+      ],
+      questions: secondVisitQuestions,
+      title: "Entrega segundo producto"
+    },
+    {
+      id: "EVALUACION_SEGUNDO_PERFUME",
       instructions: [
         {
           text: "Confirmar uso del segundo perfume, solicitar muestra de envase y registrar validaciones necesarias antes de comparar.",
@@ -1230,30 +1235,6 @@ export const HUT_V5_DEFINITION: HutDefinition = {
       ],
       questions: secondPerfumeEvaluationQuestions,
       title: "Confirmacion uso segundo perfume"
-    },
-    {
-      id: "SEGUNDA_VISITA",
-      instructions: [
-        {
-          text: "Registro historico de entrega de segundo perfume. Para nuevos flujos la entrega se registra como evento SECOND_PRODUCT_RELEASED.",
-          title: "Regreso 2 historico",
-          type: "SECTION"
-        }
-      ],
-      questions: secondVisitQuestions,
-      title: "Regreso 2 - entrega segundo perfume (historica)"
-    },
-    {
-      id: "EVALUACION_SEGUNDO_PERFUME",
-      instructions: [
-        {
-          text: "Verificar que la clave a evaluar coincide con la caratula de rotacion antes de iniciar.",
-          title: "Verificacion de rotacion",
-          type: "SECTION"
-        }
-      ],
-      questions: legacySecondPerfumeEvaluationQuestions,
-      title: "Evaluacion segundo perfume (historica)"
     },
     {
       id: "COMPARATIVA",

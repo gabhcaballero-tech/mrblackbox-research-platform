@@ -1905,6 +1905,12 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           ok: false
         };
       }
+      if (requiresSecondProductDeliveryConfirmationForSection(input.section) && !isFirstFragranceEvaluationCompleted(participant)) {
+        return {
+          message: "Completa primero la evaluacion del primer perfume antes de confirmar entrega del segundo producto.",
+          ok: false
+        };
+      }
       if (requiresThirdStageAuthorizationForSection(input.section) && !isHutFinalStageGateOpen(participant)) {
         return {
           message: "Autoriza primero la etapa final con el codigo maestro slot 3.",
@@ -2073,6 +2079,12 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           ok: false
         };
       }
+      if (requiresSecondProductDeliveryConfirmationForQuestion(question) && !isFirstFragranceEvaluationCompleted(participant)) {
+        return {
+          message: "Completa primero la evaluacion del primer perfume antes de confirmar entrega del segundo producto.",
+          ok: false
+        };
+      }
       if (requiresThirdStageAuthorizationForQuestion(question) && !isHutFinalStageGateOpen(participant)) {
         return {
           message: "Autoriza primero la etapa final con el codigo maestro slot 3.",
@@ -2191,6 +2203,14 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
             entityType: "HutParticipant",
             reason: "Captura HUT de campo"
           }
+        });
+      }
+
+      if (question.code === "HUT_V2_CONFIRMACION_ENTREGA" && parsed.answer.answerValue === "1") {
+        await ensureSecondProductReleasedFromDeliveryConfirmation({
+          actorUserId: input.actorUserId ?? null,
+          participant,
+          prisma
         });
       }
 
@@ -5876,17 +5896,16 @@ function isHutQuestionnaireFinalCompletionReady({
     return false;
   }
 
-  const secondUseSectionCompleted = completedSections.has("CONFIRMACION_USO_SEGUNDO_PERFUME") ||
-    completedSections.has("SEGUNDA_VISITA");
-  if (!secondUseSectionCompleted || !completedSections.has("COMPARATIVA")) {
+  const secondDeliverySectionCompleted = completedSections.has("SEGUNDA_VISITA");
+  const secondUseSectionCompleted = completedSections.has("EVALUACION_SEGUNDO_PERFUME");
+  if (!secondDeliverySectionCompleted || !secondUseSectionCompleted || !completedSections.has("COMPARATIVA")) {
     return false;
   }
 
-  const secondVisitRequiredQuestions = operationalApplicableQuestions.filter(
-    (question) => question.section === "CONFIRMACION_USO_SEGUNDO_PERFUME" || question.section === "SEGUNDA_VISITA"
-  );
+  const secondDeliveryRequiredQuestions = operationalApplicableQuestions.filter((question) => question.section === "SEGUNDA_VISITA");
+  const secondUseRequiredQuestions = operationalApplicableQuestions.filter((question) => question.section === "EVALUACION_SEGUNDO_PERFUME");
   const comparativeRequiredQuestions = operationalApplicableQuestions.filter((question) => question.section === "COMPARATIVA");
-  if (secondVisitRequiredQuestions.length === 0 || comparativeRequiredQuestions.length === 0) {
+  if (secondDeliveryRequiredQuestions.length === 0 || secondUseRequiredQuestions.length === 0 || comparativeRequiredQuestions.length === 0) {
     return false;
   }
 
@@ -5901,7 +5920,8 @@ function isHutQuestionnaireFinalCompletionReady({
     .map((question) => question.code);
 
   return (
-    secondVisitRequiredQuestions.every((question) => Object.prototype.hasOwnProperty.call(answers, question.code)) &&
+    secondDeliveryRequiredQuestions.every((question) => Object.prototype.hasOwnProperty.call(answers, question.code)) &&
+    secondUseRequiredQuestions.every((question) => Object.prototype.hasOwnProperty.call(answers, question.code)) &&
     applicableFinalComparativeCodes.length === finalComparativeCodes.size &&
     applicableFinalComparativeCodes.every((code) => Object.prototype.hasOwnProperty.call(answers, code))
   );
@@ -6468,12 +6488,20 @@ function requiresSecondStageAuthorizationForQuestion(question: { section: HutQue
   return question.section === "EVALUACION_PRIMER_PERFUME";
 }
 
+function requiresSecondProductDeliveryConfirmationForQuestion(question: { section: HutQuestionnaireSectionId }): boolean {
+  return requiresSecondProductDeliveryConfirmationForSection(question.section);
+}
+
+function requiresSecondProductDeliveryConfirmationForSection(section: HutQuestionnaireSectionId): boolean {
+  return section === "SEGUNDA_VISITA";
+}
+
 function requiresThirdStageAuthorizationForQuestion(question: { section: HutQuestionnaireSectionId }): boolean {
   return requiresThirdStageAuthorizationForSection(question.section);
 }
 
 function requiresThirdStageAuthorizationForSection(section: HutQuestionnaireSectionId): boolean {
-  return section === "CONFIRMACION_USO_SEGUNDO_PERFUME" || section === "COMPARATIVA";
+  return section === "EVALUACION_SEGUNDO_PERFUME" || section === "COMPARATIVA";
 }
 
 function secondStageAuthorizationRequiredMessage(participant: HutParticipantRecord): string {
@@ -6741,7 +6769,7 @@ async function createHutPhotoSlotOverrideAudit({
   slotId,
   type
 }: {
-  actorUserId: string;
+  actorUserId: string | null;
   participant: HutParticipantRecord;
   prisma: HutPrismaClient;
   reason: string;
@@ -6777,7 +6805,7 @@ async function createHutSecondProductReleaseAudit({
   reason,
   releasedAt
 }: {
-  actorUserId: string;
+  actorUserId: string | null;
   participant: HutParticipantRecord;
   prisma: HutPrismaClient;
   reason: string;
@@ -6835,6 +6863,39 @@ async function createHutSecondStageAuthorizationAudit({
       reason: HUT_SECOND_STAGE_AUTHORIZED_REASON
     }
   });
+}
+
+async function ensureSecondProductReleasedFromDeliveryConfirmation({
+  actorUserId,
+  participant,
+  prisma
+}: {
+  actorUserId: string | null;
+  participant: HutParticipantRecord;
+  prisma: HutPrismaClient;
+}): Promise<void> {
+  await attachSecondProductRelease(prisma, participant);
+  if (isSecondProductReleased(participant)) {
+    return;
+  }
+  if (!isFirstFragranceEvaluationCompleted(participant)) {
+    return;
+  }
+
+  const releasedAt = new Date();
+  await createHutSecondProductReleaseAudit({
+    actorUserId,
+    participant,
+    prisma,
+    reason: "Confirmacion de entrega del segundo perfume.",
+    releasedAt
+  });
+  participant.secondProductRelease = {
+    actorUserId,
+    reasonDetail: "Confirmacion de entrega del segundo perfume.",
+    releasedAt,
+    releasedAtMexicoCity: formatDateTimeMexicoCity(releasedAt)
+  };
 }
 
 async function createHutThirdStageAuthorizationAudit({

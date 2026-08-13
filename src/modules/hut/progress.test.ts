@@ -64,12 +64,14 @@ describe("HUT questionnaire progress", () => {
     });
 
     expect(progress.sections.find((section) => section.section === "EVALUACION_PRIMER_PERFUME")?.total).toBe(23);
-    expect(progress.sections.find((section) => section.section === "EVALUACION_SEGUNDO_PERFUME")).toBeUndefined();
-    expect(progress.sections.find((section) => section.section === "CONFIRMACION_USO_SEGUNDO_PERFUME")).toMatchObject({
+    expect(progress.sections.find((section) => section.section === "SEGUNDA_VISITA")).toMatchObject({
+      title: "Entrega segundo producto",
+      total: 1
+    });
+    expect(progress.sections.find((section) => section.section === "EVALUACION_SEGUNDO_PERFUME")).toMatchObject({
       title: "Confirmacion uso segundo perfume",
       total: 2
     });
-    expect(progress.sections.find((section) => section.section === "SEGUNDA_VISITA")).toBeUndefined();
   });
 
   it("shows four comparative questions", () => {
