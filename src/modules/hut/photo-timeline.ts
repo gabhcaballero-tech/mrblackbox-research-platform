@@ -23,9 +23,25 @@ export type HutPhotoTimelineManualOverride = {
   type: "RELEASE" | "REPEAT";
 };
 
+export type HutPhotoTimelineCompletionSource = "EVIDENCE" | "QUESTIONNAIRE";
+
+export type HutPhotoTimelineEvaluationProgress = {
+  completedAt?: Date | null;
+  slotId: Extract<HutPhotoTimelineSlotId, "PRODUCT_1_EVALUATION_1" | "PRODUCT_2_EVALUATION_2">;
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETED";
+};
+
+export type HutEvaluationVisitProgressInput = {
+  completedAt?: Date | null;
+  section: string;
+  status: string;
+};
+
 export type HutPhotoTimelineSlot = {
   availableAt: Date | null;
   availableDate: string | null;
+  completedAt: Date | null;
+  completionSource: HutPhotoTimelineCompletionSource | null;
   dayLabel: string;
   evidence: HutPhotoTimelinePhoto | null;
   id: HutPhotoTimelineSlotId;
@@ -71,6 +87,7 @@ export type HutPhotoTimelineInput = {
   legacyMirroredPlacementPhoto?: boolean;
   manualOverrides?: HutPhotoTimelineManualOverride[];
   nextAvailableAt?: Date | null;
+  evaluationProgress?: HutPhotoTimelineEvaluationProgress[];
   photoCaptureBlocked?: boolean;
   now?: Date;
   product2GateOpen?: boolean;
@@ -238,12 +255,16 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
   const manualOverrideBySlot = new Map(
     (input.manualOverrides ?? []).map((override) => [override.slotId, override])
   );
+  const evaluationProgressBySlot = new Map(
+    (input.evaluationProgress ?? []).map((progress) => [progress.slotId, progress])
+  );
   const preliminarySlots = HUT_PHOTO_TIMELINE_DEFINITIONS.map((definition) => {
     const evidence = resolveEvidenceForDefinition(definition, phaseEvidence, dailyByUseDay, legacyMirroredPlacementPhoto);
     return buildTimelineSlot({
       availableAt: null,
       definition,
       evidence,
+      evaluationProgress: evaluationProgressBySlot.get(definition.id as HutPhotoTimelineEvaluationProgress["slotId"]) ?? null,
       productCode: resolveProductCode(definition, input.rotation)
     });
   });
@@ -283,6 +304,9 @@ export function buildHutPhotoTimeline(input: HutPhotoTimelineInput): HutPhotoTim
         note: appendManualOverrideNote(slotWithAvailability.note, manualOverride),
         status: "AVAILABLE"
       };
+    }
+    if (slotWithAvailability.status === "COMPLETED") {
+      return slotWithAvailability;
     }
     if (slotWithAvailability.evidence) {
       return { ...slotWithAvailability, status: "COMPLETED" };
@@ -418,6 +442,28 @@ export function getHutPhotoTimelineSlotDefinition(slotId: string | null | undefi
   return HUT_PHOTO_TIMELINE_DEFINITIONS.find((definition) => definition.id === slotId) ?? null;
 }
 
+export function resolveHutEvaluationTimelineProgress(
+  visits: HutEvaluationVisitProgressInput[] | null | undefined
+): HutPhotoTimelineEvaluationProgress[] {
+  return (visits ?? []).flatMap((visit) => {
+    const slotId = visit.section === "EVALUACION_PRIMER_PERFUME"
+      ? "PRODUCT_1_EVALUATION_1"
+      : visit.section === "COMPARATIVA"
+        ? "PRODUCT_2_EVALUATION_2"
+        : null;
+
+    if (!slotId) {
+      return [];
+    }
+
+    return [{
+      completedAt: visit.completedAt ?? null,
+      slotId,
+      status: normalizeEvaluationProgressStatus(visit.status)
+    }];
+  });
+}
+
 export function getNextHutPhotoTimelineSlot(input: HutPhotoTimelineInput): HutPhotoTimelineSlot | null {
   return buildHutPhotoTimeline(input).find((slot) => slot.participantTask && slot.status === "AVAILABLE") ?? null;
 }
@@ -472,11 +518,22 @@ function buildTimelineSlot(input: {
   availableAt: Date | null;
   definition: HutPhotoTimelineSlotDefinition;
   evidence: HutPhotoTimelinePhoto | null;
+  evaluationProgress: HutPhotoTimelineEvaluationProgress | null;
   productCode: string | null;
 }): HutPhotoTimelineSlot {
+  const questionnaireCompleted = input.evaluationProgress?.status === "COMPLETED";
+  const completionSource: HutPhotoTimelineCompletionSource | null = input.evidence
+    ? "EVIDENCE"
+    : questionnaireCompleted
+      ? "QUESTIONNAIRE"
+      : null;
+  const completedAt = input.evidence?.capturedAt ?? (questionnaireCompleted ? input.evaluationProgress?.completedAt ?? null : null);
+
   return {
     availableAt: input.availableAt,
     availableDate: input.availableAt ? formatHutTimelineDateTime(input.availableAt) : null,
+    completedAt,
+    completionSource,
     dayLabel: input.definition.dayLabel,
     evidence: sanitizeTimelinePhoto(input.evidence),
     id: input.definition.id,
@@ -487,10 +544,14 @@ function buildTimelineSlot(input: {
     participantTask: input.definition.participantTask,
     productCode: input.evidence?.productCode ?? input.productCode,
     sourcePhase: input.definition.sourcePhase,
-    status: input.evidence ? "COMPLETED" : "PROGRAMMED",
+    status: completionSource ? "COMPLETED" : "PROGRAMMED",
     title: input.definition.title,
     useDayNumber: input.definition.useDayNumber
   };
+}
+
+function normalizeEvaluationProgressStatus(status: string): HutPhotoTimelineEvaluationProgress["status"] {
+  return status === "COMPLETED" || status === "IN_PROGRESS" ? status : "PENDING";
 }
 
 function buildScheduledAvailability(slots: HutPhotoTimelineSlot[]): Map<HutPhotoTimelineSlotId, Date> {
@@ -616,6 +677,9 @@ function resolveEvidenceForDefinition(
       return dailyByUseDay.get(1) ?? null;
     }
     return deliveryEvidence ? colocacionEvidence ?? dailyByUseDay.get(1) ?? null : dailyByUseDay.get(1) ?? null;
+  }
+  if (definition.sourcePhase) {
+    return phaseEvidence.get(definition.sourcePhase) ?? null;
   }
   if (typeof definition.useDayNumber === "number") {
     return dailyByUseDay.get(definition.useDayNumber) ?? null;

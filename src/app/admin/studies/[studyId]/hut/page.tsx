@@ -32,6 +32,7 @@ import {
   buildHutPhotoTimeline,
   createHutRepository,
   formatHutPhotoTimelineSlotTitle,
+  resolveHutEvaluationTimelineProgress,
   type HutAdminParticipant,
   type HutRegistrationSlotAdmin,
   type HutReservedNavReconciliationPreview
@@ -884,6 +885,7 @@ function ApplicationPhotoProtocolCard({
     })),
     legacyMirroredPlacementPhoto: participant.legacyMirroredPlacementPhoto,
     manualOverrides: participant.photoSlotOverrides,
+    evaluationProgress: resolveHutEvaluationTimelineProgress(participant.questionnaire?.visits ?? []),
     product2GateOpen: participant.product2GateOpen,
     rotation: {
       eva1: participant.firstFragranceLeftArm,
@@ -958,10 +960,16 @@ function ApplicationPhotoProtocolCard({
                   <p className="mt-1 text-xs text-zinc-600">Encuestador: {slot.interviewerTask}</p>
                   <p className="mt-1 text-xs text-zinc-600">Producto: {slot.productCode ?? "No asignado"}</p>
                   <p className="mt-1 text-xs text-zinc-600">
-                    {slot.evidence ? `Registro historico: ${formatDateTime(slot.evidence.capturedAt, studyTimeZone)}` : "Visita pendiente"}
+                    {slot.evidence
+                      ? `Registro historico: ${formatDateTime(slot.evidence.capturedAt, studyTimeZone)}`
+                      : slot.completionSource === "QUESTIONNAIRE"
+                        ? `Evaluacion completada${slot.completedAt ? `: ${formatDateTime(slot.completedAt, studyTimeZone)}` : ""}`
+                        : "Visita pendiente"}
                   </p>
                 </div>
-                <StatusBadge status={slot.evidence ? "ready" : "planned"}>{slot.evidence ? "Registrada" : "Pendiente"}</StatusBadge>
+                <StatusBadge status={slot.status === "COMPLETED" ? "ready" : "planned"}>
+                  {slot.status === "COMPLETED" ? "Completada" : "Pendiente"}
+                </StatusBadge>
               </div>
               {slot.evidence?.source === "PHASE_EVIDENCE" ? (
                 <AdminPhaseEvidenceLink evidence={applicationEvidence.find((item) => item.phase === slot.evidence?.phase) ?? null} />

@@ -103,6 +103,7 @@ export {
   HUT_PHOTO_TIME_ZONE,
   isLegacyMirroredPlacementPhoto,
   resolveHutPhaseCodeSlotTimelineLabel,
+  resolveHutEvaluationTimelineProgress,
   resolveHutPhotoTimelinePhotoLabel,
   resolveHutPhotoTimelinePhaseLabel,
   resolveHutPhotoTimelineUseDayLabel,
@@ -121,6 +122,7 @@ export type {
 } from "./phase-codes";
 export type {
   HutPhotoTimelinePhoto,
+  HutPhotoTimelineEvaluationProgress,
   HutPhotoTimelineSlot,
   HutPhotoTimelineSlotId,
   HutPhotoTimelineSlotStatus

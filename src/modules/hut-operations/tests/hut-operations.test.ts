@@ -45,7 +45,11 @@ describe("hut operations", () => {
     });
     expect(dashboard?.detail?.photoTimeline.some((slot) => String(slot.id) === "PLACEMENT")).toBe(false);
     expect(dashboard?.detail?.photoTimeline.some((slot) => slot.id === "PRODUCT_1_DAY_1")).toBe(true);
-    expect(dashboard?.detail?.photoTimeline.some((slot) => slot.title === "Evaluacion 1" && slot.interviewerTask)).toBe(true);
+    expect(dashboard?.detail?.photoTimeline.find((slot) => slot.id === "PRODUCT_1_EVALUATION_1")).toMatchObject({
+      completionSource: "QUESTIONNAIRE",
+      status: "COMPLETED",
+      title: "Evaluacion 1"
+    });
     expect(dashboard?.detail?.photoTimeline.some((slot) => slot.title === "Evaluacion 2" && slot.interviewerTask)).toBe(true);
     expect(dashboard?.detail?.answerGroups.some((group) => group.answers.some((answer) => answer.code === "HUT_PARTICIPO_CLT"))).toBe(true);
     expect(dashboard?.detail?.timeline.length).toBeGreaterThan(0);
@@ -191,6 +195,13 @@ function createFakePrisma(): Parameters<typeof createHutOperationsRepository>[0]
             startedAt: new Date("2026-08-08T06:11:00.000Z"),
             status: "IN_PROGRESS",
             updatedAt: new Date("2026-08-08T06:13:00.000Z")
+          },
+          {
+            completedAt: new Date("2026-08-08T06:55:00.000Z"),
+            section: "EVALUACION_PRIMER_PERFUME",
+            startedAt: new Date("2026-08-08T06:30:00.000Z"),
+            status: "COMPLETED",
+            updatedAt: new Date("2026-08-08T06:55:00.000Z")
           }
         ]
       },

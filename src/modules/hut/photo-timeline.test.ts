@@ -3,6 +3,7 @@ import {
   buildHutPhotoTimeline,
   formatHutPhotoTimelineSlotTitle,
   isLegacyMirroredPlacementPhoto,
+  resolveHutEvaluationTimelineProgress,
   resolveHutPhotoTimelinePhotoLabel,
   resolveHutPhotoTimelinePhaseLabel,
   resolveHutPhotoTimelineUseDayLabel,
@@ -283,6 +284,64 @@ describe("HutPhotoTimeline", () => {
       interviewerTask: "Evaluacion 1",
       participantTask: null,
       status: "PROGRAMMED"
+    });
+  });
+
+  it("marks the first fragrance evaluation as completed from questionnaire progress, not REGRESO_1 evidence", () => {
+    const completedAt = new Date("2026-08-13T08:56:02.985Z");
+    const timeline = buildHutPhotoTimeline({
+      evaluationProgress: resolveHutEvaluationTimelineProgress([
+        {
+          completedAt,
+          section: "EVALUACION_PRIMER_PERFUME",
+          status: "COMPLETED"
+        }
+      ]),
+      rotation: {
+        eva1: "247",
+        eva2: "583"
+      }
+    });
+
+    expect(timeline.find((slot) => slot.id === "PRODUCT_1_EVALUATION_1")).toMatchObject({
+      completedAt,
+      completionSource: "QUESTIONNAIRE",
+      evidence: null,
+      status: "COMPLETED"
+    });
+  });
+
+  it("keeps REGRESO_1 as historical evidence when present", () => {
+    const capturedAt = new Date("2026-08-13T09:15:00.000Z");
+    const timeline = buildHutPhotoTimeline({
+      applicationEvidence: [
+        {
+          capturedAt,
+          phase: "REGRESO_1",
+          productCode: "247"
+        }
+      ],
+      evaluationProgress: resolveHutEvaluationTimelineProgress([
+        {
+          completedAt: new Date("2026-08-13T08:56:02.985Z"),
+          section: "EVALUACION_PRIMER_PERFUME",
+          status: "COMPLETED"
+        }
+      ]),
+      rotation: {
+        eva1: "247",
+        eva2: "583"
+      }
+    });
+
+    expect(timeline.find((slot) => slot.id === "PRODUCT_1_EVALUATION_1")).toMatchObject({
+      completedAt: capturedAt,
+      completionSource: "EVIDENCE",
+      evidence: expect.objectContaining({
+        phase: "REGRESO_1",
+        source: "PHASE_EVIDENCE"
+      }),
+      status: "COMPLETED"
     });
   });
 

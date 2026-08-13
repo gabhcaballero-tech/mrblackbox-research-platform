@@ -224,6 +224,10 @@ function OperationsDetail({
                   <p className="text-zinc-600">Producto: {slot.productCode ?? "No asignado"}</p>
                   {slot.evidence ? (
                     <p className="text-zinc-600">Foto: {formatHutOperationsDateTime(slot.evidence.capturedAt, timeZoneIana)}</p>
+                  ) : slot.completionSource === "QUESTIONNAIRE" ? (
+                    <p className="text-zinc-600">
+                      Evaluacion completada{slot.completedAt ? `: ${formatHutOperationsDateTime(slot.completedAt, timeZoneIana)}` : ""}
+                    </p>
                   ) : (
                     <p className="text-zinc-600">{slot.isCapturableWithCurrentModel ? "Pendiente" : "Proxima actividad programada"}</p>
                   )}

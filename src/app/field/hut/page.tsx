@@ -9,6 +9,7 @@ import {
   progressSectionTitle,
   isHutOperationalPanelSection,
   orderHutQuestionsForParticipant,
+  resolveHutEvaluationTimelineProgress,
   resolveHutPhotoTimelinePhotoLabel,
   resolveHutOperationalStatusLabel,
   type HutFieldQuestionnaireWorkspace,
@@ -481,6 +482,10 @@ function FieldHutWorkspace({
                   <p className="mt-1 text-zinc-600">Producto: {slot.productCode ?? "No asignado"}</p>
                   {slot.evidence?.capturedAt ? (
                     <p className="mt-1 text-zinc-600">Registro historico: {formatDateTimeMexicoCity(slot.evidence.capturedAt)}</p>
+                  ) : slot.completionSource === "QUESTIONNAIRE" ? (
+                    <p className="mt-1 text-zinc-600">
+                      Evaluacion completada{slot.completedAt ? `: ${formatDateTimeMexicoCity(slot.completedAt)}` : ""}
+                    </p>
                   ) : (
                     <p className="mt-1 text-zinc-600">Visita pendiente</p>
                   )}
@@ -1156,6 +1161,7 @@ function buildFieldPhotoTimeline(workspace: HutFieldQuestionnaireWorkspace): Hut
     })),
     legacyMirroredPlacementPhoto: workspace.legacyMirroredPlacementPhoto,
     manualOverrides: workspace.photoSlotOverrides,
+    evaluationProgress: resolveHutEvaluationTimelineProgress(workspace.questionnaire.visits),
     product2GateOpen: workspace.product2GateOpen,
     rotation: {
       eva1: workspace.rotation.eva1,

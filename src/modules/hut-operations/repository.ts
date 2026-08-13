@@ -6,6 +6,7 @@ import {
   isSecondProductReleased,
   isSecondProductReleaseAuditJson,
   isLegacyMirroredPlacementPhoto,
+  resolveHutEvaluationTimelineProgress,
   resolveHutOperationalStatusLabel
 } from "@/modules/hut";
 import {
@@ -295,6 +296,7 @@ function toDetail(participant: HutParticipantRecord): HutOperationsDetail {
   const photoTimeline = buildHutPhotoTimeline({
     applicationEvidence: participant.applicationEvidence,
     dailyEntries: participant.applicationPhotoEntries,
+    evaluationProgress: resolveHutEvaluationTimelineProgress(visits),
     legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
     product2GateOpen: isHutProduct2GateOpen(participant),
     rotation: {
@@ -343,6 +345,7 @@ function resolveCurrentPhase(participant: HutParticipantRecord): string {
     const timeline = buildHutPhotoTimeline({
       applicationEvidence: participant.applicationEvidence,
       dailyEntries: participant.applicationPhotoEntries,
+      evaluationProgress: resolveHutEvaluationTimelineProgress(participant.questionnaireAttempt?.visits ?? []),
       legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
       product2GateOpen: isHutProduct2GateOpen(participant),
       rotation: {
