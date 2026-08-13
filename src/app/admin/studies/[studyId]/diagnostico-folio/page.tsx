@@ -13,6 +13,7 @@ import {
   type FolioDiagnosticReport,
   type FolioTechnicalDetails
 } from "@/modules/navigo-diagnostics/folio-diagnostic";
+import type { ParticipantOperationalReadiness, ParticipantStageReadiness } from "@/modules/participant-readiness";
 
 export const dynamic = "force-dynamic";
 
@@ -149,6 +150,8 @@ function DiagnosticReport({ report }: { report: FolioDiagnosticReport }) {
         ))}
       </div>
 
+      <ReadinessObservation readiness={report.readiness} />
+
       {report.technicalDetails ? <TechnicalDetails details={report.technicalDetails} /> : null}
 
       <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
@@ -163,6 +166,99 @@ function DiagnosticReport({ report }: { report: FolioDiagnosticReport }) {
       </section>
     </div>
   );
+}
+
+function ReadinessObservation({ readiness }: { readiness: ParticipantOperationalReadiness }) {
+  return (
+    <section className="rounded-lg border border-indigo-200 bg-indigo-50 p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-indigo-700">Readiness operativo</p>
+          <h2 className="mt-1 text-lg font-semibold text-zinc-950">Modo observacion</h2>
+          <p className="mt-1 text-sm text-zinc-700">
+            Esta lectura no bloquea ni libera operaciones. Sirve para comparar el flujo maestro contra el estado actual.
+          </p>
+        </div>
+        <StatusBadge status={readiness.blockingReasons.length > 0 ? "planned" : "ready"}>
+          {readiness.protocolType}
+        </StatusBadge>
+      </div>
+
+      <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+        <ReadinessDetail label="Etapa actual" value={readiness.currentStage} />
+        <ReadinessDetail label="Siguiente etapa permitida" value={readiness.nextAllowedStage ?? "Sin accion"} />
+      </dl>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <ReadinessStageCard stage={readiness.stages.screening} title="Screening" />
+        <ReadinessStageCard stage={readiness.stages.clt} title="CLT" />
+        <ReadinessStageCard stage={readiness.stages.navigo} title="Navigo" />
+        <ReadinessStageCard stage={readiness.stages.hut} title="HUT" />
+      </div>
+
+      {readiness.blockingReasons.length > 0 ? (
+        <ReadinessReasonList reasons={readiness.blockingReasons} title="Bloqueos observados" />
+      ) : null}
+      {readiness.warnings.length > 0 ? (
+        <ReadinessReasonList reasons={readiness.warnings} title="Warnings legacy" />
+      ) : null}
+    </section>
+  );
+}
+
+function ReadinessStageCard({ stage, title }: { stage: ParticipantStageReadiness; title: string }) {
+  return (
+    <div className="rounded-md border border-white/70 bg-white p-3 text-sm">
+      <p className="font-semibold text-zinc-950">{title}</p>
+      <p className="mt-1 text-xs text-zinc-600">{readinessStageLabel(stage)}</p>
+    </div>
+  );
+}
+
+function ReadinessReasonList({
+  reasons,
+  title
+}: {
+  reasons: ParticipantOperationalReadiness["blockingReasons"];
+  title: string;
+}) {
+  return (
+    <div className="mt-4 rounded-md border border-indigo-100 bg-white p-3">
+      <p className="text-sm font-semibold text-zinc-950">{title}</p>
+      <ul className="mt-2 space-y-1 text-xs text-zinc-700">
+        {reasons.map((reason) => (
+          <li key={`${reason.stage}-${reason.code}`}>
+            <span className="font-semibold">{reason.stage}</span>: {reason.message}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ReadinessDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-white/80 px-3 py-2">
+      <dt className="text-xs font-semibold uppercase tracking-wide text-indigo-700">{label}</dt>
+      <dd className="mt-1 font-medium text-zinc-950">{value}</dd>
+    </div>
+  );
+}
+
+function readinessStageLabel(stage: ParticipantStageReadiness): string {
+  if (!stage.applicable) {
+    return "No aplica";
+  }
+  if (stage.completed) {
+    return "Completado";
+  }
+  if (stage.ready) {
+    return "Listo";
+  }
+  if (stage.blockingReasons.length > 0) {
+    return "Bloqueado";
+  }
+  return "Pendiente";
 }
 
 function TechnicalDetails({ details }: { details: FolioTechnicalDetails }) {

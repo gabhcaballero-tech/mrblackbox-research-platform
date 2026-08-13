@@ -2,6 +2,9 @@ import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
 import {
   buildHutPhotoTimeline,
   buildHutQuestionnaireProgress,
+  HUT_SECOND_PRODUCT_RELEASED_REASON,
+  isSecondProductReleased,
+  isSecondProductReleaseAuditJson,
   isLegacyMirroredPlacementPhoto,
   resolveHutOperationalStatusLabel
 } from "@/modules/hut";
@@ -24,6 +27,7 @@ type Delegate = {
 };
 
 type HutOperationsPrismaClient = PrismaClientLike & {
+  auditLog?: Delegate;
   hutParticipant: Delegate;
   study: Delegate;
 };
@@ -68,7 +72,13 @@ export function createHutOperationsRepository(prismaClient?: HutOperationsPrisma
           studyId: input.studyId
         }
       }) as HutParticipantRecord[] | undefined;
-      const details = (participants ?? []).map(toDetail);
+      const secondProductReleases = await readSecondProductReleaseMap(prisma, (participants ?? []).map((participant) => participant.id));
+      const details = (participants ?? []).map((participant) =>
+        toDetail({
+          ...participant,
+          secondProductReleased: secondProductReleases.has(participant.id)
+        })
+      );
 
       return {
         detail: input.detailParticipantId
@@ -251,6 +261,7 @@ type HutParticipantRecord = {
     }>;
   } | null;
   secondFragranceRightArm: string | null;
+  secondProductReleased?: boolean;
   status: string;
   testMode: boolean;
   studyParticipant: {
@@ -373,15 +384,44 @@ function hasLegacyMirroredPlacementPhoto(participant: HutParticipantRecord): boo
 }
 
 function isHutProduct2GateOpen(participant: HutParticipantRecord): boolean {
-  const regreso1Code = participant.phaseCodes.find((code) => code.phase === "REGRESO_1") ?? null;
-  const secondProductReleased = regreso1Code ? ["USED", "VALIDATED"].includes(regreso1Code.status) : false;
   const firstEvaluationCompleted = Boolean(
     participant.questionnaireAttempt?.visits.some(
       (visit) => visit.section === "EVALUACION_PRIMER_PERFUME" && visit.status === "COMPLETED"
     )
   );
 
-  return secondProductReleased && firstEvaluationCompleted;
+  return firstEvaluationCompleted && (participant.secondProductReleased === true || isSecondProductReleased(participant));
+}
+
+async function readSecondProductReleaseMap(
+  prisma: HutOperationsPrismaClient,
+  participantIds: string[]
+): Promise<Set<string>> {
+  if (!participantIds.length || !prisma.auditLog?.findMany) {
+    return new Set();
+  }
+  const logs = await prisma.auditLog.findMany({
+    select: {
+      afterJson: true,
+      entityId: true,
+      reason: true
+    },
+    where: {
+      action: "PARTICIPANT_MODIFIED",
+      entityId: { in: participantIds },
+      entityType: "HutParticipant",
+      reason: HUT_SECOND_PRODUCT_RELEASED_REASON
+    }
+  }) as Array<{ afterJson?: unknown; entityId?: string; reason?: string | null }>;
+
+  return new Set(
+    logs
+      .filter((log) =>
+        Boolean(log.entityId) &&
+        (log.reason === HUT_SECOND_PRODUCT_RELEASED_REASON || isSecondProductReleaseAuditJson(log.afterJson))
+      )
+      .map((log) => String(log.entityId))
+  );
 }
 
 function toPhotos(participant: HutParticipantRecord): HutOperationsPhotoSummary[] {

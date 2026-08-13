@@ -12,6 +12,7 @@ import {
   reactivateHutParticipantAction,
   reconcileReservedHutNavParticipantsAction,
   releaseHutApplicationPhotoSlotAction,
+  releaseHutSecondProductAction,
   requestHutApplicationPhotoSlotRepeatAction,
   reviewHutVisualVerificationAction,
   resetHutApplicationPhotoEvidenceAction,
@@ -896,6 +897,12 @@ function ApplicationPhotoProtocolCard({
   const deliverySlot = photoSlots.find((slot) => slot.id === "DELIVERY") ?? null;
   const hasColocacionEvidence = applicationEvidence.some((evidence) => evidence.phase === "COLOCACION");
   const photoSlotOverrides = participant.photoSlotOverrides ?? [];
+  const firstEvaluationVisit = participant.questionnaire?.visits.find((visit) => visit.section === "EVALUACION_PRIMER_PERFUME") ?? null;
+  const firstEvaluationCompleted = firstEvaluationVisit?.status === "COMPLETED";
+  const legacyRegreso1Release = participant.phaseCodes.some(
+    (code) => code.phase === "REGRESO_1" && (code.status === "USED" || code.status === "VALIDATED")
+  );
+  const secondProductReleased = Boolean(participant.secondProductRelease || legacyRegreso1Release);
 
   return (
     <section className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
@@ -963,6 +970,48 @@ function ApplicationPhotoProtocolCard({
             </div>
           ))}
         </div>
+      </div>
+      <div className="mt-4 rounded-md border border-indigo-200 bg-white p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h5 className="text-sm font-semibold text-indigo-950">Liberacion de segundo producto</h5>
+            <p className="mt-1 text-xs leading-5 text-indigo-900">
+              Producto 2 se habilita cuando la evaluacion del primer perfume esta completada y el segundo producto fue liberado por operacion.
+            </p>
+          </div>
+          <StatusBadge status={secondProductReleased ? "ready" : firstEvaluationCompleted ? "planned" : "blocked"}>
+            {secondProductReleased ? "Liberado" : firstEvaluationCompleted ? "Pendiente de liberar" : "Esperando evaluacion 1"}
+          </StatusBadge>
+        </div>
+        <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+          <Field label="Evaluacion primer perfume" value={firstEvaluationCompleted ? "Completada" : "Pendiente"} />
+          <Field
+            label="Liberacion"
+            value={
+              participant.secondProductRelease
+                ? `Evento operativo: ${formatDateTime(participant.secondProductRelease.releasedAt, studyTimeZone)}`
+                : legacyRegreso1Release
+                  ? "Legacy REGRESO_1 validado/usado"
+                  : "Sin liberar"
+            }
+          />
+          <Field label="Motivo" value={participant.secondProductRelease?.reasonDetail ?? "Sin registro"} />
+        </div>
+        {showAdminResetTools ? (
+          <form action={releaseHutSecondProductAction.bind(null, studyId, participant.id)} className="mt-3 space-y-2">
+            <textarea
+              className={inputClass}
+              disabled={!firstEvaluationCompleted || secondProductReleased}
+              name="reason"
+              placeholder="Motivo obligatorio para liberar Producto 2"
+              required
+              rows={2}
+            />
+            <SubmitButton disabled={!firstEvaluationCompleted || secondProductReleased} pendingLabel="Liberando Producto 2...">
+              Liberar segundo producto
+            </SubmitButton>
+          </form>
+        ) : null}
       </div>
       {showAdminResetTools ? (
         <div className="mt-4 space-y-3">

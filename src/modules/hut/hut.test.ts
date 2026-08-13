@@ -1552,6 +1552,78 @@ describe("HUT module foundation", () => {
     });
   });
 
+  it("keeps product 2 blocked until an admin releases the second product after evaluation 1", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await createProduct2GateParticipant(repository, prisma);
+
+    const beforeRelease = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      now: new Date("2026-08-12T21:00:00.000Z"),
+      slotId: "PRODUCT_2_DAY_1",
+      storage,
+      token: participant.token
+    });
+    const release = await repository.releaseSecondProduct({
+      actorUserId: "admin-1",
+      participantId: participant.id,
+      reason: "Segundo producto entregado por operacion.",
+      studyId: "study-hut"
+    });
+    const afterRelease = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      now: new Date("2026-08-12T21:00:00.000Z"),
+      slotId: "PRODUCT_2_DAY_1",
+      storage,
+      token: participant.token
+    });
+
+    expect(beforeRelease).toMatchObject({
+      message: "Esta foto HUT aun no esta disponible.",
+      ok: false
+    });
+    expect(release).toMatchObject({ ok: true });
+    expect(afterRelease).toMatchObject({
+      data: { productCode: "583" },
+      ok: true
+    });
+    expect(prisma.state.auditLogs.find((log) => log.reason === "SECOND_PRODUCT_RELEASED")?.afterJson).toMatchObject({
+      action: "SECOND_PRODUCT_RELEASED",
+      reasonDetail: "Segundo producto entregado por operacion."
+    });
+  });
+
+  it("keeps legacy REGRESO_1 validated participants compatible for product 2", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await createProduct2GateParticipant(repository, prisma);
+    const regreso1Code: FakeHutPhaseCode = {
+      codeHash: "legacy-regreso-1-hash",
+      encryptedCode: "legacy-regreso-1-code",
+      id: "legacy-regreso-1-code",
+      participantId: participant.id,
+      phase: "REGRESO_1",
+      slot: 2,
+      status: "VALIDATED",
+      validatedAt: new Date("2026-08-12T20:00:00.000Z")
+    };
+    prisma.state.phaseCodes.push(regreso1Code);
+    participant.phaseCodes.push(regreso1Code);
+
+    const result = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      now: new Date("2026-08-12T21:00:00.000Z"),
+      slotId: "PRODUCT_2_DAY_1",
+      storage,
+      token: participant.token
+    });
+
+    expect(result).toMatchObject({
+      data: { productCode: "583" },
+      ok: true
+    });
+  });
+
   it("lets an admin request a repeat without deleting the historical photo", async () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
@@ -4863,6 +4935,96 @@ function stubAcceptedWhatsAppMeta() {
   );
 }
 
+async function createProduct2GateParticipant(
+  repository: ReturnType<typeof createHutRepository>,
+  prisma: ReturnType<typeof createFakeHutPrisma>["prisma"]
+): Promise<FakeParticipant> {
+  const created = await repository.createParticipant({
+    email: "product2-gate@example.test",
+    firstFragranceLeftArm: "247",
+    folio: `HUT-P2-${prisma.state.nextId}`,
+    name: "Participante Producto 2",
+    phone: "5577000000",
+    protocolVersion: "APPLICATION_PHOTO",
+    requestOrigin: "https://example.com",
+    secondFragranceRightArm: "583",
+    studyId: "study-hut"
+  });
+  const participantId = created.ok ? created.data.participantId : "";
+  const participant = prisma.state.participants.find((item) => item.id === participantId)!;
+  participant.origin = "CLT_HUT";
+  participant.status = "BLOCK_1_CALL_PENDING";
+  participant.applicationPhotoEntries.push(
+    {
+      capturedAt: new Date("2026-08-09T15:00:00.000Z"),
+      capturedLocalDate: "2026-08-09",
+      capturedLocalTimezone: "America/Mexico_City",
+      id: `delivery-${participantId}`,
+      participantId,
+      privateStorageKey: "hut/product2-gate/delivery.jpg",
+      productCode: null,
+      storageBucket: "participant-evidence",
+      useDayNumber: 0
+    },
+    {
+      capturedAt: new Date("2026-08-09T16:00:00.000Z"),
+      capturedLocalDate: "2026-08-09",
+      capturedLocalTimezone: "America/Mexico_City",
+      id: `p1d1-${participantId}`,
+      participantId,
+      privateStorageKey: "hut/product2-gate/p1d1.jpg",
+      productCode: "247",
+      storageBucket: "participant-evidence",
+      useDayNumber: 1
+    },
+    {
+      capturedAt: new Date("2026-08-10T10:00:00.000Z"),
+      capturedLocalDate: "2026-08-10",
+      capturedLocalTimezone: "America/Mexico_City",
+      id: `p1d2-${participantId}`,
+      participantId,
+      privateStorageKey: "hut/product2-gate/p1d2.jpg",
+      productCode: "247",
+      storageBucket: "participant-evidence",
+      useDayNumber: 2
+    },
+    {
+      capturedAt: new Date("2026-08-11T10:00:00.000Z"),
+      capturedLocalDate: "2026-08-11",
+      capturedLocalTimezone: "America/Mexico_City",
+      id: `p1d3-${participantId}`,
+      participantId,
+      privateStorageKey: "hut/product2-gate/p1d3.jpg",
+      productCode: "247",
+      storageBucket: "participant-evidence",
+      useDayNumber: 3
+    }
+  );
+  participant.questionnaireAttempt = {
+    answers: [],
+    completedAt: null,
+    id: `attempt-${participantId}`,
+    participantId,
+    startedAt: new Date("2026-08-12T18:00:00.000Z"),
+    status: "IN_PROGRESS",
+    terminatedAt: null,
+    terminationReason: null,
+    visits: [
+      {
+        attemptId: `attempt-${participantId}`,
+        completedAt: new Date("2026-08-12T20:00:00.000Z"),
+        id: `visit-eva1-${participantId}`,
+        section: "EVALUACION_PRIMER_PERFUME",
+        startedAt: new Date("2026-08-12T18:00:00.000Z"),
+        status: "COMPLETED"
+      }
+    ]
+  };
+  prisma.state.questionnaireAttempts.push(participant.questionnaireAttempt);
+
+  return participant;
+}
+
 function createFakeHutPrisma() {
   const state = {
     applicationPhotoEntries: [] as FakeApplicationPhotoEntry[],
@@ -4976,6 +5138,7 @@ function createFakeHutPrisma() {
           referenceSelfie: null,
           registrationSlot: null,
           secondFragranceRightArm: (args.data.secondFragranceRightArm as string | null) ?? null,
+          secondProductRelease: null,
           startDate: (args.data.startDate as Date | null) ?? null,
           status: (args.data.status as FakeParticipant["status"]) ?? "NOT_STARTED",
           study: state.study,
@@ -5591,6 +5754,7 @@ type FakeParticipant = {
   referenceSelfie: FakeReferenceSelfie | null;
   registrationSlot: FakeRegistrationSlot | null;
   secondFragranceRightArm: string | null;
+  secondProductRelease?: unknown;
   startDate: Date | null;
   status:
     | "NOT_STARTED"

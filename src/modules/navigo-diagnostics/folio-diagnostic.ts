@@ -1,5 +1,10 @@
 import { createPrismaClient } from "@/shared/db/client";
 import { NAVIGO_ACTIVITY_CODES } from "@/modules/navigo-app/definition";
+import {
+  calculateParticipantOperationalReadiness,
+  type ParticipantOperationalReadiness,
+  type ParticipantReadinessInput
+} from "@/modules/participant-readiness";
 import { NAVIGO_HUT_ACCESS_QUESTION_ID, isNavigoHutAccessEnabled } from "@/modules/screener/study-overrides";
 
 export type DiagnosticStatus = "BLOCKED" | "OK" | "PENDING";
@@ -23,6 +28,7 @@ export type FolioDiagnosticReport = {
   e2eStatus: E2EDiagnosticStatus;
   folio: string;
   participantName: string | null;
+  readiness: ParticipantOperationalReadiness;
   study: {
     code: string;
     id: string;
@@ -293,6 +299,7 @@ export function buildFolioDiagnosticReport(
   const hut = buildHutBlock(snapshot);
   const blocks = [screening, rotations, ctl, navigo, hut];
   const suggestions = buildSuggestions(blocks);
+  const readiness = calculateParticipantOperationalReadiness(toParticipantReadinessInput(snapshot));
   const e2eStatus = blocks.some((block) => block.status === "BLOCKED")
     ? "BLOQUEADO"
     : blocks.some((block) => block.status === "PENDING")
@@ -304,6 +311,7 @@ export function buildFolioDiagnosticReport(
     e2eStatus,
     folio: snapshot.folio,
     participantName: snapshot.confirmation?.studyParticipant.participantProfile.name ?? null,
+    readiness,
     study: snapshot.study,
     suggestions,
     technicalDetails: options.includeTechnicalDetail ? buildTechnicalDetails(snapshot) : null
@@ -497,6 +505,74 @@ function buildTechnicalDetails(snapshot: FolioDiagnosticSnapshot): FolioTechnica
       secondFragranceArm: armLabelOrNull(secondArm),
       secondFragranceApplicationOrder: secondArm?.applicationOrder ?? null
     }
+  };
+}
+
+function toParticipantReadinessInput(snapshot: FolioDiagnosticSnapshot): ParticipantReadinessInput {
+  const participant = snapshot.confirmation?.studyParticipant ?? null;
+  const hutParticipant = participant?.hutParticipant ?? snapshot.hutParticipantByFolio ?? null;
+
+  return {
+    accessTokens: participant?.accessTokens.map((token) => ({
+      expiresAt: token.expiresAt,
+      status: token.status
+    })) ?? [],
+    activities: participant?.activities.map((activity) => ({
+      activitySchedule: activity.activitySchedule
+        ? {
+            code: activity.activitySchedule.code
+          }
+        : null,
+      status: activity.status
+    })) ?? [],
+    applicationStartedAt: participant?.applicationStartedAt ?? null,
+    ctlSessions: participant?.ctlSessions.map((session) => ({ status: session.status })) ?? [],
+    ctlTriangularRotationAssignment: participant?.ctlTriangularRotationAssignment ?? null,
+    hutParticipant: hutParticipant
+      ? {
+          firstFragranceLeftArm: hutParticipant.firstFragranceLeftArm,
+          folio: null,
+          id: hutParticipant.id,
+          name: snapshot.folio,
+          origin: hutParticipant.origin,
+          phaseCodes: hutParticipant.phaseCodes.map((code) => ({
+            phase: code.phase,
+            status: code.status
+          })),
+          protocolVersion: hutParticipant.protocolVersion,
+          questionnaireAttempt: hutParticipant.questionnaireAttempt
+            ? {
+                status: hutParticipant.questionnaireAttempt.status,
+                visits: []
+              }
+            : null,
+          secondFragranceRightArm: hutParticipant.secondFragranceRightArm,
+          status: hutParticipant.status,
+          studyParticipantId: hutParticipant.studyParticipantId
+        }
+      : null,
+    id: participant?.id ?? null,
+    operationalStatus: null,
+    participantConfirmation: snapshot.confirmation
+      ? {
+          referenceCodes: snapshot.confirmation.referenceCodes.map((code) => ({ slot: code.slot })),
+          screeningAttempt: {
+            status: snapshot.confirmation.screeningAttempt.status
+          }
+        }
+      : null,
+    participantScreeningReviews: [],
+    rotationAssignment: participant?.rotationAssignment
+      ? {
+          arms: participant.rotationAssignment.arms.map((arm) => ({
+            applicationOrder: arm.applicationOrder,
+            studyProduct: {
+              internalCode: arm.studyProduct?.internalCode ?? null
+            }
+          }))
+        }
+      : null,
+    screeningStatus: participant?.screeningStatus ?? null
   };
 }
 

@@ -72,6 +72,15 @@ export {
   resolveHutPhaseCodeSecret
 } from "./phase-codes";
 export {
+  HUT_SECOND_PRODUCT_RELEASED_REASON,
+  hasLegacyRegreso1Release,
+  isSecondProductReleased,
+  isSecondProductReleaseAuditJson
+} from "./second-product-release";
+export type {
+  HutSecondProductReleaseSummary
+} from "./second-product-release";
+export {
   buildHutPhotoTimeline,
   getHutPhotoTimelineSlotDefinition,
   getNextHutPhotoTimelineSlot,

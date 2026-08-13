@@ -92,6 +92,12 @@ import {
   type HutPhotoTimelineManualOverride,
   type HutPhotoTimelineSlotId
 } from "./photo-timeline";
+import {
+  HUT_SECOND_PRODUCT_RELEASED_REASON,
+  isSecondProductReleased,
+  isSecondProductReleaseAuditJson,
+  type HutSecondProductReleaseSummary
+} from "./second-product-release";
 
 export type HutActionResult<T = void> =
   | { ok: true; data: T; message?: string }
@@ -169,6 +175,7 @@ export type HutAdminParticipant = {
     status: "AVAILABLE" | "CANCELLED" | "REGISTERED";
   } | null;
   secondFragranceRightArm: string | null;
+  secondProductRelease: HutSecondProductReleaseSummary | null;
   status: HutParticipantStatus;
   studyParticipantId: string | null;
   testMode: boolean;
@@ -872,6 +879,12 @@ export type HutRepository = {
     slotId: HutPhotoTimelineSlotId;
     studyId: string;
   }) => Promise<HutActionResult<{ participantId: string; slotId: HutPhotoTimelineSlotId }>>;
+  releaseSecondProduct: (input: {
+    actorUserId: string;
+    participantId: string;
+    reason: string;
+    studyId: string;
+  }) => Promise<HutActionResult<{ participantId: string; releasedAt: Date }>>;
   requestApplicationPhotoSlotRepeat: (input: {
     actorUserId: string;
     participantId: string;
@@ -967,6 +980,7 @@ type HutParticipantRecord = {
   referenceSelfie: HutReferenceSelfieRecord | null;
   registrationSlot?: HutRegistrationSlotRecord | null;
   secondFragranceRightArm: string | null;
+  secondProductRelease?: HutSecondProductReleaseSummary | null;
   videoSubmissions?: HutVideoRecord[];
   visualOverrideEnabled: boolean;
   visualOverrideReason: string | null;
@@ -1747,13 +1761,16 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
 
       return {
         participants: await Promise.all(
-          participants.map(async (participant) => toAdminParticipant(
-            participant,
-            input.requestOrigin,
-            input.storage,
-            getWhatsAppRepository(),
-            await readActiveHutPhotoSlotOverrides(prisma, participant.id)
-          ))
+          participants.map(async (participant) => {
+            await attachSecondProductRelease(prisma, participant);
+            return toAdminParticipant(
+              participant,
+              input.requestOrigin,
+              input.storage,
+              getWhatsAppRepository(),
+              await readActiveHutPhotoSlotOverrides(prisma, participant.id)
+            );
+          })
         ),
         reservedNavReconciliation,
         registrationSlots: registrationSlots.map((slot) => toAdminRegistrationSlot(slot, input.requestOrigin)),
@@ -1768,6 +1785,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       if (!participant) {
         return { message: "Este enlace HUT no es valido.", ok: false };
       }
+      await attachSecondProductRelease(prisma, participant);
 
       return {
         data: toPortalView(participant, await readActiveHutPhotoSlotOverrides(prisma, participant.id)),
@@ -2199,6 +2217,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       if (!isApplicationPhotoProtocol(participant)) {
         return { message: "Este participante conserva el flujo HUT historico.", ok: false };
       }
+      await attachSecondProductRelease(prisma, participant);
 
       const questionnaire = await createHutRepository(prisma, getWhatsAppRepository()).getQuestionnaireState({
         participantId: participant.id,
@@ -2286,6 +2305,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           ok: true
         };
       }
+      await attachSecondProductRelease(prisma, participant);
       const now = input.now ?? new Date();
       const manualOverrides = await readActiveHutPhotoSlotOverrides(prisma, participant.id);
       const expectedSlot = expectedApplicationPhotoSlot(participant, now, manualOverrides);
@@ -2682,6 +2702,61 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       return {
         data: { participantId: participant.id, slotId: input.slotId },
         message: "Slot fotografico liberado manualmente.",
+        ok: true
+      };
+    },
+
+    async releaseSecondProduct(input) {
+      const prisma = await getPrisma();
+      const reason = input.reason.trim();
+      if (!reason) {
+        return { message: "El motivo es obligatorio para liberar el segundo producto.", ok: false };
+      }
+
+      const participant = await findParticipant(prisma, input.participantId);
+      if (!participant || participant.studyId !== input.studyId) {
+        return { message: "No encontramos el participante HUT.", ok: false };
+      }
+      if (isReservedHutWithoutOperationalIdentity(participant)) {
+        return { message: reservedHutOperationalIdentityMessage(), ok: false };
+      }
+      if (!isApplicationPhotoProtocol(participant)) {
+        return { message: "La liberacion de segundo producto aplica solo a APPLICATION_PHOTO.", ok: false };
+      }
+      await attachSecondProductRelease(prisma, participant);
+
+      if (!isFirstFragranceEvaluationCompleted(participant)) {
+        return { message: "Completa primero la evaluacion del primer perfume antes de liberar Producto 2.", ok: false };
+      }
+      if (isSecondProductReleased(participant)) {
+        return {
+          data: {
+            participantId: participant.id,
+            releasedAt: participant.secondProductRelease?.releasedAt ?? new Date()
+          },
+          message: "El segundo producto ya estaba liberado.",
+          ok: true
+        };
+      }
+
+      const releasedAt = new Date();
+      await createHutSecondProductReleaseAudit({
+        actorUserId: input.actorUserId,
+        participant,
+        prisma,
+        reason,
+        releasedAt
+      });
+      participant.secondProductRelease = {
+        actorUserId: input.actorUserId,
+        reasonDetail: reason,
+        releasedAt,
+        releasedAtMexicoCity: formatDateTimeMexicoCity(releasedAt)
+      };
+
+      return {
+        data: { participantId: participant.id, releasedAt },
+        message: "Segundo producto liberado correctamente.",
         ok: true
       };
     },
@@ -3187,6 +3262,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       if (isReservedHutWithoutOperationalIdentity(participant)) {
         return { message: reservedHutOperationalIdentityMessage(), ok: false };
       }
+      await attachSecondProductRelease(prisma, participant);
 
       const prepared = await prepareHutPhotoReminder({
         enforceRecentDedupe: false,
@@ -3239,6 +3315,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       };
 
       for (const participant of participants) {
+        await attachSecondProductRelease(prisma, participant);
         if (!isWithinHutPhotoReminderOperationalWindow(now)) {
           summary.skipped += 1;
           await auditSkippedHutPhotoReminder({
@@ -4162,6 +4239,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       if (participantOrigin(participant) === "HUT_DIRECTO" && hutFilterStatusFromParticipant(participant) !== "COMPLETED") {
         return { message: "Completa los filtros HUT antes de registrar fotografias.", ok: false };
       }
+      await attachSecondProductRelease(prisma, participant);
 
       const manualOverrides = await readActiveHutPhotoSlotOverrides(prisma, participant.id);
       const slotResult = resolveRequestedApplicationPhotoSlot(participant, input.slotId ?? null, now, manualOverrides);
@@ -4229,6 +4307,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         if (participantOrigin(participant) === "HUT_DIRECTO" && hutFilterStatusFromParticipant(participant) !== "COMPLETED") {
           return { message: "Completa los filtros HUT antes de registrar fotografias.", ok: false };
         }
+        await attachSecondProductRelease(tx, participant);
 
         const manualOverrides = await readActiveHutPhotoSlotOverrides(tx, participant.id);
         const slotResult = resolveRequestedApplicationPhotoSlot(participant, input.slotId ?? null, now, manualOverrides);
@@ -5350,6 +5429,7 @@ async function toAdminParticipant(
       : null,
     status: participant.status,
     secondFragranceRightArm: participant.secondFragranceRightArm,
+    secondProductRelease: participant.secondProductRelease ?? null,
     studyParticipantId: participant.studyParticipantId ?? null,
     testMode: participant.testMode,
     token: participant.token,
@@ -6061,15 +6141,15 @@ function hasHutDeliveryEvidence(participant: HutParticipantRecord): boolean {
 }
 
 function isHutProduct2GateOpen(participant: HutParticipantRecord): boolean {
-  const regreso1Code = participant.phaseCodes?.find((code) => code.phase === "REGRESO_1") ?? null;
-  const secondProductReleased = regreso1Code ? ["USED", "VALIDATED"].includes(regreso1Code.status) : false;
-  const firstEvaluationCompleted = Boolean(
+  return isFirstFragranceEvaluationCompleted(participant) && isSecondProductReleased(participant);
+}
+
+function isFirstFragranceEvaluationCompleted(participant: HutParticipantRecord): boolean {
+  return Boolean(
     participant.questionnaireAttempt?.visits?.some(
       (visit) => visit.section === "EVALUACION_PRIMER_PERFUME" && visit.status === "COMPLETED"
     )
   );
-
-  return secondProductReleased && firstEvaluationCompleted;
 }
 
 function isWithinHutPhotoReminderOperationalWindow(now: Date): boolean {
@@ -6168,6 +6248,55 @@ async function readActiveHutPhotoSlotOverrides(
   return [...resolved.values()].filter((override): override is HutPhotoTimelineManualOverride => Boolean(override));
 }
 
+async function attachSecondProductRelease(
+  prisma: HutPrismaClient,
+  participant: HutParticipantRecord
+): Promise<HutParticipantRecord> {
+  participant.secondProductRelease = await readSecondProductRelease(prisma, participant.id);
+  return participant;
+}
+
+async function readSecondProductRelease(
+  prisma: HutPrismaClient,
+  participantId: string
+): Promise<HutSecondProductReleaseSummary | null> {
+  const logs = (await prisma.auditLog.findMany?.({
+    orderBy: { createdAt: "desc" },
+    select: {
+      actorUserId: true,
+      afterJson: true,
+      createdAt: true,
+      reason: true
+    },
+    where: {
+      action: "PARTICIPANT_MODIFIED",
+      entityId: participantId,
+      entityType: "HutParticipant",
+      reason: HUT_SECOND_PRODUCT_RELEASED_REASON
+    }
+  })) as Array<{
+    actorUserId?: string | null;
+    afterJson?: unknown;
+    createdAt?: Date;
+    reason?: string | null;
+  }> | undefined;
+
+  const log = (logs ?? []).find((candidate) =>
+    candidate.reason === HUT_SECOND_PRODUCT_RELEASED_REASON ||
+    isSecondProductReleaseAuditJson(candidate.afterJson)
+  );
+  if (!log) {
+    return null;
+  }
+  const metadata = isSecondProductReleaseAuditJson(log.afterJson) ? log.afterJson : null;
+  return {
+    actorUserId: log.actorUserId ?? null,
+    reasonDetail: typeof metadata?.reasonDetail === "string" ? metadata.reasonDetail : null,
+    releasedAt: log.createdAt ?? new Date(0),
+    releasedAtMexicoCity: typeof metadata?.releasedAtMexicoCity === "string" ? metadata.releasedAtMexicoCity : null
+  };
+}
+
 async function createHutPhotoSlotOverrideAudit({
   actorUserId,
   participant,
@@ -6201,6 +6330,38 @@ async function createHutPhotoSlotOverrideAudit({
       entityId: participant.id,
       entityType: "HutParticipant",
       reason: type === "RELEASE" ? "HUT_PHOTO_SLOT_MANUAL_RELEASE" : "HUT_PHOTO_SLOT_REPEAT_REQUESTED"
+    }
+  });
+}
+
+async function createHutSecondProductReleaseAudit({
+  actorUserId,
+  participant,
+  prisma,
+  reason,
+  releasedAt
+}: {
+  actorUserId: string;
+  participant: HutParticipantRecord;
+  prisma: HutPrismaClient;
+  reason: string;
+  releasedAt: Date;
+}) {
+  await prisma.auditLog.create?.({
+    data: {
+      action: "PARTICIPANT_MODIFIED",
+      actorUserId,
+      afterJson: toAuditJson({
+        action: HUT_SECOND_PRODUCT_RELEASED_REASON,
+        participant: hutParticipantAuditSnapshot(participant),
+        reasonDetail: reason,
+        releasedAtMexicoCity: formatDateTimeMexicoCity(releasedAt)
+      }),
+      beforeJson: null,
+      createdAt: releasedAt,
+      entityId: participant.id,
+      entityType: "HutParticipant",
+      reason: HUT_SECOND_PRODUCT_RELEASED_REASON
     }
   });
 }

@@ -274,6 +274,18 @@ export async function releaseHutApplicationPhotoSlotAction(studyId: string, part
   redirectWithHutMessage(studyId, result, participantId);
 }
 
+export async function releaseHutSecondProductAction(studyId: string, participantId: string, formData: FormData) {
+  const actor = await requireCapability("admin:access");
+  const result = await createHutRepository().releaseSecondProduct({
+    actorUserId: actor.id,
+    participantId,
+    reason: String(formData.get("reason") ?? ""),
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
 export async function requestHutApplicationPhotoSlotRepeatAction(studyId: string, participantId: string, formData: FormData) {
   const actor = await requireCapability("admin:access");
   const result = await createHutRepository().requestApplicationPhotoSlotRepeat({

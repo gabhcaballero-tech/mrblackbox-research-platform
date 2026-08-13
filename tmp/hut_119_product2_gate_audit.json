@@ -1,0 +1,177 @@
+{
+  "participant": {
+    "hutParticipantId": "c4d4ee8a-32b0-4a9b-bc3b-1b8e07982bc1",
+    "hutFolio": "HUT-119",
+    "navFolio": "NAV-119",
+    "name": "Ruben Bernal Garcia",
+    "status": "BLOCK_1_CALL_PENDING",
+    "origin": "CLT_HUT",
+    "protocolVersion": "APPLICATION_PHOTO",
+    "currentBlockNumber": 1,
+    "currentVideoSequence": 3,
+    "startDateCdmx": null,
+    "studyParticipantId": "2bbb68ac-0623-41fe-9613-792bfc880e06",
+    "screeningStatus": "PASSED",
+    "operationalStatus": "IN_PROGRESS",
+    "cltStatuses": "COMPLETED"
+  },
+  "product1Photos": [
+    {
+      "slot": "PRODUCT_1_DAY_1",
+      "status": "COMPLETED",
+      "blockingReason": null,
+      "photoId": "22559c13-1eca-4d7f-8ff3-53248d3da1bd",
+      "capturedAtCdmx": "09/08/26, 17:23:33 CDMX",
+      "file": "image.jpg"
+    },
+    {
+      "slot": "PRODUCT_1_DAY_2",
+      "status": "COMPLETED",
+      "blockingReason": null,
+      "photoId": "60eedbfe-f2a7-4bee-98d8-6385eaf05e34",
+      "capturedAtCdmx": "10/08/26, 22:11:05 CDMX",
+      "file": "image.jpg"
+    },
+    {
+      "slot": "PRODUCT_1_DAY_3_MORNING",
+      "status": "COMPLETED",
+      "blockingReason": null,
+      "photoId": "8d7747e9-f96f-4d04-81c4-3c1e5b1fc95b",
+      "capturedAtCdmx": "11/08/26, 12:55:20 CDMX",
+      "file": "image.jpg"
+    }
+  ],
+  "rawPhotoEntries": [
+    {
+      "id": "16280891-5667-4612-bdaf-ff23f57fca80",
+      "useDayNumber": 0,
+      "productCode": null,
+      "capturedLocalDate": "2026-08-09",
+      "capturedLocalTimezone": "America/Mexico_City",
+      "capturedAtCdmx": "09/08/26, 17:21:32 CDMX",
+      "file": "image.jpg",
+      "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/c4d4ee8a-32b0-4a9b-bc3b-1b8e07982bc1/application-photos/colocacion/4f889f35-6785-407b-afd7-5b510cc2b1b8.jpg"
+    },
+    {
+      "id": "60eedbfe-f2a7-4bee-98d8-6385eaf05e34",
+      "useDayNumber": 2,
+      "productCode": "247",
+      "capturedLocalDate": "2026-08-10",
+      "capturedLocalTimezone": "America/Mexico_City",
+      "capturedAtCdmx": "10/08/26, 22:11:05 CDMX",
+      "file": "image.jpg",
+      "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/c4d4ee8a-32b0-4a9b-bc3b-1b8e07982bc1/application-photos/colocacion/00678c11-a3cf-4e58-9973-caead1e8225a.jpg"
+    },
+    {
+      "id": "8d7747e9-f96f-4d04-81c4-3c1e5b1fc95b",
+      "useDayNumber": 3,
+      "productCode": "247",
+      "capturedLocalDate": "2026-08-11",
+      "capturedLocalTimezone": "America/Mexico_City",
+      "capturedAtCdmx": "11/08/26, 12:55:20 CDMX",
+      "file": "image.jpg",
+      "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/c4d4ee8a-32b0-4a9b-bc3b-1b8e07982bc1/application-photos/colocacion/1bc3e789-df75-496a-8e4a-c38f8cf52d46.jpg"
+    }
+  ],
+  "applicationEvidence": [
+    {
+      "id": "22559c13-1eca-4d7f-8ff3-53248d3da1bd",
+      "phase": "COLOCACION",
+      "productCode": "247",
+      "capturedAtCdmx": "09/08/26, 17:23:33 CDMX",
+      "file": "image.jpg",
+      "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/c4d4ee8a-32b0-4a9b-bc3b-1b8e07982bc1/application-photos/colocacion/186f6c75-c3cf-4563-889b-681c18cb9fdf.jpg"
+    }
+  ],
+  "questionnaire": {
+    "attempt": {
+      "id": "76679a48-922f-4e2a-b52e-04df2b095171",
+      "status": "IN_PROGRESS",
+      "startedAtCdmx": "13/08/26, 00:36:53 CDMX",
+      "completedAtCdmx": null,
+      "terminatedAtCdmx": null,
+      "terminationReason": null
+    },
+    "firstEvaluation": {
+      "id": "22a64ed6-e76d-4ac3-b6d8-fa196a7fd9f7",
+      "status": "COMPLETED",
+      "startedAtCdmx": "13/08/26, 00:06:19 CDMX",
+      "completedAtCdmx": "13/08/26, 02:56:02 CDMX",
+      "answerCount": 22,
+      "recognizedCompleted": true
+    },
+    "visits": [
+      {
+        "section": "DATOS_GENERALES",
+        "status": "COMPLETED",
+        "startedAtCdmx": "12/08/26, 21:46:46 CDMX",
+        "completedAtCdmx": "13/08/26, 03:29:45 CDMX",
+        "answerCount": 6
+      },
+      {
+        "section": "FILTROS",
+        "status": "COMPLETED",
+        "startedAtCdmx": "13/08/26, 00:36:53 CDMX",
+        "completedAtCdmx": "13/08/26, 03:29:47 CDMX",
+        "answerCount": 3
+      },
+      {
+        "section": "PRIMERA_VISITA",
+        "status": "COMPLETED",
+        "startedAtCdmx": "12/08/26, 23:53:57 CDMX",
+        "completedAtCdmx": "13/08/26, 03:29:50 CDMX",
+        "answerCount": 3
+      },
+      {
+        "section": "EVALUACION_PRIMER_PERFUME",
+        "status": "COMPLETED",
+        "startedAtCdmx": "13/08/26, 00:06:19 CDMX",
+        "completedAtCdmx": "13/08/26, 02:56:02 CDMX",
+        "answerCount": 22
+      }
+    ]
+  },
+  "regreso1": {
+    "phase": "REGRESO_1",
+    "slot": 2,
+    "status": "GENERATED",
+    "sentAtCdmx": null,
+    "validatedAtCdmx": null,
+    "usedAtCdmx": null,
+    "secondProductReleased": false
+  },
+  "timeline": {
+    "product1Day3": {
+      "status": "COMPLETED",
+      "blockingReason": null,
+      "photoId": "8d7747e9-f96f-4d04-81c4-3c1e5b1fc95b",
+      "capturedAtCdmx": "11/08/26, 12:55:20 CDMX",
+      "file": "image.jpg"
+    },
+    "product2Day1": {
+      "status": "BLOCKED",
+      "blockingReason": "REGRESO_1_NOT_USED_OR_VALIDATED",
+      "photoId": null,
+      "capturedAtCdmx": null,
+      "file": null
+    },
+    "product2GateOpen": false,
+    "product2GateRequirements": {
+      "regreso1UsedOrValidated": false,
+      "firstEvaluationCompleted": true
+    }
+  },
+  "similarCases": {
+    "count": 1,
+    "folios": [
+      {
+        "hutFolio": "HUT-119",
+        "navFolio": "NAV-119",
+        "origin": "CLT_HUT",
+        "hutStatus": "BLOCK_1_CALL_PENDING",
+        "regreso1Status": "GENERATED",
+        "cause": "REGRESO_1_NOT_USED_OR_VALIDATED"
+      }
+    ]
+  }
+}
