@@ -6,6 +6,8 @@ import type {
   CleanupOrphanParticipantProfilesReport,
   LegacyQaCleanupPreview,
   LegacyQaCleanupReport,
+  QaApprovedParticipantSummary,
+  QaApprovedProtocol,
   QaParticipantActionResult,
   QaParticipantExecutionMode,
   QaParticipantRunSummary,
@@ -31,6 +33,29 @@ export async function createQaParticipantScenarioAction(input: {
     createdByUserId: actor.id,
     executionMode,
     scenario,
+    studyId: input.studyId
+  });
+}
+
+export async function registerApprovedQaParticipantAction(input: {
+  email?: string | null;
+  executionMode?: QaParticipantExecutionMode;
+  folio: string;
+  name: string;
+  protocol: QaApprovedProtocol;
+  qaWhatsappOverridePhone: string;
+  studyId: string;
+}): Promise<QaParticipantActionResult<QaApprovedParticipantSummary>> {
+  const actor = await requireCapability("admin:access");
+
+  return createQaParticipantsRepository().registerApprovedQaParticipant({
+    createdByUserId: actor.id,
+    email: input.email,
+    executionMode: input.executionMode ?? "FAST_FORWARD",
+    folio: input.folio,
+    name: input.name,
+    protocol: input.protocol,
+    qaWhatsappOverridePhone: input.qaWhatsappOverridePhone,
     studyId: input.studyId
   });
 }

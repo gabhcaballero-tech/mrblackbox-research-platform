@@ -141,6 +141,29 @@ export type QaParticipantRunSummary = {
   updatedAt: Date;
 };
 
+export type QaApprovedProtocol = "CLT_NAVIGO_HUT" | "HUT_DIRECTO";
+
+export type QaApprovedParticipantSummary = {
+  codes: Array<{
+    code: string;
+    slot: 1 | 2 | 3;
+  }>;
+  folio: string;
+  hutParticipantId: string | null;
+  participantName: string;
+  protocol: QaApprovedProtocol;
+  qaWhatsappOverridePhone: string;
+  run: QaParticipantRunSummary;
+  studyParticipantId: string;
+  whatsapp: {
+    error: string | null;
+    metaMessageId: string | null;
+    sentAt: Date | null;
+    status: "ERROR" | "NO_ENVIADO" | "ENVIADO";
+    templateName: string;
+  };
+};
+
 export type QaParticipantActionResult<T> =
   | {
       data: T;
@@ -173,6 +196,7 @@ export type QaParticipantScenarioReport = {
   };
   qa: true;
   referenceCodes: Array<{
+    code?: string;
     generated: boolean;
     slot: 1 | 2 | 3;
   }>;

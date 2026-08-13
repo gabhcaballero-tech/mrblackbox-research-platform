@@ -274,6 +274,19 @@ export async function releaseHutApplicationPhotoSlotAction(studyId: string, part
   redirectWithHutMessage(studyId, result, participantId);
 }
 
+export async function removeHutApplicationPhotoSlotOverrideAction(studyId: string, participantId: string, formData: FormData) {
+  const actor = await requireCapability("admin:access");
+  const result = await createHutRepository().removeApplicationPhotoSlotOverride({
+    actorUserId: actor.id,
+    participantId,
+    reason: String(formData.get("reason") ?? ""),
+    slotId: String(formData.get("slotId") ?? "") as HutPhotoTimelineSlotId,
+    studyId
+  });
+
+  redirectWithHutMessage(studyId, result, participantId);
+}
+
 export async function releaseHutSecondProductAction(studyId: string, participantId: string, formData: FormData) {
   const actor = await requireCapability("admin:access");
   const result = await createHutRepository().releaseSecondProduct({

@@ -10,18 +10,40 @@ import {
 
 export type HutQuestionnaireSectionProgress = {
   answered: number;
+  optionalPendingQuestionCodes: string[];
+  optionalQuestions: HutQuestionDefinition[];
   pendingQuestionCodes: string[];
   questions: HutQuestionDefinition[];
   section: HutQuestionnaireSectionId;
+  status: HutQuestionnaireSectionStatus;
   title: string;
   total: number;
 };
+
+export type HutQuestionnaireSectionStatus = "COMPLETED" | "IN_PROGRESS" | "PENDING";
 
 export type HutQuestionnaireProgress = {
   answered: number;
   percentage: number;
   sections: HutQuestionnaireSectionProgress[];
   total: number;
+};
+
+export type HutQuestionnaireStoredVisitProgress = {
+  attemptId?: string;
+  completedAt: Date | null;
+  section: HutQuestionnaireSectionId;
+  startedAt: Date | null;
+  status: HutQuestionnaireSectionStatus;
+};
+
+export type HutQuestionnaireEffectiveVisitProgress = {
+  attemptId: string;
+  completedAt: Date | null;
+  section: HutQuestionnaireSectionId;
+  startedAt: Date | null;
+  status: HutQuestionnaireSectionStatus;
+  storedStatus: HutQuestionnaireSectionStatus | null;
 };
 
 const HUT_OPERATIONAL_PANEL_SECTIONS = new Set<HutQuestionnaireSectionId>([
@@ -67,12 +89,28 @@ export function buildHutQuestionnaireProgress({
       const pendingQuestionCodes = questions
         .filter((question) => !hasAnswer(answers, question.code))
         .map((question) => question.code);
+      const optionalQuestions = optionalProgressQuestionsForSection({
+        answers,
+        applicableQuestions,
+        participantOrigin,
+        section: section.id
+      });
+      const optionalPendingQuestionCodes = optionalQuestions
+        .filter((question) => !hasAnswer(answers, question.code))
+        .map((question) => question.code);
 
       return {
         answered: questions.length - pendingQuestionCodes.length,
+        optionalPendingQuestionCodes,
+        optionalQuestions,
         pendingQuestionCodes,
         questions,
         section: section.id,
+        status: resolveHutQuestionnaireSectionStatus({
+          answered: questions.length - pendingQuestionCodes.length,
+          pending: pendingQuestionCodes.length,
+          total: questions.length
+        }),
         title: progressSectionTitle(section.id),
         total: questions.length
       };
@@ -87,6 +125,95 @@ export function buildHutQuestionnaireProgress({
     sections,
     total
   };
+}
+
+export function optionalProgressQuestionsForSection({
+  answers = {},
+  applicableQuestions,
+  definition = getHutV5Definition(),
+  participantOrigin,
+  section
+}: {
+  answers?: HutAnswerLookup;
+  applicableQuestions?: HutQuestionDefinition[];
+  definition?: HutDefinition;
+  participantOrigin: HutParticipantOrigin;
+  section: HutQuestionnaireSectionId;
+}): HutQuestionDefinition[] {
+  const questions = applicableQuestions ?? getHutApplicableQuestions({
+    answers,
+    context: { participantOrigin },
+    definition
+  });
+
+  if (!isHutOperationalPanelSection(section)) {
+    return [];
+  }
+
+  return questions.filter((question) => {
+    if (question.section !== section || question.required) {
+      return false;
+    }
+
+    if (participantOrigin === "CLT_HUT" && section === "FILTROS") {
+      return Boolean(question.requiredForCltHut);
+    }
+
+    return true;
+  });
+}
+
+export function buildHutEffectiveVisitProgress({
+  answers = {},
+  applicableQuestionCodes,
+  attemptId,
+  definition = getHutV5Definition(),
+  participantOrigin,
+  storedVisits = []
+}: {
+  answers?: HutAnswerLookup;
+  applicableQuestionCodes?: string[];
+  attemptId: string;
+  definition?: HutDefinition;
+  participantOrigin: HutParticipantOrigin;
+  storedVisits?: HutQuestionnaireStoredVisitProgress[];
+}): HutQuestionnaireEffectiveVisitProgress[] {
+  const storedBySection = new Map(storedVisits.map((visit) => [visit.section, visit]));
+  return buildHutQuestionnaireProgress({
+    answers,
+    applicableQuestionCodes,
+    definition,
+    participantOrigin
+  }).sections.map((section) => {
+    const stored = storedBySection.get(section.section);
+    const status = stored?.status === "COMPLETED" ? "COMPLETED" : section.status;
+    return {
+      attemptId: stored?.attemptId ?? attemptId,
+      completedAt: status === "COMPLETED" ? stored?.completedAt ?? null : null,
+      section: section.section,
+      startedAt: stored?.startedAt ?? null,
+      status,
+      storedStatus: stored?.status ?? null
+    };
+  });
+}
+
+export function resolveHutQuestionnaireSectionStatus({
+  answered,
+  pending,
+  total
+}: {
+  answered: number;
+  pending: number;
+  total: number;
+}): HutQuestionnaireSectionStatus {
+  if (total > 0 && pending === 0) {
+    return "COMPLETED";
+  }
+  if (answered > 0) {
+    return "IN_PROGRESS";
+  }
+  return "PENDING";
 }
 
 export function progressQuestionsForSection({

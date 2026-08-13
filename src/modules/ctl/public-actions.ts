@@ -30,9 +30,10 @@ import {
 
 export async function loginPublicCtlInterviewerAction(studyCode: string, formData: FormData) {
   const secret = getCtlPublicSessionSecret();
+  const includeQa = formData.get("qa") === "1";
 
   if (!secret) {
-    redirect(buildCtlPublicUrl(studyCode, { ctlError: "El acceso CTL no esta configurado." }));
+    redirect(buildCtlPublicUrl(studyCode, { ctlError: "El acceso CTL no esta configurado.", qa: includeQa ? "1" : "" }));
   }
 
   const result = await createCtlRepository().validateInterviewerCode({
@@ -41,7 +42,7 @@ export async function loginPublicCtlInterviewerAction(studyCode: string, formDat
   });
 
   if (!result.ok) {
-    redirect(buildCtlPublicUrl(studyCode, { ctlError: result.message }));
+    redirect(buildCtlPublicUrl(studyCode, { ctlError: result.message, qa: includeQa ? "1" : "" }));
   }
 
   const cookieStore = await cookies();
@@ -59,7 +60,7 @@ export async function loginPublicCtlInterviewerAction(studyCode: string, formDat
     secure: process.env.NODE_ENV === "production"
   });
 
-  redirect(buildCtlPublicUrl(studyCode, { ctlMessage: "Codigo validado correctamente." }));
+  redirect(buildCtlPublicUrl(studyCode, { ctlMessage: "Codigo validado correctamente.", qa: includeQa ? "1" : "" }));
 }
 
 export async function logoutPublicCtlInterviewerAction(studyCode: string) {
@@ -70,23 +71,25 @@ export async function logoutPublicCtlInterviewerAction(studyCode: string) {
 
 export async function claimPublicCtlFolioAction(studyCode: string, formData: FormData) {
   const actor = await getPublicCtlInterviewerActor({ studyCode });
+  const includeQa = formData.get("qa") === "1";
 
   if (!actor) {
-    redirect(buildCtlPublicUrl(studyCode, { ctlError: "Ingresa tu codigo de encuestador para continuar." }));
+    redirect(buildCtlPublicUrl(studyCode, { ctlError: "Ingresa tu codigo de encuestador para continuar.", qa: includeQa ? "1" : "" }));
   }
 
   const folio = normalizeCtlCode(formData.get("folio"));
   const result = await createCtlRepository().claimFolioForInterviewerCode({
     ctlInterviewerCodeId: actor.id,
-    folio
+    folio,
+    includeQa
   });
 
   if (!result.ok) {
-    redirect(buildCtlPublicUrl(studyCode, { ctlError: result.message, folio }));
+    redirect(buildCtlPublicUrl(studyCode, { ctlError: result.message, folio, qa: includeQa ? "1" : "" }));
   }
 
   revalidatePath(`/ctl/${studyCode}`);
-  redirect(`/ctl/${encodeURIComponent(studyCode)}/sessions/${encodeURIComponent(result.sessionId)}`);
+  redirect(`/ctl/${encodeURIComponent(studyCode)}/sessions/${encodeURIComponent(result.sessionId)}${includeQa ? "?qa=1" : ""}`);
 }
 
 export async function savePublicCtlAnswersAction(studyCode: string, sessionId: string, formData: FormData) {

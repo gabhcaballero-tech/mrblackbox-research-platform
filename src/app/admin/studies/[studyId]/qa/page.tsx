@@ -10,9 +10,15 @@ import {
   cleanupLegacyQaParticipantAction,
   cleanupOrphanParticipantProfilesAction,
   cleanupQaParticipantRunAction,
-  createQaParticipantScenarioAction
+  createQaParticipantScenarioAction,
+  registerApprovedQaParticipantAction
 } from "@/modules/qa-participants/actions";
-import { createQaParticipantsRepository } from "@/modules/qa-participants";
+import {
+  APPROVED_QA_FOLIOS_CLT_NAVIGO_HUT,
+  APPROVED_QA_FOLIOS_HUT_DIRECTO,
+  createQaParticipantsRepository,
+  type QaApprovedProtocol
+} from "@/modules/qa-participants";
 import { validateQaE2eRun, type QaE2eValidationReport } from "@/modules/qa-e2e-validator";
 import type {
   LegacyQaCleanupPreview,
@@ -111,6 +117,7 @@ export default async function QaAdminPage({ params, searchParams }: QaAdminPageP
           </p>
         ) : null}
 
+        <RegisterApprovedQaParticipantSection studyId={studyId} />
         <CreateQaParticipantSection studyId={studyId} />
         <LegacyQaCleanupSection preview={legacyPreview} selectedFolios={legacySelectedFolios} studyId={studyId} />
         <OrphanParticipantProfilesCleanupSection preview={orphanProfilesPreview} studyId={studyId} />
@@ -467,6 +474,65 @@ function CreateQaParticipantSection({ studyId }: { studyId: string }) {
   );
 }
 
+function RegisterApprovedQaParticipantSection({ studyId }: { studyId: string }) {
+  return (
+    <section className="rounded-lg border border-teal-200 bg-teal-50 p-5 shadow-sm">
+      <div>
+        <h2 className="text-lg font-semibold text-teal-950">Registro QA aprobado</h2>
+        <p className="mt-1 text-sm leading-6 text-teal-900">
+          Crea participantes permanentes NAV-301 a NAV-310 como aprobados por screening. Usa el flujo real, genera tres codigos maestros y envia WhatsApp al telefono auditor.
+        </p>
+      </div>
+
+      <form action={registerApprovedQaParticipantFormAction.bind(null, studyId)} className="mt-5 grid gap-4 lg:grid-cols-3">
+        <label className={labelClass}>
+          Folio NAV
+          <select className={inputClass} name="folio" required>
+            <optgroup label="CLT + Navigo + HUT">
+              {APPROVED_QA_FOLIOS_CLT_NAVIGO_HUT.map((folio) => (
+                <option key={folio} value={folio}>
+                  {folio}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="HUT directo">
+              {APPROVED_QA_FOLIOS_HUT_DIRECTO.map((folio) => (
+                <option key={folio} value={folio}>
+                  {folio}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+        </label>
+        <label className={labelClass}>
+          Protocolo
+          <select className={inputClass} name="protocol" required>
+            <option value="CLT_NAVIGO_HUT">CLT + Navigo + HUT</option>
+            <option value="HUT_DIRECTO">HUT directo</option>
+          </select>
+        </label>
+        <label className={labelClass}>
+          Telefono WhatsApp auditor
+          <input className={inputClass} name="qaWhatsappOverridePhone" placeholder="+525500000000" required />
+        </label>
+        <label className={labelClass}>
+          Nombre de prueba
+          <input className={inputClass} name="name" placeholder="QA NAV-301" required />
+        </label>
+        <label className={labelClass}>
+          Email opcional
+          <input className={inputClass} name="email" placeholder="qa@example.com" type="email" />
+        </label>
+        <div className="flex items-end">
+          <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800" type="submit">
+            Registrar QA aprobado
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
 function QaRunsSection({
   diagnosticReport,
   runs,
@@ -639,6 +705,7 @@ function QaDiagnosticReport({ report }: { report: QaE2eValidationReport }) {
 
 function ReportSummary({ report }: { report: QaParticipantScenarioReport }) {
   const objectEntries = Object.entries(report.objects).filter(([, value]) => Boolean(value));
+  const referenceCodes = report.referenceCodes ?? [];
   return (
     <div className="grid gap-4 text-sm md:grid-cols-2">
       <div>
@@ -663,6 +730,24 @@ function ReportSummary({ report }: { report: QaParticipantScenarioReport }) {
           ))}
         </ul>
       </div>
+      {referenceCodes.length > 0 ? (
+        <div>
+          <h4 className="font-semibold text-zinc-950">Codigos maestros</h4>
+          <ul className="mt-2 space-y-1 text-zinc-700">
+            {referenceCodes.map((referenceCode) => (
+              <li className="font-mono text-xs" key={referenceCode.slot}>
+                Slot {referenceCode.slot}: {referenceCode.code ?? "generado"}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {"qaWhatsappOverridePhone" in report ? (
+        <div>
+          <h4 className="font-semibold text-zinc-950">WhatsApp QA</h4>
+          <p className="mt-2 text-zinc-700">{String(report.qaWhatsappOverridePhone ?? "-")}</p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -686,7 +771,7 @@ function CleanupQaRunForm({ run, studyId }: { run: QaParticipantRunSummary; stud
         disabled={disabled}
         type="submit"
       >
-        Limpiar run QA
+        Reiniciar prueba QA
       </button>
     </form>
   );
@@ -708,6 +793,30 @@ async function createQaParticipantFormAction(studyId: string, formData: FormData
     redirect(`/admin/studies/${studyId}/qa?qaError=${encodeURIComponent(result.message)}`);
   }
   redirect(`/admin/studies/${studyId}/qa?qaMessage=${encodeURIComponent(`Participante QA creado: ${result.data.folio ?? result.data.id}`)}`);
+}
+
+async function registerApprovedQaParticipantFormAction(studyId: string, formData: FormData) {
+  "use server";
+
+  const result = await registerApprovedQaParticipantAction({
+    email: String(formData.get("email") ?? "").trim() || null,
+    executionMode: "FAST_FORWARD",
+    folio: String(formData.get("folio") ?? ""),
+    name: String(formData.get("name") ?? ""),
+    protocol: String(formData.get("protocol") ?? "") as QaApprovedProtocol,
+    qaWhatsappOverridePhone: String(formData.get("qaWhatsappOverridePhone") ?? ""),
+    studyId
+  });
+
+  revalidatePath(`/admin/studies/${studyId}/qa`);
+  if (!result.ok) {
+    redirect(`/admin/studies/${studyId}/qa?qaError=${encodeURIComponent(result.message)}`);
+  }
+
+  const message =
+    `Participante QA aprobado registrado: ${result.data.folio}. ` +
+    `WhatsApp: ${result.data.whatsapp.status}.`;
+  redirect(`/admin/studies/${studyId}/qa?qaMessage=${encodeURIComponent(message)}`);
 }
 
 async function cleanupQaParticipantFormAction(studyId: string, runId: string, formData: FormData) {

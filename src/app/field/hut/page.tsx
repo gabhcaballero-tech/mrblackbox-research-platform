@@ -19,7 +19,6 @@ import {
 import {
   authorizeHutSecondStageForFieldAction,
   authorizeHutThirdStageForFieldAction,
-  completeHutQuestionnaireSectionForFieldAction,
   saveHutQuestionnaireAnswerForFieldAction
 } from "@/modules/hut/actions";
 import { createFieldOperationsRepository } from "@/modules/field-operations";
@@ -371,7 +370,6 @@ function FieldHutWorkspace({
         ? null
       : selectedQuestion
       ?? operationalRequiredQuestions.find((question) => !(question.code in workspace.questionnaire.answers))
-      ?? operationalQuestions.find((question) => !(question.code in workspace.questionnaire.answers))
       ?? null;
   const captureQuestion = !questionnaireClosed && selectedQuestionCode && !selectedQuestionBlockedByDirectFilter && !selectedQuestionBlockedBySecondStage && !selectedQuestionBlockedByThirdStage
     ? selectedQuestion
@@ -635,18 +633,15 @@ function SectionProgressControls({
     answers: workspace.questionnaire.answers,
     participantOrigin: workspace.participant.origin
   });
-  const visitsBySection = new Map(workspace.questionnaire.visits.map((visit) => [visit.section, visit]));
   return (
     <div className="mt-5 grid gap-3 sm:grid-cols-2">
       {progress.sections.map((sectionProgress) => {
-        const visit = visitsBySection.get(sectionProgress.section);
         const pendingQuestionCode = sectionProgress.pendingQuestionCodes[0];
-        const canComplete = workspace.questionnaire.attempt.status !== "TERMINATED" && sectionProgress.pendingQuestionCodes.length === 0 && visit?.status !== "COMPLETED";
         return (
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={sectionProgress.section}>
             <p className="font-semibold text-zinc-950">{sectionProgress.title}</p>
             <p className="mt-1 text-zinc-600">
-              {sectionProgress.answered}/{sectionProgress.total} · {statusLabel(visit?.status ?? "PENDING")}
+              {sectionProgress.answered}/{sectionProgress.total} · {statusLabel(sectionProgress.status)}
             </p>
             {pendingQuestionCode ? (
               <a
@@ -656,22 +651,10 @@ function SectionProgressControls({
                 Capturar pendiente
               </a>
             ) : null}
-            {canComplete ? (
-              <form
-                action={completeHutQuestionnaireSectionForFieldAction.bind(
-                  null,
-                  searchedFolio,
-                  workspace.participant.id,
-                  workspace.participant.studyId,
-                  sectionProgress.section
-                )}
-                className="mt-3"
-              >
-                <FieldHutAccessHiddenInputs access={access} />
-                <button className="rounded-md border border-teal-700 px-3 py-2 text-sm font-semibold text-teal-800" type="submit">
-                  Confirmar y cerrar sección
-                </button>
-              </form>
+            {sectionProgress.optionalPendingQuestionCodes.length > 0 ? (
+              <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900">
+                Opcional pendiente: {sectionProgress.optionalPendingQuestionCodes.length}
+              </p>
             ) : null}
           </div>
         );
@@ -1158,9 +1141,7 @@ function nextQuestionAfterCurrent({
   const sectionQuestions = currentSection ? questions.filter((question) => question.section === currentSection) : questions;
   const sectionIndex = sectionQuestions.findIndex((question) => question.code === currentCode);
   const remainingQuestions = sectionIndex >= 0 ? sectionQuestions.slice(sectionIndex + 1) : sectionQuestions;
-  return remainingQuestions.find((question) => question.required && !(question.code in answers))
-    ?? remainingQuestions.find((question) => !(question.code in answers))
-    ?? null;
+  return remainingQuestions.find((question) => question.required && !(question.code in answers)) ?? null;
 }
 
 function applicableQuestions(workspace: HutFieldQuestionnaireWorkspace) {

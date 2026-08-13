@@ -4,12 +4,23 @@ import { generateParticipantReferenceCode, generateReferenceCodes } from "@/modu
 import { createHutParticipantToken, createHutRegistrationToken } from "@/modules/hut/service";
 import { hashToken } from "@/modules/navigo-app";
 import {
+  sendNavigoConfirmationWhatsApp,
+  type WhatsAppTemplateSender
+} from "@/modules/oneui-whatsapp";
+import {
   createEmptyQaCleanupReport,
+  isApprovedQaFolioProtocolAllowed,
   normalizeQaParticipantFolio,
+  normalizeApprovedQaFolio,
+  parseNavFolioSequence,
   recordQaCleanupCount
 } from "./service";
+
+const QA_INITIAL_CODES_WHATSAPP_TEMPLATE_NAME = "oneui_navigo_confirmation_participacion";
 import type {
   CleanupOrphanParticipantProfilesReport,
+  QaApprovedParticipantSummary,
+  QaApprovedProtocol,
   QaParticipantActionResult,
   QaParticipantCleanupReport,
   QaParticipantExecutionMode,
@@ -159,12 +170,26 @@ export type CreateQaParticipantScenarioInput = {
   studyId: string;
 };
 
+export type RegisterApprovedQaParticipantInput = {
+  createdByUserId: string;
+  email?: string | null;
+  executionMode?: QaParticipantExecutionMode;
+  folio: string;
+  name: string;
+  now?: Date;
+  protocol: QaApprovedProtocol;
+  qaWhatsappOverridePhone: string;
+  sender?: WhatsAppTemplateSender;
+  studyId: string;
+};
+
 export type QaParticipantsRepository = {
   cleanupLegacyQaParticipant: (input: CleanupLegacyQaParticipantsInput) => Promise<QaParticipantActionResult<LegacyQaCleanupReport>>;
   cleanupLegacyAuthorizedFolios: (input: CleanupLegacyQaParticipantsInput) => Promise<QaParticipantActionResult<LegacyQaCleanupReport>>;
   cleanupOrphanParticipantProfiles: (input: CleanupOrphanParticipantProfilesInput) => Promise<QaParticipantActionResult<CleanupOrphanParticipantProfilesReport>>;
   cleanupRun: (input: CleanupQaParticipantRunInput) => Promise<QaParticipantActionResult<QaParticipantRunSummary>>;
   createEmptyRun: (input: CreateEmptyQaParticipantRunInput) => Promise<QaParticipantActionResult<QaParticipantRunSummary>>;
+  registerApprovedQaParticipant: (input: RegisterApprovedQaParticipantInput) => Promise<QaParticipantActionResult<QaApprovedParticipantSummary>>;
   createScenario: (input: CreateQaParticipantScenarioInput) => Promise<QaParticipantActionResult<QaParticipantRunSummary>>;
   getRun: (runId: string) => Promise<QaParticipantRunSummary | null>;
   listRuns: (input: ListQaParticipantRunsInput) => Promise<QaParticipantRunSummary[]>;
@@ -282,6 +307,151 @@ export function createQaParticipantsRepository(prismaClient?: QaPrismaClient): Q
       })) as QaParticipantRunRecord;
 
       return { data: toQaParticipantRunSummary(created), ok: true };
+    },
+
+    async registerApprovedQaParticipant(input) {
+      const normalizedFolio = normalizeApprovedQaFolio(input.folio);
+      if (!normalizedFolio) {
+        return { message: "Usa un folio QA reservado entre NAV-301 y NAV-310.", ok: false };
+      }
+      if (!isApprovedQaFolioProtocolAllowed(normalizedFolio, input.protocol)) {
+        return {
+          message: input.protocol === "CLT_NAVIGO_HUT"
+            ? "CLT_NAVIGO_HUT solo puede usarse con NAV-301 a NAV-305."
+            : "HUT_DIRECTO solo puede usarse con NAV-306 a NAV-310.",
+          ok: false
+        };
+      }
+      const participantName = input.name.trim();
+      const qaWhatsappOverridePhone = input.qaWhatsappOverridePhone.trim();
+      if (!participantName || !qaWhatsappOverridePhone) {
+        return { message: "Captura nombre de prueba y telefono WhatsApp del auditor.", ok: false };
+      }
+
+      const prisma = await getPrisma();
+      const now = input.now ?? new Date();
+      const initialRun = (await prisma.qaParticipantRun.create?.({
+        data: {
+          createdByUserId: input.createdByUserId,
+          executionMode: input.executionMode ?? "FAST_FORWARD",
+          folio: normalizedFolio,
+          reportJson: {
+            createdAt: now.toISOString(),
+            folio: normalizedFolio,
+            protocol: input.protocol,
+            qa: true,
+            qaMode: true,
+            source: "APPROVED_QA_REGISTRATION",
+            status: "CREATING"
+          },
+          scenario: input.protocol,
+          status: "CREATED",
+          studyId: input.studyId
+        },
+        select: qaRunSelect
+      })) as QaParticipantRunRecord;
+
+      try {
+        const created = await prisma.$transaction((tx) =>
+          createApprovedQaRegistrationData(tx, {
+            ...input,
+            email: input.email ?? null,
+            folio: normalizedFolio,
+            name: participantName,
+            now,
+            qaWhatsappOverridePhone,
+            run: initialRun
+          })
+        );
+        const whatsappResult = await sendNavigoConfirmationWhatsApp({
+          codes: created.referenceCodes,
+          folio: created.folio,
+          now,
+          participantId: created.studyParticipantId,
+          participantName: created.participantName,
+          phone: qaWhatsappOverridePhone,
+          sender: input.sender,
+          studyId: input.studyId
+        });
+        const whatsapp = whatsappResult.ok
+          ? {
+              error: null,
+              metaMessageId: whatsappResult.data.metaMessageId,
+              sentAt: whatsappResult.data.timestamp ?? whatsappResult.data.createdAt,
+              status: "ENVIADO" as const,
+              templateName: QA_INITIAL_CODES_WHATSAPP_TEMPLATE_NAME
+            }
+          : {
+              error: whatsappResult.message,
+              metaMessageId: "data" in whatsappResult ? whatsappResult.data?.metaMessageId ?? null : null,
+              sentAt: "data" in whatsappResult ? whatsappResult.data?.timestamp ?? whatsappResult.data?.createdAt ?? null : null,
+              status: "ERROR" as const,
+              templateName: QA_INITIAL_CODES_WHATSAPP_TEMPLATE_NAME
+            };
+
+        const finalReport = {
+          ...created.report,
+          qaWhatsappOverridePhone,
+          whatsappInitialCodes: whatsapp
+        };
+        const updated = (await prisma.qaParticipantRun.update?.({
+          data: {
+            reportJson: finalReport,
+            status: "CREATED"
+          },
+          select: qaRunSelect,
+          where: { id: initialRun.id }
+        })) as QaParticipantRunRecord;
+        if (whatsapp.status === "ENVIADO") {
+          await prisma.participantConfirmation.update?.({
+            data: {
+              manualMessageMarkedSentAt: whatsapp.sentAt ?? now,
+              manualMessageMarkedSentByUserId: input.createdByUserId,
+              manualMessageStatus: "SENT"
+            },
+            where: { id: created.confirmationId }
+          });
+        }
+
+        return {
+          data: {
+            codes: created.referenceCodes,
+            folio: created.folio,
+            hutParticipantId: created.hutParticipantId,
+            participantName: created.participantName,
+            protocol: input.protocol,
+            qaWhatsappOverridePhone,
+            run: toQaParticipantRunSummary(updated),
+            studyParticipantId: created.studyParticipantId,
+            whatsapp
+          },
+          ok: true
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "No fue posible registrar participante QA.";
+        await prisma.qaParticipantRun.update?.({
+          data: {
+            reportJson: {
+              createdAt: now.toISOString(),
+              error: message,
+              folio: normalizedFolio,
+              protocol: input.protocol,
+              qa: true,
+              qaMode: true,
+              source: "APPROVED_QA_REGISTRATION",
+              status: "FAILED"
+            },
+            status: "FAILED"
+          },
+          select: qaRunSelect,
+          where: { id: initialRun.id }
+        });
+
+        return {
+          message: `No fue posible registrar participante QA: ${message}`,
+          ok: false
+        };
+      }
     },
 
     async createScenario(input) {
@@ -1120,6 +1290,29 @@ type QaHutParticipant = {
   token: string;
 };
 
+type ApprovedQaRegistrationDataInput = RegisterApprovedQaParticipantInput & {
+  email: string | null;
+  folio: string;
+  name: string;
+  now: Date;
+  qaWhatsappOverridePhone: string;
+  run: QaParticipantRunRecord;
+};
+
+type ApprovedQaRegistrationCreated = {
+  confirmationId: string;
+  folio: string;
+  hutParticipantId: string | null;
+  participantName: string;
+  referenceCodes: Array<{ code: string; slot: 1 | 2 | 3 }>;
+  report: QaParticipantScenarioReport & {
+    protocol: QaApprovedProtocol;
+    qaMode: true;
+    qaWhatsappOverridePhone: string;
+  };
+  studyParticipantId: string;
+};
+
 async function createQaScenarioData(
   tx: QaPrismaClient,
   input: QaScenarioDataInput
@@ -1254,6 +1447,123 @@ async function createQaScenarioData(
   return toQaParticipantRunSummary(updated);
 }
 
+async function createApprovedQaRegistrationData(
+  tx: QaPrismaClient,
+  input: ApprovedQaRegistrationDataInput
+): Promise<ApprovedQaRegistrationCreated> {
+  const study = await findQaStudy(tx, input.studyId);
+  const report = createBaseScenarioReport({
+    baseUrl: undefined,
+    createdByUserId: input.createdByUserId,
+    executionMode: input.executionMode ?? "FAST_FORWARD",
+    hutPhaseCodeSecret: undefined,
+    now: input.now,
+    run: input.run,
+    scenario: input.protocol,
+    studyId: input.studyId
+  });
+  report.skippedExternalEffects = [];
+
+  const participant = await createQaStudyParticipantFoundation(tx, {
+    actorUserId: input.createdByUserId,
+    email: input.email,
+    folio: input.folio,
+    name: input.name,
+    now: input.now,
+    phone: input.qaWhatsappOverridePhone,
+    runId: input.run.id,
+    study
+  });
+  report.objects.participantProfileId = participant.participantProfileId;
+  report.objects.studyParticipantId = participant.participantId;
+  report.objects.screeningAttemptId = participant.screeningAttemptId;
+  report.objects.participantConfirmationId = participant.confirmationId;
+  report.referenceCodes = participant.referenceCodes.map((code) => ({
+    code: code.code,
+    generated: true,
+    slot: code.slot
+  }));
+  report.links.ctlPublic = input.protocol === "CLT_NAVIGO_HUT" ? `/ctl/${study.code}?qa=1` : undefined;
+
+  const rotation = await assignQaNavigoRotation(tx, {
+    actorUserId: input.createdByUserId,
+    now: input.now,
+    studyId: study.id,
+    studyParticipantId: participant.participantId
+  });
+  report.objects.rotationAssignmentId = rotation.assignmentId;
+  report.rotations.navigo = {
+    armAssignmentCount: rotation.arms.length,
+    firstFragrance: rotation.firstFragrance,
+    rotationCode: rotation.rotationCode,
+    secondFragrance: rotation.secondFragrance
+  };
+
+  if (input.protocol === "CLT_NAVIGO_HUT") {
+    const triangular = await createQaCtlTriangularRotation(tx, {
+      actorUserId: input.createdByUserId,
+      firstFragrance: rotation.firstFragrance,
+      secondFragrance: rotation.secondFragrance,
+      studyParticipantId: participant.participantId
+    });
+    report.objects.triangularRotationAssignmentId = triangular.id;
+    report.rotations.ctlTriangular = toCtlTriangularReport(triangular);
+  }
+
+  const hutParticipant = await createQaHutParticipant(tx, {
+    now: input.now,
+    origin: input.protocol === "HUT_DIRECTO" ? "HUT_DIRECTO" : "CLT_HUT",
+    source: {
+      email: input.email ?? `qa-${input.folio.toLowerCase()}@example.invalid`,
+      firstFragrance: rotation.firstFragrance,
+      folio: input.folio,
+      name: input.name,
+      phone: input.qaWhatsappOverridePhone,
+      referenceCodes: participant.referenceCodes,
+      secondFragrance: rotation.secondFragrance,
+      studyParticipantId: participant.participantId
+    },
+    studyId: study.id,
+    testMode: true
+  });
+  report.objects.hutParticipantId = hutParticipant.id;
+  report.objects.hutQuestionnaireAttemptId = hutParticipant.attemptId;
+  report.links.hutParticipant = `/hut/p/${hutParticipant.token}`;
+  report.rotations.hut = {
+    eva1: rotation.firstFragrance,
+    eva2: rotation.secondFragrance
+  };
+  report.status = "CREATED";
+
+  const enrichedReport = {
+    ...report,
+    protocol: input.protocol,
+    qaMode: true as const,
+    qaWhatsappOverridePhone: input.qaWhatsappOverridePhone
+  };
+  await tx.qaParticipantRun.update?.({
+    data: {
+      folio: input.folio,
+      hutParticipantId: hutParticipant.id,
+      reportJson: enrichedReport,
+      status: "CREATED",
+      studyParticipantId: participant.participantId
+    },
+    select: qaRunSelect,
+    where: { id: input.run.id }
+  });
+
+  return {
+    confirmationId: participant.confirmationId,
+    folio: input.folio,
+    hutParticipantId: hutParticipant.id,
+    participantName: participant.participantName,
+    referenceCodes: participant.referenceCodes,
+    report: enrichedReport,
+    studyParticipantId: participant.participantId
+  };
+}
+
 async function findQaStudy(tx: QaPrismaClient, studyId: string): Promise<QaStudyRecord> {
   const study = (await tx.study.findUnique?.({
     select: {
@@ -1275,8 +1585,11 @@ async function createQaStudyParticipantFoundation(
   tx: QaPrismaClient,
   input: {
     actorUserId: string;
+    email?: string | null;
     folio: string;
+    name?: string | null;
     now: Date;
+    phone?: string | null;
     runId: string;
     study: QaStudyRecord;
   }
@@ -1298,10 +1611,10 @@ async function createQaStudyParticipantFoundation(
   const profile = (await tx.participantProfile.create?.({
     data: {
       createdByUserId: input.actorUserId,
-      email: `qa-${input.runId}@example.invalid`,
+      email: input.email ?? `qa-${input.runId}@example.invalid`,
       externalReference: input.folio,
-      name: `QA ${input.folio}`,
-      phone: "+520000000000",
+      name: input.name?.trim() || `QA ${input.folio}`,
+      phone: input.phone ?? "+520000000000",
       status: "ACTIVE"
     },
     select: { id: true, name: true }
@@ -1351,7 +1664,7 @@ async function createQaStudyParticipantFoundation(
       approvedAt: input.now,
       approvedByUserId: input.actorUserId,
       folio: input.folio,
-      folioSequence: buildQaFolioSequence(input.runId),
+      folioSequence: parseNavFolioSequence(input.folio) ?? buildQaFolioSequence(input.runId),
       manualMessageStatus: "NOT_SENT",
       screeningAttemptId: screeningAttempt.id,
       studyId: input.study.id,
@@ -1669,6 +1982,7 @@ async function createQaHutParticipant(
       studyParticipantId: string | null;
     };
     studyId: string;
+    testMode?: boolean;
   }
 ): Promise<QaHutParticipant> {
   const token = createHutParticipantToken();
@@ -1685,6 +1999,7 @@ async function createQaHutParticipant(
       status: "NOT_STARTED",
       studyId: input.studyId,
       studyParticipantId: input.source.studyParticipantId,
+      testMode: Boolean(input.testMode),
       token
     },
     select: { id: true }

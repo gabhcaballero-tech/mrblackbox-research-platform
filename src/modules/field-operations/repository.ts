@@ -1,6 +1,7 @@
 import { createCltOperationsRepository } from "@/modules/clt-operations";
 import type { CltOperationsActivitySummary, CltOperationsDetail, CltOperationsHutSummary } from "@/modules/clt-operations/types";
 import { hashCtlInterviewerCode, normalizeCtlCode } from "@/modules/ctl/service";
+import { buildHutEffectiveVisitProgress, type HutQuestionnaireSectionId } from "@/modules/hut";
 import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
 import type {
   FieldOperationsDashboard,
@@ -341,11 +342,20 @@ const fieldHutParticipantSelect = {
   protocolVersion: true,
   questionnaireAttempt: {
     select: {
+      id: true,
+      answers: {
+        select: {
+          answerJson: true,
+          questionCode: true
+        }
+      },
       status: true,
       visits: {
         orderBy: { createdAt: "asc" },
         select: {
+          completedAt: true,
           section: true,
+          startedAt: true,
           status: true
         }
       }
@@ -519,9 +529,16 @@ type FieldHutParticipantRecord = {
   origin: string;
   protocolVersion: string;
   questionnaireAttempt: {
+    answers?: Array<{
+      answerJson: unknown;
+      questionCode: string;
+    }>;
+    id?: string;
     status: string;
-    visits: Array<{
+    visits?: Array<{
+      completedAt: Date | null;
       section: string;
+      startedAt: Date | null;
       status: string;
     }>;
   } | null;
@@ -649,7 +666,20 @@ function toRotationSummary(participant: FieldStudyParticipantRecord): CltOperati
 }
 
 function toHutSummary(participant: FieldHutParticipantRecord): CltOperationsHutSummary {
-  const activeVisit = participant.questionnaireAttempt?.visits.find((visit) => visit.status !== "COMPLETED") ?? null;
+  const activeVisit = participant.questionnaireAttempt
+    ? buildHutEffectiveVisitProgress({
+        answers: Object.fromEntries((participant.questionnaireAttempt.answers ?? []).map((answer) => [answer.questionCode, answer.answerJson])),
+        attemptId: participant.questionnaireAttempt.id ?? "hut-questionnaire-attempt",
+        participantOrigin: participant.origin === "CLT_HUT" ? "CLT_HUT" : "HUT_DIRECTO",
+        storedVisits: (participant.questionnaireAttempt.visits ?? []).map((visit) => ({
+          attemptId: participant.questionnaireAttempt!.id ?? "hut-questionnaire-attempt",
+          completedAt: visit.completedAt,
+          section: visit.section as HutQuestionnaireSectionId,
+          startedAt: visit.startedAt,
+          status: visit.status === "COMPLETED" ? "COMPLETED" : visit.status === "IN_PROGRESS" ? "IN_PROGRESS" : "PENDING"
+        }))
+      }).find((visit) => visit.status !== "COMPLETED") ?? null
+    : null;
 
   return {
     applicationPhotoCount: participant.applicationPhotoEntries.length,

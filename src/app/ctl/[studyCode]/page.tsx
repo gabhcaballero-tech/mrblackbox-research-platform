@@ -15,21 +15,24 @@ export const dynamic = "force-dynamic";
 
 type CtlPublicPageProps = {
   params: Promise<{ studyCode: string }>;
-  searchParams?: Promise<{ ctlError?: string; ctlMessage?: string }>;
+  searchParams?: Promise<{ ctlError?: string; ctlMessage?: string; qa?: string }>;
 };
 
 export default async function CtlPublicPage({ params, searchParams }: CtlPublicPageProps) {
   const { studyCode } = await params;
   const query = await searchParams;
+  const includeQa = query?.qa === "1";
   const actor = await getPublicCtlInterviewerActor({ studyCode });
   const availableParticipants = actor
     ? await createCtlRepository().listAvailableParticipantsForInterviewerCode({
-        ctlInterviewerCodeId: actor.id
+        ctlInterviewerCodeId: actor.id,
+        includeQa
       })
     : null;
   const openSessions = actor
     ? await createCtlRepository().listOpenSessionsForInterviewerCode({
         ctlInterviewerCodeId: actor.id,
+        includeQa,
         studyCode
       })
     : null;
@@ -51,6 +54,7 @@ export default async function CtlPublicPage({ params, searchParams }: CtlPublicP
           <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-semibold">Ingresar codigo IKA</h2>
             <form action={loginPublicCtlInterviewerAction.bind(null, studyCode)} className="mt-4 space-y-4">
+              {includeQa ? <input name="qa" type="hidden" value="1" /> : null}
               <label className={labelClass}>
                 Codigo de encuestador
                 <input
@@ -87,7 +91,7 @@ export default async function CtlPublicPage({ params, searchParams }: CtlPublicP
             </section>
 
             {openSessions?.ok ? (
-              <OpenSessionsTable sessions={openSessions.sessions} studyCode={studyCode} />
+              <OpenSessionsTable includeQa={includeQa} sessions={openSessions.sessions} studyCode={studyCode} />
             ) : openSessions ? (
               <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
                 {openSessions.message}
@@ -95,7 +99,7 @@ export default async function CtlPublicPage({ params, searchParams }: CtlPublicP
             ) : null}
 
             {availableParticipants?.ok ? (
-              <AvailableParticipantsTable participants={availableParticipants.participants} studyCode={studyCode} />
+              <AvailableParticipantsTable includeQa={includeQa} participants={availableParticipants.participants} studyCode={studyCode} />
             ) : availableParticipants ? (
               <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
                 {availableParticipants.message}
@@ -109,9 +113,11 @@ export default async function CtlPublicPage({ params, searchParams }: CtlPublicP
 }
 
 function OpenSessionsTable({
+  includeQa,
   sessions,
   studyCode
 }: {
+  includeQa: boolean;
   sessions: CtlOpenInterviewerSessionSummary[];
   studyCode: string;
 }) {
@@ -140,7 +146,7 @@ function OpenSessionsTable({
                 <td className="px-4 py-3 font-semibold text-zinc-950">{session.name}</td>
                 <td className="px-4 py-3 text-zinc-700">{ctlStatusLabel(session.status)}</td>
                 <td className="px-4 py-3">
-                  <a className={primaryButtonClass} href={`/ctl/${encodeURIComponent(studyCode)}/sessions/${encodeURIComponent(session.sessionId)}`}>
+                  <a className={primaryButtonClass} href={`/ctl/${encodeURIComponent(studyCode)}/sessions/${encodeURIComponent(session.sessionId)}${includeQa ? "?qa=1" : ""}`}>
                     Continuar CTL
                   </a>
                 </td>
@@ -160,9 +166,11 @@ function OpenSessionsTable({
 }
 
 function AvailableParticipantsTable({
+  includeQa,
   participants,
   studyCode
 }: {
+  includeQa: boolean;
   participants: CtlAvailableParticipantSummary[];
   studyCode: string;
 }) {
@@ -191,6 +199,7 @@ function AvailableParticipantsTable({
                 <td className="px-4 py-3">
                   <form action={claimPublicCtlFolioAction.bind(null, studyCode)}>
                     <input name="folio" type="hidden" value={participant.folio} />
+                    {includeQa ? <input name="qa" type="hidden" value="1" /> : null}
                     <button className={primaryButtonClass} type="submit">
                       Iniciar CTL
                     </button>

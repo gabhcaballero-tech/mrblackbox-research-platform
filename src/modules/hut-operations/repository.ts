@@ -1,6 +1,7 @@
 import { createPrismaClient, type PrismaClientLike } from "@/shared/db/client";
 import {
   buildHutPhotoTimeline,
+  buildHutEffectiveVisitProgress,
   buildHutQuestionnaireProgress,
   HUT_SECOND_PRODUCT_RELEASED_REASON,
   isSecondProductReleased,
@@ -9,6 +10,7 @@ import {
   resolveHutEvaluationTimelineProgress,
   resolveHutOperationalStatusLabel
 } from "@/modules/hut";
+import type { HutQuestionnaireSectionId } from "@/modules/hut";
 import {
   buildHutAnswerGroups,
   latestTimelineDate,
@@ -154,6 +156,7 @@ const hutParticipantSelect = {
       },
       completedAt: true,
       createdAt: true,
+      id: true,
       startedAt: true,
       status: true,
       terminatedAt: true,
@@ -248,6 +251,7 @@ type HutParticipantRecord = {
     }>;
     completedAt: Date | null;
     createdAt: Date;
+    id: string;
     startedAt: Date | null;
     status: string;
     terminatedAt: Date | null;
@@ -286,12 +290,12 @@ function toDetail(participant: HutParticipantRecord): HutOperationsDetail {
     answers,
     participantOrigin: participant.origin === "CLT_HUT" ? "CLT_HUT" : "HUT_DIRECTO"
   });
-  const visits = participant.questionnaireAttempt?.visits.map((visit) => ({
+  const visits = toEffectiveHutOperationsVisits(participant).map((visit) => ({
     completedAt: visit.completedAt,
     section: visit.section,
     startedAt: visit.startedAt,
     status: visit.status
-  })) ?? [];
+  }));
   const photos = toPhotos(participant);
   const photoTimeline = buildHutPhotoTimeline({
     applicationEvidence: participant.applicationEvidence,
@@ -345,7 +349,7 @@ function resolveCurrentPhase(participant: HutParticipantRecord): string {
     const timeline = buildHutPhotoTimeline({
       applicationEvidence: participant.applicationEvidence,
       dailyEntries: participant.applicationPhotoEntries,
-      evaluationProgress: resolveHutEvaluationTimelineProgress(participant.questionnaireAttempt?.visits ?? []),
+      evaluationProgress: resolveHutEvaluationTimelineProgress(toEffectiveHutOperationsVisits(participant)),
       legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
       product2GateOpen: isHutProduct2GateOpen(participant),
       rotation: {
@@ -357,12 +361,35 @@ function resolveCurrentPhase(participant: HutParticipantRecord): string {
     return timeline.find((slot) => slot.status === "AVAILABLE")?.title ?? resolveHutOperationalStatusLabel(participant.status);
   }
 
-  const activeVisit = participant.questionnaireAttempt?.visits.find((visit) => visit.status !== "COMPLETED");
+  const activeVisit = toEffectiveHutOperationsVisits(participant).find((visit) => visit.status !== "COMPLETED") ?? null;
   if (activeVisit) {
     return activeVisit.section;
   }
 
   return participant.questionnaireAttempt?.status === "COMPLETED" ? "COMPLETADO" : resolveHutOperationalStatusLabel(participant.status);
+}
+
+function toEffectiveHutOperationsVisits(participant: HutParticipantRecord) {
+  if (!participant.questionnaireAttempt) {
+    return [];
+  }
+
+  return buildHutEffectiveVisitProgress({
+    answers: Object.fromEntries(participant.questionnaireAttempt.answers.map((answer) => [answer.questionCode, answer.answerJson])),
+    attemptId: participant.questionnaireAttempt.id,
+    participantOrigin: participant.origin === "CLT_HUT" ? "CLT_HUT" : "HUT_DIRECTO",
+    storedVisits: participant.questionnaireAttempt.visits.map((visit) => ({
+      attemptId: participant.questionnaireAttempt!.id,
+      completedAt: visit.completedAt,
+      section: visit.section as HutQuestionnaireSectionId,
+      startedAt: visit.startedAt,
+      status: normalizeVisitProgressStatus(visit.status)
+    }))
+  });
+}
+
+function normalizeVisitProgressStatus(status: string): "COMPLETED" | "IN_PROGRESS" | "PENDING" {
+  return status === "COMPLETED" || status === "IN_PROGRESS" ? status : "PENDING";
 }
 
 function toRotation(participant: HutParticipantRecord): HutOperationsRotationSummary {
@@ -388,7 +415,7 @@ function hasLegacyMirroredPlacementPhoto(participant: HutParticipantRecord): boo
 
 function isHutProduct2GateOpen(participant: HutParticipantRecord): boolean {
   const firstEvaluationCompleted = Boolean(
-    participant.questionnaireAttempt?.visits.some(
+    toEffectiveHutOperationsVisits(participant).some(
       (visit) => visit.section === "EVALUACION_PRIMER_PERFUME" && visit.status === "COMPLETED"
     )
   );

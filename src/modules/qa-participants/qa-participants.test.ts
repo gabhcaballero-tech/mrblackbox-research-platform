@@ -50,6 +50,110 @@ describe("qa participants repository", () => {
     });
   });
 
+  it("registra QA aprobado CLT_NAVIGO_HUT sin contestar screening y envia codigos al telefono auditor", async () => {
+    const prisma = createQaPrisma();
+    const sentTemplates: Array<{ parameters?: Array<{ text: string }>; toPhone?: string }> = [];
+    const repository = createQaParticipantsRepository(prisma as never);
+
+    const result = await repository.registerApprovedQaParticipant({
+      createdByUserId: "user-admin",
+      email: "qa301@example.test",
+      folio: "NAV-301",
+      name: "QA NAV 301",
+      protocol: "CLT_NAVIGO_HUT",
+      qaWhatsappOverridePhone: "+525500000301",
+      sender: async (input) => {
+        sentTemplates.push(input as { parameters?: Array<{ text: string }>; toPhone?: string });
+        return {
+          data: {
+            bodyText: input.bodyText ?? null,
+            conversationId: "conversation-qa",
+            createdAt: new Date("2026-08-08T12:00:00.000Z"),
+            direction: "OUTBOUND",
+            fromPhone: "wa-system",
+            id: "wa-message-qa",
+            messageType: "template",
+            metaMessageId: "meta-qa",
+            rawPayload: {},
+            status: "accepted",
+            timestamp: new Date("2026-08-08T12:01:00.000Z"),
+            toPhone: input.toPhone,
+            updatedAt: new Date("2026-08-08T12:01:00.000Z")
+          },
+          ok: true
+        };
+      },
+      studyId: "study-qa"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.folio : null).toBe("NAV-301");
+    expect(result.ok ? result.data.protocol : null).toBe("CLT_NAVIGO_HUT");
+    expect(result.ok ? result.data.codes : []).toHaveLength(3);
+    expect(result.ok ? result.data.whatsapp.status : null).toBe("ENVIADO");
+    expect(sentTemplates[0]?.toPhone).toBe("+525500000301");
+    expect(sentTemplates[0]?.parameters?.map((parameter) => parameter.text).slice(0, 2)).toEqual(["QA NAV 301", "NAV-301"]);
+    expect(prisma.calls).toContainEqual(expect.objectContaining({
+      data: expect.objectContaining({
+        folio: "NAV-301",
+        folioSequence: 301
+      }),
+      modelName: "participantConfirmation",
+      operation: "create"
+    }));
+    expect(prisma.calls).toContainEqual(expect.objectContaining({
+      data: expect.objectContaining({
+        testMode: true
+      }),
+      modelName: "hutParticipant",
+      operation: "create"
+    }));
+    expect(prisma.calls).toContainEqual(expect.objectContaining({
+      modelName: "ctlTriangularRotationAssignment",
+      operation: "create"
+    }));
+    expect(prisma.calls.filter((call: FakePrismaCall) => call.modelName === "participantReferenceCode" && call.operation === "create")).toHaveLength(3);
+  });
+
+  it("registra QA aprobado HUT_DIRECTO con identidad operativa y bloquea folios fuera de su grupo", async () => {
+    const prisma = createQaPrisma();
+    const repository = createQaParticipantsRepository(prisma as never);
+
+    const blocked = await repository.registerApprovedQaParticipant({
+      createdByUserId: "user-admin",
+      folio: "NAV-301",
+      name: "QA incorrecto",
+      protocol: "HUT_DIRECTO",
+      qaWhatsappOverridePhone: "+525500000306",
+      sender: async () => ({ code: "CONFIGURATION_ERROR", message: "sin envio", ok: false }),
+      studyId: "study-qa"
+    });
+    expect(blocked.ok).toBe(false);
+
+    const result = await repository.registerApprovedQaParticipant({
+      createdByUserId: "user-admin",
+      folio: "NAV-306",
+      name: "QA HUT 306",
+      protocol: "HUT_DIRECTO",
+      qaWhatsappOverridePhone: "+525500000306",
+      sender: async () => ({ code: "CONFIGURATION_ERROR", message: "sin envio", ok: false }),
+      studyId: "study-qa"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.data.folio : null).toBe("NAV-306");
+    expect(result.ok ? result.data.protocol : null).toBe("HUT_DIRECTO");
+    expect(prisma.calls).toContainEqual(expect.objectContaining({
+      data: expect.objectContaining({
+        folio: "NAV-306",
+        origin: "HUT_DIRECTO",
+        testMode: true
+      }),
+      modelName: "hutParticipant",
+      operation: "create"
+    }));
+  });
+
   it("limpia solo los participantes enlazados por QaParticipantRun", async () => {
     const prisma = createQaPrisma();
     const repository = createQaParticipantsRepository(prisma as never);

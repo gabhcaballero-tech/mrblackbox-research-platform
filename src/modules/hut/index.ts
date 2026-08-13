@@ -121,10 +121,13 @@ export {
   resolveHutOperationalStatusLabel
 } from "./photo-timeline";
 export {
+  buildHutEffectiveVisitProgress,
   buildHutQuestionnaireProgress,
   isHutOperationalPanelSection,
+  optionalProgressQuestionsForSection,
   progressQuestionsForSection,
-  progressSectionTitle
+  progressSectionTitle,
+  resolveHutQuestionnaireSectionStatus
 } from "./progress";
 export type {
   HutPhase,

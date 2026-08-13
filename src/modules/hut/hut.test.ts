@@ -1560,6 +1560,57 @@ describe("HUT module foundation", () => {
     });
   });
 
+  it("removes an active manual photo slot override without deleting evidence", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await createProduct2GateParticipant(repository, prisma);
+    const initialPhotoCount = participant.applicationPhotoEntries.length;
+
+    const release = await repository.releaseApplicationPhotoSlot({
+      actorUserId: "admin-1",
+      participantId: participant.id,
+      reason: "Liberacion accidental del slot PRODUCT_2_DAY_1.",
+      slotId: "PRODUCT_2_DAY_1",
+      studyId: "study-hut"
+    });
+    const activeOverrideUpload = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      now: new Date("2026-08-12T21:00:00.000Z"),
+      slotId: "PRODUCT_2_DAY_1",
+      storage,
+      token: participant.token
+    });
+    const removed = await repository.removeApplicationPhotoSlotOverride({
+      actorUserId: "admin-2",
+      participantId: participant.id,
+      reason: "Liberacion aplicada por error operativo.",
+      slotId: "PRODUCT_2_DAY_1",
+      studyId: "study-hut"
+    });
+    const afterRemovalUpload = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      now: new Date("2026-08-12T21:00:00.000Z"),
+      slotId: "PRODUCT_2_DAY_1",
+      storage,
+      token: participant.token
+    });
+
+    expect(release).toMatchObject({ ok: true });
+    expect(activeOverrideUpload).toMatchObject({ ok: true });
+    expect(removed).toMatchObject({ ok: true });
+    expect(afterRemovalUpload).toMatchObject({
+      message: "Esta foto HUT aun no esta disponible.",
+      ok: false
+    });
+    expect(participant.applicationPhotoEntries).toHaveLength(initialPhotoCount);
+    expect(prisma.state.auditLogs.find((log) => log.reason === "HUT_PHOTO_SLOT_OVERRIDE_REMOVED")?.afterJson).toMatchObject({
+      action: "HUT_PHOTO_SLOT_OVERRIDE_REMOVED",
+      overrideType: "REMOVED",
+      reasonDetail: "Liberacion aplicada por error operativo.",
+      slotId: "PRODUCT_2_DAY_1"
+    });
+  });
+
   it("keeps product 2 blocked until an admin releases the second product after evaluation 1", async () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
@@ -3039,6 +3090,7 @@ describe("HUT module foundation", () => {
     }).filter((question) => question.required);
 
     const saveSections = async (sectionsToSave: string[]) => {
+      let lastAnswerResult: Awaited<ReturnType<typeof repository.saveQuestionnaireAnswer>> | null = null;
       for (const question of applicableQuestions.filter((candidate) => sectionsToSave.includes(candidate.section))) {
         const result = await repository.saveQuestionnaireAnswer({
           answerInput: { [question.code]: answers[question.code] },
@@ -3047,7 +3099,9 @@ describe("HUT module foundation", () => {
           studyId: "study-hut"
         });
         expect(result.ok, `${question.code}: ${result.message}`).toBe(true);
+        lastAnswerResult = result;
       }
+      return lastAnswerResult;
     };
     const completeSections = async (sectionsToComplete: string[]) => {
       let lastSectionResult: Awaited<ReturnType<typeof repository.completeQuestionnaireSection>> | null = null;
@@ -3100,6 +3154,7 @@ describe("HUT module foundation", () => {
     }).filter((question) => question.required);
 
     const saveSections = async (sectionsToSave: string[]) => {
+      let lastAnswerResult: Awaited<ReturnType<typeof repository.saveQuestionnaireAnswer>> | null = null;
       for (const question of applicableQuestions.filter((candidate) => sectionsToSave.includes(candidate.section))) {
         const result = await repository.saveQuestionnaireAnswer({
           answerInput: { [question.code]: answers[question.code] },
@@ -3108,7 +3163,9 @@ describe("HUT module foundation", () => {
           studyId: "study-hut"
         });
         expect(result.ok, `${question.code}: ${result.message}`).toBe(true);
+        lastAnswerResult = result;
       }
+      return lastAnswerResult;
     };
     const completeSections = async (sectionsToComplete: string[]) => {
       let lastSectionResult: Awaited<ReturnType<typeof repository.completeQuestionnaireSection>> | null = null;
@@ -3132,7 +3189,7 @@ describe("HUT module foundation", () => {
     authorizeThirdStageForTest(prisma.state, participant);
     await saveSections(["EVALUACION_SEGUNDO_PERFUME"]);
     await completeSections(["EVALUACION_SEGUNDO_PERFUME"]);
-    await saveSections(["COMPARATIVA"]);
+    const finalAnswerResult = await saveSections(["COMPARATIVA"]);
     const lastResult = await completeSections(["COMPARATIVA"]);
     const repeated = await repository.completeQuestionnaireSection({
       actorUserId: "field-user-1",
@@ -3141,7 +3198,8 @@ describe("HUT module foundation", () => {
       studyId: "study-hut"
     });
 
-    expect(lastResult?.ok ? lastResult.message : "").toBe("Participacion HUT finalizada correctamente.");
+    expect(finalAnswerResult?.ok ? finalAnswerResult.message : "").toBe("Participacion HUT finalizada correctamente.");
+    expect(lastResult?.ok).toBe(true);
     expect(repeated.ok).toBe(true);
     expect(participant.status).toBe("COMPLETED");
     expect(prisma.state.questionnaireAttempts[0]).toMatchObject({
@@ -3151,7 +3209,7 @@ describe("HUT module foundation", () => {
     expect(whatsapp.createOutboundMessage).toHaveBeenCalledTimes(1);
     expect(prisma.state.auditLogs.filter((log) => log.reason === "HUT_COMPLETION_MESSAGE")).toHaveLength(1);
     expect(prisma.state.auditLogs.find((log) => log.reason === "HUT_COMPLETION_MESSAGE")).toMatchObject({
-      actorUserId: "field-user-1",
+      actorUserId: null,
       entityId: participant.id,
       entityType: "HutParticipant"
     });

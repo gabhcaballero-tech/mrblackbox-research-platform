@@ -110,7 +110,7 @@ import {
   isSecondStageAuthorized,
   type HutSecondStageAuthorizationSummary
 } from "./second-stage-authorization";
-import { isHutOperationalPanelSection } from "./progress";
+import { buildHutEffectiveVisitProgress, buildHutQuestionnaireProgress, isHutOperationalPanelSection } from "./progress";
 import {
   getThirdStageAuthorizationWarnings,
   HUT_THIRD_STAGE_AUTHORIZED_REASON,
@@ -276,6 +276,7 @@ export type HutQuestionnaireProgressSummary = {
   section: HutQuestionnaireSectionId;
   startedAt: Date | null;
   status: "COMPLETED" | "IN_PROGRESS" | "PENDING";
+  storedStatus?: "COMPLETED" | "IN_PROGRESS" | "PENDING" | null;
 };
 
 export type HutQuestionnaireState = {
@@ -917,6 +918,13 @@ export type HutRepository = {
     studyId: string;
   }) => Promise<HutActionResult<{ participantId: string; useDayNumber: number }>>;
   releaseApplicationPhotoSlot: (input: {
+    actorUserId: string;
+    participantId: string;
+    reason: string;
+    slotId: HutPhotoTimelineSlotId;
+    studyId: string;
+  }) => Promise<HutActionResult<{ participantId: string; slotId: HutPhotoTimelineSlotId }>>;
+  removeApplicationPhotoSlotOverride: (input: {
     actorUserId: string;
     participantId: string;
     reason: string;
@@ -2136,6 +2144,10 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           }
         }
       });
+      const answersAfterSave = {
+        ...answerLookup,
+        [question.code]: parsed.answer.answerValue
+      };
       const fieldAccessAudit = input.fieldAccessAudit
         ? {
             accessType: input.fieldAccessAudit.accessType,
@@ -2187,6 +2199,42 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         };
       }
 
+      const effectiveSectionProgress = buildHutEffectiveVisitProgress({
+        answers: answersAfterSave,
+        attemptId: attempt.data.id,
+        participantOrigin: origin,
+        storedVisits: [{
+          attemptId: progress.data.attemptId,
+          completedAt: progress.data.completedAt,
+          section: progress.data.section,
+          startedAt: progress.data.startedAt,
+          status: progress.data.storedStatus ?? progress.data.status
+        }]
+      }).find((sectionProgress) => sectionProgress.section === question.section);
+      const sectionCompletedByAnswers = effectiveSectionProgress?.status === "COMPLETED";
+      let visitForCompletion: HutVisitProgressRecord = {
+        attemptId: progress.data.attemptId,
+        completedAt: progress.data.completedAt,
+        id: progress.data.id,
+        section: progress.data.section,
+        startedAt: progress.data.startedAt,
+        status: progress.data.storedStatus ?? progress.data.status
+      };
+
+      if (sectionCompletedByAnswers && visitForCompletion.status !== "COMPLETED") {
+        const completedVisit = (await prisma.hutVisitProgress.update?.({
+          data: {
+            completedAt: now,
+            status: "COMPLETED"
+          },
+          select: hutVisitProgressSelect,
+          where: { id: progress.data.id }
+        })) as HutVisitProgressRecord | null;
+        if (completedVisit) {
+          visitForCompletion = completedVisit;
+        }
+      }
+
       if (fieldAccessAudit) {
         await prisma.auditLog.create?.({
           data: {
@@ -2214,13 +2262,57 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         });
       }
 
+      const attemptAfterAnswer = (await prisma.hutQuestionnaireAttempt.findUnique?.({
+        select: hutQuestionnaireStateSelect,
+        where: { participantId: participant.id }
+      })) as HutQuestionnaireAttemptRecord | null;
+      const finalCompletionReady = attemptAfterAnswer
+        ? isHutQuestionnaireFinalCompletionReady({
+            attempt: attemptAfterAnswer,
+            participant,
+            recentlyCompletedSection: question.section,
+            visit: visitForCompletion
+          })
+        : false;
+
+      if (attemptAfterAnswer && finalCompletionReady && attemptAfterAnswer.status !== "COMPLETED") {
+        await prisma.hutQuestionnaireAttempt.update?.({
+          data: {
+            completedAt: now,
+            status: "COMPLETED"
+          },
+          where: { id: attemptAfterAnswer.id }
+        });
+      }
+
+      if (finalCompletionReady && participant.status !== "COMPLETED") {
+        await prisma.hutParticipant.update?.({
+          data: {
+            status: "COMPLETED"
+          },
+          where: { id: participant.id }
+        });
+      }
+
+      const completionMessageSent = finalCompletionReady
+        ? await sendHutCompletionMessageIfReady({
+            actorUserId: input.actorUserId ?? null,
+            now,
+            participant,
+            prisma,
+            recentlyCompletedSection: question.section,
+            visit: visitForCompletion,
+            whatsappRepository: getWhatsAppRepository()
+          })
+        : false;
+
       return {
         data: {
           answerValue: parsed.answer.answerValue,
           questionCode: question.code,
           visitProgressId: progress.data.id
         },
-        message: "Respuesta HUT guardada correctamente.",
+        message: completionMessageSent ? "Participacion HUT finalizada correctamente." : "Respuesta HUT guardada correctamente.",
         ok: true
       };
     },
@@ -2282,7 +2374,12 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           }),
           omittedQuestionCodes,
           participantOrigin: origin,
-          visits: (state.visits ?? []).map(toVisitProgressSummary)
+          visits: toEffectiveVisitProgressSummaries({
+            answers,
+            attemptId: state.id,
+            participantOrigin: origin,
+            visits: state.visits ?? []
+          })
         },
         ok: true
       };
@@ -2805,6 +2902,50 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       return {
         data: { participantId: participant.id, slotId: input.slotId },
         message: "Slot fotografico liberado manualmente.",
+        ok: true
+      };
+    },
+
+    async removeApplicationPhotoSlotOverride(input) {
+      const prisma = await getPrisma();
+      const reason = input.reason.trim();
+      if (!reason) {
+        return { message: "El motivo es obligatorio para eliminar una excepcion de slot.", ok: false };
+      }
+
+      const participant = await findParticipant(prisma, input.participantId);
+      if (!participant || participant.studyId !== input.studyId) {
+        return { message: "No encontramos el participante HUT.", ok: false };
+      }
+      if (isReservedHutWithoutOperationalIdentity(participant)) {
+        return { message: reservedHutOperationalIdentityMessage(), ok: false };
+      }
+      if (!isApplicationPhotoProtocol(participant)) {
+        return { message: "El control manual de slots aplica solo a APPLICATION_PHOTO.", ok: false };
+      }
+      const definition = getHutPhotoTimelineSlotDefinition(input.slotId);
+      if (!definition?.participantTask) {
+        return { message: "Este slot HUT no requiere captura fotografica.", ok: false };
+      }
+
+      const activeOverrides = await readActiveHutPhotoSlotOverrides(prisma, participant.id);
+      const activeOverride = activeOverrides.find((override) => override.slotId === input.slotId) ?? null;
+      if (!activeOverride) {
+        return { message: "Este slot no tiene una excepcion manual activa.", ok: false };
+      }
+
+      await createHutPhotoSlotOverrideRemovalAudit({
+        actorUserId: input.actorUserId,
+        override: activeOverride,
+        participant,
+        prisma,
+        reason,
+        slotId: input.slotId
+      });
+
+      return {
+        data: { participantId: participant.id, slotId: input.slotId },
+        message: "Excepcion manual de slot eliminada correctamente.",
         ok: true
       };
     },
@@ -5557,8 +5698,28 @@ function toVisitProgressSummary(visit: HutVisitProgressRecord): HutQuestionnaire
     completedAt: visit.completedAt,
     section: visit.section,
     startedAt: visit.startedAt,
-    status: visit.status
+    status: visit.status,
+    storedStatus: visit.status
   };
+}
+
+function toEffectiveVisitProgressSummaries({
+  answers,
+  attemptId,
+  participantOrigin,
+  visits
+}: {
+  answers: Record<string, unknown>;
+  attemptId: string;
+  participantOrigin: "CLT_HUT" | "HUT_DIRECTO";
+  visits: HutVisitProgressRecord[];
+}): HutQuestionnaireProgressSummary[] {
+  return buildHutEffectiveVisitProgress({
+    answers,
+    attemptId,
+    participantOrigin,
+    storedVisits: visits
+  });
 }
 
 function toApplicationPhotoEntrySummary(entry: HutApplicationPhotoEntryRecord): HutApplicationPhotoEntrySummary {
@@ -5771,7 +5932,12 @@ function toAdminQuestionnaireSummary(participant: HutParticipantRecord): HutQues
     attempt: toQuestionnaireAttemptSummary(attempt),
     omittedQuestionCodes: questions.filter((question) => !applicableQuestions.some((applicable) => applicable.code === question.code)).map((question) => question.code),
     totalRequired: requiredQuestions.length,
-    visits: (attempt.visits ?? []).map(toVisitProgressSummary)
+    visits: toEffectiveVisitProgressSummaries({
+      answers,
+      attemptId: attempt.id,
+      participantOrigin: participantOrigin(participant),
+      visits: attempt.visits ?? []
+    })
   };
 }
 
@@ -5867,27 +6033,30 @@ function isHutQuestionnaireFinalCompletionReady({
   }
 
   const answers = Object.fromEntries((attempt.answers ?? []).map((answer) => [answer.questionCode, answer.answerJson]));
-  const applicableQuestions = getHutApplicableQuestions({
+  const questionnaireProgress = buildHutQuestionnaireProgress({
     answers,
-    context: { participantOrigin: participantOrigin(participant) },
-    definition: getHutV5Definition()
-  }).filter((question) => question.required);
-  const pendingQuestion = applicableQuestions.find((question) => !Object.prototype.hasOwnProperty.call(answers, question.code));
+    participantOrigin: participantOrigin(participant)
+  });
 
-  if (pendingQuestion) {
+  if (questionnaireProgress.sections.some((section) => section.status !== "COMPLETED")) {
     return false;
   }
 
+  void recentlyCompletedSection;
+  void visit;
+
   const completedSections = new Set(
-    (attempt.visits ?? [])
+    toEffectiveVisitProgressSummaries({
+      answers,
+      attemptId: attempt.id,
+      participantOrigin: participantOrigin(participant),
+      visits: attempt.visits ?? []
+    })
       .filter((candidate) => candidate.status === "COMPLETED")
       .map((candidate) => candidate.section)
   );
-  if (visit?.status === "COMPLETED" && recentlyCompletedSection) {
-    completedSections.add(recentlyCompletedSection);
-  }
 
-  const operationalApplicableQuestions = applicableQuestions.filter((question) =>
+  const operationalApplicableQuestions = questionnaireProgress.sections.flatMap((section) => section.questions).filter((question) =>
     isHutOperationalPanelSection(question.section)
   );
   const requiredSections = new Set(operationalApplicableQuestions.map((question) => question.section));
@@ -6442,10 +6611,26 @@ function hutOperationalCompatibilityWarnings(participant: HutParticipantRecord):
 }
 
 function isFirstFragranceEvaluationCompleted(participant: HutParticipantRecord): boolean {
+  const attempt = participant.questionnaireAttempt;
+  if (!attempt) {
+    return false;
+  }
+  return isHutQuestionnaireSectionCompletedByAnswers(participant, attempt, "EVALUACION_PRIMER_PERFUME");
+}
+
+function isHutQuestionnaireSectionCompletedByAnswers(
+  participant: HutParticipantRecord,
+  attempt: HutQuestionnaireAttemptRecord,
+  section: HutQuestionnaireSectionId
+): boolean {
+  const answers = Object.fromEntries((attempt.answers ?? []).map((answer) => [answer.questionCode, answer.answerJson]));
   return Boolean(
-    participant.questionnaireAttempt?.visits?.some(
-      (visit) => visit.section === "EVALUACION_PRIMER_PERFUME" && visit.status === "COMPLETED"
-    )
+    toEffectiveVisitProgressSummaries({
+      answers,
+      attemptId: attempt.id,
+      participantOrigin: participantOrigin(participant),
+      visits: attempt.visits ?? []
+    }).find((visit) => visit.section === section && visit.status === "COMPLETED")
   );
 }
 
@@ -6549,7 +6734,7 @@ async function readActiveHutPhotoSlotOverrides(
   participantId: string
 ): Promise<HutPhotoTimelineManualOverride[]> {
   const logs = (await prisma.auditLog.findMany?.({
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: "asc" },
     select: {
       actorUserId: true,
       afterJson: true,
@@ -6574,11 +6759,11 @@ async function readActiveHutPhotoSlotOverrides(
     const slotId = typeof metadata.slotId === "string" && getHutPhotoTimelineSlotDefinition(metadata.slotId)
       ? metadata.slotId as HutPhotoTimelineSlotId
       : null;
-    if (!slotId || resolved.has(slotId)) {
+    if (!slotId) {
       continue;
     }
 
-    if (log.reason === "HUT_PHOTO_SLOT_OVERRIDE_USED") {
+    if (log.reason === "HUT_PHOTO_SLOT_OVERRIDE_USED" || log.reason === "HUT_PHOTO_SLOT_OVERRIDE_REMOVED" || metadata.overrideType === "REMOVED") {
       resolved.set(slotId, null);
       continue;
     }
@@ -6794,6 +6979,57 @@ async function createHutPhotoSlotOverrideAudit({
       entityId: participant.id,
       entityType: "HutParticipant",
       reason: type === "RELEASE" ? "HUT_PHOTO_SLOT_MANUAL_RELEASE" : "HUT_PHOTO_SLOT_REPEAT_REQUESTED"
+    }
+  });
+}
+
+async function createHutPhotoSlotOverrideRemovalAudit({
+  actorUserId,
+  override,
+  participant,
+  prisma,
+  reason,
+  slotId
+}: {
+  actorUserId: string | null;
+  override: HutPhotoTimelineManualOverride;
+  participant: HutParticipantRecord;
+  prisma: HutPrismaClient;
+  reason: string;
+  slotId: HutPhotoTimelineSlotId;
+}) {
+  const now = new Date();
+  await prisma.auditLog.create?.({
+    data: {
+      action: "PARTICIPANT_MODIFIED",
+      actorUserId,
+      afterJson: toAuditJson({
+        action: "HUT_PHOTO_SLOT_OVERRIDE_REMOVED",
+        overrideType: "REMOVED",
+        participant: hutParticipantAuditSnapshot(participant),
+        previousOverride: {
+          actorUserId: override.actorUserId,
+          createdAtMexicoCity: formatDateTimeMexicoCity(override.createdAt),
+          reasonDetail: override.reason,
+          type: override.type
+        },
+        reasonDetail: reason,
+        removedAtMexicoCity: formatDateTimeMexicoCity(now),
+        slotId
+      }),
+      beforeJson: toAuditJson({
+        activeOverride: {
+          actorUserId: override.actorUserId,
+          createdAtMexicoCity: formatDateTimeMexicoCity(override.createdAt),
+          reasonDetail: override.reason,
+          slotId: override.slotId,
+          type: override.type
+        }
+      }),
+      createdAt: now,
+      entityId: participant.id,
+      entityType: "HutParticipant",
+      reason: "HUT_PHOTO_SLOT_OVERRIDE_REMOVED"
     }
   });
 }

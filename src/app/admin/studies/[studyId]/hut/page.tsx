@@ -13,6 +13,7 @@ import {
   reconcileReservedHutNavParticipantsAction,
   releaseHutApplicationPhotoSlotAction,
   releaseHutSecondProductAction,
+  removeHutApplicationPhotoSlotOverrideAction,
   requestHutApplicationPhotoSlotRepeatAction,
   reviewHutVisualVerificationAction,
   resetHutApplicationPhotoEvidenceAction,
@@ -1092,6 +1093,30 @@ function ApplicationPhotoProtocolCard({
                     ))}
                   </ul>
                 </div>
+              ) : null}
+              {photoSlotOverrides.length > 0 ? (
+                <form action={removeHutApplicationPhotoSlotOverrideAction.bind(null, studyId, participant.id)} className="space-y-2 rounded-md border border-sky-200 bg-white p-3">
+                  <h5 className="text-sm font-semibold text-sky-950">Eliminar excepcion manual activa</h5>
+                  <p className="text-xs leading-5 text-sky-900">
+                    Esta accion no borra fotos ni respuestas. Solo cancela la excepcion activa y el timeline vuelve a calcularse con reglas normales.
+                  </p>
+                  <label className="flex flex-col gap-1 text-xs font-semibold text-sky-950">
+                    Excepcion
+                    <select className={inputClass} name="slotId" required>
+                      {photoSlotOverrides.map((override) => (
+                        <option key={`${override.slotId}-${override.type}`} value={override.slotId}>
+                          {override.type === "REPEAT" ? "Repeticion" : "Liberacion"} - {formatHutPhotoTimelineSlotTitle({
+                            dayLabel: "",
+                            id: override.slotId,
+                            title: ""
+                          })}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <textarea className={inputClass} name="reason" placeholder="Motivo obligatorio" required rows={2} />
+                  <SubmitButton pendingLabel="Eliminando excepcion...">Eliminar excepcion</SubmitButton>
+                </form>
               ) : null}
               <form action={releaseHutApplicationPhotoSlotAction.bind(null, studyId, participant.id)} className="space-y-2 rounded-md border border-sky-200 bg-white p-3">
                 <h5 className="text-sm font-semibold text-sky-950">Liberar siguiente slot fotografico manualmente</h5>
