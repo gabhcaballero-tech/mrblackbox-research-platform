@@ -6,7 +6,7 @@ import {
   applyHutVideoSubmission,
   buildHutTsv,
   createHutRepository,
-  decryptHutPhaseCode,
+  encryptHutPhaseCode,
   getHutApplicableQuestions,
   getHutQuestions,
   hashHutPhaseCode,
@@ -1739,11 +1739,11 @@ describe("HUT module foundation", () => {
     });
   });
 
-  it("syncs HUT phase codes from participant reference codes without overwriting existing records", async () => {
+  it("keeps HUT phase code sync as historical no-op for new operational codes", async () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
-      protocolVersion: "LEGACY_VIDEO",
+      protocolVersion: "APPLICATION_PHOTO",
       folio: "NAV-001",
       firstFragranceLeftArm: "247",
       name: "Participante Codigos",
@@ -1766,19 +1766,13 @@ describe("HUT module foundation", () => {
       studyId: "study-hut"
     });
 
-    expect(first).toMatchObject({ data: { created: 3, existing: 0 }, ok: true });
-    expect(second).toMatchObject({ data: { created: 0, existing: 3 }, ok: true });
-    expect(prisma.state.phaseCodes).toHaveLength(3);
-    expect(prisma.state.phaseCodes.map((code) => [code.slot, code.phase])).toEqual([
-      [1, "COLOCACION"],
-      [2, "REGRESO_1"],
-      [3, "REGRESO_2"]
-    ]);
-    expect(prisma.state.phaseCodes[0]?.codeHash).toBe(hashHutPhaseCode("A7K4", secret));
-    expect(decryptHutPhaseCode(prisma.state.phaseCodes[1]?.encryptedCode ?? "", secret)).toBe("M3P9");
+    expect(first).toMatchObject({ data: { created: 0, existing: 0 }, ok: true });
+    expect(first.ok ? first.message : "").toContain("ParticipantReferenceCode");
+    expect(second).toMatchObject({ data: { created: 0, existing: 0 }, ok: true });
+    expect(prisma.state.phaseCodes).toHaveLength(0);
   });
 
-  it("detects missing source slots while syncing HUT phase codes", async () => {
+  it("does not block HUT phase code sync when master reference slots are incomplete", async () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
@@ -1805,14 +1799,11 @@ describe("HUT module foundation", () => {
       studyId: "study-hut"
     });
 
-    expect(result).toMatchObject({
-      message: "Faltan codigos de referencia para slots: 3.",
-      ok: false
-    });
+    expect(result).toMatchObject({ data: { created: 0, existing: 0 }, ok: true });
     expect(prisma.state.phaseCodes).toHaveLength(0);
   });
 
-  it("detects inconsistent existing HUT phase code mappings", async () => {
+  it("preserves inconsistent existing HUT phase code mappings as legacy audit", async () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
@@ -1835,6 +1826,7 @@ describe("HUT module foundation", () => {
       slot: 1,
       status: "GENERATED"
     });
+    participant.phaseCodes.push(prisma.state.phaseCodes[0]!);
 
     const result = await repository.ensureHutPhaseCodesForParticipant({
       participantId: participant.id,
@@ -1842,8 +1834,8 @@ describe("HUT module foundation", () => {
       studyId: "study-hut"
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.ok ? "" : result.message).toContain("Slot 1 esta asociado a REGRESO_2");
+    expect(result).toMatchObject({ data: { created: 0, existing: 1 }, ok: true });
+    expect(prisma.state.phaseCodes).toHaveLength(1);
   });
 
   it("keeps phase codes auditable without blocking application photo uploads", async () => {
@@ -1861,6 +1853,7 @@ describe("HUT module foundation", () => {
     });
     prisma.state.confirmations.push(confirmationWithCodes("NAV-004"));
     const participant = prisma.state.participants[0]!;
+    participant.studyParticipant = prisma.state.confirmations[0]!.studyParticipant;
     participant.origin = "CLT_HUT";
     participant.applicationPhotoEntries.push({
       capturedAt: new Date("2026-08-07T10:00:00.000Z"),
@@ -1871,12 +1864,6 @@ describe("HUT module foundation", () => {
       privateStorageKey: "hut/delivery.jpg",
       productCode: null,
       useDayNumber: 0
-    });
-
-    await repository.ensureHutPhaseCodesForParticipant({
-      participantId: participant.id,
-      secret: "hut-phase-secret-for-tests",
-      studyId: "study-hut"
     });
 
     const viewBefore = await repository.getPortalView(participant.token);
@@ -1892,7 +1879,7 @@ describe("HUT module foundation", () => {
       token: participant.token
     });
     const valid = await repository.validatePhaseCode({
-      code: "A7K4",
+      code: "M3P9",
       phase: "COLOCACION",
       token: participant.token
     });
@@ -1918,10 +1905,87 @@ describe("HUT module foundation", () => {
       ok: true
     });
     expect(viewAfter.ok ? viewAfter.data.phaseGate : null).toBeNull();
-    expect(prisma.state.phaseCodes.find((code) => code.phase === "COLOCACION")).toMatchObject({
+    expect(prisma.state.phaseCodes).toHaveLength(0);
+    expect(prisma.state.participants[0]?.applicationEvidence).toHaveLength(1);
+  });
+
+  it("keeps used historical HUT phase codes valid for legacy participants", async () => {
+    vi.stubEnv("HUT_PHASE_CODE_SECRET", "hut-phase-secret-for-tests");
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      folio: "NAV-004B",
+      firstFragranceLeftArm: "247",
+      name: "Participante Legacy Codigo",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      startDate: new Date("2026-07-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    const participant = prisma.state.participants[0]!;
+    participant.origin = "CLT_HUT";
+    participant.applicationPhotoEntries.push({
+      capturedAt: new Date("2026-08-07T10:00:00.000Z"),
+      capturedLocalDate: "2026-08-07",
+      capturedLocalTimezone: "America/Mexico_City",
+      id: "delivery-entry-legacy",
+      participantId: participant.id,
+      privateStorageKey: "hut/delivery.jpg",
+      productCode: null,
+      useDayNumber: 0
+    });
+    participant.phaseCodes.push({
+      codeHash: hashHutPhaseCode("A7K4", "hut-phase-secret-for-tests"),
+      encryptedCode: "encrypted-legacy-code",
+      id: "phase-legacy-used",
+      participantId: participant.id,
+      phase: "COLOCACION",
+      slot: 1,
       status: "USED"
     });
-    expect(prisma.state.participants[0]?.applicationEvidence).toHaveLength(1);
+
+    const validation = await repository.validatePhaseCode({
+      code: "CUALQUIER",
+      phase: "COLOCACION",
+      token: participant.token
+    });
+
+    expect(validation).toMatchObject({
+      data: { phase: "COLOCACION" },
+      message: "Codigo HUT ya validado para esta fase.",
+      ok: true
+    });
+  });
+
+  it("does not issue a new operational code for REGRESO_2 in APPLICATION_PHOTO", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    await repository.createParticipant({
+      folio: "NAV-004C",
+      firstFragranceLeftArm: "247",
+      name: "Participante Sin Regreso 2",
+      protocolVersion: "APPLICATION_PHOTO",
+      requestOrigin: "https://example.com",
+      secondFragranceRightArm: "583",
+      startDate: new Date("2026-07-01T00:00:00.000Z"),
+      studyId: "study-hut"
+    });
+    prisma.state.confirmations.push(confirmationWithCodes("NAV-004C"));
+    const participant = prisma.state.participants[0]!;
+    participant.origin = "CLT_HUT";
+    participant.status = "BLOCK_2_CALL_PENDING";
+
+    const recovered = await repository.recoverPhaseCode({
+      participantId: participant.id,
+      phase: "REGRESO_2",
+      studyId: "study-hut"
+    });
+
+    expect(recovered).toMatchObject({
+      message: "Esta fase HUT no requiere un codigo operativo nuevo.",
+      ok: false
+    });
   });
 
   it("keeps reserved HUT folios without operational identity from starting capture or validating codes", async () => {
@@ -2287,7 +2351,19 @@ describe("HUT module foundation", () => {
     });
     prisma.state.confirmations.push(confirmationWithCodes("NAV-004"));
     const participant = prisma.state.participants[0]!;
-    await repository.ensureHutPhaseCodesForParticipant({
+    const legacyRegreso1Code: FakeHutPhaseCode = {
+      codeHash: hashHutPhaseCode("M3P9", "hut-phase-secret-for-tests"),
+      encryptedCode: encryptHutPhaseCode("M3P9", "hut-phase-secret-for-tests"),
+      id: "phase-admin-regreso-1",
+      participantId: participant.id,
+      phase: "REGRESO_1",
+      slot: 2,
+      status: "GENERATED"
+    };
+    prisma.state.phaseCodes.push(legacyRegreso1Code);
+    participant.phaseCodes.push(legacyRegreso1Code);
+
+    const synced = await repository.ensureHutPhaseCodesForParticipant({
       participantId: participant.id,
       studyId: "study-hut"
     });
@@ -2308,6 +2384,7 @@ describe("HUT module foundation", () => {
       studyId: "study-hut"
     });
 
+    expect(synced).toMatchObject({ data: { created: 0, existing: 1 }, ok: true });
     expect(recovered).toMatchObject({ data: { code: "M3P9" }, ok: true });
     expect(revoked.ok).toBe(true);
     expect(regenerated.ok).toBe(true);

@@ -9,7 +9,6 @@ import {
   progressSectionTitle,
   isHutOperationalPanelSection,
   orderHutQuestionsForParticipant,
-  resolveHutPhaseCodeSlotTimelineLabel,
   resolveHutPhotoTimelinePhotoLabel,
   resolveHutOperationalStatusLabel,
   type HutFieldQuestionnaireWorkspace,
@@ -508,10 +507,14 @@ function FieldHutWorkspace({
 
       <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
         <h3 className="text-lg font-semibold text-zinc-950">Fases y códigos HUT</h3>
+        <p className="mt-1 text-sm text-zinc-600">
+          Los codigos maestros del participante son la fuente operativa. Los phase codes HUT se conservan como historico.
+        </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {workspace.phaseCodes.map((phaseCode) => (
             <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm" key={phaseCode.phase}>
-              <p className="font-semibold text-zinc-950">{resolveHutPhaseCodeSlotTimelineLabel(phaseCode.slot)}</p>
+              <p className="font-semibold text-zinc-950">{phaseCode.label}</p>
+              <p className="mt-1 text-zinc-600">{hutOperationalCodeSourceLabel(phaseCode)}</p>
               <p className="mt-1 text-zinc-600">Estado: {statusLabel(phaseCode.status)}</p>
             </div>
           ))}
@@ -1101,6 +1104,16 @@ function originLabel(value: string): string {
   };
 
   return labels[value] ?? value;
+}
+
+function hutOperationalCodeSourceLabel(phaseCode: HutFieldQuestionnaireWorkspace["phaseCodes"][number]): string {
+  if (phaseCode.operationalSource === "MASTER_REFERENCE_CODE") {
+    return `Fuente operativa: codigo maestro slot ${phaseCode.operationalSlot}.`;
+  }
+  if (phaseCode.operationalSource === "HISTORICAL_PHASE_CODE") {
+    return `Fuente operativa: phase code historico slot ${phaseCode.legacySlot ?? phaseCode.slot}.`;
+  }
+  return "Sin codigo operativo nuevo.";
 }
 
 function filterStatusLabel(value: HutFieldQuestionnaireWorkspace["questionnaire"]["filterStatus"]): string {

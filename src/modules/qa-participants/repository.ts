@@ -2,13 +2,6 @@ import { createPrismaClient } from "@/shared/db/client";
 import { randomUUID, createHash } from "node:crypto";
 import { generateParticipantReferenceCode, generateReferenceCodes } from "@/modules/participant-portal/review";
 import { createHutParticipantToken, createHutRegistrationToken } from "@/modules/hut/service";
-import {
-  encryptHutPhaseCode,
-  generateHutPhaseCode,
-  hashHutPhaseCode,
-  hutPhaseForSlot,
-  resolveHutPhaseCodeSecret
-} from "@/modules/hut/phase-codes";
 import { hashToken } from "@/modules/navigo-app";
 import {
   createEmptyQaCleanupReport,
@@ -1754,30 +1747,8 @@ async function createQaHutPhaseCodes(
     referenceCodes: Array<{ code: string; slot: 1 | 2 | 3 }>;
   }
 ): Promise<void> {
-  const secret = input.hutPhaseCodeSecret ?? resolveHutPhaseCodeSecret();
-  if (!secret) {
-    throw new Error("Falta HUT_PHASE_CODE_SECRET para generar codigos HUT QA.");
-  }
-
-  for (const slot of [1, 2, 3] as const) {
-    const phase = hutPhaseForSlot(slot);
-    if (!phase) {
-      continue;
-    }
-    const code = input.referenceCodes.find((candidate) => candidate.slot === slot)?.code ?? generateHutPhaseCode();
-    await tx.hutParticipantPhaseCode.create?.({
-      data: {
-        codeHash: hashHutPhaseCode(code, secret),
-        encryptedCode: encryptHutPhaseCode(code, secret),
-        encryptionVersion: 1,
-        participantId: input.participantId,
-        phase,
-        sentAt: null,
-        slot,
-        status: "GENERATED"
-      }
-    });
-  }
+  void tx;
+  void input;
 }
 
 function createBaseScenarioReport(input: QaScenarioDataInput): QaParticipantScenarioReport {

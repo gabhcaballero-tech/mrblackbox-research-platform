@@ -5,11 +5,13 @@ import { recoverHutPhaseCodeAction, regenerateHutPhaseCodeAction } from "@/modul
 import type { HutPhase } from "@/modules/hut";
 
 export function HutPhaseCodeControls({
+  allowRegenerate = true,
   disabled,
   participantId,
   phase,
   studyId
 }: {
+  allowRegenerate?: boolean;
   disabled?: boolean;
   participantId: string;
   phase: HutPhase;
@@ -42,11 +44,11 @@ export function HutPhaseCodeControls({
         </button>
         <button
           className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={disabled || isPending}
+          disabled={disabled || !allowRegenerate || isPending}
           onClick={() => run("regenerate")}
           type="button"
         >
-          {isPending ? "Procesando..." : "Regenerar codigo"}
+          {isPending ? "Procesando..." : "Regenerar codigo legacy"}
         </button>
       </div>
       {result ? (

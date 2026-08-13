@@ -2771,11 +2771,7 @@ describe("navigo app MVP rules", () => {
         status: "REGISTERED"
       }
     ]);
-    expect(state.hutParticipantPhaseCodes).toMatchObject([
-      { phase: "COLOCACION", slot: 1, status: "GENERATED" },
-      { phase: "REGRESO_1", slot: 2, status: "GENERATED" },
-      { phase: "REGRESO_2", slot: 3, status: "GENERATED" }
-    ]);
+    expect(state.hutParticipantPhaseCodes).toHaveLength(0);
     expect(state.hutParticipants[0]?.blocks).toHaveLength(0);
     expect(state.hutParticipants[0]?.callEvaluations).toHaveLength(0);
   });
@@ -2948,7 +2944,7 @@ describe("navigo app MVP rules", () => {
     expect(applied?.ok).toBe(true);
     expect(state.hutParticipants).toHaveLength(1);
     expect(state.hutRegistrationSlots).toHaveLength(1);
-    expect(state.hutParticipantPhaseCodes).toHaveLength(3);
+    expect(state.hutParticipantPhaseCodes).toHaveLength(0);
   });
 
   it("links HUT folios to the equivalent NAV participant when present", async () => {
@@ -3056,7 +3052,7 @@ describe("navigo app MVP rules", () => {
       secondFragranceRightArm: "902",
       studyParticipantId: state.participant.id
     });
-    expect(state.hutParticipantPhaseCodes).toHaveLength(3);
+    expect(state.hutParticipantPhaseCodes).toHaveLength(0);
     expect(state.hutRegistrationSlots[0]).toMatchObject({
       firstFragranceLeftArm: "901",
       participantId: state.hutParticipants[0]?.id,
@@ -3188,7 +3184,7 @@ describe("navigo app MVP rules", () => {
         studyParticipantId: null
       }
     ]);
-    expect(state.hutParticipantPhaseCodes).toHaveLength(3);
+    expect(state.hutParticipantPhaseCodes).toHaveLength(0);
   });
 
   it("retries rotation import without duplicating plans or assignments", async () => {

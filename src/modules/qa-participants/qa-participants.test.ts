@@ -637,7 +637,7 @@ describe("qa participants repository", () => {
       },
       scenario: "CLT_NAVIGO_HUT"
     });
-    expect(prisma.calls.filter((call: FakePrismaCall) => call.modelName === "hutParticipantPhaseCode" && call.operation === "create")).toHaveLength(3);
+    expect(prisma.calls.filter((call: FakePrismaCall) => call.modelName === "hutParticipantPhaseCode" && call.operation === "create")).toHaveLength(0);
     expect(prisma.calls).not.toContainEqual(expect.objectContaining({ modelName: "hutBlock", operation: "create" }));
     expect(prisma.calls).not.toContainEqual(expect.objectContaining({ modelName: "oneuiWhatsAppMessage", operation: "create" }));
   });

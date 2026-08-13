@@ -807,7 +807,7 @@ function baseParticipant() {
       },
       {
         expiresAt: null,
-        label: "Regreso 1",
+        label: "HUT seguimiento / Producto 2",
         phase: "REGRESO_1" as const,
         sentAt: null,
         slot: 2,
@@ -818,7 +818,7 @@ function baseParticipant() {
       },
       {
         expiresAt: null,
-        label: "Regreso 2",
+        label: "Sin codigo nuevo / Historico",
         phase: "REGRESO_2" as const,
         sentAt: null,
         slot: 3,

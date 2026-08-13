@@ -12,6 +12,55 @@ export type HutPhase = (typeof HUT_PHASES_BY_SLOT)[keyof typeof HUT_PHASES_BY_SL
 export type HutPhaseCodeStatus = "EXPIRED" | "GENERATED" | "REVOKED" | "SENT" | "USED" | "VALIDATED";
 export type HutPhaseCodeSlot = keyof typeof HUT_PHASES_BY_SLOT;
 
+export const HUT_MASTER_REFERENCE_SLOT_BY_PHASE = {
+  COLOCACION: 2,
+  REGRESO_1: 3,
+  REGRESO_2: null
+} as const satisfies Record<HutPhase, 2 | 3 | null>;
+
+export type HutOperationalReferenceCode = {
+  code: string;
+  slot: number;
+};
+
+export type HutOperationalPhaseCode = {
+  codeHash?: string;
+  encryptedCode?: string;
+  id?: string;
+  phase: HutPhase;
+  slot: number;
+  status: HutPhaseCodeStatus;
+};
+
+export type HutOperationalCodeParticipant = {
+  phaseCodes?: HutOperationalPhaseCode[] | null;
+  studyParticipant?: {
+    participantConfirmation?: {
+      referenceCodes?: HutOperationalReferenceCode[] | null;
+    } | null;
+  } | null;
+};
+
+export type HutOperationalCodeResolution =
+  | {
+      code: string;
+      phase: HutPhase;
+      slot: 2 | 3;
+      source: "MASTER_REFERENCE_CODE";
+    }
+  | {
+      encryptedCode?: string;
+      legacyPhaseCode: HutOperationalPhaseCode;
+      phase: HutPhase;
+      source: "LEGACY_PHASE_CODE";
+    }
+  | {
+      phase: HutPhase;
+      reason: "NO_CODE_FOR_PHASE" | "MISSING_MASTER_REFERENCE_CODE";
+      slot: 2 | 3 | null;
+      source: "NO_OPERATIONAL_CODE";
+    };
+
 export function hutPhaseForSlot(slot: number): HutPhase | null {
   return HUT_PHASES_BY_SLOT[slot as HutPhaseCodeSlot] ?? null;
 }
@@ -19,6 +68,58 @@ export function hutPhaseForSlot(slot: number): HutPhase | null {
 export function hutSlotForPhase(phase: HutPhase): HutPhaseCodeSlot {
   const entry = Object.entries(HUT_PHASES_BY_SLOT).find(([, value]) => value === phase);
   return Number(entry?.[0] ?? 1) as HutPhaseCodeSlot;
+}
+
+export function masterReferenceSlotForHutPhase(phase: HutPhase): 2 | 3 | null {
+  return HUT_MASTER_REFERENCE_SLOT_BY_PHASE[phase];
+}
+
+export function resolveHutOperationalCode(
+  participant: HutOperationalCodeParticipant,
+  phase: HutPhase
+): HutOperationalCodeResolution {
+  const legacyCode = participant.phaseCodes?.find(
+    (code) => code.phase === phase && (code.status === "USED" || code.status === "VALIDATED")
+  );
+
+  if (legacyCode) {
+    return {
+      encryptedCode: legacyCode.encryptedCode,
+      legacyPhaseCode: legacyCode,
+      phase,
+      source: "LEGACY_PHASE_CODE"
+    };
+  }
+
+  const slot = masterReferenceSlotForHutPhase(phase);
+  if (!slot) {
+    return {
+      phase,
+      reason: "NO_CODE_FOR_PHASE",
+      slot,
+      source: "NO_OPERATIONAL_CODE"
+    };
+  }
+
+  const referenceCode = participant.studyParticipant?.participantConfirmation?.referenceCodes?.find(
+    (code) => code.slot === slot
+  );
+
+  if (!referenceCode?.code) {
+    return {
+      phase,
+      reason: "MISSING_MASTER_REFERENCE_CODE",
+      slot,
+      source: "NO_OPERATIONAL_CODE"
+    };
+  }
+
+  return {
+    code: referenceCode.code,
+    phase,
+    slot,
+    source: "MASTER_REFERENCE_CODE"
+  };
 }
 
 export function generateHutPhaseCode(): string {

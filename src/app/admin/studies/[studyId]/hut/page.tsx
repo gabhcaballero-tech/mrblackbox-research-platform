@@ -31,7 +31,6 @@ import {
   buildHutPhotoTimeline,
   createHutRepository,
   formatHutPhotoTimelineSlotTitle,
-  resolveHutPhaseCodeSlotTimelineLabel,
   type HutAdminParticipant,
   type HutRegistrationSlotAdmin,
   type HutReservedNavReconciliationPreview
@@ -814,7 +813,7 @@ function HutPhaseCodesCard({
       <div>
         <h4 className="text-sm font-semibold text-zinc-950">Códigos por fase HUT</h4>
         <p className="mt-1 text-xs leading-5 text-zinc-600">
-          Cada codigo conserva la trazabilidad operativa de entrega, evaluacion 1 y evaluacion 2.
+          ParticipantReferenceCode es la fuente operativa para HUT nuevo. Los phase codes HUT se conservan como historico y auditoria.
         </p>
       </div>
       <div className="mt-3 space-y-3">
@@ -822,7 +821,8 @@ function HutPhaseCodesCard({
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3" key={phaseCode.phase}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-zinc-950">{resolveHutPhaseCodeSlotTimelineLabel(phaseCode.slot)}</p>
+                <p className="text-sm font-semibold text-zinc-950">{phaseCode.label}</p>
+                <p className="mt-1 text-xs text-zinc-600">{hutOperationalCodeSourceLabel(phaseCode)}</p>
                 <p className="mt-1 text-xs text-zinc-600">{`Slot ${phaseCode.slot} · Estado: ${hutPhaseCodeStatusLabel(phaseCode.status)}`}</p>
               </div>
               <StatusBadge status={hutPhaseCodeStatusBadge(phaseCode.status)}>{hutPhaseCodeStatusLabel(phaseCode.status)}</StatusBadge>
@@ -836,6 +836,7 @@ function HutPhaseCodesCard({
             </div>
             <div className="mt-3 space-y-2">
               <HutPhaseCodeControls
+                allowRegenerate={phaseCode.operationalSource === "HISTORICAL_PHASE_CODE" || participant.protocolVersion === "LEGACY_VIDEO"}
                 disabled={phaseCode.status === "MISSING"}
                 participantId={participant.id}
                 phase={phaseCode.phase}
@@ -1312,6 +1313,16 @@ function hutPhaseCodeStatusLabel(status: HutAdminParticipant["phaseCodes"][numbe
   };
 
   return labels[status];
+}
+
+function hutOperationalCodeSourceLabel(phaseCode: HutAdminParticipant["phaseCodes"][number]): string {
+  if (phaseCode.operationalSource === "MASTER_REFERENCE_CODE") {
+    return `Fuente operativa: codigo maestro slot ${phaseCode.operationalSlot}.`;
+  }
+  if (phaseCode.operationalSource === "HISTORICAL_PHASE_CODE") {
+    return `Fuente operativa: phase code historico slot ${phaseCode.legacySlot ?? phaseCode.slot}.`;
+  }
+  return "Sin codigo operativo nuevo.";
 }
 
 function hutPhaseCodeStatusBadge(status: HutAdminParticipant["phaseCodes"][number]["status"]): "blocked" | "planned" | "ready" {

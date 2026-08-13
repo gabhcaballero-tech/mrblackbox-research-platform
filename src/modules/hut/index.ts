@@ -68,6 +68,7 @@ export {
   hashHutPhaseCode,
   hutPhaseForSlot,
   normalizeHutPhaseCode,
+  resolveHutOperationalCode,
   resolveHutPhaseCodeSecret
 } from "./phase-codes";
 export {
@@ -92,6 +93,7 @@ export {
 } from "./progress";
 export type {
   HutPhase,
+  HutOperationalCodeResolution,
   HutPhaseCodeStatus
 } from "./phase-codes";
 export type {

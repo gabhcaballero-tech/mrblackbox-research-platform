@@ -75,14 +75,7 @@ import {
   createHutRegistrationToken,
   createHutParticipantToken
 } from "@/modules/hut/service";
-import {
-  encryptHutPhaseCode,
-  generateHutPhaseCode,
-  hashHutPhaseCode,
-  hutPhaseForSlot,
-  resolveHutPhaseCodeSecret,
-  type HutPhase
-} from "@/modules/hut/phase-codes";
+import type { HutPhase } from "@/modules/hut/phase-codes";
 import type { NavigoHutRotationWorkbookRowInput, NavigoRotationWorkbookRowInput } from "./rotation-workbook";
 
 export type NavigoInternalActor = {
@@ -5932,7 +5925,6 @@ async function buildHutRotationWorkbookPreview({
   });
   const hutParticipants = await findHutParticipantsByFolio({ folios: rows.map((row) => row.folio), prisma, studyId });
   const hutSlots = await findHutRegistrationSlotsByFolio({ folios: rows.map((row) => row.folio), prisma, studyId });
-  const phaseCodeSecretReady = rows.length === 0 || Boolean(resolveHutPhaseCodeSecret());
   const seenFolios = new Set<string>();
   const duplicateFolios = new Set<string>();
 
@@ -5965,9 +5957,6 @@ async function buildHutRotationWorkbookPreview({
     }
     if (!row.hutEva2) {
       errors.push("EVA2 HUT vacia");
-    }
-    if (!phaseCodeSecretReady) {
-      errors.push("falta configuracion segura para codigos HUT");
     }
     if (confirmation && participantStatus(confirmation.studyParticipant) !== "APPROVED") {
       errors.push(`participante ${confirmationFolio} no confirmado para HUT`);
@@ -6219,46 +6208,14 @@ async function upsertHutRegistrationSlotFromWorkbookRow({
 
 async function ensureHutPhaseCodesForWorkbookParticipant({
   participant,
-  prisma,
   referenceCodes
 }: {
   participant: HutParticipantWorkbookRecord;
   prisma: NavigoTransactionClient;
   referenceCodes: Array<{ code: string; slot: number }>;
 }) {
-  const secret = resolveHutPhaseCodeSecret();
-  if (!secret) {
-    throw new NavigoRotationApplyError({
-      folio: participant.folio ?? undefined,
-      message: "No se pudieron preparar codigos HUT seguros.",
-      step: "hut-phase-secret"
-    });
-  }
-
-  const existingCodes = participant.phaseCodes ?? [];
-  const existingByPhase = new Map(existingCodes.map((code) => [code.phase, code]));
-  const referenceBySlot = new Map(referenceCodes.map((code) => [code.slot, code]));
-
-  for (const slot of [1, 2, 3] as const) {
-    const phase = hutPhaseForSlot(slot);
-    if (!phase || existingByPhase.has(phase)) {
-      continue;
-    }
-
-    const code = referenceBySlot.get(slot)?.code ?? generateHutPhaseCode();
-
-    await prisma.hutParticipantPhaseCode?.create?.({
-      data: {
-        codeHash: hashHutPhaseCode(code, secret),
-        encryptedCode: encryptHutPhaseCode(code, secret),
-        encryptionVersion: 1,
-        participantId: participant.id,
-        phase,
-        slot,
-        status: "GENERATED"
-      }
-    });
-  }
+  void participant;
+  void referenceCodes;
 }
 
 function hutParticipantHasProgress(participant: HutParticipantWorkbookRecord): boolean {
