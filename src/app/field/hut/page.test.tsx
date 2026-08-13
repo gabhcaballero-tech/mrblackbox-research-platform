@@ -146,6 +146,25 @@ describe("FieldHutPage", () => {
     expect(screen.queryByRole("button", { name: "Guardar y continuar" })).not.toBeInTheDocument();
   });
 
+  it("no usa preguntas opcionales pendientes como siguiente evaluacion", async () => {
+    getFieldQuestionnaireWorkspaceMock.mockResolvedValue({
+      data: createLegacyOptionalPendingWorkspace(),
+      ok: true
+    });
+
+    render(await FieldHutPage({ searchParams: Promise.resolve({ folio: "HUT-121", interviewerCode: "JES26" }) }));
+
+    const nextEvaluation = screen.getByText("Siguiente evaluacion").closest("div");
+    expect(nextEvaluation).not.toBeNull();
+    expect(within(nextEvaluation as HTMLElement).getByText("Entrega de perfume")).toBeInTheDocument();
+    expect(within(nextEvaluation as HTMLElement).queryByText("Datos generales")).not.toBeInTheDocument();
+    expect(screen.getByText("Opcional pendiente: 4")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Iniciar evaluacion" })).toHaveAttribute(
+      "href",
+      "/field/hut?folio=HUT-121&interviewerCode=JES26&accessType=INTERVIEWER&questionCode=HUT_V1_CONFIRMACION_ENTREGA"
+    );
+  });
+
   it("resuelve rotacion, muestra etiquetas de escala y recupera seleccion guardada", async () => {
     getFieldQuestionnaireWorkspaceMock.mockResolvedValue({
       data: createScaleWorkspace(),
@@ -424,6 +443,45 @@ function createWorkspace() {
       eva2: "583"
     },
     secondStageAuthorized: true
+  };
+}
+
+function createLegacyOptionalPendingWorkspace() {
+  const workspace = createWorkspace();
+  return {
+    ...workspace,
+    participant: {
+      ...workspace.participant,
+      hutFolio: "HUT-100",
+      navFolio: "NAV-100",
+      name: "Participante HUT 100"
+    },
+    questionnaire: {
+      ...workspace.questionnaire,
+      answers: {
+        HUT_DG_FOLIO: "HUT-100",
+        HUT_DG_NOMBRE: "Participante HUT 100"
+      },
+      applicableQuestionCodes: [
+        "HUT_DG_NOMBRE",
+        "HUT_DG_FOLIO",
+        "HUT_DG_COLONIA",
+        "HUT_DG_TELEFONO",
+        "HUT_DG_DIRECCION",
+        "HUT_DG_EMAIL",
+        "HUT_V1_CONFIRMACION_ENTREGA"
+      ],
+      filterStatus: "PENDING",
+      visits: [
+        {
+          attemptId: "attempt-100",
+          completedAt: null,
+          section: "DATOS_GENERALES",
+          startedAt: new Date("2026-08-01T12:00:00.000Z"),
+          status: "IN_PROGRESS"
+        }
+      ]
+    }
   };
 }
 

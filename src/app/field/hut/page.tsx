@@ -364,7 +364,6 @@ function FieldHutWorkspace({
     ? null
     : selectedQuestionBlockedByDirectFilter || selectedQuestionBlockedBySecondStage
       ? requiredQuestions.find((question) => question.section === "FILTROS" && !(question.code in workspace.questionnaire.answers))
-      ?? questions.find((question) => question.section === "FILTROS" && !(question.code in workspace.questionnaire.answers))
       ?? null
       : selectedQuestionBlockedByThirdStage
         ? null
