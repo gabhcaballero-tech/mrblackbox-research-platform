@@ -308,6 +308,28 @@ export async function authorizeHutSecondStageForFieldAction(
   redirectToFieldHut(folio, result.ok ? result.message ?? "Segunda etapa autorizada." : null, result.ok ? null : result.message, null, fieldAccess);
 }
 
+export async function authorizeHutThirdStageForFieldAction(
+  folio: string,
+  participantId: string,
+  studyId: string,
+  formData: FormData
+) {
+  const fieldAccess = await resolveFieldHutActionAccess(folio, formData);
+  if (!fieldAccess.ok) {
+    redirectToFieldHut(folio, null, fieldAccess.message, null, fieldAccess);
+  }
+  const result = await createHutRepository().authorizeThirdStage({
+    accessCode: fieldAccess.interviewerCode ?? null,
+    accessType: fieldAccess.accessType,
+    actorUserId: fieldAccess.actorUserId,
+    code: String(formData.get("thirdStageCode") ?? ""),
+    participantId,
+    studyId
+  });
+
+  redirectToFieldHut(folio, result.ok ? result.message ?? "Etapa final autorizada." : null, result.ok ? null : result.message, null, fieldAccess);
+}
+
 export async function requestHutApplicationPhotoSlotRepeatAction(studyId: string, participantId: string, formData: FormData) {
   const actor = await requireCapability("admin:access");
   const result = await createHutRepository().requestApplicationPhotoSlotRepeat({

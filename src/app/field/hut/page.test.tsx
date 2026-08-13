@@ -123,8 +123,7 @@ describe("FieldHutPage", () => {
     expect(screen.getByText("Producto 2 - Dia 3 tarde - Evaluacion 2")).toBeInTheDocument();
     expect(screen.getAllByText("Entrega de perfume").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Regreso 1 - Evaluacion primer perfume").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Regreso 2 - Confirmacion segundo perfume").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Evaluacion comparativa (Regreso 2)").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Autorizacion etapa final")).toBeInTheDocument();
     expect(screen.queryByText("Evaluacion segundo perfume")).not.toBeInTheDocument();
     expect(screen.queryByText("Regreso 1")).not.toBeInTheDocument();
     expect(screen.queryByText("Regreso 2")).not.toBeInTheDocument();

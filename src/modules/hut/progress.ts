@@ -29,7 +29,7 @@ const HUT_OPERATIONAL_PANEL_SECTIONS = new Set<HutQuestionnaireSectionId>([
   "FILTROS",
   "PRIMERA_VISITA",
   "EVALUACION_PRIMER_PERFUME",
-  "SEGUNDA_VISITA",
+  "CONFIRMACION_USO_SEGUNDO_PERFUME",
   "COMPARATIVA"
 ]);
 
@@ -134,8 +134,11 @@ export function progressSectionTitle(section: HutQuestionnaireSectionId): string
   if (section === "EVALUACION_PRIMER_PERFUME") {
     return "Regreso 1 - Evaluacion primer perfume";
   }
+  if (section === "CONFIRMACION_USO_SEGUNDO_PERFUME") {
+    return "Confirmacion uso segundo perfume";
+  }
   if (section === "SEGUNDA_VISITA") {
-    return "Regreso 2 - Confirmacion segundo perfume";
+    return "Regreso 2 - entrega segundo perfume (historica)";
   }
   if (section === "EVALUACION_SEGUNDO_PERFUME") {
     return "Evaluacion segundo perfume (historica)";

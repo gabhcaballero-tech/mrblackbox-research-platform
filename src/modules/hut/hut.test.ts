@@ -462,6 +462,7 @@ describe("HUT module foundation", () => {
       "FILTROS",
       "PRIMERA_VISITA",
       "EVALUACION_PRIMER_PERFUME",
+      "CONFIRMACION_USO_SEGUNDO_PERFUME",
       "SEGUNDA_VISITA",
       "EVALUACION_SEGUNDO_PERFUME",
       "COMPARATIVA"
@@ -472,7 +473,8 @@ describe("HUT module foundation", () => {
     expect(definition.sections.find((section) => section.id === "FILTROS")?.title).toBe("Filtro de participante");
     expect(definition.sections.find((section) => section.id === "PRIMERA_VISITA")?.title).toBe("Entrega de perfume");
     expect(definition.sections.find((section) => section.id === "EVALUACION_PRIMER_PERFUME")?.title).toBe("Regreso 1 - Evaluacion primer perfume");
-    expect(definition.sections.find((section) => section.id === "SEGUNDA_VISITA")?.title).toBe("Regreso 2 - Confirmacion segundo perfume");
+    expect(definition.sections.find((section) => section.id === "CONFIRMACION_USO_SEGUNDO_PERFUME")?.title).toBe("Confirmacion uso segundo perfume");
+    expect(definition.sections.find((section) => section.id === "SEGUNDA_VISITA")?.title).toBe("Regreso 2 - entrega segundo perfume (historica)");
     expect(definition.sections.find((section) => section.id === "COMPARATIVA")?.title).toBe("Evaluacion comparativa (Regreso 2)");
     expect(definition.sections.find((section) => section.id === "EVALUACION_SEGUNDO_PERFUME")?.title).toBe("Evaluacion segundo perfume (historica)");
     expect(definition.sections.flatMap((section) => section.questions).map((question) => question.code)).toContain(
@@ -1601,7 +1603,7 @@ describe("HUT module foundation", () => {
     });
   });
 
-  it("requires master slot 3 authorization before capturing the first perfume evaluation", async () => {
+  it("requires master slot 2 authorization before capturing the first perfume evaluation", async () => {
     const { prisma, storage } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     const participant = await createProduct2GateParticipant(repository, prisma);
@@ -1626,7 +1628,7 @@ describe("HUT module foundation", () => {
       accessCode: "SUP26",
       accessType: "SUPERVISOR",
       actorUserId: null,
-      code: "T8R2",
+      code: "M3P9",
       participantId: participant.id,
       studyId: "study-hut"
     });
@@ -1645,11 +1647,11 @@ describe("HUT module foundation", () => {
     });
 
     expect(beforeAuthorization).toMatchObject({
-      message: "Autoriza primero la segunda etapa con el codigo maestro slot 3.",
+      message: "Autoriza primero la segunda etapa con el codigo maestro slot 2.",
       ok: false
     });
     expect(wrongCode).toMatchObject({
-      message: "El codigo maestro slot 3 no es correcto.",
+      message: "El codigo maestro slot 2 no es correcto.",
       ok: false
     });
     expect(authorization).toMatchObject({ ok: true });
@@ -1693,6 +1695,61 @@ describe("HUT module foundation", () => {
       ok: true
     });
     expect(prisma.state.auditLogs.some((log) => log.reason === "SECOND_STAGE_AUTHORIZED")).toBe(false);
+  });
+
+  it("requires master slot 3 authorization before confirming second perfume use and comparativa", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await createProduct2GateParticipant(repository, prisma);
+    completeProduct1EvaluationAndReleaseProduct2(prisma.state, participant);
+
+    const beforeAuthorization = await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_P1B_USO_PERFUME: "1" },
+      participantId: participant.id,
+      questionCode: "HUT_P1B_USO_PERFUME",
+      studyId: "study-hut"
+    });
+    const wrongCode = await repository.authorizeThirdStage({
+      accessCode: "SUP26",
+      accessType: "SUPERVISOR",
+      actorUserId: null,
+      code: "M3P9",
+      participantId: participant.id,
+      studyId: "study-hut"
+    });
+    const authorization = await repository.authorizeThirdStage({
+      accessCode: "SUP26",
+      accessType: "SUPERVISOR",
+      actorUserId: null,
+      code: "T8R2",
+      participantId: participant.id,
+      studyId: "study-hut"
+    });
+    const afterAuthorization = await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_P1B_USO_PERFUME: "1" },
+      participantId: participant.id,
+      questionCode: "HUT_P1B_USO_PERFUME",
+      studyId: "study-hut"
+    });
+
+    expect(beforeAuthorization).toMatchObject({
+      message: "Autoriza primero la etapa final con el codigo maestro slot 3.",
+      ok: false
+    });
+    expect(wrongCode).toMatchObject({
+      message: "El codigo maestro slot 3 no es correcto.",
+      ok: false
+    });
+    expect(authorization).toMatchObject({ ok: true });
+    expect(prisma.state.auditLogs.find((log) => log.reason === "THIRD_STAGE_AUTHORIZED")?.afterJson).toMatchObject({
+      accessCode: "SUP26",
+      accessType: "SUPERVISOR",
+      action: "THIRD_STAGE_AUTHORIZED"
+    });
+    expect(afterAuthorization).toMatchObject({
+      data: { questionCode: "HUT_P1B_USO_PERFUME" },
+      ok: true
+    });
   });
 
   it("keeps legacy second product progress compatible without creating release events", async () => {
@@ -2165,7 +2222,7 @@ describe("HUT module foundation", () => {
     });
   });
 
-  it("does not issue a new operational code for REGRESO_2 in APPLICATION_PHOTO", async () => {
+  it("uses master slot 3 as the final-stage code for REGRESO_2 in APPLICATION_PHOTO", async () => {
     const { prisma } = createFakeHutPrisma();
     const repository = createHutRepository(prisma as never);
     await repository.createParticipant({
@@ -2178,9 +2235,16 @@ describe("HUT module foundation", () => {
       startDate: new Date("2026-07-01T00:00:00.000Z"),
       studyId: "study-hut"
     });
-    prisma.state.confirmations.push(confirmationWithCodes("NAV-004C"));
+    const confirmation = confirmationWithCodes("NAV-004C");
+    prisma.state.confirmations.push(confirmation);
     const participant = prisma.state.participants[0]!;
     participant.origin = "CLT_HUT";
+    participant.studyParticipantId = confirmation.studyParticipant.id;
+    participant.studyParticipant = {
+      ...confirmation.studyParticipant,
+      ctlSessions: [],
+      participantConfirmation: confirmation
+    };
     participant.status = "BLOCK_2_CALL_PENDING";
 
     const recovered = await repository.recoverPhaseCode({
@@ -2190,8 +2254,11 @@ describe("HUT module foundation", () => {
     });
 
     expect(recovered).toMatchObject({
-      message: "Esta fase HUT no requiere un codigo operativo nuevo.",
-      ok: false
+      data: {
+        code: "T8R2",
+        phase: "REGRESO_2"
+      },
+      ok: true
     });
   });
 
@@ -2960,7 +3027,8 @@ describe("HUT module foundation", () => {
     stubAcceptedWhatsAppMeta();
     await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-COMPLETE-NO-COMP" });
     const participant = prisma.state.participants[0]!;
-    completeProduct1AndAuthorizeSecondStageForTest(prisma.state, participant);
+    completeProduct1EvaluationAndReleaseProduct2(prisma.state, participant);
+    authorizeThirdStageForTest(prisma.state, participant);
     const formData = createCompleteHutV5FormData({ participantOrigin: "CLT_HUT" });
     formData.set("HUT_F2_EDAD_EXACTA", "35");
     formData.set("HUT_F2_RANGO_EDAD", "2");
@@ -3011,7 +3079,8 @@ describe("HUT module foundation", () => {
     stubAcceptedWhatsAppMeta();
     await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-COMPLETE-001" });
     const participant = prisma.state.participants[0]!;
-    completeProduct1AndAuthorizeSecondStageForTest(prisma.state, participant);
+    completeProduct1EvaluationAndReleaseProduct2(prisma.state, participant);
+    authorizeThirdStageForTest(prisma.state, participant);
     const formData = createCompleteHutV5FormData({ participantOrigin: "CLT_HUT" });
     formData.set("HUT_F2_EDAD_EXACTA", "35");
     formData.set("HUT_F2_RANGO_EDAD", "2");
@@ -5058,6 +5127,33 @@ function completeProduct1EvaluationAndReleaseProduct2(
   participant.phaseCodes.push(regreso1Code);
 }
 
+function authorizeThirdStageForTest(
+  state: ReturnType<typeof createFakeHutPrisma>["prisma"]["state"],
+  participant: FakeParticipant
+) {
+  const authorizedAt = new Date("2026-08-12T21:00:00.000Z");
+  participant.thirdStageAuthorization = {
+    accessCode: "SUP26",
+    accessType: "SUPERVISOR",
+    actorUserId: null,
+    authorizedAt,
+    authorizedAtMexicoCity: "12/08/2026, 15:00 hrs CDMX"
+  };
+  state.auditLogs.push({
+    action: "PARTICIPANT_MODIFIED",
+    afterJson: {
+      accessCode: "SUP26",
+      accessType: "SUPERVISOR",
+      action: "THIRD_STAGE_AUTHORIZED",
+      authorizedAtMexicoCity: "12/08/2026, 15:00 hrs CDMX"
+    },
+    createdAt: authorizedAt,
+    entityId: participant.id,
+    entityType: "HutParticipant",
+    reason: "THIRD_STAGE_AUTHORIZED"
+  });
+}
+
 function completeDirectHutFilters(
   state: ReturnType<typeof createFakeHutPrisma>["prisma"]["state"],
   participant: FakeParticipant
@@ -5939,6 +6035,7 @@ type FakeParticipant = {
   secondFragranceRightArm: string | null;
   secondStageAuthorization?: unknown;
   secondProductRelease?: unknown;
+  thirdStageAuthorization?: unknown;
   startDate: Date | null;
   status:
     | "NOT_STARTED"

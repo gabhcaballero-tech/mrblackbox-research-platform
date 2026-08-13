@@ -69,6 +69,7 @@ export {
   hutPhaseForSlot,
   normalizeHutPhaseCode,
   resolveHutOperationalCode,
+  resolveHutOperationalStageCode,
   resolveHutPhaseCodeSecret
 } from "./phase-codes";
 export {
@@ -95,6 +96,16 @@ export type {
   HutSecondStageAuthorizationSummary
 } from "./second-stage-authorization";
 export {
+  getThirdStageAuthorizationWarnings,
+  hasLegacyThirdStageProgress,
+  HUT_THIRD_STAGE_AUTHORIZED_REASON,
+  isThirdStageAuthorizationAuditJson,
+  isThirdStageAuthorized
+} from "./third-stage-authorization";
+export type {
+  HutThirdStageAuthorizationSummary
+} from "./third-stage-authorization";
+export {
   buildHutPhotoTimeline,
   getHutPhotoTimelineSlotDefinition,
   getNextHutPhotoTimelineSlot,
@@ -118,6 +129,7 @@ export {
 export type {
   HutPhase,
   HutOperationalCodeResolution,
+  HutOperationalStage,
   HutPhaseCodeStatus
 } from "./phase-codes";
 export type {

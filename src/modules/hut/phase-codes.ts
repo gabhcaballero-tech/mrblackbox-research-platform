@@ -14,9 +14,9 @@ export type HutPhaseCodeSlot = keyof typeof HUT_PHASES_BY_SLOT;
 
 export const HUT_MASTER_REFERENCE_SLOT_BY_PHASE = {
   COLOCACION: 2,
-  REGRESO_1: 3,
-  REGRESO_2: null
-} as const satisfies Record<HutPhase, 2 | 3 | null>;
+  REGRESO_1: 2,
+  REGRESO_2: 3
+} as const satisfies Record<HutPhase, 1 | 2 | 3>;
 
 export type HutOperationalReferenceCode = {
   code: string;
@@ -33,6 +33,7 @@ export type HutOperationalPhaseCode = {
 };
 
 export type HutOperationalCodeParticipant = {
+  origin?: "CLT_HUT" | "HUT_DIRECTO" | null;
   phaseCodes?: HutOperationalPhaseCode[] | null;
   studyParticipant?: {
     participantConfirmation?: {
@@ -41,11 +42,13 @@ export type HutOperationalCodeParticipant = {
   } | null;
 };
 
+export type HutOperationalStage = "INITIAL_HUT" | "SECOND_STAGE" | "THIRD_STAGE";
+
 export type HutOperationalCodeResolution =
   | {
       code: string;
       phase: HutPhase;
-      slot: 2 | 3;
+      slot: 1 | 2 | 3;
       source: "MASTER_REFERENCE_CODE";
     }
   | {
@@ -57,7 +60,7 @@ export type HutOperationalCodeResolution =
   | {
       phase: HutPhase;
       reason: "NO_CODE_FOR_PHASE" | "MISSING_MASTER_REFERENCE_CODE";
-      slot: 2 | 3 | null;
+      slot: 1 | 2 | 3 | null;
       source: "NO_OPERATIONAL_CODE";
     };
 
@@ -70,7 +73,13 @@ export function hutSlotForPhase(phase: HutPhase): HutPhaseCodeSlot {
   return Number(entry?.[0] ?? 1) as HutPhaseCodeSlot;
 }
 
-export function masterReferenceSlotForHutPhase(phase: HutPhase): 2 | 3 | null {
+export function masterReferenceSlotForHutPhase(
+  phase: HutPhase,
+  participant?: Pick<HutOperationalCodeParticipant, "origin"> | null
+): 1 | 2 | 3 {
+  if (phase === "COLOCACION" && participant?.origin === "HUT_DIRECTO") {
+    return 1;
+  }
   return HUT_MASTER_REFERENCE_SLOT_BY_PHASE[phase];
 }
 
@@ -91,15 +100,7 @@ export function resolveHutOperationalCode(
     };
   }
 
-  const slot = masterReferenceSlotForHutPhase(phase);
-  if (!slot) {
-    return {
-      phase,
-      reason: "NO_CODE_FOR_PHASE",
-      slot,
-      source: "NO_OPERATIONAL_CODE"
-    };
-  }
+  const slot = masterReferenceSlotForHutPhase(phase, participant);
 
   const referenceCode = participant.studyParticipant?.participantConfirmation?.referenceCodes?.find(
     (code) => code.slot === slot
@@ -117,6 +118,56 @@ export function resolveHutOperationalCode(
   return {
     code: referenceCode.code,
     phase,
+    slot,
+    source: "MASTER_REFERENCE_CODE"
+  };
+}
+
+export function masterReferenceSlotForHutOperationalStage(
+  participant: Pick<HutOperationalCodeParticipant, "origin">,
+  stage: HutOperationalStage
+): 1 | 2 | 3 {
+  const origin = participant.origin ?? "CLT_HUT";
+  if (origin === "HUT_DIRECTO") {
+    if (stage === "INITIAL_HUT") {
+      return 1;
+    }
+    if (stage === "SECOND_STAGE") {
+      return 2;
+    }
+    return 3;
+  }
+
+  if (stage === "INITIAL_HUT") {
+    return 2;
+  }
+  if (stage === "SECOND_STAGE") {
+    return 2;
+  }
+  return 3;
+}
+
+export function resolveHutOperationalStageCode(
+  participant: HutOperationalCodeParticipant,
+  stage: HutOperationalStage
+): HutOperationalCodeResolution {
+  const slot = masterReferenceSlotForHutOperationalStage(participant, stage);
+  const referenceCode = participant.studyParticipant?.participantConfirmation?.referenceCodes?.find(
+    (code) => code.slot === slot
+  );
+
+  if (!referenceCode?.code) {
+    return {
+      phase: stage === "THIRD_STAGE" ? "REGRESO_2" : "REGRESO_1",
+      reason: "MISSING_MASTER_REFERENCE_CODE",
+      slot,
+      source: "NO_OPERATIONAL_CODE"
+    };
+  }
+
+  return {
+    code: referenceCode.code,
+    phase: stage === "THIRD_STAGE" ? "REGRESO_2" : "REGRESO_1",
     slot,
     source: "MASTER_REFERENCE_CODE"
   };

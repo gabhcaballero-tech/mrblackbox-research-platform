@@ -48,7 +48,7 @@ export function hasLegacySecondProductProgress(participant: HutSecondProductRele
       participant.applicationPhotoEntries?.some((entry) => product2UseDayNumbers.has(entry.useDayNumber)) ||
       participant.applicationEvidence?.some((evidence) => evidence.phase === "REGRESO_2") ||
       participant.questionnaireAttempt?.visits?.some((visit) =>
-        ["SEGUNDA_VISITA", "COMPARATIVA"].includes(visit.section)
+        ["CONFIRMACION_USO_SEGUNDO_PERFUME", "SEGUNDA_VISITA", "COMPARATIVA"].includes(visit.section)
       ) ||
       participant.questionnaireAttempt?.answers?.some((answer) => isSecondProductOrComparativeQuestionCode(answer.questionCode))
   );

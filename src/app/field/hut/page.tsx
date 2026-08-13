@@ -18,6 +18,7 @@ import {
 } from "@/modules/hut";
 import {
   authorizeHutSecondStageForFieldAction,
+  authorizeHutThirdStageForFieldAction,
   completeHutQuestionnaireSectionForFieldAction,
   saveHutQuestionnaireAnswerForFieldAction
 } from "@/modules/hut/actions";
@@ -342,6 +343,9 @@ function FieldHutWorkspace({
   const selectedQuestionBlockedBySecondStage = Boolean(
     selectedQuestion?.section === "EVALUACION_PRIMER_PERFUME" && !workspace.secondStageAuthorized
   );
+  const selectedQuestionBlockedByThirdStage = Boolean(
+    selectedQuestion && requiresThirdStageAuthorizationForQuestion(selectedQuestion) && !workspace.thirdStageAuthorized
+  );
   const questions = allQuestions.filter((question) => isQuestionAvailableForCurrentHutStage(question, workspace));
   const operationalQuestions = workspace.participant.origin === "CLT_HUT"
     ? questions.filter((question) => question.section !== "FILTROS")
@@ -363,11 +367,13 @@ function FieldHutWorkspace({
       ? requiredQuestions.find((question) => question.section === "FILTROS" && !(question.code in workspace.questionnaire.answers))
       ?? questions.find((question) => question.section === "FILTROS" && !(question.code in workspace.questionnaire.answers))
       ?? null
+      : selectedQuestionBlockedByThirdStage
+        ? null
       : selectedQuestion
       ?? operationalRequiredQuestions.find((question) => !(question.code in workspace.questionnaire.answers))
       ?? operationalQuestions.find((question) => !(question.code in workspace.questionnaire.answers))
       ?? null;
-  const captureQuestion = !questionnaireClosed && selectedQuestionCode && !selectedQuestionBlockedByDirectFilter && !selectedQuestionBlockedBySecondStage
+  const captureQuestion = !questionnaireClosed && selectedQuestionCode && !selectedQuestionBlockedByDirectFilter && !selectedQuestionBlockedBySecondStage && !selectedQuestionBlockedByThirdStage
     ? selectedQuestion
     : null;
   const photoTimelineSlots = hutTimeline.filter((slot) => slot.participantTask);
@@ -502,6 +508,12 @@ function FieldHutWorkspace({
       <SecondStageAuthorizationCard
         access={access}
         product1PhotoCycleComplete={product1PhotoCycleComplete}
+        searchedFolio={searchedFolio}
+        workspace={workspace}
+      />
+
+      <ThirdStageAuthorizationCard
+        access={access}
         searchedFolio={searchedFolio}
         workspace={workspace}
       />
@@ -691,7 +703,7 @@ function SecondStageAuthorizationCard({
         <div>
           <h3 className="text-lg font-semibold text-indigo-950">Autorizacion segunda etapa</h3>
           <p className="mt-1 text-sm text-indigo-900">
-            Antes de iniciar la evaluacion del primer perfume, solicita al participante su segundo codigo enviado por WhatsApp y valida el codigo maestro slot 3.
+            Antes de iniciar la evaluacion del primer perfume, solicita al participante su segundo codigo enviado por WhatsApp y valida el codigo maestro slot 2.
           </p>
         </div>
         <StatusBadge status={workspace.secondStageAuthorized ? "ready" : product1PhotoCycleComplete ? "planned" : "blocked"}>
@@ -716,7 +728,7 @@ function SecondStageAuthorizationCard({
         >
           <FieldHutAccessHiddenInputs access={access} />
           <label className="block text-sm font-semibold text-indigo-950" htmlFor="second-stage-code">
-            Codigo maestro slot 3
+            Codigo maestro slot 2
           </label>
           <input
             autoComplete="one-time-code"
@@ -736,6 +748,78 @@ function SecondStageAuthorizationCard({
       ) : (
         <p className="mt-4 rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-800">
           Completa primero las fotografias del Producto 1. Despues se podra validar el codigo para iniciar la evaluacion.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function ThirdStageAuthorizationCard({
+  access,
+  searchedFolio,
+  workspace
+}: {
+  access: FieldHutAccessContext | null;
+  searchedFolio: string;
+  workspace: HutFieldQuestionnaireWorkspace;
+}) {
+  const status = workspace.thirdStageAuthorized
+    ? "Autorizada"
+    : workspace.product2GateOpen
+      ? "Pendiente de codigo"
+      : "Esperando segundo producto";
+
+  return (
+    <section className="rounded-lg border border-purple-200 bg-purple-50 p-5 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-purple-950">Autorizacion etapa final</h3>
+          <p className="mt-1 text-sm text-purple-900">
+            Despues de liberar el segundo producto, solicita al participante su codigo maestro slot 3 para confirmar uso del segundo perfume e iniciar comparativa.
+          </p>
+        </div>
+        <StatusBadge status={workspace.thirdStageAuthorized ? "ready" : workspace.product2GateOpen ? "planned" : "blocked"}>
+          {status}
+        </StatusBadge>
+      </div>
+      {workspace.thirdStageAuthorized ? (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800">
+          {(workspace.warnings ?? []).includes("LEGACY_PROGRESS_WITHOUT_EVENT")
+            ? "Etapa final disponible por compatibilidad historica."
+            : "Etapa final autorizada. Ya puedes confirmar uso del segundo perfume y capturar comparativa."}
+        </p>
+      ) : workspace.product2GateOpen ? (
+        <form
+          action={authorizeHutThirdStageForFieldAction.bind(
+            null,
+            searchedFolio,
+            workspace.participant.id,
+            workspace.participant.studyId
+          )}
+          className="mt-4 space-y-3"
+        >
+          <FieldHutAccessHiddenInputs access={access} />
+          <label className="block text-sm font-semibold text-purple-950" htmlFor="third-stage-code">
+            Codigo maestro slot 3
+          </label>
+          <input
+            autoComplete="one-time-code"
+            className="w-full rounded-md border border-purple-200 bg-white px-3 py-2 text-sm font-semibold uppercase text-zinc-950"
+            id="third-stage-code"
+            name="thirdStageCode"
+            placeholder="Captura codigo"
+            required
+          />
+          <button
+            className="rounded-md bg-purple-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-800"
+            type="submit"
+          >
+            Validar codigo y autorizar etapa final
+          </button>
+        </form>
+      ) : (
+        <p className="mt-4 rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-800">
+          Completa la evaluacion del primer perfume y registra la liberacion del segundo producto antes de autorizar la etapa final.
         </p>
       )}
     </section>
@@ -1091,8 +1175,15 @@ function isQuestionAvailableForCurrentHutStage(question: HutQuestionDefinition, 
   if (question.section === "EVALUACION_PRIMER_PERFUME") {
     return workspace.secondStageAuthorized;
   }
+  if (requiresThirdStageAuthorizationForQuestion(question)) {
+    return workspace.thirdStageAuthorized;
+  }
 
   return true;
+}
+
+function requiresThirdStageAuthorizationForQuestion(question: HutQuestionDefinition): boolean {
+  return question.section === "CONFIRMACION_USO_SEGUNDO_PERFUME" || question.section === "COMPARATIVA";
 }
 
 function isFieldProduct1PhotoCycleComplete(timeline: HutPhotoTimelineSlot[]): boolean {
@@ -1106,7 +1197,11 @@ function productLabelForQuestion(question: HutQuestionDefinition, workspace: Hut
   if (question.section === "EVALUACION_PRIMER_PERFUME" || question.section === "PRIMERA_VISITA") {
     return workspace.rotation.eva1 ?? "EVA1 no asignado";
   }
-  if (question.section === "EVALUACION_SEGUNDO_PERFUME" || question.section === "SEGUNDA_VISITA") {
+  if (
+    question.section === "CONFIRMACION_USO_SEGUNDO_PERFUME" ||
+    question.section === "EVALUACION_SEGUNDO_PERFUME" ||
+    question.section === "SEGUNDA_VISITA"
+  ) {
     return workspace.rotation.eva2 ?? "EVA2 no asignado";
   }
   if (question.section === "COMPARATIVA") {

@@ -79,6 +79,7 @@ import {
   hutSlotForPhase,
   normalizeHutPhaseCode,
   resolveHutOperationalCode,
+  resolveHutOperationalStageCode,
   resolveHutPhaseCodeSecret,
   type HutPhase,
   type HutPhaseCodeStatus
@@ -109,6 +110,14 @@ import {
   isSecondStageAuthorized,
   type HutSecondStageAuthorizationSummary
 } from "./second-stage-authorization";
+import { isHutOperationalPanelSection } from "./progress";
+import {
+  getThirdStageAuthorizationWarnings,
+  HUT_THIRD_STAGE_AUTHORIZED_REASON,
+  isThirdStageAuthorizationAuditJson,
+  isThirdStageAuthorized,
+  type HutThirdStageAuthorizationSummary
+} from "./third-stage-authorization";
 
 export type HutActionResult<T = void> =
   | { ok: true; data: T; message?: string }
@@ -124,7 +133,7 @@ export type HutPhaseCodeAdmin = {
   expiresAt: Date | null;
   label: string;
   legacySlot?: number | null;
-  operationalSlot?: 2 | 3 | null;
+  operationalSlot?: 1 | 2 | 3 | null;
   operationalSource?: "HISTORICAL_PHASE_CODE" | "MASTER_REFERENCE_CODE" | "NONE";
   phase: HutPhase;
   sentAt: Date | null;
@@ -188,6 +197,7 @@ export type HutAdminParticipant = {
   secondFragranceRightArm: string | null;
   secondStageAuthorization: HutSecondStageAuthorizationSummary | null;
   secondProductRelease: HutSecondProductReleaseSummary | null;
+  thirdStageAuthorization: HutThirdStageAuthorizationSummary | null;
   status: HutParticipantStatus;
   studyParticipantId: string | null;
   testMode: boolean;
@@ -380,6 +390,7 @@ export type HutFieldQuestionnaireWorkspace = {
   photoSlotOverrides: HutPhotoTimelineManualOverride[];
   product2GateOpen: boolean;
   secondStageAuthorized: boolean;
+  thirdStageAuthorized: boolean;
   questionnaire: HutQuestionnaireState;
   legacyMirroredPlacementPhoto: boolean;
   rotation: {
@@ -651,6 +662,14 @@ export type HutRepository = {
     studyId: string;
   }) => Promise<HutActionResult<{ participantId: string }>>;
   authorizeSecondStage: (input: {
+    accessCode?: string | null;
+    accessType: "ADMIN" | "ENCUESTADOR" | "SUPERVISOR";
+    actorUserId?: string | null;
+    code: string;
+    participantId: string;
+    studyId: string;
+  }) => Promise<HutActionResult<{ authorizedAt: Date; participantId: string }>>;
+  authorizeThirdStage: (input: {
     accessCode?: string | null;
     accessType: "ADMIN" | "ENCUESTADOR" | "SUPERVISOR";
     actorUserId?: string | null;
@@ -1007,6 +1026,7 @@ type HutParticipantRecord = {
   secondFragranceRightArm: string | null;
   secondStageAuthorization?: HutSecondStageAuthorizationSummary | null;
   secondProductRelease?: HutSecondProductReleaseSummary | null;
+  thirdStageAuthorization?: HutThirdStageAuthorizationSummary | null;
   videoSubmissions?: HutVideoRecord[];
   visualOverrideEnabled: boolean;
   visualOverrideReason: string | null;
@@ -1790,6 +1810,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           participants.map(async (participant) => {
             await attachSecondStageAuthorization(prisma, participant);
             await attachSecondProductRelease(prisma, participant);
+            await attachThirdStageAuthorization(prisma, participant);
             return toAdminParticipant(
               participant,
               input.requestOrigin,
@@ -1814,6 +1835,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       }
       await attachSecondStageAuthorization(prisma, participant);
       await attachSecondProductRelease(prisma, participant);
+      await attachThirdStageAuthorization(prisma, participant);
 
       return {
         data: toPortalView(participant, await readActiveHutPhotoSlotOverrides(prisma, participant.id)),
@@ -1876,9 +1898,16 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         };
       }
       await attachSecondStageAuthorization(prisma, participant);
+      await attachThirdStageAuthorization(prisma, participant);
       if (input.section === "EVALUACION_PRIMER_PERFUME" && !isHutFirstEvaluationGateOpen(participant)) {
         return {
-          message: "Autoriza primero la segunda etapa con el codigo maestro slot 3.",
+          message: secondStageAuthorizationRequiredMessage(participant),
+          ok: false
+        };
+      }
+      if (requiresThirdStageAuthorizationForSection(input.section) && !isHutFinalStageGateOpen(participant)) {
+        return {
+          message: "Autoriza primero la etapa final con el codigo maestro slot 3.",
           ok: false
         };
       }
@@ -2037,9 +2066,16 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         };
       }
       await attachSecondStageAuthorization(prisma, participant);
+      await attachThirdStageAuthorization(prisma, participant);
       if (requiresSecondStageAuthorizationForQuestion(question) && !isHutFirstEvaluationGateOpen(participant)) {
         return {
-          message: "Autoriza primero la segunda etapa con el codigo maestro slot 3.",
+          message: secondStageAuthorizationRequiredMessage(participant),
+          ok: false
+        };
+      }
+      if (requiresThirdStageAuthorizationForQuestion(question) && !isHutFinalStageGateOpen(participant)) {
+        return {
+          message: "Autoriza primero la etapa final con el codigo maestro slot 3.",
           ok: false
         };
       }
@@ -2259,7 +2295,9 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       if (!isApplicationPhotoProtocol(participant)) {
         return { message: "Este participante conserva el flujo HUT historico.", ok: false };
       }
+      await attachSecondStageAuthorization(prisma, participant);
       await attachSecondProductRelease(prisma, participant);
+      await attachThirdStageAuthorization(prisma, participant);
 
       const questionnaire = await createHutRepository(prisma, getWhatsAppRepository()).getQuestionnaireState({
         participantId: participant.id,
@@ -2289,6 +2327,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           photos: await toFieldPhotoSummaries(participant, input.storage),
           product2GateOpen: isHutProduct2GateOpen(participant),
           secondStageAuthorized: isHutFirstEvaluationGateOpen(participant),
+          thirdStageAuthorized: isHutFinalStageGateOpen(participant),
           questionnaire: questionnaire.data,
           legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
           rotation: {
@@ -2809,7 +2848,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       const prisma = await getPrisma();
       const submittedCode = normalizeHutPhaseCode(input.code);
       if (!submittedCode) {
-        return { message: "Captura el codigo maestro slot 3 para autorizar la segunda etapa.", ok: false };
+        return { message: "Captura el codigo maestro para autorizar la segunda etapa.", ok: false };
       }
 
       const participant = await findParticipant(prisma, input.participantId);
@@ -2838,7 +2877,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         };
       }
 
-      const resolution = resolveHutOperationalCode(participant, "REGRESO_1");
+      const resolution = resolveHutOperationalStageCode(participant, "SECOND_STAGE");
       if (resolution.source === "NO_OPERATIONAL_CODE") {
         return {
           message: hutOperationalCodeUnavailableMessage(resolution.reason, resolution.slot),
@@ -2856,7 +2895,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
         };
       }
       if (normalizeHutPhaseCode(resolution.code) !== submittedCode) {
-        return { message: "El codigo maestro slot 3 no es correcto.", ok: false };
+        return { message: `El codigo maestro slot ${resolution.slot} no es correcto.`, ok: false };
       }
 
       const authorizedAt = new Date();
@@ -2879,6 +2918,88 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       return {
         data: { authorizedAt, participantId: participant.id },
         message: "Segunda etapa autorizada. Ya puedes iniciar la evaluacion del primer perfume.",
+        ok: true
+      };
+    },
+
+    async authorizeThirdStage(input) {
+      const prisma = await getPrisma();
+      const submittedCode = normalizeHutPhaseCode(input.code);
+      if (!submittedCode) {
+        return { message: "Captura el codigo maestro slot 3 para autorizar la etapa final.", ok: false };
+      }
+
+      const participant = await findParticipant(prisma, input.participantId);
+      if (!participant || participant.studyId !== input.studyId) {
+        return { message: "No encontramos el participante HUT.", ok: false };
+      }
+      if (isReservedHutWithoutOperationalIdentity(participant)) {
+        return { message: reservedHutOperationalIdentityMessage(), ok: false };
+      }
+      if (!isApplicationPhotoProtocol(participant)) {
+        return { message: "La autorizacion de etapa final aplica solo a APPLICATION_PHOTO.", ok: false };
+      }
+      await attachSecondProductRelease(prisma, participant);
+      await attachThirdStageAuthorization(prisma, participant);
+
+      if (!isFirstFragranceEvaluationCompleted(participant)) {
+        return { message: "Completa primero la evaluacion del primer perfume antes de autorizar la etapa final.", ok: false };
+      }
+      if (!isSecondProductReleased(participant)) {
+        return { message: "Libera primero el segundo producto antes de autorizar la etapa final.", ok: false };
+      }
+      if (isThirdStageAuthorized(participant)) {
+        return {
+          data: {
+            authorizedAt: participant.thirdStageAuthorization?.authorizedAt ?? new Date(),
+            participantId: participant.id
+          },
+          message: "La etapa final ya estaba autorizada.",
+          ok: true
+        };
+      }
+
+      const resolution = resolveHutOperationalStageCode(participant, "THIRD_STAGE");
+      if (resolution.source === "NO_OPERATIONAL_CODE") {
+        return {
+          message: hutOperationalCodeUnavailableMessage(resolution.reason, resolution.slot),
+          ok: false
+        };
+      }
+      if (resolution.source === "LEGACY_PHASE_CODE") {
+        return {
+          data: {
+            authorizedAt: new Date(),
+            participantId: participant.id
+          },
+          message: "La etapa final ya estaba autorizada por codigo historico.",
+          ok: true
+        };
+      }
+      if (normalizeHutPhaseCode(resolution.code) !== submittedCode) {
+        return { message: `El codigo maestro slot ${resolution.slot} no es correcto.`, ok: false };
+      }
+
+      const authorizedAt = new Date();
+      await createHutThirdStageAuthorizationAudit({
+        accessCode: input.accessCode ?? null,
+        accessType: input.accessType,
+        actorUserId: input.actorUserId ?? null,
+        authorizedAt,
+        participant,
+        prisma
+      });
+      participant.thirdStageAuthorization = {
+        accessCode: input.accessCode ?? null,
+        accessType: input.accessType,
+        actorUserId: input.actorUserId ?? null,
+        authorizedAt,
+        authorizedAtMexicoCity: formatDateTimeMexicoCity(authorizedAt)
+      };
+
+      return {
+        data: { authorizedAt, participantId: participant.id },
+        message: "Etapa final autorizada. Ya puedes confirmar uso del segundo perfume y capturar comparativa.",
         ok: true
       };
     },
@@ -5553,6 +5674,7 @@ async function toAdminParticipant(
     status: participant.status,
     secondFragranceRightArm: participant.secondFragranceRightArm,
     secondProductRelease: participant.secondProductRelease ?? null,
+    thirdStageAuthorization: participant.thirdStageAuthorization ?? null,
     studyParticipantId: participant.studyParticipantId ?? null,
     testMode: participant.testMode,
     token: participant.token,
@@ -5745,18 +5867,25 @@ function isHutQuestionnaireFinalCompletionReady({
     completedSections.add(recentlyCompletedSection);
   }
 
-  const requiredSections = new Set(applicableQuestions.map((question) => question.section));
+  const operationalApplicableQuestions = applicableQuestions.filter((question) =>
+    isHutOperationalPanelSection(question.section)
+  );
+  const requiredSections = new Set(operationalApplicableQuestions.map((question) => question.section));
   const hasPendingSection = [...requiredSections].some((section) => !completedSections.has(section));
   if (hasPendingSection) {
     return false;
   }
 
-  if (!completedSections.has("SEGUNDA_VISITA") || !completedSections.has("COMPARATIVA")) {
+  const secondUseSectionCompleted = completedSections.has("CONFIRMACION_USO_SEGUNDO_PERFUME") ||
+    completedSections.has("SEGUNDA_VISITA");
+  if (!secondUseSectionCompleted || !completedSections.has("COMPARATIVA")) {
     return false;
   }
 
-  const secondVisitRequiredQuestions = applicableQuestions.filter((question) => question.section === "SEGUNDA_VISITA");
-  const comparativeRequiredQuestions = applicableQuestions.filter((question) => question.section === "COMPARATIVA");
+  const secondVisitRequiredQuestions = operationalApplicableQuestions.filter(
+    (question) => question.section === "CONFIRMACION_USO_SEGUNDO_PERFUME" || question.section === "SEGUNDA_VISITA"
+  );
+  const comparativeRequiredQuestions = operationalApplicableQuestions.filter((question) => question.section === "COMPARATIVA");
   if (secondVisitRequiredQuestions.length === 0 || comparativeRequiredQuestions.length === 0) {
     return false;
   }
@@ -6278,11 +6407,16 @@ function isHutFirstEvaluationGateOpen(participant: HutParticipantRecord): boolea
   return isProduct1PhotoCycleComplete(participant) && isSecondStageAuthorized(participant);
 }
 
+function isHutFinalStageGateOpen(participant: HutParticipantRecord): boolean {
+  return isHutProduct2GateOpen(participant) && isThirdStageAuthorized(participant);
+}
+
 function hutOperationalCompatibilityWarnings(participant: HutParticipantRecord): HutOperationalCompatibilityWarning[] {
   return Array.from(
     new Set([
       ...getSecondStageAuthorizationWarnings(participant),
-      ...getSecondProductReleaseWarnings(participant)
+      ...getSecondProductReleaseWarnings(participant),
+      ...getThirdStageAuthorizationWarnings(participant)
     ])
   );
 }
@@ -6332,6 +6466,20 @@ function isProduct1PhotoCycleComplete(participant: HutParticipantRecord): boolea
 
 function requiresSecondStageAuthorizationForQuestion(question: { section: HutQuestionnaireSectionId }): boolean {
   return question.section === "EVALUACION_PRIMER_PERFUME";
+}
+
+function requiresThirdStageAuthorizationForQuestion(question: { section: HutQuestionnaireSectionId }): boolean {
+  return requiresThirdStageAuthorizationForSection(question.section);
+}
+
+function requiresThirdStageAuthorizationForSection(section: HutQuestionnaireSectionId): boolean {
+  return section === "CONFIRMACION_USO_SEGUNDO_PERFUME" || section === "COMPARATIVA";
+}
+
+function secondStageAuthorizationRequiredMessage(participant: HutParticipantRecord): string {
+  const resolution = resolveHutOperationalStageCode(participant, "SECOND_STAGE");
+  const slot = resolution.source === "LEGACY_PHASE_CODE" ? 2 : resolution.slot ?? 2;
+  return `Autoriza primero la segunda etapa con el codigo maestro slot ${slot}.`;
 }
 
 function isWithinHutPhotoReminderOperationalWindow(now: Date): boolean {
@@ -6446,6 +6594,14 @@ async function attachSecondStageAuthorization(
   return participant;
 }
 
+async function attachThirdStageAuthorization(
+  prisma: HutPrismaClient,
+  participant: HutParticipantRecord
+): Promise<HutParticipantRecord> {
+  participant.thirdStageAuthorization = await readThirdStageAuthorization(prisma, participant.id);
+  return participant;
+}
+
 async function readSecondStageAuthorization(
   prisma: HutPrismaClient,
   participantId: string
@@ -6529,6 +6685,51 @@ async function readSecondProductRelease(
     reasonDetail: typeof metadata?.reasonDetail === "string" ? metadata.reasonDetail : null,
     releasedAt: log.createdAt ?? new Date(0),
     releasedAtMexicoCity: typeof metadata?.releasedAtMexicoCity === "string" ? metadata.releasedAtMexicoCity : null
+  };
+}
+
+async function readThirdStageAuthorization(
+  prisma: HutPrismaClient,
+  participantId: string
+): Promise<HutThirdStageAuthorizationSummary | null> {
+  const logs = (await prisma.auditLog.findMany?.({
+    orderBy: { createdAt: "desc" },
+    select: {
+      actorUserId: true,
+      afterJson: true,
+      createdAt: true,
+      reason: true
+    },
+    where: {
+      action: "PARTICIPANT_MODIFIED",
+      entityId: participantId,
+      entityType: "HutParticipant",
+      reason: HUT_THIRD_STAGE_AUTHORIZED_REASON
+    }
+  })) as Array<{
+    actorUserId?: string | null;
+    afterJson?: unknown;
+    createdAt?: Date;
+    reason?: string | null;
+  }> | undefined;
+
+  const log = (logs ?? []).find((candidate) =>
+    candidate.reason === HUT_THIRD_STAGE_AUTHORIZED_REASON ||
+    isThirdStageAuthorizationAuditJson(candidate.afterJson)
+  );
+  if (!log) {
+    return null;
+  }
+  const metadata = isThirdStageAuthorizationAuditJson(log.afterJson) ? log.afterJson : null;
+  const accessType = metadata?.accessType === "ENCUESTADOR" || metadata?.accessType === "SUPERVISOR" || metadata?.accessType === "ADMIN"
+    ? metadata.accessType
+    : null;
+  return {
+    accessCode: typeof metadata?.accessCode === "string" ? metadata.accessCode : null,
+    accessType,
+    actorUserId: log.actorUserId ?? null,
+    authorizedAt: log.createdAt ?? new Date(0),
+    authorizedAtMexicoCity: typeof metadata?.authorizedAtMexicoCity === "string" ? metadata.authorizedAtMexicoCity : null
   };
 }
 
@@ -6632,6 +6833,41 @@ async function createHutSecondStageAuthorizationAudit({
       entityId: participant.id,
       entityType: "HutParticipant",
       reason: HUT_SECOND_STAGE_AUTHORIZED_REASON
+    }
+  });
+}
+
+async function createHutThirdStageAuthorizationAudit({
+  accessCode,
+  accessType,
+  actorUserId,
+  authorizedAt,
+  participant,
+  prisma
+}: {
+  accessCode: string | null;
+  accessType: "ADMIN" | "ENCUESTADOR" | "SUPERVISOR";
+  actorUserId: string | null;
+  authorizedAt: Date;
+  participant: HutParticipantRecord;
+  prisma: HutPrismaClient;
+}) {
+  await prisma.auditLog.create?.({
+    data: {
+      action: "PARTICIPANT_MODIFIED",
+      actorUserId,
+      afterJson: toAuditJson({
+        accessCode,
+        accessType,
+        action: HUT_THIRD_STAGE_AUTHORIZED_REASON,
+        authorizedAtMexicoCity: formatDateTimeMexicoCity(authorizedAt),
+        participant: hutParticipantAuditSnapshot(participant)
+      }),
+      beforeJson: null,
+      createdAt: authorizedAt,
+      entityId: participant.id,
+      entityType: "HutParticipant",
+      reason: HUT_THIRD_STAGE_AUTHORIZED_REASON
     }
   });
 }
@@ -7584,7 +7820,7 @@ function pendingHutPhaseMessage(participant: HutParticipantRecord): string | nul
     : null;
 }
 
-function hutOperationalCodeUnavailableMessage(reason: "MISSING_MASTER_REFERENCE_CODE" | "NO_CODE_FOR_PHASE", slot: 2 | 3 | null): string {
+function hutOperationalCodeUnavailableMessage(reason: "MISSING_MASTER_REFERENCE_CODE" | "NO_CODE_FOR_PHASE", slot: 1 | 2 | 3 | null): string {
   if (reason === "NO_CODE_FOR_PHASE") {
     return "Esta fase HUT no requiere un codigo operativo nuevo.";
   }

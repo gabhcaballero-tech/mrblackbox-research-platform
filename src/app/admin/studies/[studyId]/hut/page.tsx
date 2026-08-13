@@ -904,6 +904,7 @@ function ApplicationPhotoProtocolCard({
   const legacyCompatibility = (participant.warnings ?? []).includes("LEGACY_PROGRESS_WITHOUT_EVENT");
   const secondStageAuthorized = Boolean(participant.secondStageAuthorization || legacyCompatibility);
   const secondProductReleased = participant.product2GateOpen;
+  const thirdStageAuthorized = Boolean(participant.thirdStageAuthorization || legacyCompatibility);
 
   return (
     <section className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
@@ -1015,6 +1016,18 @@ function ApplicationPhotoProtocolCard({
             }
           />
           <Field label="Motivo" value={participant.secondProductRelease?.reasonDetail ?? "Sin registro"} />
+          <Field
+            label="Autorizacion etapa final"
+            value={
+              participant.thirdStageAuthorization
+                ? `Codigo validado: ${formatDateTime(participant.thirdStageAuthorization.authorizedAt, studyTimeZone)}`
+                : legacyCompatibility && thirdStageAuthorized
+                  ? "Compatible historico sin evento"
+                  : thirdStageAuthorized
+                    ? "Autorizada"
+                    : "Sin autorizar"
+            }
+          />
         </div>
         {legacyCompatibility ? (
           <p className="mt-3 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-900">
@@ -1302,6 +1315,7 @@ function hutPhaseLabel(phase: "COLOCACION" | "REGRESO_1" | "REGRESO_2") {
 function hutQuestionnaireSectionLabel(section: NonNullable<HutAdminParticipant["questionnaire"]>["visits"][number]["section"]): string {
   const labels: Record<NonNullable<HutAdminParticipant["questionnaire"]>["visits"][number]["section"], string> = {
     COMPARATIVA: "Comparativa",
+    CONFIRMACION_USO_SEGUNDO_PERFUME: "Confirmacion uso segundo perfume",
     DATOS_GENERALES: "Datos generales",
     EVALUACION_PRIMER_PERFUME: "Evaluacion primer perfume",
     EVALUACION_SEGUNDO_PERFUME: "Evaluacion segundo perfume",
