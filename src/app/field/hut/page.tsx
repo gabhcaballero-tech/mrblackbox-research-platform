@@ -16,6 +16,7 @@ import {
   type HutQuestionDefinition
 } from "@/modules/hut";
 import {
+  authorizeHutSecondStageForFieldAction,
   completeHutQuestionnaireSectionForFieldAction,
   saveHutQuestionnaireAnswerForFieldAction
 } from "@/modules/hut/actions";
@@ -333,7 +334,14 @@ function FieldHutWorkspace({
   selectedQuestionCode: string;
   workspace: HutFieldQuestionnaireWorkspace;
 }) {
-  const questions = applicableQuestions(workspace);
+  const allQuestions = applicableQuestions(workspace);
+  const hutTimeline = buildFieldPhotoTimeline(workspace);
+  const product1PhotoCycleComplete = isFieldProduct1PhotoCycleComplete(hutTimeline);
+  const selectedQuestion = allQuestions.find((question) => question.code === selectedQuestionCode) ?? null;
+  const selectedQuestionBlockedBySecondStage = Boolean(
+    selectedQuestion?.section === "EVALUACION_PRIMER_PERFUME" && !workspace.secondStageAuthorized
+  );
+  const questions = allQuestions.filter((question) => isQuestionAvailableForCurrentHutStage(question, workspace));
   const operationalQuestions = workspace.participant.origin === "CLT_HUT"
     ? questions.filter((question) => question.section !== "FILTROS")
     : questions;
@@ -344,14 +352,13 @@ function FieldHutWorkspace({
     answers: workspace.questionnaire.answers,
     participantOrigin: workspace.participant.origin
   });
-  const selectedQuestion = questions.find((question) => question.code === selectedQuestionCode) ?? null;
   const questionnaireClosed = workspace.questionnaire.attempt.status === "COMPLETED" || workspace.questionnaire.attempt.status === "TERMINATED";
   const selectedQuestionBlockedByDirectFilter = workspace.participant.origin === "HUT_DIRECTO"
     && workspace.questionnaire.filterStatus !== "COMPLETED"
     && selectedQuestion?.section !== "FILTROS";
   const nextQuestion = questionnaireClosed
     ? null
-    : selectedQuestionBlockedByDirectFilter
+    : selectedQuestionBlockedByDirectFilter || selectedQuestionBlockedBySecondStage
       ? requiredQuestions.find((question) => question.section === "FILTROS" && !(question.code in workspace.questionnaire.answers))
       ?? questions.find((question) => question.section === "FILTROS" && !(question.code in workspace.questionnaire.answers))
       ?? null
@@ -359,8 +366,9 @@ function FieldHutWorkspace({
       ?? operationalRequiredQuestions.find((question) => !(question.code in workspace.questionnaire.answers))
       ?? operationalQuestions.find((question) => !(question.code in workspace.questionnaire.answers))
       ?? null;
-  const captureQuestion = !questionnaireClosed && selectedQuestionCode && !selectedQuestionBlockedByDirectFilter ? selectedQuestion : null;
-  const hutTimeline = buildFieldPhotoTimeline(workspace);
+  const captureQuestion = !questionnaireClosed && selectedQuestionCode && !selectedQuestionBlockedByDirectFilter && !selectedQuestionBlockedBySecondStage
+    ? selectedQuestion
+    : null;
   const photoTimelineSlots = hutTimeline.filter((slot) => slot.participantTask);
   const evaluationTimelineSlots = hutTimeline.filter((slot) => slot.interviewerTask);
   const currentEvaluationQuestion = captureQuestion ?? nextQuestion;
@@ -428,6 +436,11 @@ function FieldHutWorkspace({
             Filtro rechazado. Revisa el motivo antes de continuar.
           </p>
         ) : null}
+        {(workspace.warnings ?? []).includes("LEGACY_PROGRESS_WITHOUT_EVENT") ? (
+          <p className="mt-4 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-900">
+            Compatibilidad historica activa: este HUT avanzo antes de registrar los nuevos eventos operativos.
+          </p>
+        ) : null}
       </section>
 
       <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
@@ -480,6 +493,13 @@ function FieldHutWorkspace({
           ))}
         </div>
       </section>
+
+      <SecondStageAuthorizationCard
+        access={access}
+        product1PhotoCycleComplete={product1PhotoCycleComplete}
+        searchedFolio={searchedFolio}
+        workspace={workspace}
+      />
 
       <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
         <h3 className="text-lg font-semibold text-zinc-950">Fotos recibidas</h3>
@@ -640,6 +660,80 @@ function SectionProgressControls({
         );
       })}
     </div>
+  );
+}
+
+function SecondStageAuthorizationCard({
+  access,
+  product1PhotoCycleComplete,
+  searchedFolio,
+  workspace
+}: {
+  access: FieldHutAccessContext | null;
+  product1PhotoCycleComplete: boolean;
+  searchedFolio: string;
+  workspace: HutFieldQuestionnaireWorkspace;
+}) {
+  const status = workspace.secondStageAuthorized
+    ? "Autorizada"
+    : product1PhotoCycleComplete
+      ? "Pendiente de codigo"
+      : "Esperando Producto 1";
+
+  return (
+    <section className="rounded-lg border border-indigo-200 bg-indigo-50 p-5 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-indigo-950">Autorizacion segunda etapa</h3>
+          <p className="mt-1 text-sm text-indigo-900">
+            Antes de iniciar la evaluacion del primer perfume, solicita al participante su segundo codigo enviado por WhatsApp y valida el codigo maestro slot 3.
+          </p>
+        </div>
+        <StatusBadge status={workspace.secondStageAuthorized ? "ready" : product1PhotoCycleComplete ? "planned" : "blocked"}>
+          {status}
+        </StatusBadge>
+      </div>
+      {workspace.secondStageAuthorized ? (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800">
+          {(workspace.warnings ?? []).includes("LEGACY_PROGRESS_WITHOUT_EVENT")
+            ? "Segunda etapa disponible por compatibilidad historica. La evaluacion del primer perfume esta disponible para captura."
+            : "Segunda etapa autorizada. La evaluacion del primer perfume esta disponible para captura."}
+        </p>
+      ) : product1PhotoCycleComplete ? (
+        <form
+          action={authorizeHutSecondStageForFieldAction.bind(
+            null,
+            searchedFolio,
+            workspace.participant.id,
+            workspace.participant.studyId
+          )}
+          className="mt-4 space-y-3"
+        >
+          <FieldHutAccessHiddenInputs access={access} />
+          <label className="block text-sm font-semibold text-indigo-950" htmlFor="second-stage-code">
+            Codigo maestro slot 3
+          </label>
+          <input
+            autoComplete="one-time-code"
+            className="w-full rounded-md border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold uppercase text-zinc-950"
+            id="second-stage-code"
+            name="secondStageCode"
+            placeholder="Captura codigo"
+            required
+          />
+          <button
+            className="rounded-md bg-indigo-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-800"
+            type="submit"
+          >
+            Validar codigo y autorizar evaluacion
+          </button>
+        </form>
+      ) : (
+        <p className="mt-4 rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-800">
+          Completa primero las fotografias del Producto 1. Despues se podra validar el codigo para iniciar la evaluacion.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -986,6 +1080,21 @@ function applicableQuestions(workspace: HutFieldQuestionnaireWorkspace) {
     getHutQuestions().filter((question) => applicableCodes.has(question.code) && isHutOperationalPanelSection(question.section)),
     workspace.participant.id
   );
+}
+
+function isQuestionAvailableForCurrentHutStage(question: HutQuestionDefinition, workspace: HutFieldQuestionnaireWorkspace): boolean {
+  if (question.section === "EVALUACION_PRIMER_PERFUME") {
+    return workspace.secondStageAuthorized;
+  }
+
+  return true;
+}
+
+function isFieldProduct1PhotoCycleComplete(timeline: HutPhotoTimelineSlot[]): boolean {
+  const requiredSlots = new Set(["PRODUCT_1_DAY_1", "PRODUCT_1_DAY_2", "PRODUCT_1_DAY_3_MORNING"]);
+  return timeline
+    .filter((slot) => requiredSlots.has(slot.id))
+    .every((slot) => slot.status === "COMPLETED");
 }
 
 function productLabelForQuestion(question: HutQuestionDefinition, workspace: HutFieldQuestionnaireWorkspace): string {

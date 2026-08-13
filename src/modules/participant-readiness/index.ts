@@ -7,6 +7,8 @@ export {
 } from "./repository";
 export type {
   ParticipantCurrentStage,
+  ParticipantDeclaredOperationalState,
+  ParticipantOperationalEvidence,
   ParticipantOperationalReadiness,
   ParticipantOperationalStage,
   ParticipantProtocolType,

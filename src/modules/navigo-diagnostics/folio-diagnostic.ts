@@ -149,9 +149,13 @@ type ParticipantSnapshot = {
   ctlTriangularRotationAssignment: CtlTriangularSnapshot | null;
   hutParticipant: HutParticipantSnapshot | null;
   id: string;
+  operationalStatus: string;
   participantProfile: {
     name: string;
   };
+  participantScreeningReviews: Array<{
+    status: string;
+  }>;
   rotationAssignment: {
     arms: RotationArmSnapshot[];
     rotationCode: string;
@@ -552,7 +556,7 @@ function toParticipantReadinessInput(snapshot: FolioDiagnosticSnapshot): Partici
         }
       : null,
     id: participant?.id ?? null,
-    operationalStatus: null,
+    operationalStatus: participant?.operationalStatus ?? null,
     participantConfirmation: snapshot.confirmation
       ? {
           referenceCodes: snapshot.confirmation.referenceCodes.map((code) => ({ slot: code.slot })),
@@ -561,7 +565,7 @@ function toParticipantReadinessInput(snapshot: FolioDiagnosticSnapshot): Partici
           }
         }
       : null,
-    participantScreeningReviews: [],
+    participantScreeningReviews: participant?.participantScreeningReviews.map((review) => ({ status: review.status })) ?? [],
     rotationAssignment: participant?.rotationAssignment
       ? {
           arms: participant.rotationAssignment.arms.map((arm) => ({
@@ -868,8 +872,18 @@ const confirmationDiagnosticSelect = {
         select: hutParticipantDiagnosticSelect
       },
       id: true,
+      operationalStatus: true,
       participantProfile: {
         select: { name: true }
+      },
+      participantScreeningReviews: {
+        orderBy: {
+          reviewedAt: "desc"
+        },
+        select: {
+          status: true
+        },
+        take: 1
       },
       rotationAssignment: {
         select: {

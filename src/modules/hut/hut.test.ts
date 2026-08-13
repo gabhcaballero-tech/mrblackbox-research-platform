@@ -632,7 +632,9 @@ describe("HUT module foundation", () => {
       studyId: "study-hut"
     });
     const participantId = participant.ok ? participant.data.participantId : "";
-    prisma.state.participants.find((item) => item.id === participantId)!.origin = "CLT_HUT";
+    const createdParticipant = prisma.state.participants.find((item) => item.id === participantId)!;
+    createdParticipant.origin = "CLT_HUT";
+    completeProduct1AndAuthorizeSecondStageForTest(prisma.state, createdParticipant);
 
     const started = await repository.ensureQuestionnaireSectionProgress({
       participantId,
@@ -671,7 +673,9 @@ describe("HUT module foundation", () => {
       studyId: "study-hut"
     });
     const participantId = participant.ok ? participant.data.participantId : "";
-    prisma.state.participants.find((item) => item.id === participantId)!.origin = "CLT_HUT";
+    const createdParticipant = prisma.state.participants.find((item) => item.id === participantId)!;
+    createdParticipant.origin = "CLT_HUT";
+    completeProduct1AndAuthorizeSecondStageForTest(prisma.state, createdParticipant);
 
     const first = await repository.saveQuestionnaireAnswer({
       answerInput: { HUT_EVA1_GUSTO: "6" },
@@ -735,7 +739,9 @@ describe("HUT module foundation", () => {
       studyId: "study-hut"
     });
     const participantId = participant.ok ? participant.data.participantId : "";
-    prisma.state.participants.find((item) => item.id === participantId)!.origin = "CLT_HUT";
+    const createdParticipant = prisma.state.participants.find((item) => item.id === participantId)!;
+    createdParticipant.origin = "CLT_HUT";
+    completeProduct1AndAuthorizeSecondStageForTest(prisma.state, createdParticipant);
 
     const result = await repository.saveQuestionnaireAnswer({
       actorUserId: "field-user-1",
@@ -752,7 +758,9 @@ describe("HUT module foundation", () => {
     expect(result.ok).toBe(true);
     expect(prisma.state.answers.find((answer) => answer.questionCode === "HUT_P8A_GUSTO_ABIERTO")?.answerJson)
       .toBe("ME GUSTO EL AROMA.");
-    expect(prisma.state.auditLogs[0]?.afterJson).toMatchObject({
+    expect(prisma.state.auditLogs.find((log) =>
+      (log.afterJson as { questionCode?: string } | undefined)?.questionCode === "HUT_P8A_GUSTO_ABIERTO"
+    )?.afterJson).toMatchObject({
       questionCode: "HUT_P8A_GUSTO_ABIERTO",
       questionPairRotation: getHutQuestionPairRotationAudit({
         participantId,
@@ -1591,6 +1599,133 @@ describe("HUT module foundation", () => {
       action: "SECOND_PRODUCT_RELEASED",
       reasonDetail: "Segundo producto entregado por operacion."
     });
+  });
+
+  it("requires master slot 3 authorization before capturing the first perfume evaluation", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await createProduct2GateParticipant(repository, prisma);
+    participant.questionnaireAttempt = null;
+    prisma.state.questionnaireAttempts = [];
+
+    const beforeAuthorization = await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_P1A_USO_PERFUME: "1" },
+      participantId: participant.id,
+      questionCode: "HUT_P1A_USO_PERFUME",
+      studyId: "study-hut"
+    });
+    const wrongCode = await repository.authorizeSecondStage({
+      accessCode: "SUP26",
+      accessType: "SUPERVISOR",
+      actorUserId: null,
+      code: "NOPE",
+      participantId: participant.id,
+      studyId: "study-hut"
+    });
+    const authorization = await repository.authorizeSecondStage({
+      accessCode: "SUP26",
+      accessType: "SUPERVISOR",
+      actorUserId: null,
+      code: "T8R2",
+      participantId: participant.id,
+      studyId: "study-hut"
+    });
+    const product2BeforeRelease = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      now: new Date("2026-08-12T21:00:00.000Z"),
+      slotId: "PRODUCT_2_DAY_1",
+      storage,
+      token: participant.token
+    });
+    const afterAuthorization = await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_P1A_USO_PERFUME: "1" },
+      participantId: participant.id,
+      questionCode: "HUT_P1A_USO_PERFUME",
+      studyId: "study-hut"
+    });
+
+    expect(beforeAuthorization).toMatchObject({
+      message: "Autoriza primero la segunda etapa con el codigo maestro slot 3.",
+      ok: false
+    });
+    expect(wrongCode).toMatchObject({
+      message: "El codigo maestro slot 3 no es correcto.",
+      ok: false
+    });
+    expect(authorization).toMatchObject({ ok: true });
+    expect(prisma.state.auditLogs.find((log) => log.reason === "SECOND_STAGE_AUTHORIZED")?.afterJson).toMatchObject({
+      accessCode: "SUP26",
+      accessType: "SUPERVISOR",
+      action: "SECOND_STAGE_AUTHORIZED"
+    });
+    expect(product2BeforeRelease).toMatchObject({
+      message: "Esta foto HUT aun no esta disponible.",
+      ok: false
+    });
+    expect(afterAuthorization).toMatchObject({
+      data: { questionCode: "HUT_P1A_USO_PERFUME" },
+      ok: true
+    });
+  });
+
+  it("keeps legacy first perfume evaluation progress compatible without creating authorization events", async () => {
+    const { prisma } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await createProduct2GateParticipant(repository, prisma);
+
+    const result = await repository.saveQuestionnaireAnswer({
+      answerInput: { HUT_P3A_MOSTRO_ENVASE: "1" },
+      participantId: participant.id,
+      questionCode: "HUT_P3A_MOSTRO_ENVASE",
+      studyId: "study-hut"
+    });
+    const workspace = await repository.getFieldQuestionnaireWorkspace({ folio: participant.folio ?? "" });
+
+    expect(result).toMatchObject({
+      data: { questionCode: "HUT_P3A_MOSTRO_ENVASE" },
+      ok: true
+    });
+    expect(workspace).toMatchObject({
+      data: {
+        secondStageAuthorized: true,
+        warnings: ["LEGACY_PROGRESS_WITHOUT_EVENT"]
+      },
+      ok: true
+    });
+    expect(prisma.state.auditLogs.some((log) => log.reason === "SECOND_STAGE_AUTHORIZED")).toBe(false);
+  });
+
+  it("keeps legacy second product progress compatible without creating release events", async () => {
+    const { prisma, storage } = createFakeHutPrisma();
+    const repository = createHutRepository(prisma as never);
+    const participant = await createProduct2GateParticipant(repository, prisma);
+    participant.testMode = true;
+    addApplicationPhotoEntry(prisma.state, participant, {
+      capturedAt: new Date("2026-08-12T18:00:00.000Z"),
+      useDayNumber: 4
+    });
+
+    const result = await repository.requestApplicationPhotoUpload({
+      metadata: selfieMetadata(),
+      now: new Date("2026-08-12T21:00:00.000Z"),
+      slotId: "PRODUCT_2_DAY_2",
+      storage,
+      token: participant.token
+    });
+    const workspace = await repository.getFieldQuestionnaireWorkspace({ folio: participant.folio ?? "" });
+
+    expect(result).toMatchObject({
+      data: { productCode: "583" },
+      ok: true
+    });
+    expect(workspace).toMatchObject({
+      data: {
+        product2GateOpen: true,
+        warnings: ["LEGACY_PROGRESS_WITHOUT_EVENT"]
+      },
+      ok: true
+    });
+    expect(prisma.state.auditLogs.some((log) => log.reason === "SECOND_PRODUCT_RELEASED")).toBe(false);
   });
 
   it("keeps legacy REGRESO_1 validated participants compatible for product 2", async () => {
@@ -2825,6 +2960,7 @@ describe("HUT module foundation", () => {
     stubAcceptedWhatsAppMeta();
     await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-COMPLETE-NO-COMP" });
     const participant = prisma.state.participants[0]!;
+    completeProduct1AndAuthorizeSecondStageForTest(prisma.state, participant);
     const formData = createCompleteHutV5FormData({ participantOrigin: "CLT_HUT" });
     formData.set("HUT_F2_EDAD_EXACTA", "35");
     formData.set("HUT_F2_RANGO_EDAD", "2");
@@ -2875,6 +3011,7 @@ describe("HUT module foundation", () => {
     stubAcceptedWhatsAppMeta();
     await createApplicationPhotoParticipant(repository, prisma.state, { folio: "HUT-COMPLETE-001" });
     const participant = prisma.state.participants[0]!;
+    completeProduct1AndAuthorizeSecondStageForTest(prisma.state, participant);
     const formData = createCompleteHutV5FormData({ participantOrigin: "CLT_HUT" });
     formData.set("HUT_F2_EDAD_EXACTA", "35");
     formData.set("HUT_F2_RANGO_EDAD", "2");
@@ -4840,6 +4977,42 @@ function addApplicationPhotoEntry(
   participant.applicationPhotoEntries.push(entry);
 }
 
+function completeProduct1AndAuthorizeSecondStageForTest(
+  state: ReturnType<typeof createFakeHutPrisma>["prisma"]["state"],
+  participant: FakeParticipant
+) {
+  for (const [useDayNumber, capturedAt] of [
+    [1, new Date("2026-08-09T16:00:00.000Z")],
+    [2, new Date("2026-08-10T10:00:00.000Z")],
+    [3, new Date("2026-08-11T10:00:00.000Z")]
+  ] as const) {
+    if (!participant.applicationPhotoEntries.some((entry) => entry.useDayNumber === useDayNumber)) {
+      addApplicationPhotoEntry(state, participant, { capturedAt, useDayNumber });
+    }
+  }
+  const authorizedAt = new Date("2026-08-12T18:00:00.000Z");
+  participant.secondStageAuthorization = {
+    accessCode: "SUP26",
+    accessType: "SUPERVISOR",
+    actorUserId: null,
+    authorizedAt,
+    authorizedAtMexicoCity: "12/08/2026, 12:00 hrs CDMX"
+  };
+  state.auditLogs.push({
+    action: "PARTICIPANT_MODIFIED",
+    afterJson: {
+      accessCode: "SUP26",
+      accessType: "SUPERVISOR",
+      action: "SECOND_STAGE_AUTHORIZED",
+      authorizedAtMexicoCity: "12/08/2026, 12:00 hrs CDMX"
+    },
+    createdAt: authorizedAt,
+    entityId: participant.id,
+    entityType: "HutParticipant",
+    reason: "SECOND_STAGE_AUTHORIZED"
+  });
+}
+
 function completeProduct1EvaluationAndReleaseProduct2(
   state: ReturnType<typeof createFakeHutPrisma>["prisma"]["state"],
   participant: FakeParticipant
@@ -4952,8 +5125,16 @@ async function createProduct2GateParticipant(
   });
   const participantId = created.ok ? created.data.participantId : "";
   const participant = prisma.state.participants.find((item) => item.id === participantId)!;
+  const confirmation = confirmationWithCodes(`NAV-P2-${prisma.state.nextId}`);
   participant.origin = "CLT_HUT";
+  participant.studyParticipantId = confirmation.studyParticipant.id;
+  participant.studyParticipant = {
+    ...confirmation.studyParticipant,
+    ctlSessions: [{ completedAt: new Date("2026-08-09T14:00:00.000Z"), id: `ctl-${participantId}`, status: "COMPLETED" }],
+    participantConfirmation: confirmation
+  };
   participant.status = "BLOCK_1_CALL_PENDING";
+  prisma.state.confirmations.push(confirmation);
   participant.applicationPhotoEntries.push(
     {
       capturedAt: new Date("2026-08-09T15:00:00.000Z"),
@@ -5076,12 +5257,14 @@ function createFakeHutPrisma() {
           createdAt?: { gte?: Date };
           entityId?: string;
           entityType?: string;
+          reason?: string;
         };
       }) {
         const results = state.auditLogs.filter((log) =>
           (!args.where.action || log.action === args.where.action) &&
           (!args.where.entityId || log.entityId === args.where.entityId) &&
           (!args.where.entityType || log.entityType === args.where.entityType) &&
+          (!args.where.reason || log.reason === args.where.reason) &&
           (!args.where.createdAt?.gte || (log.createdAt?.getTime() ?? 0) >= args.where.createdAt.gte.getTime())
         );
         return args.orderBy?.createdAt === "desc"
@@ -5754,6 +5937,7 @@ type FakeParticipant = {
   referenceSelfie: FakeReferenceSelfie | null;
   registrationSlot: FakeRegistrationSlot | null;
   secondFragranceRightArm: string | null;
+  secondStageAuthorization?: unknown;
   secondProductRelease?: unknown;
   startDate: Date | null;
   status:
@@ -5778,6 +5962,7 @@ type FakeParticipant = {
       id: string;
       status: string;
     }>;
+    participantConfirmation?: FakeParticipantConfirmation | null;
     participantProfile: {
       email: string | null;
       name: string;

@@ -899,10 +899,9 @@ function ApplicationPhotoProtocolCard({
   const photoSlotOverrides = participant.photoSlotOverrides ?? [];
   const firstEvaluationVisit = participant.questionnaire?.visits.find((visit) => visit.section === "EVALUACION_PRIMER_PERFUME") ?? null;
   const firstEvaluationCompleted = firstEvaluationVisit?.status === "COMPLETED";
-  const legacyRegreso1Release = participant.phaseCodes.some(
-    (code) => code.phase === "REGRESO_1" && (code.status === "USED" || code.status === "VALIDATED")
-  );
-  const secondProductReleased = Boolean(participant.secondProductRelease || legacyRegreso1Release);
+  const legacyCompatibility = (participant.warnings ?? []).includes("LEGACY_PROGRESS_WITHOUT_EVENT");
+  const secondStageAuthorized = Boolean(participant.secondStageAuthorization || legacyCompatibility);
+  const secondProductReleased = participant.product2GateOpen;
 
   return (
     <section className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
@@ -986,17 +985,34 @@ function ApplicationPhotoProtocolCard({
         <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
           <Field label="Evaluacion primer perfume" value={firstEvaluationCompleted ? "Completada" : "Pendiente"} />
           <Field
+            label="Autorizacion segunda etapa"
+            value={
+              participant.secondStageAuthorization
+                ? `Codigo validado: ${formatDateTime(participant.secondStageAuthorization.authorizedAt, studyTimeZone)}`
+                : legacyCompatibility
+                  ? "Compatible historico sin evento"
+                  : secondStageAuthorized
+                    ? "Autorizada"
+                    : "Sin autorizar"
+            }
+          />
+          <Field
             label="Liberacion"
             value={
               participant.secondProductRelease
                 ? `Evento operativo: ${formatDateTime(participant.secondProductRelease.releasedAt, studyTimeZone)}`
-                : legacyRegreso1Release
-                  ? "Legacy REGRESO_1 validado/usado"
+                : legacyCompatibility && secondProductReleased
+                  ? "Compatible historico sin evento"
                   : "Sin liberar"
             }
           />
           <Field label="Motivo" value={participant.secondProductRelease?.reasonDetail ?? "Sin registro"} />
         </div>
+        {legacyCompatibility ? (
+          <p className="mt-3 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-900">
+            LEGACY_PROGRESS_WITHOUT_EVENT: este HUT conserva avance historico sin evento operativo nuevo.
+          </p>
+        ) : null}
         {showAdminResetTools ? (
           <form action={releaseHutSecondProductAction.bind(null, studyId, participant.id)} className="mt-3 space-y-2">
             <textarea

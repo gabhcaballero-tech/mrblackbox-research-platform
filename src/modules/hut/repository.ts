@@ -94,10 +94,21 @@ import {
 } from "./photo-timeline";
 import {
   HUT_SECOND_PRODUCT_RELEASED_REASON,
+  getSecondProductReleaseWarnings,
+  hasLegacySecondProductProgress,
   isSecondProductReleased,
   isSecondProductReleaseAuditJson,
   type HutSecondProductReleaseSummary
 } from "./second-product-release";
+import {
+  getSecondStageAuthorizationWarnings,
+  hasLegacyFirstPerfumeEvaluationProgress,
+  HUT_LEGACY_PROGRESS_WITHOUT_EVENT_WARNING,
+  HUT_SECOND_STAGE_AUTHORIZED_REASON,
+  isSecondStageAuthorizationAuditJson,
+  isSecondStageAuthorized,
+  type HutSecondStageAuthorizationSummary
+} from "./second-stage-authorization";
 
 export type HutActionResult<T = void> =
   | { ok: true; data: T; message?: string }
@@ -175,6 +186,7 @@ export type HutAdminParticipant = {
     status: "AVAILABLE" | "CANCELLED" | "REGISTERED";
   } | null;
   secondFragranceRightArm: string | null;
+  secondStageAuthorization: HutSecondStageAuthorizationSummary | null;
   secondProductRelease: HutSecondProductReleaseSummary | null;
   status: HutParticipantStatus;
   studyParticipantId: string | null;
@@ -183,7 +195,10 @@ export type HutAdminParticipant = {
   usedToleranceInCurrentBlock: boolean;
   visualOverrideEnabled: boolean;
   whatsappRegistration: WhatsAppAutomationStatus;
+  warnings: HutOperationalCompatibilityWarning[];
 };
+
+export type HutOperationalCompatibilityWarning = typeof HUT_LEGACY_PROGRESS_WITHOUT_EVENT_WARNING;
 
 export type HutRegistrationSlotAdmin = {
   email: string | null;
@@ -364,12 +379,14 @@ export type HutFieldQuestionnaireWorkspace = {
   photos: HutFieldPhotoSummary[];
   photoSlotOverrides: HutPhotoTimelineManualOverride[];
   product2GateOpen: boolean;
+  secondStageAuthorized: boolean;
   questionnaire: HutQuestionnaireState;
   legacyMirroredPlacementPhoto: boolean;
   rotation: {
     eva1: string | null;
     eva2: string | null;
   };
+  warnings: HutOperationalCompatibilityWarning[];
 };
 
 export type HutVideoSummary = {
@@ -633,6 +650,14 @@ export type HutRepository = {
     reason: string;
     studyId: string;
   }) => Promise<HutActionResult<{ participantId: string }>>;
+  authorizeSecondStage: (input: {
+    accessCode?: string | null;
+    accessType: "ADMIN" | "ENCUESTADOR" | "SUPERVISOR";
+    actorUserId?: string | null;
+    code: string;
+    participantId: string;
+    studyId: string;
+  }) => Promise<HutActionResult<{ authorizedAt: Date; participantId: string }>>;
   assignParticipantRotation: (input: {
     firstFragranceLeftArm?: string | null;
     folio?: string | null;
@@ -980,6 +1005,7 @@ type HutParticipantRecord = {
   referenceSelfie: HutReferenceSelfieRecord | null;
   registrationSlot?: HutRegistrationSlotRecord | null;
   secondFragranceRightArm: string | null;
+  secondStageAuthorization?: HutSecondStageAuthorizationSummary | null;
   secondProductRelease?: HutSecondProductReleaseSummary | null;
   videoSubmissions?: HutVideoRecord[];
   visualOverrideEnabled: boolean;
@@ -1762,6 +1788,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       return {
         participants: await Promise.all(
           participants.map(async (participant) => {
+            await attachSecondStageAuthorization(prisma, participant);
             await attachSecondProductRelease(prisma, participant);
             return toAdminParticipant(
               participant,
@@ -1785,6 +1812,7 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       if (!participant) {
         return { message: "Este enlace HUT no es valido.", ok: false };
       }
+      await attachSecondStageAuthorization(prisma, participant);
       await attachSecondProductRelease(prisma, participant);
 
       return {
@@ -1844,6 +1872,13 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       ) {
         return {
           message: "Completa los filtros HUT antes de cerrar esta seccion.",
+          ok: false
+        };
+      }
+      await attachSecondStageAuthorization(prisma, participant);
+      if (input.section === "EVALUACION_PRIMER_PERFUME" && !isHutFirstEvaluationGateOpen(participant)) {
+        return {
+          message: "Autoriza primero la segunda etapa con el codigo maestro slot 3.",
           ok: false
         };
       }
@@ -1998,6 +2033,13 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       ) {
         return {
           message: "Completa los filtros HUT antes de continuar el protocolo.",
+          ok: false
+        };
+      }
+      await attachSecondStageAuthorization(prisma, participant);
+      if (requiresSecondStageAuthorizationForQuestion(question) && !isHutFirstEvaluationGateOpen(participant)) {
+        return {
+          message: "Autoriza primero la segunda etapa con el codigo maestro slot 3.",
           ok: false
         };
       }
@@ -2246,12 +2288,14 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
           photoSlotOverrides: await readActiveHutPhotoSlotOverrides(prisma, participant.id),
           photos: await toFieldPhotoSummaries(participant, input.storage),
           product2GateOpen: isHutProduct2GateOpen(participant),
+          secondStageAuthorized: isHutFirstEvaluationGateOpen(participant),
           questionnaire: questionnaire.data,
           legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
           rotation: {
             eva1: participant.firstFragranceLeftArm,
             eva2: participant.secondFragranceRightArm
-          }
+          },
+          warnings: hutOperationalCompatibilityWarnings(participant)
         },
         ok: true
       };
@@ -2757,6 +2801,84 @@ export function createHutRepository(prismaClient?: HutPrismaClient, whatsappRepo
       return {
         data: { participantId: participant.id, releasedAt },
         message: "Segundo producto liberado correctamente.",
+        ok: true
+      };
+    },
+
+    async authorizeSecondStage(input) {
+      const prisma = await getPrisma();
+      const submittedCode = normalizeHutPhaseCode(input.code);
+      if (!submittedCode) {
+        return { message: "Captura el codigo maestro slot 3 para autorizar la segunda etapa.", ok: false };
+      }
+
+      const participant = await findParticipant(prisma, input.participantId);
+      if (!participant || participant.studyId !== input.studyId) {
+        return { message: "No encontramos el participante HUT.", ok: false };
+      }
+      if (isReservedHutWithoutOperationalIdentity(participant)) {
+        return { message: reservedHutOperationalIdentityMessage(), ok: false };
+      }
+      if (!isApplicationPhotoProtocol(participant)) {
+        return { message: "La autorizacion de segunda etapa aplica solo a APPLICATION_PHOTO.", ok: false };
+      }
+      await attachSecondStageAuthorization(prisma, participant);
+
+      if (!isProduct1PhotoCycleComplete(participant)) {
+        return { message: "Completa primero las fotografias del Producto 1 antes de autorizar la segunda etapa.", ok: false };
+      }
+      if (isSecondStageAuthorized(participant)) {
+        return {
+          data: {
+            authorizedAt: participant.secondStageAuthorization?.authorizedAt ?? new Date(),
+            participantId: participant.id
+          },
+          message: "La segunda etapa ya estaba autorizada.",
+          ok: true
+        };
+      }
+
+      const resolution = resolveHutOperationalCode(participant, "REGRESO_1");
+      if (resolution.source === "NO_OPERATIONAL_CODE") {
+        return {
+          message: hutOperationalCodeUnavailableMessage(resolution.reason, resolution.slot),
+          ok: false
+        };
+      }
+      if (resolution.source === "LEGACY_PHASE_CODE") {
+        return {
+          data: {
+            authorizedAt: new Date(),
+            participantId: participant.id
+          },
+          message: "La segunda etapa ya estaba autorizada por codigo historico.",
+          ok: true
+        };
+      }
+      if (normalizeHutPhaseCode(resolution.code) !== submittedCode) {
+        return { message: "El codigo maestro slot 3 no es correcto.", ok: false };
+      }
+
+      const authorizedAt = new Date();
+      await createHutSecondStageAuthorizationAudit({
+        accessCode: input.accessCode ?? null,
+        accessType: input.accessType,
+        actorUserId: input.actorUserId ?? null,
+        authorizedAt,
+        participant,
+        prisma
+      });
+      participant.secondStageAuthorization = {
+        accessCode: input.accessCode ?? null,
+        accessType: input.accessType,
+        actorUserId: input.actorUserId ?? null,
+        authorizedAt,
+        authorizedAtMexicoCity: formatDateTimeMexicoCity(authorizedAt)
+      };
+
+      return {
+        data: { authorizedAt, participantId: participant.id },
+        message: "Segunda etapa autorizada. Ya puedes iniciar la evaluacion del primer perfume.",
         ok: true
       };
     },
@@ -5405,6 +5527,7 @@ async function toAdminParticipant(
     phone: participant.phone,
     photoSlotOverrides,
     product2GateOpen: isHutProduct2GateOpen(participant),
+    secondStageAuthorization: participant.secondStageAuthorization ?? null,
     protocolVersion: participant.protocolVersion ?? "LEGACY_VIDEO",
     questionnaire,
     recruiter: participant.recruiter,
@@ -5435,7 +5558,8 @@ async function toAdminParticipant(
     token: participant.token,
     usedToleranceInCurrentBlock: Boolean(block && block.missedDaysCount >= block.maxMissedDaysAllowed),
     visualOverrideEnabled: participant.visualOverrideEnabled,
-    whatsappRegistration
+    whatsappRegistration,
+    warnings: hutOperationalCompatibilityWarnings(participant)
   };
 }
 
@@ -6141,7 +6265,26 @@ function hasHutDeliveryEvidence(participant: HutParticipantRecord): boolean {
 }
 
 function isHutProduct2GateOpen(participant: HutParticipantRecord): boolean {
+  if (!participant.secondProductRelease && hasLegacySecondProductProgress(participant)) {
+    return true;
+  }
   return isFirstFragranceEvaluationCompleted(participant) && isSecondProductReleased(participant);
+}
+
+function isHutFirstEvaluationGateOpen(participant: HutParticipantRecord): boolean {
+  if (!participant.secondStageAuthorization && hasLegacyFirstPerfumeEvaluationProgress(participant)) {
+    return true;
+  }
+  return isProduct1PhotoCycleComplete(participant) && isSecondStageAuthorized(participant);
+}
+
+function hutOperationalCompatibilityWarnings(participant: HutParticipantRecord): HutOperationalCompatibilityWarning[] {
+  return Array.from(
+    new Set([
+      ...getSecondStageAuthorizationWarnings(participant),
+      ...getSecondProductReleaseWarnings(participant)
+    ])
+  );
 }
 
 function isFirstFragranceEvaluationCompleted(participant: HutParticipantRecord): boolean {
@@ -6150,6 +6293,45 @@ function isFirstFragranceEvaluationCompleted(participant: HutParticipantRecord):
       (visit) => visit.section === "EVALUACION_PRIMER_PERFUME" && visit.status === "COMPLETED"
     )
   );
+}
+
+function isProduct1PhotoCycleComplete(participant: HutParticipantRecord): boolean {
+  if (!isApplicationPhotoProtocol(participant)) {
+    return true;
+  }
+  const timeline = buildHutPhotoTimeline({
+    dailyEntries: (participant.applicationPhotoEntries ?? []).map((entry) => ({
+      capturedAt: entry.capturedAt,
+      capturedLocalDate: entry.capturedLocalDate,
+      productCode: entry.productCode,
+      useDayNumber: entry.useDayNumber
+    })),
+    applicationEvidence: (participant.applicationEvidence ?? []).map((evidence) => ({
+      capturedAt: evidence.capturedAt,
+      phase: evidence.phase,
+      productCode: evidence.productCode
+    })),
+    legacyMirroredPlacementPhoto: hasLegacyMirroredPlacementPhoto(participant),
+    product2GateOpen: false,
+    rotation: {
+      eva1: participant.firstFragranceLeftArm,
+      eva2: participant.secondFragranceRightArm
+    },
+    testMode: participant.testMode
+  });
+  const requiredSlots = new Set<HutPhotoTimelineSlotId>([
+    "PRODUCT_1_DAY_1",
+    "PRODUCT_1_DAY_2",
+    "PRODUCT_1_DAY_3_MORNING"
+  ]);
+
+  return timeline
+    .filter((slot) => requiredSlots.has(slot.id))
+    .every((slot) => slot.status === "COMPLETED");
+}
+
+function requiresSecondStageAuthorizationForQuestion(question: { section: HutQuestionnaireSectionId }): boolean {
+  return question.section === "EVALUACION_PRIMER_PERFUME";
 }
 
 function isWithinHutPhotoReminderOperationalWindow(now: Date): boolean {
@@ -6254,6 +6436,59 @@ async function attachSecondProductRelease(
 ): Promise<HutParticipantRecord> {
   participant.secondProductRelease = await readSecondProductRelease(prisma, participant.id);
   return participant;
+}
+
+async function attachSecondStageAuthorization(
+  prisma: HutPrismaClient,
+  participant: HutParticipantRecord
+): Promise<HutParticipantRecord> {
+  participant.secondStageAuthorization = await readSecondStageAuthorization(prisma, participant.id);
+  return participant;
+}
+
+async function readSecondStageAuthorization(
+  prisma: HutPrismaClient,
+  participantId: string
+): Promise<HutSecondStageAuthorizationSummary | null> {
+  const logs = (await prisma.auditLog.findMany?.({
+    orderBy: { createdAt: "desc" },
+    select: {
+      actorUserId: true,
+      afterJson: true,
+      createdAt: true,
+      reason: true
+    },
+    where: {
+      action: "PARTICIPANT_MODIFIED",
+      entityId: participantId,
+      entityType: "HutParticipant",
+      reason: HUT_SECOND_STAGE_AUTHORIZED_REASON
+    }
+  })) as Array<{
+    actorUserId?: string | null;
+    afterJson?: unknown;
+    createdAt?: Date;
+    reason?: string | null;
+  }> | undefined;
+
+  const log = (logs ?? []).find((candidate) =>
+    candidate.reason === HUT_SECOND_STAGE_AUTHORIZED_REASON ||
+    isSecondStageAuthorizationAuditJson(candidate.afterJson)
+  );
+  if (!log) {
+    return null;
+  }
+  const metadata = isSecondStageAuthorizationAuditJson(log.afterJson) ? log.afterJson : null;
+  const accessType = metadata?.accessType === "ENCUESTADOR" || metadata?.accessType === "SUPERVISOR" || metadata?.accessType === "ADMIN"
+    ? metadata.accessType
+    : null;
+  return {
+    accessCode: typeof metadata?.accessCode === "string" ? metadata.accessCode : null,
+    accessType,
+    actorUserId: log.actorUserId ?? null,
+    authorizedAt: log.createdAt ?? new Date(0),
+    authorizedAtMexicoCity: typeof metadata?.authorizedAtMexicoCity === "string" ? metadata.authorizedAtMexicoCity : null
+  };
 }
 
 async function readSecondProductRelease(
@@ -6362,6 +6597,41 @@ async function createHutSecondProductReleaseAudit({
       entityId: participant.id,
       entityType: "HutParticipant",
       reason: HUT_SECOND_PRODUCT_RELEASED_REASON
+    }
+  });
+}
+
+async function createHutSecondStageAuthorizationAudit({
+  accessCode,
+  accessType,
+  actorUserId,
+  authorizedAt,
+  participant,
+  prisma
+}: {
+  accessCode: string | null;
+  accessType: "ADMIN" | "ENCUESTADOR" | "SUPERVISOR";
+  actorUserId: string | null;
+  authorizedAt: Date;
+  participant: HutParticipantRecord;
+  prisma: HutPrismaClient;
+}) {
+  await prisma.auditLog.create?.({
+    data: {
+      action: "PARTICIPANT_MODIFIED",
+      actorUserId,
+      afterJson: toAuditJson({
+        accessCode,
+        accessType,
+        action: HUT_SECOND_STAGE_AUTHORIZED_REASON,
+        authorizedAtMexicoCity: formatDateTimeMexicoCity(authorizedAt),
+        participant: hutParticipantAuditSnapshot(participant)
+      }),
+      beforeJson: null,
+      createdAt: authorizedAt,
+      entityId: participant.id,
+      entityType: "HutParticipant",
+      reason: HUT_SECOND_STAGE_AUTHORIZED_REASON
     }
   });
 }

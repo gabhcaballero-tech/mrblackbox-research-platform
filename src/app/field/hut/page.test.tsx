@@ -423,7 +423,8 @@ function createWorkspace() {
     rotation: {
       eva1: "247",
       eva2: "583"
-    }
+    },
+    secondStageAuthorized: true
   };
 }
 

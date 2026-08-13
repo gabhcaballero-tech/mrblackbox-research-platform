@@ -1,6 +1,8 @@
 import { NAVIGO_ACTIVITY_CODES } from "@/modules/navigo-app/definition";
 import type {
   ParticipantCurrentStage,
+  ParticipantDeclaredOperationalState,
+  ParticipantOperationalEvidence,
   ParticipantOperationalReadiness,
   ParticipantOperationalStage,
   ParticipantProtocolType,
@@ -16,7 +18,9 @@ export function calculateParticipantOperationalReadiness(
   input: ParticipantReadinessInput
 ): ParticipantOperationalReadiness {
   const protocolType = resolveProtocolType(input);
-  const screening = buildScreeningReadiness(input);
+  const declaredState = buildDeclaredState(input);
+  const operationalEvidence = buildOperationalEvidence(input);
+  const screening = buildScreeningReadiness(operationalEvidence);
   const clt = buildCltReadiness(input, protocolType, screening.ready || screening.completed);
   const navigo = buildNavigoReadiness(input, protocolType, clt.completed);
   const hut = buildHutReadiness(
@@ -30,13 +34,16 @@ export function calculateParticipantOperationalReadiness(
   const blockingReasons = Object.values(stages).flatMap((stage) => stage.blockingReasons);
   const warnings = [
     ...Object.values(stages).flatMap((stage) => stage.warnings),
+    ...buildStaleAggregatedStatusWarnings({ declaredState, operationalEvidence }),
     ...buildLegacyWarnings(input)
   ];
 
   return {
     blockingReasons,
     currentStage: resolveCurrentStage({ clt, hut, navigo, protocolType, screening }),
+    declaredState,
     nextAllowedStage: resolveNextAllowedStage({ clt, hut, navigo, protocolType, screening }),
+    operationalEvidence,
     participantId: input.id,
     protocolType,
     stages,
@@ -52,25 +59,57 @@ function resolveProtocolType(input: ParticipantReadinessInput): ParticipantProto
   return "CLT_NAVIGO_HUT";
 }
 
-function buildScreeningReadiness(input: ParticipantReadinessInput): ParticipantStageReadiness {
-  const reasons: ParticipantReadinessReason[] = [];
-  const confirmation = input.participantConfirmation ?? null;
-  const referenceSlots = new Set((confirmation?.referenceCodes ?? []).map((code) => code.slot));
+function buildDeclaredState(input: ParticipantReadinessInput): ParticipantDeclaredOperationalState {
+  return {
+    operationalStatus: input.operationalStatus ?? null,
+    screeningStatus: input.screeningStatus ?? null
+  };
+}
 
-  if (!input.id) {
+function buildOperationalEvidence(input: ParticipantReadinessInput): ParticipantOperationalEvidence {
+  const confirmation = input.participantConfirmation ?? null;
+  const referenceCodeSlots = (confirmation?.referenceCodes ?? []).map((code) => code.slot).sort((left, right) => left - right);
+  const referenceSlotSet = new Set(referenceCodeSlots);
+  const hut = input.hutParticipant ?? null;
+
+  return {
+    activeTokenExists: hasActiveToken(input),
+    cltCompleted: hasCompletedCtlSession(input),
+    confirmationExists: Boolean(confirmation),
+    currentNavigoActivitiesExist: hasCurrentNavigoActivities(input),
+    hasAllReferenceCodes: [1, 2, 3].every((slot) => referenceSlotSet.has(slot)),
+    hutCompleted: Boolean(hut && isHutCompleted(hut)),
+    hutExists: Boolean(hut),
+    hutRotationComplete: Boolean(hut?.firstFragranceLeftArm && hut.secondFragranceRightArm),
+    hutStarted: Boolean(hut && (hut.status !== "NOT_STARTED" || hut.applicationPhotoEntries?.length || hut.applicationEvidence?.length)),
+    navigoActivitiesCompleted: hasCompletedNavigoActivities(input),
+    navigoRotationComplete: hasCompleteNavigoRotation(input),
+    participantExists: Boolean(input.id),
+    referenceCodeSlots,
+    screeningAttemptPassed: confirmation?.screeningAttempt?.status === "PASSED",
+    screeningReviewApproved: input.participantScreeningReviews?.some((review) => review.status === "APPROVED") ?? false,
+    screeningPassedByEvidence: Boolean(
+      confirmation && (confirmation.screeningAttempt?.status === "PASSED" || input.participantScreeningReviews?.some((review) => review.status === "APPROVED"))
+    ),
+    t0Exists: Boolean(input.applicationStartedAt),
+    triangularRotationExists: Boolean(input.ctlTriangularRotationAssignment)
+  };
+}
+
+function buildScreeningReadiness(evidence: ParticipantOperationalEvidence): ParticipantStageReadiness {
+  const reasons: ParticipantReadinessReason[] = [];
+
+  if (!evidence.participantExists) {
     reasons.push(reason("SCREENING", "PARTICIPANT_MISSING", "Falta identidad operativa del participante."));
   }
-  if (!confirmation) {
+  if (!evidence.confirmationExists) {
     reasons.push(reason("SCREENING", "CONFIRMATION_MISSING", "Falta ParticipantConfirmation."));
   }
-  if (confirmation?.screeningAttempt?.status !== "PASSED") {
-    reasons.push(reason("SCREENING", "SCREENING_ATTEMPT_NOT_PASSED", "El ScreeningAttempt no esta aprobado."));
-  }
-  if (input.screeningStatus !== "PASSED") {
-    reasons.push(reason("SCREENING", "SCREENING_STATUS_NOT_PASSED", "StudyParticipant.screeningStatus no esta PASSED."));
+  if (!evidence.screeningPassedByEvidence) {
+    reasons.push(reason("SCREENING", "SCREENING_EVIDENCE_NOT_PASSED", "No existe evidencia operativa de screening aprobado."));
   }
   for (const slot of [1, 2, 3]) {
-    if (!referenceSlots.has(slot)) {
+    if (!evidence.referenceCodeSlots.includes(slot)) {
       reasons.push(reason("SCREENING", `REFERENCE_CODE_SLOT_${slot}_MISSING`, `Falta ParticipantReferenceCode slot ${slot}.`));
     }
   }
@@ -81,6 +120,41 @@ function buildScreeningReadiness(input: ParticipantReadinessInput): ParticipantS
     ready: reasons.length === 0,
     reasons
   });
+}
+
+function buildStaleAggregatedStatusWarnings({
+  declaredState,
+  operationalEvidence
+}: {
+  declaredState: ParticipantDeclaredOperationalState;
+  operationalEvidence: ParticipantOperationalEvidence;
+}): ParticipantReadinessReason[] {
+  const hasAdvancedOperationalEvidence = Boolean(
+    operationalEvidence.cltCompleted ||
+      operationalEvidence.t0Exists ||
+      operationalEvidence.activeTokenExists ||
+      operationalEvidence.currentNavigoActivitiesExist ||
+      operationalEvidence.hutStarted ||
+      operationalEvidence.hutCompleted
+  );
+  const screeningStatusStale = operationalEvidence.screeningPassedByEvidence && declaredState.screeningStatus !== "PASSED";
+  const operationalStatusStale = Boolean(
+    hasAdvancedOperationalEvidence &&
+      declaredState.operationalStatus &&
+      !["IN_PROGRESS", "COMPLETED"].includes(declaredState.operationalStatus)
+  );
+
+  if (!screeningStatusStale && !operationalStatusStale) {
+    return [];
+  }
+
+  return [
+    reason(
+      "SCREENING",
+      "STALE_AGGREGATED_STATUS",
+      `Estado agregado posiblemente desactualizado: screeningStatus=${declaredState.screeningStatus ?? "null"}, operationalStatus=${declaredState.operationalStatus ?? "null"}.`
+    )
+  ];
 }
 
 function buildCltReadiness(

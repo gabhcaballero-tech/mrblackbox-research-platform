@@ -38,10 +38,38 @@ export type ParticipantStageReadiness = {
   warnings: ParticipantReadinessReason[];
 };
 
+export type ParticipantDeclaredOperationalState = {
+  operationalStatus: string | null;
+  screeningStatus: string | null;
+};
+
+export type ParticipantOperationalEvidence = {
+  activeTokenExists: boolean;
+  cltCompleted: boolean;
+  confirmationExists: boolean;
+  currentNavigoActivitiesExist: boolean;
+  hasAllReferenceCodes: boolean;
+  hutCompleted: boolean;
+  hutExists: boolean;
+  hutRotationComplete: boolean;
+  hutStarted: boolean;
+  navigoActivitiesCompleted: boolean;
+  navigoRotationComplete: boolean;
+  participantExists: boolean;
+  referenceCodeSlots: number[];
+  screeningAttemptPassed: boolean;
+  screeningReviewApproved: boolean;
+  screeningPassedByEvidence: boolean;
+  t0Exists: boolean;
+  triangularRotationExists: boolean;
+};
+
 export type ParticipantOperationalReadiness = {
   blockingReasons: ParticipantReadinessReason[];
   currentStage: ParticipantCurrentStage;
+  declaredState: ParticipantDeclaredOperationalState;
   nextAllowedStage: ParticipantOperationalStage | null;
+  operationalEvidence: ParticipantOperationalEvidence;
   participantId: string | null;
   protocolType: ParticipantProtocolType;
   stages: {

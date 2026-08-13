@@ -113,6 +113,37 @@ describe("participant operational readiness", () => {
     );
     expect(readiness.stages.hut.ready).toBe(true);
   });
+
+  it("warns about stale aggregated status when operational evidence already advanced", () => {
+    const readiness = calculateParticipantOperationalReadiness({
+      ...baseCltParticipant(),
+      accessTokens: [{ expiresAt: new Date("2099-01-01T00:00:00.000Z"), status: "ACTIVE" }],
+      activities: [
+        activity("T3_HORAS", "COMPLETED"),
+        activity("T4_5_HORAS", "COMPLETED"),
+        activity("T6_HORAS", "COMPLETED")
+      ],
+      applicationStartedAt: new Date("2026-08-08T06:30:00.000Z"),
+      ctlSessions: [{ status: "COMPLETED" }],
+      operationalStatus: "SCREENING_STARTED",
+      screeningStatus: "STARTED"
+    });
+
+    expect(readiness.declaredState).toMatchObject({
+      operationalStatus: "SCREENING_STARTED",
+      screeningStatus: "STARTED"
+    });
+    expect(readiness.operationalEvidence).toMatchObject({
+      activeTokenExists: true,
+      cltCompleted: true,
+      confirmationExists: true,
+      currentNavigoActivitiesExist: true,
+      screeningPassedByEvidence: true
+    });
+    expect(readiness.stages.screening.completed).toBe(true);
+    expect(readiness.blockingReasons.map((item) => item.code)).not.toContain("SCREENING_STATUS_NOT_PASSED");
+    expect(readiness.warnings.map((warning) => warning.code)).toContain("STALE_AGGREGATED_STATUS");
+  });
 });
 
 function baseCltParticipant(): ParticipantReadinessInput {

@@ -187,7 +187,24 @@ function ReadinessObservation({ readiness }: { readiness: ParticipantOperational
       <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
         <ReadinessDetail label="Etapa actual" value={readiness.currentStage} />
         <ReadinessDetail label="Siguiente etapa permitida" value={readiness.nextAllowedStage ?? "Sin accion"} />
+        <ReadinessDetail label="screeningStatus declarado" value={readiness.declaredState.screeningStatus ?? "Sin dato"} />
+        <ReadinessDetail label="operationalStatus declarado" value={readiness.declaredState.operationalStatus ?? "Sin dato"} />
       </dl>
+
+      <div className="mt-4 rounded-md border border-white/70 bg-white p-3">
+        <p className="text-sm font-semibold text-zinc-950">Evidencia operativa observada</p>
+        <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+          <ReadinessDetail label="Confirmacion" value={yesNo(readiness.operationalEvidence.confirmationExists)} />
+          <ReadinessDetail label="Codigos 1/2/3" value={readiness.operationalEvidence.referenceCodeSlots.join(", ") || "Sin codigos"} />
+          <ReadinessDetail label="CLT completado" value={yesNo(readiness.operationalEvidence.cltCompleted)} />
+          <ReadinessDetail label="T0" value={yesNo(readiness.operationalEvidence.t0Exists)} />
+          <ReadinessDetail label="Token Navigo activo" value={yesNo(readiness.operationalEvidence.activeTokenExists)} />
+          <ReadinessDetail label="Actividades Navigo" value={yesNo(readiness.operationalEvidence.currentNavigoActivitiesExist)} />
+          <ReadinessDetail label="HUT" value={yesNo(readiness.operationalEvidence.hutExists)} />
+          <ReadinessDetail label="HUT iniciado" value={yesNo(readiness.operationalEvidence.hutStarted)} />
+          <ReadinessDetail label="HUT completado" value={yesNo(readiness.operationalEvidence.hutCompleted)} />
+        </dl>
+      </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-4">
         <ReadinessStageCard stage={readiness.stages.screening} title="Screening" />
@@ -243,6 +260,10 @@ function ReadinessDetail({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 font-medium text-zinc-950">{value}</dd>
     </div>
   );
+}
+
+function yesNo(value: boolean): string {
+  return value ? "Si" : "No";
 }
 
 function readinessStageLabel(stage: ParticipantStageReadiness): string {

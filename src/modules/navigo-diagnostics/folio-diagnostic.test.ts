@@ -294,9 +294,11 @@ function completeSnapshot(overrides: Partial<FolioDiagnosticSnapshot> = {}): Fol
           studyParticipantId: "participant-1"
         },
         id: "participant-1",
+        operationalStatus: "IN_PROGRESS",
         participantProfile: {
           name: "Participante Demo"
         },
+        participantScreeningReviews: [{ status: "APPROVED" }],
         rotationAssignment: {
           arms: [
             {

@@ -637,6 +637,13 @@ type TestParticipant = {
   } | null;
   reminderPending: boolean;
   secondFragranceRightArm: string | null;
+  secondStageAuthorization: {
+    accessCode: string | null;
+    accessType: "ADMIN" | "ENCUESTADOR" | "SUPERVISOR" | null;
+    actorUserId: string | null;
+    authorizedAt: Date;
+    authorizedAtMexicoCity: string | null;
+  } | null;
   status:
     | "BLOCK_1_CALL_PENDING"
     | "BLOCK_1_IN_PROGRESS"
@@ -841,6 +848,7 @@ function baseParticipant() {
     registrationSlot: null,
     reminderPending: false,
     secondFragranceRightArm: "FRAGANCIA B",
+    secondStageAuthorization: null,
     status: "NOT_STARTED" as const,
     studyParticipantId: null,
     testMode: false,

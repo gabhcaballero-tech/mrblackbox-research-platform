@@ -74,12 +74,26 @@ export {
 export {
   HUT_SECOND_PRODUCT_RELEASED_REASON,
   hasLegacyRegreso1Release,
+  hasLegacySecondProductProgress,
+  getSecondProductReleaseWarnings,
   isSecondProductReleased,
   isSecondProductReleaseAuditJson
 } from "./second-product-release";
 export type {
   HutSecondProductReleaseSummary
 } from "./second-product-release";
+export {
+  getSecondStageAuthorizationWarnings,
+  hasLegacyFirstPerfumeEvaluationProgress,
+  HUT_LEGACY_PROGRESS_WITHOUT_EVENT_WARNING,
+  HUT_SECOND_STAGE_AUTHORIZED_REASON,
+  hasLegacySecondStageAuthorization,
+  isSecondStageAuthorizationAuditJson,
+  isSecondStageAuthorized
+} from "./second-stage-authorization";
+export type {
+  HutSecondStageAuthorizationSummary
+} from "./second-stage-authorization";
 export {
   buildHutPhotoTimeline,
   getHutPhotoTimelineSlotDefinition,
