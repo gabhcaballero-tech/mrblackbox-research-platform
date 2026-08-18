@@ -110,6 +110,17 @@ export type MarkOutboundMessageFailedInput = {
   status: string;
 };
 
+export type MirrorV2OutboundMessageInput = {
+  bodyText: string;
+  conversationId: string;
+  fromPhone: string;
+  metaMessageId: string;
+  rawPayload: unknown;
+  status: string;
+  timestamp: Date;
+  toPhone: string;
+};
+
 export type OneuiWhatsAppRepository = {
   createOutboundMessage: (input: CreateOutboundMessageInput) => Promise<OneuiWhatsAppMessageRecord>;
   findLatestOutboundTemplateMessage: (input: {
@@ -121,6 +132,7 @@ export type OneuiWhatsAppRepository = {
   listConversations: () => Promise<OneuiWhatsAppConversationSummary[]>;
   markOutboundMessageAccepted: (input: MarkOutboundMessageAcceptedInput) => Promise<OneuiWhatsAppMessageRecord>;
   markOutboundMessageFailed: (input: MarkOutboundMessageFailedInput) => Promise<OneuiWhatsAppMessageRecord>;
+  mirrorV2OutboundMessage?: (input: MirrorV2OutboundMessageInput) => Promise<OneuiWhatsAppMessageRecord>;
   saveInboundMessage: (input: SaveInboundMessageInput) => Promise<OneuiWhatsAppMessageRecord>;
   saveStatusEvent: (input: SaveStatusEventInput) => Promise<OneuiWhatsAppStatusEventRecord>;
   upsertInboundConversation: (input: UpsertInboundConversationInput) => Promise<OneuiWhatsAppConversationRecord>;
@@ -310,6 +322,46 @@ export function createOneuiWhatsAppRepository(
         select: messageSelect,
         where: { id: input.messageId }
       });
+    },
+    async mirrorV2OutboundMessage(input) {
+      const prisma = await getPrisma();
+      const message = await prisma.oneuiWhatsAppMessage.upsert({
+        where: { metaMessageId: input.metaMessageId },
+        create: {
+          bodyText: input.bodyText,
+          conversationId: input.conversationId,
+          direction: "OUTBOUND",
+          fromPhone: input.fromPhone,
+          messageType: "template",
+          metaMessageId: input.metaMessageId,
+          rawPayload: input.rawPayload,
+          status: input.status,
+          timestamp: input.timestamp,
+          toPhone: input.toPhone
+        },
+        update: {
+          bodyText: input.bodyText,
+          conversationId: input.conversationId,
+          fromPhone: input.fromPhone,
+          messageType: "template",
+          rawPayload: input.rawPayload,
+          status: input.status,
+          timestamp: input.timestamp,
+          toPhone: input.toPhone
+        },
+        select: messageSelect
+      });
+
+      await prisma.oneuiWhatsAppConversation.update({
+        data: {
+          lastMessageAt: input.timestamp,
+          lastOutboundAt: input.timestamp
+        },
+        select: conversationSelect,
+        where: { id: input.conversationId }
+      });
+
+      return message;
     },
     async saveInboundMessage(input) {
       const prisma = await getPrisma();
