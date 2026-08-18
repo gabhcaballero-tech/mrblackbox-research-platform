@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createHutRepository } from "@/modules/hut";
+import {
+  V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE,
+  areV1HutAutomaticCommunicationsDisabled
+} from "@/modules/oneui-whatsapp";
 import { MEXICO_CITY_TIME_ZONE } from "@/shared/utils/date-format";
 import { createPrismaClient } from "@/shared/db/client";
 import { DEFAULT_PUBLIC_APP_ORIGIN, resolveConfiguredPublicOrigin } from "@/shared/utils/request-origin";
@@ -47,6 +51,14 @@ async function processHutRemindersRequest(request: NextRequest) {
     }
   } else if (process.env.NODE_ENV === "production") {
     return NextResponse.json({ message: "Cron secret not configured", ok: false }, { status: 500 });
+  }
+
+  if (areV1HutAutomaticCommunicationsDisabled()) {
+    return NextResponse.json({
+      code: "AUTOMATION_DISABLED",
+      message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE,
+      ok: false
+    });
   }
 
   const now = resolveCronNow(request);

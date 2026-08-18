@@ -17,6 +17,10 @@ import {
   getFieldAnswerInputFromFormData,
   getFieldParticipantInputFromFormData
 } from "./validation";
+import {
+  isV1FieldScreeningBlocked,
+  V1_FIELD_SCREENING_BLOCK_MESSAGE
+} from "./v1-screening-block";
 
 export type FieldStartActionState = {
   duplicate?: FieldDuplicateDetectionResult;
@@ -49,6 +53,14 @@ export async function startFieldScreeningAttemptAction(
   _previousState: FieldStartActionState,
   formData: FormData
 ): Promise<FieldStartActionState> {
+  if (isV1FieldScreeningBlocked()) {
+    const participantInput = getFieldParticipantInputFromFormData(formData);
+    return {
+      error: V1_FIELD_SCREENING_BLOCK_MESSAGE,
+      values: participantInput
+    };
+  }
+
   const actor = await getFieldActorForRequest();
   const participantInput = getFieldParticipantInputFromFormData(formData);
   const decision = String(formData.get("participantDecision") ?? "");
@@ -105,6 +117,10 @@ export async function saveFieldScreeningAnswerAction(
   questionId: string,
   formData: FormData
 ): Promise<void> {
+  if (isV1FieldScreeningBlocked()) {
+    redirect(fieldAttemptPath(attemptId, questionId, V1_FIELD_SCREENING_BLOCK_MESSAGE));
+  }
+
   const actor = await getFieldActorForRequest();
   let result: Awaited<ReturnType<typeof saveFieldScreeningAnswer>>;
 

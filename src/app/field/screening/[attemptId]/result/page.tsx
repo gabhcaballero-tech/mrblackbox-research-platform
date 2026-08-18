@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import type React from "react";
 import { getFieldActorForRequest } from "@/modules/field/auth";
 import {
@@ -13,6 +12,7 @@ import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { createFieldRepository } from "@/modules/field/repository";
 import { getFieldScreeningAttemptScreen } from "@/modules/field/service";
 import { fieldAttemptStatusLabel } from "@/modules/field/status-labels";
+import { V1_FIELD_SCREENING_BLOCK_MESSAGE } from "@/modules/field/v1-screening-block";
 import { ScreeningResultCard } from "../../../_components/FieldComponents";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +42,7 @@ export default async function ScreeningResultPage({ params }: ScreeningResultPag
   if (readiness.nextStep === "PERFUME_PHOTOS") {
     return renderFieldResultContent({
       actor,
-      content: <FieldPendingPerfumePhotosCard attemptId={attemptId} />,
+      content: <FieldPendingPerfumePhotosCard />,
       readiness
     });
   }
@@ -50,7 +50,7 @@ export default async function ScreeningResultPage({ params }: ScreeningResultPag
   if (readiness.nextStep === "SELFIE") {
     return renderFieldResultContent({
       actor,
-      content: <FieldPendingSelfieCard attemptId={attemptId} />,
+      content: <FieldPendingSelfieCard />,
       readiness
     });
   }
@@ -144,32 +144,26 @@ function FieldResultMessage({ title }: { title: string }) {
   );
 }
 
-function FieldPendingSelfieCard({ attemptId }: { attemptId: string }) {
+function FieldPendingSelfieCard() {
   return (
     <section className="rounded-lg border border-amber-200 bg-amber-50 p-6 shadow-sm">
-      <p className="text-sm font-semibold uppercase tracking-wide text-amber-800">Selfie pendiente</p>
-      <h2 className="mt-2 text-xl font-semibold text-zinc-950">Completa la selfie para enviar a revisión</h2>
+      <p className="text-sm font-semibold uppercase tracking-wide text-amber-800">Campo V1 cerrado</p>
+      <h2 className="mt-2 text-xl font-semibold text-zinc-950">Registro migrado a V2</h2>
       <p className="mt-2 text-sm leading-6 text-zinc-700">
-        El filtro ya fue registrado y la confirmación fue generada. Falta capturar la selfie final antes de cerrar este paso.
+        {V1_FIELD_SCREENING_BLOCK_MESSAGE}
       </p>
-      <Link className={primaryButtonClass} href={`/field/screening/${attemptId}/selfie`}>
-        Completar selfie
-      </Link>
     </section>
   );
 }
 
-function FieldPendingPerfumePhotosCard({ attemptId }: { attemptId: string }) {
+function FieldPendingPerfumePhotosCard() {
   return (
     <section className="rounded-lg border border-amber-200 bg-amber-50 p-6 shadow-sm">
-      <p className="text-sm font-semibold uppercase tracking-wide text-amber-800">Fotos pendientes</p>
-      <h2 className="mt-2 text-xl font-semibold text-zinc-950">Agrega fotos de marcas de perfumes</h2>
+      <p className="text-sm font-semibold uppercase tracking-wide text-amber-800">Campo V1 cerrado</p>
+      <h2 className="mt-2 text-xl font-semibold text-zinc-950">Registro migrado a V2</h2>
       <p className="mt-2 text-sm leading-6 text-zinc-700">
-        Falta agregar al menos una foto de las marcas de perfumes antes de enviar el perfil a revisión.
+        {V1_FIELD_SCREENING_BLOCK_MESSAGE}
       </p>
-      <Link className={primaryButtonClass} href={`/field/screening/${attemptId}/evidences`}>
-        Agregar fotos de marcas de perfumes
-      </Link>
     </section>
   );
 }
@@ -212,6 +206,3 @@ function logFieldResultReadiness(
     studyParticipantId: readiness.studyParticipantId
   });
 }
-
-const primaryButtonClass =
-  "mt-5 inline-flex w-fit justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800";

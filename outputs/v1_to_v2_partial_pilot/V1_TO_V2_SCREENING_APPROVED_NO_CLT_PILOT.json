@@ -1,0 +1,109 @@
+{
+  "metadata": {
+    "exportType": "V1_TO_V2_SCREENING_APPROVED_NO_CLT_PILOT",
+    "sourceStudyCode": "FMASCULINA-NAVIGO-2026",
+    "sourceStudyName": "Fragancia Masculina — Navigo Homme",
+    "generatedAt": "2026-08-14T22:29:37.135Z",
+    "readOnly": true,
+    "criteria": [
+      "Screening completado",
+      "Screening aprobado/elegible",
+      "CLT no iniciado",
+      "CLT respuestas = 0"
+    ],
+    "excludedData": [
+      "respuestas CLT",
+      "respuestas HUT",
+      "evidencias",
+      "actividades posteriores",
+      "datos sensibles innecesarios"
+    ]
+  },
+  "participants": [
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-009",
+        "HUT_FOLIO": null
+      },
+      "datosParticipante": {
+        "nombreCompleto": "Marcos Espinoza",
+        "telefono": "55 5951 8529",
+        "correoElectronico": "cadres.rahmen@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-14T02:15:25.563Z"
+      },
+      "codigos": {
+        "codigo1": "FD9Y",
+        "codigo2": "FKRY",
+        "codigo3": "G3W2",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-011",
+        "HUT_FOLIO": "HUT-011"
+      },
+      "datosParticipante": {
+        "nombreCompleto": "HERIBERTO MADRID ALARCON",
+        "telefono": "+525630822700",
+        "correoElectronico": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-27T03:26:39.493Z"
+      },
+      "codigos": {
+        "codigo1": "38FQ",
+        "codigo2": "FW2F",
+        "codigo3": "JSEC",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-023",
+        "HUT_FOLIO": "HUT-023"
+      },
+      "datosParticipante": {
+        "nombreCompleto": "DIEGO YAEL VICTORIANO CONTRERAS",
+        "telefono": "+525653853333",
+        "correoElectronico": "diegoyael850@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-29T17:49:38.055Z"
+      },
+      "codigos": {
+        "codigo1": "HW2U",
+        "codigo2": "T8MG",
+        "codigo3": "38VJ",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    }
+  ],
+  "excluded": []
+}

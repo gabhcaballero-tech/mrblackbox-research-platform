@@ -1,0 +1,2085 @@
+{
+  "schemaVersion": "v1-to-v2.participant-export.1",
+  "source": {
+    "project": "mrblackbox-research-platform",
+    "studyCode": "FMASCULINA-NAVIGO-2026",
+    "studyName": "Fragancia Masculina — Navigo Homme",
+    "exportedAt": "2026-08-15T00:59:15.369Z",
+    "exportedAtMexicoCity": "14/08/2026, 18:59:15",
+    "readOnly": true,
+    "publicOrigin": "https://mrblackbox-research-platform.vercel.app"
+  },
+  "participant": {
+    "navFolio": "NAV-109",
+    "hutFolio": "HUT-109",
+    "name": "ARTURO ZARATE MARTINEZ",
+    "phone": "+525587106524",
+    "email": "ferranmun.1@live.com.mx",
+    "protocol": "CLT_NAVIGO_HUT",
+    "products": {
+      "eva1": {
+        "code": "247",
+        "label": "Primera fragancia",
+        "arm": "LEFT",
+        "armLabel": "Brazo izquierdo",
+        "applicationOrder": 1,
+        "participantVisibleLabel": "Primera fragancia"
+      },
+      "eva2": {
+        "code": "583",
+        "label": "Segunda fragancia",
+        "arm": "RIGHT",
+        "armLabel": "Brazo derecho",
+        "applicationOrder": 2,
+        "participantVisibleLabel": "Segunda fragancia"
+      },
+      "arms": [
+        {
+          "code": "247",
+          "label": "Primera fragancia",
+          "arm": "LEFT",
+          "armLabel": "Brazo izquierdo",
+          "applicationOrder": 1,
+          "participantVisibleLabel": "Primera fragancia"
+        },
+        {
+          "code": "583",
+          "label": "Segunda fragancia",
+          "arm": "RIGHT",
+          "armLabel": "Brazo derecho",
+          "applicationOrder": 2,
+          "participantVisibleLabel": "Segunda fragancia"
+        }
+      ]
+    },
+    "ids": {
+      "participantProfileId": "3ff99467-06fd-41a5-a416-16ce976bab57",
+      "studyParticipantId": "b1f27685-8c9d-4b51-8638-8ba6b82c6555",
+      "participantConfirmationId": "23d70af5-c1cb-42cd-b427-38078c71295c",
+      "hutParticipantId": "607b954a-7dba-4e81-a0d5-4020187854bb"
+    },
+    "statuses": {
+      "screeningStatus": "PASSED",
+      "operationalStatus": "SCREENING_PASSED",
+      "hutStatus": "NOT_STARTED"
+    },
+    "createdAt": "2026-06-24T17:24:54.464Z",
+    "updatedAt": "2026-08-06T02:04:14.076Z"
+  },
+  "codes": [
+    {
+      "slot": 1,
+      "code": "KC9J",
+      "source": "ParticipantReferenceCode",
+      "createdAt": "2026-08-06T02:04:14.127Z"
+    },
+    {
+      "slot": 2,
+      "code": "QRZU",
+      "source": "ParticipantReferenceCode",
+      "createdAt": "2026-08-06T02:04:14.127Z"
+    },
+    {
+      "slot": 3,
+      "code": "QEHG",
+      "source": "ParticipantReferenceCode",
+      "createdAt": "2026-08-06T02:04:14.127Z"
+    }
+  ],
+  "rotations": {
+    "clt": {
+      "rotationPlanName": "NAV-109__247__583",
+      "rotationCode": "NAV-109__247__583",
+      "eva1": {
+        "code": "247",
+        "label": "Primera fragancia",
+        "arm": "LEFT",
+        "armLabel": "Brazo izquierdo",
+        "applicationOrder": 1,
+        "participantVisibleLabel": "Primera fragancia"
+      },
+      "eva2": {
+        "code": "583",
+        "label": "Segunda fragancia",
+        "arm": "RIGHT",
+        "armLabel": "Brazo derecho",
+        "applicationOrder": 2,
+        "participantVisibleLabel": "Segunda fragancia"
+      },
+      "pr1": "C-583",
+      "pr2": "G-835",
+      "pr3": "Z-724",
+      "pr4": "H-358",
+      "pr5": "K-247",
+      "pr6": "0-472",
+      "veri1": "Z-724",
+      "veri2": "H-358",
+      "triangularSource": "CtlTriangularRotationAssignment",
+      "importedAt": "2026-08-08T18:44:38.900Z"
+    },
+    "hut": {
+      "eva1": "247",
+      "eva2": "583",
+      "source": "HutParticipant"
+    }
+  },
+  "activities": [
+    {
+      "type": "CLT_SESSION",
+      "code": "CLT",
+      "status": "PENDING",
+      "startedAt": "2026-08-10T16:44:32.582Z",
+      "completedAt": null,
+      "metadata": {
+        "ctlSessionId": "d6ee5cca-5f12-4d3e-a041-f8bdc3c0d9c6",
+        "claimedAt": "2026-08-10T16:44:32.582Z",
+        "triangularRotationSnapshot": {
+          "triangular1": {
+            "pr1": "C-583",
+            "pr2": "G-835",
+            "pr3": "Z-724",
+            "verify": "Z-724"
+          },
+          "triangular2": {
+            "pr1": "H-358",
+            "pr2": "K-247",
+            "pr3": "0-472",
+            "verify": "H-358"
+          },
+          "assignmentId": "5b791ac2-e3b3-4ba2-a196-340507ebfaf2"
+        }
+      }
+    },
+    {
+      "type": "CLT_PHASE",
+      "code": "COLOCACION",
+      "status": "IN_PROGRESS",
+      "startedAt": "2026-08-10T16:44:32.582Z",
+      "completedAt": null,
+      "metadata": {
+        "ctlPhaseProgressId": "a3110fea-0d5f-4bf6-bd1c-18fe48d0d481",
+        "referenceCodeSlot": 1,
+        "productCode": "247",
+        "arm": "IZQUIERDO",
+        "validatedAt": null
+      }
+    },
+    {
+      "type": "CLT_PHASE",
+      "code": "EVALUACION_1",
+      "status": "PENDING",
+      "startedAt": null,
+      "completedAt": null,
+      "metadata": {
+        "ctlPhaseProgressId": "49aaafe1-5c4f-45bc-89d6-f4e1e8dcdba6",
+        "referenceCodeSlot": 2,
+        "productCode": "583",
+        "arm": "DERECHO",
+        "validatedAt": null
+      }
+    },
+    {
+      "type": "CLT_PHASE",
+      "code": "EVALUACION_2",
+      "status": "PENDING",
+      "startedAt": null,
+      "completedAt": null,
+      "metadata": {
+        "ctlPhaseProgressId": "3062a449-fb83-4855-bd97-5b6a0e3ba46d",
+        "referenceCodeSlot": 3,
+        "productCode": "583",
+        "arm": null,
+        "validatedAt": null
+      }
+    },
+    {
+      "type": "HUT_PARTICIPANT",
+      "code": "HUT-109",
+      "status": "NOT_STARTED",
+      "startedAt": null,
+      "completedAt": null,
+      "metadata": {
+        "hutParticipantId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "origin": "CLT_HUT",
+        "protocolVersion": "APPLICATION_PHOTO",
+        "currentBlockNumber": 1,
+        "currentVideoSequence": 1,
+        "testMode": false
+      }
+    },
+    {
+      "type": "HUT_PHASE_CODE",
+      "code": "COLOCACION",
+      "status": "GENERATED",
+      "completedAt": null,
+      "metadata": {
+        "hutParticipantPhaseCodeId": "7b42d1f5-8b4c-4a61-ae2f-50eafa0562ba",
+        "slot": 1,
+        "sentAt": null,
+        "validatedAt": null,
+        "usedAt": null
+      }
+    },
+    {
+      "type": "HUT_PHASE_CODE",
+      "code": "REGRESO_1",
+      "status": "GENERATED",
+      "completedAt": null,
+      "metadata": {
+        "hutParticipantPhaseCodeId": "739669d8-1d2c-4264-afc1-2216a0ff0abf",
+        "slot": 2,
+        "sentAt": null,
+        "validatedAt": null,
+        "usedAt": null
+      }
+    },
+    {
+      "type": "HUT_PHASE_CODE",
+      "code": "REGRESO_2",
+      "status": "GENERATED",
+      "completedAt": null,
+      "metadata": {
+        "hutParticipantPhaseCodeId": "95e91896-4fe2-4a47-b024-e9c8116a2db7",
+        "slot": 3,
+        "sentAt": null,
+        "validatedAt": null,
+        "usedAt": null
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-10T21:00:41.114Z",
+      "metadata": {
+        "auditLogId": "8dc40cff-0bb8-4756-9291-966aab0c715e",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "Recordatorio HUT enviado por WhatsApp.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "metaMessageId": "wamid.HBgNNTIxNTU4NzEwNjUyNBUCABEYEjU5MzlEMjlFMzA1Mjg1MkIwOQA=",
+          "whatsappStatus": "ENVIADO",
+          "hutUrlAvailable": true
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-10T22:00:01.538Z",
+      "metadata": {
+        "auditLogId": "4791e7ed-3e67-43ae-a915-e6680fe133dd",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-10T23:01:22.058Z",
+      "metadata": {
+        "auditLogId": "b73be261-443e-4b55-8274-d90d2a5bc908",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T00:02:46.381Z",
+      "metadata": {
+        "auditLogId": "c50a177a-adf5-48d3-81fe-4b43e46dff43",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T01:00:29.185Z",
+      "metadata": {
+        "auditLogId": "dedecd86-438c-48ff-94f7-1410d9563325",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T02:00:29.463Z",
+      "metadata": {
+        "auditLogId": "e83eb66d-6f27-424e-96ae-cdf3e8a8c0c7",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T03:01:17.231Z",
+      "metadata": {
+        "auditLogId": "e844bfcb-64ef-4ffb-bd99-13c5eb9b4fed",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T04:01:20.878Z",
+      "metadata": {
+        "auditLogId": "92e51cbd-92a7-44fd-9889-837829882996",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T05:00:31.853Z",
+      "metadata": {
+        "auditLogId": "bf45397a-8394-4764-8422-73c2f95d29b8",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T06:01:20.603Z",
+      "metadata": {
+        "auditLogId": "f122e0bf-8cb5-4a70-91d7-4aaced6eda82",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T07:00:29.198Z",
+      "metadata": {
+        "auditLogId": "42088c28-cfa3-478d-ad6b-4e50acc6be50",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T08:01:27.689Z",
+      "metadata": {
+        "auditLogId": "0d81cb5a-c0a2-4012-9232-48b4492ace18",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T09:01:22.680Z",
+      "metadata": {
+        "auditLogId": "3927d9d0-4d19-4203-b680-1c2ef5aa40b0",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T10:01:19.233Z",
+      "metadata": {
+        "auditLogId": "615a8b52-bf94-406b-8f55-7351d5c385d5",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T11:01:24.999Z",
+      "metadata": {
+        "auditLogId": "90164c22-0180-4f19-ad97-dde0b7ca3fd4",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T12:01:28.455Z",
+      "metadata": {
+        "auditLogId": "57c36b6f-7743-4642-82d7-a0fdaec3b5ae",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T13:00:29.263Z",
+      "metadata": {
+        "auditLogId": "0786ece1-e059-4ef0-a437-a7880bf1be77",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T14:01:23.837Z",
+      "metadata": {
+        "auditLogId": "18af04ec-cfc5-4359-baf4-5ebe817810d1",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T15:00:29.143Z",
+      "metadata": {
+        "auditLogId": "ebd6f1ad-481c-40d0-bab9-b21cbd7d73cd",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T16:01:07.691Z",
+      "metadata": {
+        "auditLogId": "8da5490f-23af-4428-86eb-28f611b68fac",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El recordatorio HUT automatico solo se envia de 15:00 a 18:00 hrs CDMX.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "OUTSIDE_OPERATIONAL_WINDOW",
+          "exclusionReasons": [
+            "OUTSIDE_OPERATIONAL_WINDOW"
+          ],
+          "evaluatedAtMexicoCity": "11/08/2026, 10:01 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-12T21:01:31.865Z",
+      "metadata": {
+        "auditLogId": "0e3e1df8-0893-463d-9df5-25149ac5197d",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "12/08/2026, 15:01 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-12T22:00:34.171Z",
+      "metadata": {
+        "auditLogId": "b2972082-38e6-48e4-9fa4-fb5f53294b13",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "12/08/2026, 16:00 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-12T23:00:38.421Z",
+      "metadata": {
+        "auditLogId": "76acde88-1a8f-46a3-a5c8-df88b3a4a520",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "12/08/2026, 17:00 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-13T21:00:06.321Z",
+      "metadata": {
+        "auditLogId": "431fb3a5-4e5f-4221-a22a-d9bd5c00ae20",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "13/08/2026, 15:00 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-13T22:00:58.353Z",
+      "metadata": {
+        "auditLogId": "a5b3942f-199e-47cd-9528-b314ce098456",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "13/08/2026, 16:00 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-13T23:01:02.833Z",
+      "metadata": {
+        "auditLogId": "3c3ccfe5-4399-4a9b-b63e-efe7594a1e36",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "13/08/2026, 17:01 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-14T21:00:59.393Z",
+      "metadata": {
+        "auditLogId": "39514cc7-0b30-4b0a-804e-58ec82664ceb",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "14/08/2026, 15:00 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-14T22:00:55.143Z",
+      "metadata": {
+        "auditLogId": "a80d2906-79bc-402b-8350-46c66cdadf25",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "14/08/2026, 16:00 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-14T23:00:58.924Z",
+      "metadata": {
+        "auditLogId": "e950c5b5-6401-4553-b7cf-b15216665d9c",
+        "entityType": "HutParticipant",
+        "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_CLT",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "14/08/2026, 17:00 hrs CDMX"
+        }
+      }
+    }
+  ],
+  "answers": [
+    {
+      "activity": "SCREENING",
+      "questionKey": "CONSENTIMIENTO",
+      "answerValue": "SI",
+      "answeredAt": "2026-06-24T17:25:27.465Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "58edf33b-baff-4aa1-8283-831ec396f290"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F1_GENERO",
+      "answerValue": "HOMBRE",
+      "answeredAt": "2026-06-24T17:25:32.266Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "4f8c2ce9-b3dc-4c79-aba2-f545f071a07c"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F2_EDAD",
+      "answerValue": 46,
+      "answeredAt": "2026-06-24T17:25:39.449Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "90160569-5adf-4f89-87dd-841ca60daf81"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F3_EXCLUSION_LABORAL",
+      "answerValue": "NINGUNA",
+      "answeredAt": "2026-06-24T17:25:45.881Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "15c686b4-74df-42a5-b687-1ad4bfd2299a"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F4_PARTICIPACION_RECIENTE",
+      "answerValue": "NO",
+      "answeredAt": "2026-06-24T17:26:01.755Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "d50a812b-872e-4e5d-9d7c-8f6a5c5d4dde"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F5_CONDICIONES_FISICAS",
+      "answerValue": "NINGUNA",
+      "answeredAt": "2026-06-24T17:26:11.188Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "1b33843b-09e7-482a-bd2e-e7a5956df94f"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F6_MARCAS_UTILIZA",
+      "answerValue": "NAVIGO",
+      "answeredAt": "2026-06-24T17:37:47.480Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "3f56539d-4aad-4f38-b051-b935fb01ef4d"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F7_MARCA_FRECUENTE",
+      "answerValue": "NAVIGO_HOMME_AZUL",
+      "answeredAt": "2026-06-24T17:37:56.068Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "9dfe1f70-7f0c-4e8d-83fc-69d0fc713c32"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F8_VARIANTE_COLOR",
+      "answerValue": "AZUL",
+      "answeredAt": "2026-06-24T17:38:09.724Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "eddcdee7-6872-4d8a-9203-20e3a072bca2"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F9_FRECUENCIA_SEMANAL",
+      "answerValue": "SIETE_DIAS",
+      "answeredAt": "2026-06-24T17:38:21.145Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "a25d86d7-4b01-4740-a365-d2341444c5f7"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F10_ULTIMA_COMPRA",
+      "answerValue": "HACE UN MES",
+      "answeredAt": "2026-06-24T17:39:05.661Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "086a9d69-9d7d-4cf2-967d-ac90fdafe94c"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR",
+      "answerValue": "LICENCIATURA_COMPLETA",
+      "answeredAt": "2026-06-24T17:39:12.578Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "1939550e-77e7-4f74-9fa5-d6d70bc3418a"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D2_BANOS_COMPLETOS",
+      "answerValue": "UN_BANO_COMPLETO",
+      "answeredAt": "2026-06-24T17:39:16.981Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "3331d22f-1bd6-48b6-ba3a-e93d367432f8"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D3_AUTOMOVILES_HOGAR",
+      "answerValue": "UN_AUTO",
+      "answeredAt": "2026-06-24T17:39:20.651Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "fac0a54b-424f-463d-8dde-8593a85f6b68"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D4_INTERNET_HOGAR",
+      "answerValue": "SI_TIENE_INTERNET",
+      "answeredAt": "2026-06-24T17:39:25.897Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "d9f577cc-f529-41f9-815b-34f464841c65"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D5_PERSONAS_TRABAJARON",
+      "answerValue": "DOS_PERSONAS",
+      "answeredAt": "2026-06-24T17:39:32.163Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "44353f89-165b-4830-80fb-6f543885d87f"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D6_CUARTOS_DORMIR",
+      "answerValue": "DOS_CUARTOS",
+      "answeredAt": "2026-06-24T17:39:36.673Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "116528bf-263d-45b0-bbb0-174fe71b1c2d"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "OP1_RECLUTADOR",
+      "answerValue": "ALICIA LARA",
+      "answeredAt": "2026-06-24T17:40:03.261Z",
+      "metadata": {
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "screeningAnswerId": "ceb11fff-c55d-4448-8f2a-dc3d05f55b4b"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_NOMBRE",
+      "answerValue": "ARTURO ZARATE MARTINEZ",
+      "answeredAt": "2026-08-10T16:44:32.891Z",
+      "metadata": {
+        "ctlSessionId": "d6ee5cca-5f12-4d3e-a041-f8bdc3c0d9c6",
+        "ctlAnswerId": "9581c859-455d-48b6-8939-762402d9b03d"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_FECHA",
+      "answerValue": "10/08/2026",
+      "answeredAt": "2026-08-10T16:44:32.913Z",
+      "metadata": {
+        "ctlSessionId": "d6ee5cca-5f12-4d3e-a041-f8bdc3c0d9c6",
+        "ctlAnswerId": "cef3dce4-846a-4842-b5a8-4f4880cca48d"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_HORA_INICIO",
+      "answerValue": "10:44 a.m.",
+      "answeredAt": "2026-08-10T16:44:32.933Z",
+      "metadata": {
+        "ctlSessionId": "d6ee5cca-5f12-4d3e-a041-f8bdc3c0d9c6",
+        "ctlAnswerId": "7b437b0d-da1c-4096-a900-7b4f7651a6b2"
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "type": "SCREENING:PERFUME_PHOTO",
+      "url": null,
+      "fecha": "2026-06-24T17:37:28.539Z",
+      "fechaMexicoCity": "24/06/2026, 11:37:28",
+      "storage": {
+        "storageBucket": "participant-evidence",
+        "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/3ff99467-06fd-41a5-a416-16ce976bab57/screening-attempts/2765ab11-42bf-455e-a993-dcc3fbd6a875/perfume_photo/c5155c4c-48a1-4077-a8b1-36e61718eaac.jpg",
+        "originalFilename": "perfume_photo-1782322639781.jpg",
+        "mimeType": "image/jpeg",
+        "extension": "jpg",
+        "sizeBytes": 46636
+      },
+      "metadata": {
+        "participantEvidenceId": "623e43c8-a919-4c01-8ccd-f8005a2c71cc",
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "relatedQuestionId": "F6_MARCAS_UTILIZA",
+        "reviewStatus": "APPROVED",
+        "reviewedAt": "2026-08-06T02:04:13.987Z"
+      }
+    },
+    {
+      "type": "SCREENING:SELFIE_IDENTIFICATION",
+      "url": null,
+      "fecha": "2026-06-24T17:42:39.802Z",
+      "fechaMexicoCity": "24/06/2026, 11:42:39",
+      "storage": {
+        "storageBucket": "participant-evidence",
+        "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/3ff99467-06fd-41a5-a416-16ce976bab57/screening-attempts/2765ab11-42bf-455e-a993-dcc3fbd6a875/selfie_identification/8b23d7ab-b8d4-4c09-87bc-8184f58cf6de.jpg",
+        "originalFilename": "selfie_identification-1782322950819.jpg",
+        "mimeType": "image/jpeg",
+        "extension": "jpg",
+        "sizeBytes": 44837
+      },
+      "metadata": {
+        "participantEvidenceId": "b60a286a-6180-4b2f-a3df-dde21e4926c7",
+        "screeningAttemptId": "2765ab11-42bf-455e-a993-dcc3fbd6a875",
+        "relatedQuestionId": null,
+        "reviewStatus": "APPROVED",
+        "reviewedAt": "2026-08-06T02:04:13.987Z"
+      }
+    }
+  ],
+  "audit": [
+    {
+      "id": "8dc40cff-0bb8-4756-9291-966aab0c715e",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON",
+      "createdAt": "2026-08-10T21:00:41.114Z",
+      "createdAtMexicoCity": "10/08/2026, 15:00:41",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "Recordatorio HUT enviado por WhatsApp.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "metaMessageId": "wamid.HBgNNTIxNTU4NzEwNjUyNBUCABEYEjU5MzlEMjlFMzA1Mjg1MkIwOQA=",
+        "whatsappStatus": "ENVIADO",
+        "hutUrlAvailable": true
+      }
+    },
+    {
+      "id": "4791e7ed-3e67-43ae-a915-e6680fe133dd",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-10T22:00:01.538Z",
+      "createdAtMexicoCity": "10/08/2026, 16:00:01",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "b73be261-443e-4b55-8274-d90d2a5bc908",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-10T23:01:22.058Z",
+      "createdAtMexicoCity": "10/08/2026, 17:01:22",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "c50a177a-adf5-48d3-81fe-4b43e46dff43",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T00:02:46.381Z",
+      "createdAtMexicoCity": "10/08/2026, 18:02:46",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "dedecd86-438c-48ff-94f7-1410d9563325",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T01:00:29.185Z",
+      "createdAtMexicoCity": "10/08/2026, 19:00:29",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "e83eb66d-6f27-424e-96ae-cdf3e8a8c0c7",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T02:00:29.463Z",
+      "createdAtMexicoCity": "10/08/2026, 20:00:29",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "e844bfcb-64ef-4ffb-bd99-13c5eb9b4fed",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T03:01:17.231Z",
+      "createdAtMexicoCity": "10/08/2026, 21:01:17",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "92e51cbd-92a7-44fd-9889-837829882996",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T04:01:20.878Z",
+      "createdAtMexicoCity": "10/08/2026, 22:01:20",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "bf45397a-8394-4764-8422-73c2f95d29b8",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T05:00:31.853Z",
+      "createdAtMexicoCity": "10/08/2026, 23:00:31",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "f122e0bf-8cb5-4a70-91d7-4aaced6eda82",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T06:01:20.603Z",
+      "createdAtMexicoCity": "11/08/2026, 00:01:20",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "42088c28-cfa3-478d-ad6b-4e50acc6be50",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T07:00:29.198Z",
+      "createdAtMexicoCity": "11/08/2026, 01:00:29",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "0d81cb5a-c0a2-4012-9232-48b4492ace18",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T08:01:27.689Z",
+      "createdAtMexicoCity": "11/08/2026, 02:01:27",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "3927d9d0-4d19-4203-b680-1c2ef5aa40b0",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T09:01:22.680Z",
+      "createdAtMexicoCity": "11/08/2026, 03:01:22",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "615a8b52-bf94-406b-8f55-7351d5c385d5",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T10:01:19.233Z",
+      "createdAtMexicoCity": "11/08/2026, 04:01:19",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "90164c22-0180-4f19-ad97-dde0b7ca3fd4",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T11:01:24.999Z",
+      "createdAtMexicoCity": "11/08/2026, 05:01:24",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "57c36b6f-7743-4642-82d7-a0fdaec3b5ae",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T12:01:28.455Z",
+      "createdAtMexicoCity": "11/08/2026, 06:01:28",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "0786ece1-e059-4ef0-a437-a7880bf1be77",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T13:00:29.263Z",
+      "createdAtMexicoCity": "11/08/2026, 07:00:29",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "18af04ec-cfc5-4359-baf4-5ebe817810d1",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T14:01:23.837Z",
+      "createdAtMexicoCity": "11/08/2026, 08:01:23",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "ebd6f1ad-481c-40d0-bab9-b21cbd7d73cd",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T15:00:29.143Z",
+      "createdAtMexicoCity": "11/08/2026, 09:00:29",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "8da5490f-23af-4428-86eb-28f611b68fac",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T16:01:07.691Z",
+      "createdAtMexicoCity": "11/08/2026, 10:01:07",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El recordatorio HUT automatico solo se envia de 15:00 a 18:00 hrs CDMX.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "OUTSIDE_OPERATIONAL_WINDOW",
+        "exclusionReasons": [
+          "OUTSIDE_OPERATIONAL_WINDOW"
+        ],
+        "evaluatedAtMexicoCity": "11/08/2026, 10:01 hrs CDMX"
+      }
+    },
+    {
+      "id": "0e3e1df8-0893-463d-9df5-25149ac5197d",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-12T21:01:31.865Z",
+      "createdAtMexicoCity": "12/08/2026, 15:01:31",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "12/08/2026, 15:01 hrs CDMX"
+      }
+    },
+    {
+      "id": "b2972082-38e6-48e4-9fa4-fb5f53294b13",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-12T22:00:34.171Z",
+      "createdAtMexicoCity": "12/08/2026, 16:00:34",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "12/08/2026, 16:00 hrs CDMX"
+      }
+    },
+    {
+      "id": "76acde88-1a8f-46a3-a5c8-df88b3a4a520",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-12T23:00:38.421Z",
+      "createdAtMexicoCity": "12/08/2026, 17:00:38",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "12/08/2026, 17:00 hrs CDMX"
+      }
+    },
+    {
+      "id": "431fb3a5-4e5f-4221-a22a-d9bd5c00ae20",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-13T21:00:06.321Z",
+      "createdAtMexicoCity": "13/08/2026, 15:00:06",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "13/08/2026, 15:00 hrs CDMX"
+      }
+    },
+    {
+      "id": "a5b3942f-199e-47cd-9528-b314ce098456",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-13T22:00:58.353Z",
+      "createdAtMexicoCity": "13/08/2026, 16:00:58",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "13/08/2026, 16:00 hrs CDMX"
+      }
+    },
+    {
+      "id": "3c3ccfe5-4399-4a9b-b63e-efe7594a1e36",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-13T23:01:02.833Z",
+      "createdAtMexicoCity": "13/08/2026, 17:01:02",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "13/08/2026, 17:01 hrs CDMX"
+      }
+    },
+    {
+      "id": "39514cc7-0b30-4b0a-804e-58ec82664ceb",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-14T21:00:59.393Z",
+      "createdAtMexicoCity": "14/08/2026, 15:00:59",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "14/08/2026, 15:00 hrs CDMX"
+      }
+    },
+    {
+      "id": "a80d2906-79bc-402b-8350-46c66cdadf25",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-14T22:00:55.143Z",
+      "createdAtMexicoCity": "14/08/2026, 16:00:55",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "14/08/2026, 16:00 hrs CDMX"
+      }
+    },
+    {
+      "id": "e950c5b5-6401-4553-b7cf-b15216665d9c",
+      "entityType": "HutParticipant",
+      "entityId": "607b954a-7dba-4e81-a0d5-4020187854bb",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-14T23:00:58.924Z",
+      "createdAtMexicoCity": "14/08/2026, 17:00:58",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_CLT",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "14/08/2026, 17:00 hrs CDMX"
+      }
+    }
+  ],
+  "warnings": [
+    "PRIVATE_EVIDENCE_EXPORTED_WITH_STORAGE_KEY_ONLY"
+  ]
+}

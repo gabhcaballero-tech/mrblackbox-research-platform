@@ -1,0 +1,646 @@
+{
+  "metadata": {
+    "exportType": "V1_TO_V2_CREATED_TODAY_2026_08_15_CDMX",
+    "sourceStudyCode": "FMASCULINA-NAVIGO-2026",
+    "sourceStudyName": "Fragancia Masculina — Navigo Homme",
+    "generatedAt": "2026-08-15T18:17:02.125Z",
+    "readOnly": true,
+    "cdmxRange": {
+      "start": "2026-08-15 00:00:00 America/Mexico_City",
+      "end": "2026-08-15 23:59:59 America/Mexico_City"
+    },
+    "utcRange": {
+      "startInclusive": "2026-08-15T06:00:00.000Z",
+      "endExclusive": "2026-08-16T06:00:00.000Z"
+    },
+    "criteria": [
+      "StudyParticipant.createdAt dentro del 15/08/2026 CDMX",
+      "Incluidos para importacion: NAV_FOLIO existente y codigos 1/2/3 completos",
+      "Estados agregados de screening distintos a PASSED se conservan como warnings",
+      "Excluidos: registros sin folio/codigos"
+    ],
+    "excludedData": [
+      "respuestas CLT detalladas",
+      "respuestas HUT detalladas",
+      "evidencias binarias",
+      "tokens internos"
+    ],
+    "totals": {
+      "createdToday": 15,
+      "included": 9,
+      "excluded": 6
+    }
+  },
+  "participants": [
+    {
+      "participantIdV1": "389b4296-fc64-4553-8c30-e38d5620c361",
+      "identificacion": {
+        "NAV_FOLIO": "NAV-146",
+        "HUT_FOLIO": "HUT-146"
+      },
+      "datos": {
+        "nombre": "Alfredo Lopes Villaruel",
+        "telefono": "5615620525",
+        "email": "villaruel0169@hotmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-15T15:18:24.982Z",
+        "fechaAprobacionMexicoCity": "15/08/26, 09:18:24",
+        "latestAttemptId": "2c4ea6ca-be93-4bc1-9b64-a0631d7a03bf",
+        "latestAttemptStatus": "PASSED"
+      },
+      "codigos": {
+        "codigo1": "6US6",
+        "codigo2": "BPHM",
+        "codigo3": "CAFA",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": true,
+        "cltRespuestas": 75,
+        "navigoIniciado": true,
+        "hutIniciado": true,
+        "resultadoMigracion": "IMPORTAR_CON_AVANCE",
+        "warnings": []
+      },
+      "registroV1": {
+        "createdAt": "2026-08-15T15:14:10.681Z",
+        "createdAtMexicoCity": "15/08/26, 09:14:10",
+        "operationalStatus": "IN_PROGRESS"
+      }
+    },
+    {
+      "participantIdV1": "00ec6bcc-7373-4248-be52-7eec0bfdc604",
+      "identificacion": {
+        "NAV_FOLIO": "NAV-150",
+        "HUT_FOLIO": "HUT-150"
+      },
+      "datos": {
+        "nombre": "ALAN JESÚS ESPINOSA MENDIETA",
+        "telefono": "+525528164746",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-15T16:33:49.411Z",
+        "fechaAprobacionMexicoCity": "15/08/26, 10:33:49",
+        "latestAttemptId": "3eda6b73-cf26-41e8-a33a-3e7bb5deb979",
+        "latestAttemptStatus": "PASSED"
+      },
+      "codigos": {
+        "codigo1": "V4BW",
+        "codigo2": "ZQJR",
+        "codigo3": "TNSS",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "navigoIniciado": false,
+        "hutIniciado": true,
+        "resultadoMigracion": "IMPORTAR_CON_AVANCE",
+        "warnings": []
+      },
+      "registroV1": {
+        "createdAt": "2026-08-15T16:12:24.401Z",
+        "createdAtMexicoCity": "15/08/26, 10:12:24",
+        "operationalStatus": "SCREENING_PASSED"
+      }
+    },
+    {
+      "participantIdV1": "8dc478f5-f8ac-40ae-8bae-895c2ae10236",
+      "identificacion": {
+        "NAV_FOLIO": "NAV-148",
+        "HUT_FOLIO": "HUT-148"
+      },
+      "datos": {
+        "nombre": "LUIS GONZÁLEZ AMAYA",
+        "telefono": "+525545787689",
+        "email": "lubel8081@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-15T16:33:05.535Z",
+        "fechaAprobacionMexicoCity": "15/08/26, 10:33:05",
+        "latestAttemptId": "476740ce-98d4-4748-9e28-888c93cf4df7",
+        "latestAttemptStatus": "PASSED"
+      },
+      "codigos": {
+        "codigo1": "ZZHK",
+        "codigo2": "TTWC",
+        "codigo3": "S8QD",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "navigoIniciado": false,
+        "hutIniciado": true,
+        "resultadoMigracion": "IMPORTAR_CON_AVANCE",
+        "warnings": []
+      },
+      "registroV1": {
+        "createdAt": "2026-08-15T16:13:25.507Z",
+        "createdAtMexicoCity": "15/08/26, 10:13:25",
+        "operationalStatus": "SCREENING_PASSED"
+      }
+    },
+    {
+      "participantIdV1": "291d6dc3-3977-4ebc-8e04-4e043a614d16",
+      "identificacion": {
+        "NAV_FOLIO": "NAV-149",
+        "HUT_FOLIO": "HUT-149"
+      },
+      "datos": {
+        "nombre": "GERARDO ZARATE MARTÍNEZ",
+        "telefono": "+525524159001",
+        "email": "gerardozarate3@hotmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-15T16:33:16.910Z",
+        "fechaAprobacionMexicoCity": "15/08/26, 10:33:16",
+        "latestAttemptId": "608a22c0-0daf-472f-a082-d122c6b6de63",
+        "latestAttemptStatus": "PASSED"
+      },
+      "codigos": {
+        "codigo1": "4ADX",
+        "codigo2": "Z6M4",
+        "codigo3": "6VQF",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "navigoIniciado": false,
+        "hutIniciado": true,
+        "resultadoMigracion": "IMPORTAR_CON_AVANCE",
+        "warnings": []
+      },
+      "registroV1": {
+        "createdAt": "2026-08-15T16:14:53.677Z",
+        "createdAtMexicoCity": "15/08/26, 10:14:53",
+        "operationalStatus": "SCREENING_PASSED"
+      }
+    },
+    {
+      "participantIdV1": "8fb0835e-d4ce-43b9-9225-8ae1339dd154",
+      "identificacion": {
+        "NAV_FOLIO": "NAV-152",
+        "HUT_FOLIO": "HUT-152"
+      },
+      "datos": {
+        "nombre": "JORGE EDUARDO CARMONA SANTILLANA",
+        "telefono": "+525577579273",
+        "email": "jorgesantillana43@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-15T16:38:38.601Z",
+        "fechaAprobacionMexicoCity": "15/08/26, 10:38:38",
+        "latestAttemptId": "ab13fd79-cb36-451e-b156-6c660ef9766a",
+        "latestAttemptStatus": "PASSED"
+      },
+      "codigos": {
+        "codigo1": "SXN9",
+        "codigo2": "W6MB",
+        "codigo3": "REP6",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "navigoIniciado": false,
+        "hutIniciado": true,
+        "resultadoMigracion": "IMPORTAR_CON_AVANCE",
+        "warnings": []
+      },
+      "registroV1": {
+        "createdAt": "2026-08-15T16:17:18.283Z",
+        "createdAtMexicoCity": "15/08/26, 10:17:18",
+        "operationalStatus": "SCREENING_PASSED"
+      }
+    },
+    {
+      "participantIdV1": "60a671d3-e242-420f-be7a-dc790a86fd8b",
+      "identificacion": {
+        "NAV_FOLIO": "NAV-153",
+        "HUT_FOLIO": "HUT-153"
+      },
+      "datos": {
+        "nombre": "FABIAN TORRES URIBE",
+        "telefono": "+525516800935",
+        "email": "fabian_7latidos@hotmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-15T16:39:46.287Z",
+        "fechaAprobacionMexicoCity": "15/08/26, 10:39:46",
+        "latestAttemptId": "7d288bc5-2616-449d-9413-3d0fb33a5028",
+        "latestAttemptStatus": "PASSED"
+      },
+      "codigos": {
+        "codigo1": "CUJY",
+        "codigo2": "4VXB",
+        "codigo3": "97UY",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "navigoIniciado": false,
+        "hutIniciado": true,
+        "resultadoMigracion": "IMPORTAR_CON_AVANCE",
+        "warnings": []
+      },
+      "registroV1": {
+        "createdAt": "2026-08-15T16:22:07.633Z",
+        "createdAtMexicoCity": "15/08/26, 10:22:07",
+        "operationalStatus": "SCREENING_PASSED"
+      }
+    },
+    {
+      "participantIdV1": "2f390899-4cd0-4fb9-accd-010cabfd4a40",
+      "identificacion": {
+        "NAV_FOLIO": "NAV-151",
+        "HUT_FOLIO": "HUT-151"
+      },
+      "datos": {
+        "nombre": "JORGE TOMAS LOREDO FLORES",
+        "telefono": "+524442887718",
+        "email": "jtlftom3ero@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-15T16:36:15.461Z",
+        "fechaAprobacionMexicoCity": "15/08/26, 10:36:15",
+        "latestAttemptId": "b567df9f-db56-4a3a-ba50-6fd819c462bc",
+        "latestAttemptStatus": "PASSED"
+      },
+      "codigos": {
+        "codigo1": "TVTR",
+        "codigo2": "7DRG",
+        "codigo3": "YS22",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "navigoIniciado": false,
+        "hutIniciado": true,
+        "resultadoMigracion": "IMPORTAR_CON_AVANCE",
+        "warnings": []
+      },
+      "registroV1": {
+        "createdAt": "2026-08-15T16:24:02.441Z",
+        "createdAtMexicoCity": "15/08/26, 10:24:02",
+        "operationalStatus": "SCREENING_PASSED"
+      }
+    },
+    {
+      "participantIdV1": "13c0ec6a-2eb6-428f-84f1-1a1ccacf0879",
+      "identificacion": {
+        "NAV_FOLIO": "NAV-147",
+        "HUT_FOLIO": "HUT-147"
+      },
+      "datos": {
+        "nombre": "Jordan",
+        "telefono": "5582207934",
+        "email": "jordanjpicszol@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PENDING_REVIEW",
+        "screeningResult": "PENDING_REVIEW",
+        "fechaAprobacion": "2026-08-15T16:32:43.120Z",
+        "fechaAprobacionMexicoCity": "15/08/26, 10:32:43",
+        "latestAttemptId": "c9300422-5930-40de-88bb-b9c99ad09a22",
+        "latestAttemptStatus": "PENDING_REVIEW"
+      },
+      "codigos": {
+        "codigo1": "94TF",
+        "codigo2": "QXS7",
+        "codigo3": "UV8R",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "navigoIniciado": false,
+        "hutIniciado": true,
+        "resultadoMigracion": "IMPORTAR_CON_AVANCE",
+        "warnings": [
+          "SCREENING_STATUS_PENDING_REVIEW"
+        ]
+      },
+      "registroV1": {
+        "createdAt": "2026-08-15T16:28:55.480Z",
+        "createdAtMexicoCity": "15/08/26, 10:28:55",
+        "operationalStatus": "SCREENING_PASSED"
+      }
+    },
+    {
+      "participantIdV1": "26aff770-a401-439b-bc86-929ee7d44d0d",
+      "identificacion": {
+        "NAV_FOLIO": "NAV-154",
+        "HUT_FOLIO": "HUT-154"
+      },
+      "datos": {
+        "nombre": "HÉCTOR EDUARDO RICO LOPEZ",
+        "telefono": "+525561658964",
+        "email": "ricohector782@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-15T16:47:59.436Z",
+        "fechaAprobacionMexicoCity": "15/08/26, 10:47:59",
+        "latestAttemptId": "95fcaea1-5a50-4545-b3e3-763ab0a01541",
+        "latestAttemptStatus": "PASSED"
+      },
+      "codigos": {
+        "codigo1": "42FG",
+        "codigo2": "F34P",
+        "codigo3": "68MU",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "navigoIniciado": false,
+        "hutIniciado": true,
+        "resultadoMigracion": "IMPORTAR_CON_AVANCE",
+        "warnings": []
+      },
+      "registroV1": {
+        "createdAt": "2026-08-15T16:39:56.196Z",
+        "createdAtMexicoCity": "15/08/26, 10:39:56",
+        "operationalStatus": "SCREENING_PASSED"
+      }
+    }
+  ],
+  "excluded": [
+    {
+      "participantIdV1": "31ff943f-c80a-4f08-ae0c-48aeac7af5de",
+      "identificacion": {
+        "NAV_FOLIO": null,
+        "HUT_FOLIO": null
+      },
+      "datos": {
+        "nombre": "ANIBAL VAZQUEZ SANTOS",
+        "telefono": "+525537740147",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "INCOMPLETE",
+        "screeningResult": "INCOMPLETE",
+        "fechaAprobacion": null,
+        "fechaAprobacionMexicoCity": null,
+        "latestAttemptId": "adfa48e7-276c-416f-88b3-2a9c7cf40745",
+        "latestAttemptStatus": "INCOMPLETE"
+      },
+      "codigos": {
+        "codigo1": null,
+        "codigo2": null,
+        "codigo3": null,
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "navigoIniciado": false,
+        "hutIniciado": false,
+        "resultadoMigracion": "SIN_NAV_FOLIO",
+        "warnings": []
+      },
+      "registroV1": {
+        "createdAt": "2026-08-15T16:21:03.081Z",
+        "createdAtMexicoCity": "15/08/26, 10:21:03",
+        "operationalStatus": "SCREENING_STARTED"
+      },
+      "motivoExclusion": "SIN_NAV_FOLIO"
+    },
+    {
+      "participantIdV1": "14524731-561f-47c3-8cf7-23b0472b0033",
+      "identificacion": {
+        "NAV_FOLIO": null,
+        "HUT_FOLIO": null
+      },
+      "datos": {
+        "nombre": "BRANDON SANTIAGO SORIA",
+        "telefono": "+525534258866",
+        "email": "santiagosoriabrandon@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "TERMINATED",
+        "screeningResult": "REJECTED",
+        "fechaAprobacion": null,
+        "fechaAprobacionMexicoCity": null,
+        "latestAttemptId": "1a96cc7a-5341-464e-8b7a-a3c3e109b1b0",
+        "latestAttemptStatus": "TERMINATED"
+      },
+      "codigos": {
+        "codigo1": null,
+        "codigo2": null,
+        "codigo3": null,
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "navigoIniciado": false,
+        "hutIniciado": false,
+        "resultadoMigracion": "SIN_NAV_FOLIO",
+        "warnings": []
+      },
+      "registroV1": {
+        "createdAt": "2026-08-15T16:24:10.544Z",
+        "createdAtMexicoCity": "15/08/26, 10:24:10",
+        "operationalStatus": "SCREENING_TERMINATED"
+      },
+      "motivoExclusion": "SIN_NAV_FOLIO"
+    },
+    {
+      "participantIdV1": "b6a34d29-c85d-4775-8040-ea98bf9decfb",
+      "identificacion": {
+        "NAV_FOLIO": null,
+        "HUT_FOLIO": null
+      },
+      "datos": {
+        "nombre": "PEDRO HERNANDEZ",
+        "telefono": "+526671815057",
+        "email": "dragondelcielo25@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "INCOMPLETE",
+        "screeningResult": "INCOMPLETE",
+        "fechaAprobacion": null,
+        "fechaAprobacionMexicoCity": null,
+        "latestAttemptId": "9e1fe9fd-c20e-4398-b013-76e90368160b",
+        "latestAttemptStatus": "INCOMPLETE"
+      },
+      "codigos": {
+        "codigo1": null,
+        "codigo2": null,
+        "codigo3": null,
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "navigoIniciado": false,
+        "hutIniciado": false,
+        "resultadoMigracion": "SIN_NAV_FOLIO",
+        "warnings": []
+      },
+      "registroV1": {
+        "createdAt": "2026-08-15T16:25:28.984Z",
+        "createdAtMexicoCity": "15/08/26, 10:25:28",
+        "operationalStatus": "SCREENING_STARTED"
+      },
+      "motivoExclusion": "SIN_NAV_FOLIO"
+    },
+    {
+      "participantIdV1": "48eb5998-0ecf-4c97-b2fa-e77703600f96",
+      "identificacion": {
+        "NAV_FOLIO": null,
+        "HUT_FOLIO": null
+      },
+      "datos": {
+        "nombre": "CRISTIAN SANTIAGO SORIA",
+        "telefono": "+525571874388",
+        "email": "brandon31thanathos@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "INCOMPLETE",
+        "screeningResult": "INCOMPLETE",
+        "fechaAprobacion": null,
+        "fechaAprobacionMexicoCity": null,
+        "latestAttemptId": "6d81ce82-744f-44b7-8adb-0dd6ac3b7693",
+        "latestAttemptStatus": "INCOMPLETE"
+      },
+      "codigos": {
+        "codigo1": null,
+        "codigo2": null,
+        "codigo3": null,
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "navigoIniciado": false,
+        "hutIniciado": false,
+        "resultadoMigracion": "SIN_NAV_FOLIO",
+        "warnings": []
+      },
+      "registroV1": {
+        "createdAt": "2026-08-15T16:37:41.510Z",
+        "createdAtMexicoCity": "15/08/26, 10:37:41",
+        "operationalStatus": "SCREENING_STARTED"
+      },
+      "motivoExclusion": "SIN_NAV_FOLIO"
+    },
+    {
+      "participantIdV1": "8264a0f6-abef-465f-a060-cc1e42dd0754",
+      "identificacion": {
+        "NAV_FOLIO": null,
+        "HUT_FOLIO": null
+      },
+      "datos": {
+        "nombre": "ERIC ISMAEL VALENCIA LOPEZ",
+        "telefono": "+525575694267",
+        "email": "erick.valencia87@yahoo.com.mx",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "INCOMPLETE",
+        "screeningResult": "INCOMPLETE",
+        "fechaAprobacion": null,
+        "fechaAprobacionMexicoCity": null,
+        "latestAttemptId": "0c4716d7-c7fd-4600-9a36-57f525b2148a",
+        "latestAttemptStatus": "INCOMPLETE"
+      },
+      "codigos": {
+        "codigo1": null,
+        "codigo2": null,
+        "codigo3": null,
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "navigoIniciado": false,
+        "hutIniciado": false,
+        "resultadoMigracion": "SIN_NAV_FOLIO",
+        "warnings": []
+      },
+      "registroV1": {
+        "createdAt": "2026-08-15T16:44:17.437Z",
+        "createdAtMexicoCity": "15/08/26, 10:44:17",
+        "operationalStatus": "SCREENING_STARTED"
+      },
+      "motivoExclusion": "SIN_NAV_FOLIO"
+    },
+    {
+      "participantIdV1": "212ac0e6-7509-4cfc-b7ef-c8398c38fc1e",
+      "identificacion": {
+        "NAV_FOLIO": null,
+        "HUT_FOLIO": null
+      },
+      "datos": {
+        "nombre": "MIGUEL ANGEL CASTAÑEDA",
+        "telefono": "+525546196763",
+        "email": "miguel.angel.castaneda.mac@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "TERMINATED",
+        "screeningResult": "REJECTED",
+        "fechaAprobacion": null,
+        "fechaAprobacionMexicoCity": null,
+        "latestAttemptId": "172d5cb1-2232-4797-b0c0-0e64ef849bf8",
+        "latestAttemptStatus": "TERMINATED"
+      },
+      "codigos": {
+        "codigo1": null,
+        "codigo2": null,
+        "codigo3": null,
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "navigoIniciado": false,
+        "hutIniciado": false,
+        "resultadoMigracion": "SIN_NAV_FOLIO",
+        "warnings": []
+      },
+      "registroV1": {
+        "createdAt": "2026-08-15T17:00:31.117Z",
+        "createdAtMexicoCity": "15/08/26, 11:00:31",
+        "operationalStatus": "SCREENING_TERMINATED"
+      },
+      "motivoExclusion": "SIN_NAV_FOLIO"
+    }
+  ]
+}

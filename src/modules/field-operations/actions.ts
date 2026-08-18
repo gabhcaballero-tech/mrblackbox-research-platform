@@ -3,6 +3,10 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createNavigoAppRepository } from "@/modules/navigo-app";
+import {
+  V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE,
+  areV1OperationalCommunicationsDisabled
+} from "@/modules/oneui-whatsapp";
 import { requireCapability } from "@/shared/auth/session";
 
 export async function sendFieldNavigoEvaluationReminderNowAction(
@@ -12,6 +16,13 @@ export async function sendFieldNavigoEvaluationReminderNowAction(
   studyId: string
 ) {
   const actor = await requireCapability("field:access");
+  if (areV1OperationalCommunicationsDisabled()) {
+    const params = new URLSearchParams();
+    params.set("fieldOpsError", V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE);
+
+    redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}${params.toString()}`);
+  }
+
   const result = await createNavigoAppRepository().sendEvaluationReminderNow({
     actorUserId: actor.id,
     participantActivityId: activityId,

@@ -1,0 +1,758 @@
+{
+  "generatedAt": "2026-08-18T04:50:06.130Z",
+  "readOnly": true,
+  "rows": [
+    {
+      "folio": "NAV-117",
+      "hutFolio": "HUT-117",
+      "participantName": "LUIS ANGEL SANCHEZ AGUILAR",
+      "studyParticipantId": "cf1aea90-e6a4-4efe-9160-a29d36b7831f",
+      "hutParticipantId": "77d1bd6c-5734-4668-abcb-238c46efa0e6",
+      "attempt": {
+        "id": "4b0f7362-f9e9-45c6-981b-d07caf901c98",
+        "status": "IN_PROGRESS",
+        "startedAt": "2026-08-15T19:45:21.558Z",
+        "completedAt": null,
+        "updatedAt": "2026-08-15T19:45:21.576Z"
+      },
+      "comparativeVisit": {
+        "id": "1d328a59-9703-4a36-819f-0b3f9414c229",
+        "section": "COMPARATIVA",
+        "status": "COMPLETED",
+        "startedAt": "2026-08-15T19:45:21.558Z",
+        "completedAt": "2026-08-15T19:45:21.592Z",
+        "updatedAt": "2026-08-15T19:45:21.609Z"
+      },
+      "comparativeAnswers": [
+        {
+          "id": "e31f80d9-5de9-4bdd-be7b-ed5c0d66b1b9",
+          "questionCode": "HUT_P24_PREFERENCIA_GENERAL",
+          "questionLabel": "P24. Preferencia general",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": "1",
+          "answeredAt": "2026-08-15T19:43:11.507Z",
+          "updatedAt": "2026-08-15T19:43:11.507Z"
+        },
+        {
+          "id": "092cbc89-2ddd-4706-880d-75bbfaa5ad56",
+          "questionCode": "HUT_P25_COMPRA_PRIMERO",
+          "questionLabel": "P25. Probabilidad de compra primer perfume",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": 4,
+          "answeredAt": "2026-08-15T19:43:31.211Z",
+          "updatedAt": "2026-08-15T19:43:31.211Z"
+        },
+        {
+          "id": "3dd4f749-5daf-475b-aa94-297d67e233b3",
+          "questionCode": "HUT_P26_COMPRA_SEGUNDO",
+          "questionLabel": "P26. Probabilidad de compra segundo perfume",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": 4,
+          "answeredAt": "2026-08-15T19:43:43.886Z",
+          "updatedAt": "2026-08-15T19:43:43.886Z"
+        },
+        {
+          "id": "16e00759-da88-449e-8cb6-806e870bc6e7",
+          "questionCode": "HUT_P27_COMPARATIVA_ATRIBUTOS",
+          "questionLabel": "P27. Comparativa de atributos",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": {
+            "SEGURIDAD": "1",
+            "AROMA_UNICO": "1",
+            "ENVASE_COMODO": "3",
+            "AROMA_DURADERO": "1",
+            "CANTIDAD_FACIL": "3",
+            "AROMA_AGRADABLE": "1",
+            "DIRECCION_FACIL": "3",
+            "ATOMIZADOR_CALIDAD": "3",
+            "ATOMIZADOR_CANTIDAD": "4",
+            "ATOMIZADOR_FUNCIONO": "3",
+            "ATOMIZADOR_UNIFORME": "3",
+            "INTENSIDAD_ADECUADA": "1",
+            "ATOMIZADOR_DISTRIBUYE": "3",
+            "ATOMIZADOR_RESISTENTE": "3",
+            "REFLEJA_MI_PERSONALIDAD": "1",
+            "ATOMIZADOR_FACIL_PRESIONAR": "3",
+            "ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO": "1"
+          },
+          "answeredAt": "2026-08-15T19:45:21.592Z",
+          "updatedAt": "2026-08-15T19:45:21.593Z"
+        }
+      ],
+      "comparativeEvidence": [],
+      "allHutEvidence": [
+        {
+          "type": "HutApplicationEvidence",
+          "phase": "COLOCACION",
+          "capturedAt": "2026-08-11T16:45:38.702Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/77d1bd6c-5734-4668-abcb-238c46efa0e6/application-photos/colocacion/77ace4b1-65d3-4bbc-ae9e-dc2d41be5332.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 0,
+          "productCode": null,
+          "capturedAt": "2026-08-11T00:02:31.056Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/77d1bd6c-5734-4668-abcb-238c46efa0e6/application-photos/colocacion/0a8d50d7-6b0d-4fe3-a4e8-cd851f6c5254.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 2,
+          "productCode": "247",
+          "capturedAt": "2026-08-12T18:46:51.985Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/77d1bd6c-5734-4668-abcb-238c46efa0e6/application-photos/colocacion/4dcab281-f4d9-4fd0-a680-37e29fdb6c69.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 4,
+          "productCode": "583",
+          "capturedAt": "2026-08-13T20:55:10.029Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/77d1bd6c-5734-4668-abcb-238c46efa0e6/application-photos/regreso_2/948c9b46-da80-4a29-9bf6-584f97fcd82b.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 3,
+          "productCode": "247",
+          "capturedAt": "2026-08-14T21:11:11.163Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/77d1bd6c-5734-4668-abcb-238c46efa0e6/application-photos/colocacion/a3076bcd-74e3-4326-a93c-90854507fe72.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 5,
+          "productCode": "583",
+          "capturedAt": "2026-08-15T16:48:39.993Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/77d1bd6c-5734-4668-abcb-238c46efa0e6/application-photos/regreso_2/c398a24c-b6b0-4e40-af14-757a4aa3b4b5.jpg"
+        }
+      ],
+      "classification": "A_COMPARATIVA_REAL_CAPTURADA"
+    },
+    {
+      "folio": "NAV-100",
+      "hutFolio": "HUT-100",
+      "participantName": "FRANCISCO ROMERO GARCÍA",
+      "studyParticipantId": "eb4a4f3d-29f2-4705-9716-e38c267bf42b",
+      "hutParticipantId": "e581c1b1-42e2-48a9-8285-0f1042718260",
+      "attempt": {
+        "id": "8c0019a2-9ab2-427f-a31b-566ac977726f",
+        "status": "IN_PROGRESS",
+        "startedAt": "2026-08-15T23:14:30.052Z",
+        "completedAt": null,
+        "updatedAt": "2026-08-15T23:14:30.074Z"
+      },
+      "comparativeVisit": {
+        "id": "fed05a36-a5e1-42ba-9f59-fc9653115aa9",
+        "section": "COMPARATIVA",
+        "status": "COMPLETED",
+        "startedAt": "2026-08-15T23:14:30.052Z",
+        "completedAt": "2026-08-15T23:14:30.088Z",
+        "updatedAt": "2026-08-15T23:14:30.106Z"
+      },
+      "comparativeAnswers": [
+        {
+          "id": "e1d408d0-dfa8-413a-9f06-78c729adf312",
+          "questionCode": "HUT_P24_PREFERENCIA_GENERAL",
+          "questionLabel": "P24. Preferencia general",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": "2",
+          "answeredAt": "2026-08-15T23:11:42.680Z",
+          "updatedAt": "2026-08-15T23:11:42.682Z"
+        },
+        {
+          "id": "7dd2586d-b05c-4585-86ea-0d1b04b9f035",
+          "questionCode": "HUT_P25_COMPRA_PRIMERO",
+          "questionLabel": "P25. Probabilidad de compra primer perfume",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": 4,
+          "answeredAt": "2026-08-15T23:12:03.876Z",
+          "updatedAt": "2026-08-15T23:12:03.880Z"
+        },
+        {
+          "id": "ddcee671-9b42-441d-8401-17e2207cff31",
+          "questionCode": "HUT_P26_COMPRA_SEGUNDO",
+          "questionLabel": "P26. Probabilidad de compra segundo perfume",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": 4,
+          "answeredAt": "2026-08-15T23:12:20.773Z",
+          "updatedAt": "2026-08-15T23:12:20.773Z"
+        },
+        {
+          "id": "a72ca94a-99c0-46ae-949c-e48c312cd955",
+          "questionCode": "HUT_P27_COMPARATIVA_ATRIBUTOS",
+          "questionLabel": "P27. Comparativa de atributos",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": {
+            "SEGURIDAD": "2",
+            "AROMA_UNICO": "2",
+            "ENVASE_COMODO": "2",
+            "AROMA_DURADERO": "2",
+            "CANTIDAD_FACIL": "3",
+            "AROMA_AGRADABLE": "2",
+            "DIRECCION_FACIL": "3",
+            "ATOMIZADOR_CALIDAD": "3",
+            "ATOMIZADOR_CANTIDAD": "3",
+            "ATOMIZADOR_FUNCIONO": "3",
+            "ATOMIZADOR_UNIFORME": "3",
+            "INTENSIDAD_ADECUADA": "2",
+            "ATOMIZADOR_DISTRIBUYE": "3",
+            "ATOMIZADOR_RESISTENTE": "2",
+            "REFLEJA_MI_PERSONALIDAD": "2",
+            "ATOMIZADOR_FACIL_PRESIONAR": "3",
+            "ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO": "2"
+          },
+          "answeredAt": "2026-08-15T23:14:30.088Z",
+          "updatedAt": "2026-08-15T23:14:30.090Z"
+        }
+      ],
+      "comparativeEvidence": [],
+      "allHutEvidence": [
+        {
+          "type": "HutApplicationEvidence",
+          "phase": "COLOCACION",
+          "capturedAt": "2026-08-08T17:28:56.126Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/e581c1b1-42e2-48a9-8285-0f1042718260/application-photos/colocacion/7984233d-7a0e-48e8-ac47-789478e2acd5.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 1,
+          "productCode": "583",
+          "capturedAt": "2026-08-08T17:28:56.126Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/e581c1b1-42e2-48a9-8285-0f1042718260/application-photos/colocacion/7984233d-7a0e-48e8-ac47-789478e2acd5.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 1,
+          "productCode": "583",
+          "capturedAt": "2026-08-11T14:53:00.043Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/e581c1b1-42e2-48a9-8285-0f1042718260/application-photos/colocacion/1c0aa6f7-68d4-4b95-9400-1c630fbf9fe9.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 2,
+          "productCode": "583",
+          "capturedAt": "2026-08-13T04:03:00.633Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/e581c1b1-42e2-48a9-8285-0f1042718260/application-photos/colocacion/d4bb8760-b272-4f52-86c6-8b7f630981a7.jpg"
+        }
+      ],
+      "classification": "A_COMPARATIVA_REAL_CAPTURADA"
+    },
+    {
+      "folio": "NAV-110",
+      "hutFolio": "HUT-110",
+      "participantName": "GERMAINE FARID PEÑA RANGEL",
+      "studyParticipantId": "8454b331-4600-446e-8d3c-9aae44e1e508",
+      "hutParticipantId": "19ee863c-1c93-422c-ac1f-484b6e7304b1",
+      "attempt": {
+        "id": "5aac8b9c-3fdf-4c5a-a081-2fb9f8acc842",
+        "status": "IN_PROGRESS",
+        "startedAt": "2026-08-15T19:37:30.776Z",
+        "completedAt": null,
+        "updatedAt": "2026-08-15T19:37:30.793Z"
+      },
+      "comparativeVisit": {
+        "id": "60a62c43-a9b2-4f4f-82ce-7ec8e6d1f3c8",
+        "section": "COMPARATIVA",
+        "status": "COMPLETED",
+        "startedAt": "2026-08-15T19:37:30.776Z",
+        "completedAt": "2026-08-15T19:37:30.807Z",
+        "updatedAt": "2026-08-15T19:37:30.824Z"
+      },
+      "comparativeAnswers": [
+        {
+          "id": "a9c645fd-85b2-4bc9-b4a1-6557ff7235fe",
+          "questionCode": "HUT_P24_PREFERENCIA_GENERAL",
+          "questionLabel": "P24. Preferencia general",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": "2",
+          "answeredAt": "2026-08-15T19:34:51.156Z",
+          "updatedAt": "2026-08-15T19:34:51.157Z"
+        },
+        {
+          "id": "fb5b88ca-9523-4263-a611-f241daa50a0d",
+          "questionCode": "HUT_P25_COMPRA_PRIMERO",
+          "questionLabel": "P25. Probabilidad de compra primer perfume",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": 2,
+          "answeredAt": "2026-08-15T19:35:13.397Z",
+          "updatedAt": "2026-08-15T19:35:13.399Z"
+        },
+        {
+          "id": "d95aa9d8-d0e3-4f8d-a89d-53dd4f63b597",
+          "questionCode": "HUT_P26_COMPRA_SEGUNDO",
+          "questionLabel": "P26. Probabilidad de compra segundo perfume",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": 4,
+          "answeredAt": "2026-08-15T19:35:27.320Z",
+          "updatedAt": "2026-08-15T19:35:27.323Z"
+        },
+        {
+          "id": "49ab62d4-a76c-4990-915a-4091d64c88d0",
+          "questionCode": "HUT_P27_COMPARATIVA_ATRIBUTOS",
+          "questionLabel": "P27. Comparativa de atributos",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": {
+            "SEGURIDAD": "2",
+            "AROMA_UNICO": "2",
+            "ENVASE_COMODO": "4",
+            "AROMA_DURADERO": "3",
+            "CANTIDAD_FACIL": "2",
+            "AROMA_AGRADABLE": "3",
+            "DIRECCION_FACIL": "4",
+            "ATOMIZADOR_CALIDAD": "2",
+            "ATOMIZADOR_CANTIDAD": "3",
+            "ATOMIZADOR_FUNCIONO": "2",
+            "ATOMIZADOR_UNIFORME": "3",
+            "INTENSIDAD_ADECUADA": "2",
+            "ATOMIZADOR_DISTRIBUYE": "3",
+            "ATOMIZADOR_RESISTENTE": "2",
+            "REFLEJA_MI_PERSONALIDAD": "2",
+            "ATOMIZADOR_FACIL_PRESIONAR": "4",
+            "ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO": "2"
+          },
+          "answeredAt": "2026-08-15T19:37:30.807Z",
+          "updatedAt": "2026-08-15T19:37:30.808Z"
+        }
+      ],
+      "comparativeEvidence": [],
+      "allHutEvidence": [
+        {
+          "type": "HutApplicationEvidence",
+          "phase": "COLOCACION",
+          "capturedAt": "2026-08-08T19:13:11.834Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/19ee863c-1c93-422c-ac1f-484b6e7304b1/application-photos/colocacion/9452351a-5e56-4357-9159-96b7d862599d.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 1,
+          "productCode": "583",
+          "capturedAt": "2026-08-08T19:13:11.834Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/19ee863c-1c93-422c-ac1f-484b6e7304b1/application-photos/colocacion/9452351a-5e56-4357-9159-96b7d862599d.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 1,
+          "productCode": "583",
+          "capturedAt": "2026-08-10T20:53:40.368Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/19ee863c-1c93-422c-ac1f-484b6e7304b1/application-photos/colocacion/4cbe5964-86d2-41c9-a39e-827e689a4ef2.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 2,
+          "productCode": "583",
+          "capturedAt": "2026-08-11T16:24:43.455Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/19ee863c-1c93-422c-ac1f-484b6e7304b1/application-photos/colocacion/dc5493b7-28a1-4739-a664-a8c581e6d3ee.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 3,
+          "productCode": "583",
+          "capturedAt": "2026-08-12T18:42:00.257Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/19ee863c-1c93-422c-ac1f-484b6e7304b1/application-photos/colocacion/d7a8f8e7-308e-4a47-9608-8566c329746b.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 4,
+          "productCode": "247",
+          "capturedAt": "2026-08-13T21:04:35.777Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/19ee863c-1c93-422c-ac1f-484b6e7304b1/application-photos/regreso_2/54e9d5f2-ad44-4020-bc44-cdcefa1786cb.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 5,
+          "productCode": "247",
+          "capturedAt": "2026-08-14T21:04:11.451Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/19ee863c-1c93-422c-ac1f-484b6e7304b1/application-photos/regreso_2/2bf5f61d-aaad-4e6b-ae69-deae7ef1eada.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 6,
+          "productCode": "247",
+          "capturedAt": "2026-08-15T16:45:38.874Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/19ee863c-1c93-422c-ac1f-484b6e7304b1/application-photos/regreso_2/7357042b-49f0-456d-8a1f-228497242d2c.jpg"
+        }
+      ],
+      "classification": "A_COMPARATIVA_REAL_CAPTURADA"
+    },
+    {
+      "folio": "NAV-078",
+      "hutFolio": "HUT-078",
+      "participantName": "ESLIM RICARDO ROJAS POZOS",
+      "studyParticipantId": "1f0c33c6-843c-4988-80f8-5cedff9e2956",
+      "hutParticipantId": "5b8b6788-0c23-4d85-83e4-3725b1b4cde1",
+      "attempt": {
+        "id": "fd216a54-f03a-40bd-a02b-b09029372af0",
+        "status": "IN_PROGRESS",
+        "startedAt": "2026-08-17T20:35:06.653Z",
+        "completedAt": null,
+        "updatedAt": "2026-08-17T20:35:06.672Z"
+      },
+      "comparativeVisit": {
+        "id": "c37971ea-e61c-4763-94a4-cdb32e72c57e",
+        "section": "COMPARATIVA",
+        "status": "COMPLETED",
+        "startedAt": "2026-08-17T20:35:06.653Z",
+        "completedAt": "2026-08-17T20:35:06.688Z",
+        "updatedAt": "2026-08-17T20:35:06.706Z"
+      },
+      "comparativeAnswers": [
+        {
+          "id": "e7cb430e-2e86-4291-a59c-1fbb70d57a77",
+          "questionCode": "HUT_P24_PREFERENCIA_GENERAL",
+          "questionLabel": "P24. Preferencia general",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": "2",
+          "answeredAt": "2026-08-17T20:32:39.711Z",
+          "updatedAt": "2026-08-17T20:32:39.712Z"
+        },
+        {
+          "id": "6a083a54-dea3-4678-b51a-e7bdf29c5d94",
+          "questionCode": "HUT_P25_COMPRA_PRIMERO",
+          "questionLabel": "P25. Probabilidad de compra primer perfume",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": 1,
+          "answeredAt": "2026-08-17T20:32:53.830Z",
+          "updatedAt": "2026-08-17T20:32:53.832Z"
+        },
+        {
+          "id": "9c7edd70-2439-4592-b2c7-da292ad54fe0",
+          "questionCode": "HUT_P26_COMPRA_SEGUNDO",
+          "questionLabel": "P26. Probabilidad de compra segundo perfume",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": 5,
+          "answeredAt": "2026-08-17T20:33:06.208Z",
+          "updatedAt": "2026-08-17T20:33:06.210Z"
+        },
+        {
+          "id": "e6644f98-7cb8-47a2-940d-19d8bf21ae8a",
+          "questionCode": "HUT_P27_COMPARATIVA_ATRIBUTOS",
+          "questionLabel": "P27. Comparativa de atributos",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": {
+            "SEGURIDAD": "2",
+            "AROMA_UNICO": "3",
+            "ENVASE_COMODO": "2",
+            "AROMA_DURADERO": "2",
+            "CANTIDAD_FACIL": "2",
+            "AROMA_AGRADABLE": "2",
+            "DIRECCION_FACIL": "2",
+            "ATOMIZADOR_CALIDAD": "3",
+            "ATOMIZADOR_CANTIDAD": "3",
+            "ATOMIZADOR_FUNCIONO": "3",
+            "ATOMIZADOR_UNIFORME": "3",
+            "INTENSIDAD_ADECUADA": "2",
+            "ATOMIZADOR_DISTRIBUYE": "3",
+            "ATOMIZADOR_RESISTENTE": "3",
+            "REFLEJA_MI_PERSONALIDAD": "2",
+            "ATOMIZADOR_FACIL_PRESIONAR": "3",
+            "ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO": "2"
+          },
+          "answeredAt": "2026-08-17T20:35:06.688Z",
+          "updatedAt": "2026-08-17T20:35:06.690Z"
+        }
+      ],
+      "comparativeEvidence": [],
+      "allHutEvidence": [
+        {
+          "type": "HutApplicationEvidence",
+          "phase": "COLOCACION",
+          "capturedAt": "2026-08-08T17:16:30.915Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/5b8b6788-0c23-4d85-83e4-3725b1b4cde1/application-photos/colocacion/d118f077-73fb-4a50-abc0-339054c940fc.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 1,
+          "productCode": "583",
+          "capturedAt": "2026-08-08T17:16:30.915Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/5b8b6788-0c23-4d85-83e4-3725b1b4cde1/application-photos/colocacion/d118f077-73fb-4a50-abc0-339054c940fc.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 1,
+          "productCode": "583",
+          "capturedAt": "2026-08-11T04:37:15.389Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/5b8b6788-0c23-4d85-83e4-3725b1b4cde1/application-photos/colocacion/80cd3792-18cb-49fb-8553-2e5bce68d115.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 2,
+          "productCode": "583",
+          "capturedAt": "2026-08-12T05:33:58.872Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/5b8b6788-0c23-4d85-83e4-3725b1b4cde1/application-photos/colocacion/6a61cf83-6943-4ade-a9fc-75a4623da820.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 3,
+          "productCode": "583",
+          "capturedAt": "2026-08-12T12:42:41.908Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/5b8b6788-0c23-4d85-83e4-3725b1b4cde1/application-photos/colocacion/653ac993-d49a-45d6-be28-1b5df67e5583.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 4,
+          "productCode": "247",
+          "capturedAt": "2026-08-13T16:16:17.969Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/5b8b6788-0c23-4d85-83e4-3725b1b4cde1/application-photos/regreso_2/a637c987-a91a-495f-bef0-86cc9c206803.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 5,
+          "productCode": "247",
+          "capturedAt": "2026-08-15T01:50:26.030Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/5b8b6788-0c23-4d85-83e4-3725b1b4cde1/application-photos/regreso_2/61fc7d67-ee39-4f68-9a19-a057e23770cc.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 6,
+          "productCode": "247",
+          "capturedAt": "2026-08-15T15:31:06.828Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/5b8b6788-0c23-4d85-83e4-3725b1b4cde1/application-photos/regreso_2/9f6fbbe6-fb59-498a-afc7-a52862fa5c02.jpg"
+        }
+      ],
+      "classification": "A_COMPARATIVA_REAL_CAPTURADA"
+    },
+    {
+      "folio": "NAV-124",
+      "hutFolio": "HUT-124",
+      "participantName": "Juan Arturo Hernández Flores",
+      "studyParticipantId": "9e4c82b2-7403-422b-b247-0bf97b7a58fc",
+      "hutParticipantId": "6e6a3070-01ed-4b83-be8d-3ea1bbfae0f4",
+      "attempt": {
+        "id": "e10d5b81-627a-4fdc-be20-ab3c49bea082",
+        "status": "IN_PROGRESS",
+        "startedAt": "2026-08-17T20:29:52.455Z",
+        "completedAt": null,
+        "updatedAt": "2026-08-17T20:29:52.472Z"
+      },
+      "comparativeVisit": {
+        "id": "49f14add-3f8e-4780-9a6d-465136f92e38",
+        "section": "COMPARATIVA",
+        "status": "COMPLETED",
+        "startedAt": "2026-08-17T20:29:52.455Z",
+        "completedAt": "2026-08-17T20:29:52.487Z",
+        "updatedAt": "2026-08-17T20:29:52.505Z"
+      },
+      "comparativeAnswers": [
+        {
+          "id": "24c5f8a1-d67f-45d9-933c-8be09b564268",
+          "questionCode": "HUT_P24_PREFERENCIA_GENERAL",
+          "questionLabel": "P24. Preferencia general",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": "1",
+          "answeredAt": "2026-08-17T20:26:51.886Z",
+          "updatedAt": "2026-08-17T20:26:51.886Z"
+        },
+        {
+          "id": "406dbc45-7f8a-497b-80a0-e3342c40cfd7",
+          "questionCode": "HUT_P25_COMPRA_PRIMERO",
+          "questionLabel": "P25. Probabilidad de compra primer perfume",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": 5,
+          "answeredAt": "2026-08-17T20:27:12.214Z",
+          "updatedAt": "2026-08-17T20:27:12.216Z"
+        },
+        {
+          "id": "0100e51c-a770-44b4-a99c-a94fe577a89d",
+          "questionCode": "HUT_P26_COMPRA_SEGUNDO",
+          "questionLabel": "P26. Probabilidad de compra segundo perfume",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": 5,
+          "answeredAt": "2026-08-17T20:27:33.637Z",
+          "updatedAt": "2026-08-17T20:27:33.637Z"
+        },
+        {
+          "id": "2f14de59-13c8-402b-8bf0-b3dfba61913e",
+          "questionCode": "HUT_P27_COMPARATIVA_ATRIBUTOS",
+          "questionLabel": "P27. Comparativa de atributos",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": {
+            "SEGURIDAD": "1",
+            "AROMA_UNICO": "2",
+            "ENVASE_COMODO": "3",
+            "AROMA_DURADERO": "1",
+            "CANTIDAD_FACIL": "3",
+            "AROMA_AGRADABLE": "2",
+            "DIRECCION_FACIL": "3",
+            "ATOMIZADOR_CALIDAD": "3",
+            "ATOMIZADOR_CANTIDAD": "1",
+            "ATOMIZADOR_FUNCIONO": "3",
+            "ATOMIZADOR_UNIFORME": "3",
+            "INTENSIDAD_ADECUADA": "1",
+            "ATOMIZADOR_DISTRIBUYE": "1",
+            "ATOMIZADOR_RESISTENTE": "1",
+            "REFLEJA_MI_PERSONALIDAD": "3",
+            "ATOMIZADOR_FACIL_PRESIONAR": "3",
+            "ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO": "2"
+          },
+          "answeredAt": "2026-08-17T20:29:52.487Z",
+          "updatedAt": "2026-08-17T20:29:52.489Z"
+        }
+      ],
+      "comparativeEvidence": [],
+      "allHutEvidence": [
+        {
+          "type": "HutApplicationEvidence",
+          "phase": "COLOCACION",
+          "capturedAt": "2026-08-10T22:46:24.786Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/6e6a3070-01ed-4b83-be8d-3ea1bbfae0f4/application-photos/colocacion/7267f8ea-1f0a-498a-b44e-75cc439d3a16.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 0,
+          "productCode": null,
+          "capturedAt": "2026-08-10T16:15:13.678Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/6e6a3070-01ed-4b83-be8d-3ea1bbfae0f4/application-photos/colocacion/5e954887-1f5e-480a-bdf7-8dc185f42eb5.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 2,
+          "productCode": "583",
+          "capturedAt": "2026-08-12T21:11:14.850Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/6e6a3070-01ed-4b83-be8d-3ea1bbfae0f4/application-photos/colocacion/a1c58b65-a7d4-42fc-ae31-50d1a5893bdd.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 3,
+          "productCode": "583",
+          "capturedAt": "2026-08-13T23:54:21.140Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/6e6a3070-01ed-4b83-be8d-3ea1bbfae0f4/application-photos/colocacion/f7ba3c60-0f95-4c0f-83bf-7899ff22a01f.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 4,
+          "productCode": "247",
+          "capturedAt": "2026-08-15T00:33:27.800Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/6e6a3070-01ed-4b83-be8d-3ea1bbfae0f4/application-photos/regreso_2/46633f09-ee01-4b08-9b18-467cfb380ddb.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 5,
+          "productCode": "247",
+          "capturedAt": "2026-08-16T00:29:10.189Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/6e6a3070-01ed-4b83-be8d-3ea1bbfae0f4/application-photos/regreso_2/fc1a6279-9bce-49fd-8af5-e55243684fed.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 6,
+          "productCode": "247",
+          "capturedAt": "2026-08-17T00:20:41.508Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/6e6a3070-01ed-4b83-be8d-3ea1bbfae0f4/application-photos/regreso_2/e369f793-3a72-46b5-9d55-d96d86110acf.jpg"
+        }
+      ],
+      "classification": "A_COMPARATIVA_REAL_CAPTURADA"
+    },
+    {
+      "folio": "NAV-129",
+      "hutFolio": "HUT-129",
+      "participantName": "Hugo ulises salazar martinez",
+      "studyParticipantId": "fafcb33a-8452-48e8-873c-705660da28ed",
+      "hutParticipantId": "4e33dea2-98f6-48f1-9148-eca14281621f",
+      "attempt": {
+        "id": "19671ad9-05e0-4f8d-a4ea-f76dd44dd16a",
+        "status": "IN_PROGRESS",
+        "startedAt": "2026-08-17T21:50:59.066Z",
+        "completedAt": null,
+        "updatedAt": "2026-08-17T21:50:59.087Z"
+      },
+      "comparativeVisit": {
+        "id": "f64853ab-b255-4354-bd72-23b6c84607cb",
+        "section": "COMPARATIVA",
+        "status": "COMPLETED",
+        "startedAt": "2026-08-17T21:50:59.066Z",
+        "completedAt": "2026-08-17T21:50:59.101Z",
+        "updatedAt": "2026-08-17T21:50:59.125Z"
+      },
+      "comparativeAnswers": [
+        {
+          "id": "ba87cfe4-9caf-4e2a-917e-40794cf948b3",
+          "questionCode": "HUT_P24_PREFERENCIA_GENERAL",
+          "questionLabel": "P24. Preferencia general",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": "1",
+          "answeredAt": "2026-08-17T21:48:54.383Z",
+          "updatedAt": "2026-08-17T21:48:54.383Z"
+        },
+        {
+          "id": "d7a96c5c-8a3f-409b-b525-aa76bb9a2b6b",
+          "questionCode": "HUT_P25_COMPRA_PRIMERO",
+          "questionLabel": "P25. Probabilidad de compra primer perfume",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": 4,
+          "answeredAt": "2026-08-17T21:49:11.833Z",
+          "updatedAt": "2026-08-17T21:49:11.835Z"
+        },
+        {
+          "id": "09d30fa8-195a-4632-9123-f5808b0da841",
+          "questionCode": "HUT_P26_COMPRA_SEGUNDO",
+          "questionLabel": "P26. Probabilidad de compra segundo perfume",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": 1,
+          "answeredAt": "2026-08-17T21:49:22.686Z",
+          "updatedAt": "2026-08-17T21:49:22.688Z"
+        },
+        {
+          "id": "9d8b31f0-833a-4fe9-bc6b-246662efd48c",
+          "questionCode": "HUT_P27_COMPARATIVA_ATRIBUTOS",
+          "questionLabel": "P27. Comparativa de atributos",
+          "sectionFromVisitProgress": "COMPARATIVA",
+          "answerJson": {
+            "SEGURIDAD": "1",
+            "AROMA_UNICO": "1",
+            "ENVASE_COMODO": "3",
+            "AROMA_DURADERO": "1",
+            "CANTIDAD_FACIL": "3",
+            "AROMA_AGRADABLE": "1",
+            "DIRECCION_FACIL": "3",
+            "ATOMIZADOR_CALIDAD": "3",
+            "ATOMIZADOR_CANTIDAD": "3",
+            "ATOMIZADOR_FUNCIONO": "3",
+            "ATOMIZADOR_UNIFORME": "3",
+            "INTENSIDAD_ADECUADA": "3",
+            "ATOMIZADOR_DISTRIBUYE": "3",
+            "ATOMIZADOR_RESISTENTE": "3",
+            "REFLEJA_MI_PERSONALIDAD": "1",
+            "ATOMIZADOR_FACIL_PRESIONAR": "3",
+            "ME_HACE_SENTIR_FRESCO_POR_MAS_TIEMPO": "1"
+          },
+          "answeredAt": "2026-08-17T21:50:59.101Z",
+          "updatedAt": "2026-08-17T21:50:59.103Z"
+        }
+      ],
+      "comparativeEvidence": [],
+      "allHutEvidence": [
+        {
+          "type": "HutApplicationEvidence",
+          "phase": "COLOCACION",
+          "capturedAt": "2026-08-13T18:18:09.529Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/4e33dea2-98f6-48f1-9148-eca14281621f/application-photos/colocacion/305f44d9-5e62-45ab-9f93-dc478375176e.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 0,
+          "productCode": null,
+          "capturedAt": "2026-08-11T19:07:37.447Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/4e33dea2-98f6-48f1-9148-eca14281621f/application-photos/colocacion/816237ef-748e-4365-9309-d33074486009.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 2,
+          "productCode": "247",
+          "capturedAt": "2026-08-14T11:57:35.903Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/4e33dea2-98f6-48f1-9148-eca14281621f/application-photos/colocacion/37c0d4ca-1334-4470-9120-a06bcfb80b2d.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 3,
+          "productCode": "247",
+          "capturedAt": "2026-08-15T14:10:47.788Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/4e33dea2-98f6-48f1-9148-eca14281621f/application-photos/colocacion/1839fe43-8baf-415c-9bb6-3465ea8da92b.jpg"
+        },
+        {
+          "type": "HutApplicationPhotoEntry",
+          "useDayNumber": 4,
+          "productCode": "583",
+          "capturedAt": "2026-08-17T21:23:09.084Z",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/hut-participants/4e33dea2-98f6-48f1-9148-eca14281621f/application-photos/regreso_2/d3e994a5-740b-4331-a464-b46176d1235f.jpg"
+        }
+      ],
+      "classification": "A_COMPARATIVA_REAL_CAPTURADA"
+    }
+  ]
+}

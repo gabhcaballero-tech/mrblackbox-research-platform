@@ -14,6 +14,7 @@ import {
   createSupabaseEvidenceStorageClient,
   type EvidenceUploadMetadata
 } from "@/modules/participant-portal/evidence-storage";
+import { isV1FieldScreeningBlocked, V1_FIELD_SCREENING_BLOCK_MESSAGE } from "./v1-screening-block";
 
 type FieldEvidenceActionResult<T = unknown> =
   | {
@@ -33,6 +34,10 @@ export async function requestFieldEvidenceUploadAction(
   storageBucket: string;
   token?: string;
 }>> {
+  if (isV1FieldScreeningBlocked()) {
+    return { message: V1_FIELD_SCREENING_BLOCK_MESSAGE, ok: false };
+  }
+
   const actor = await getFieldActorForRequest();
   const result = await requestFieldEvidenceUpload({
     actor,
@@ -70,6 +75,10 @@ export async function confirmFieldEvidenceUploadAction(
     storageBucket: string;
   }
 ): Promise<FieldEvidenceActionResult<{ counts: { perfumePhotos: number; selfie: number }; perfumePhotoCount: number; selfieCount: number }>> {
+  if (isV1FieldScreeningBlocked()) {
+    return { message: V1_FIELD_SCREENING_BLOCK_MESSAGE, ok: false };
+  }
+
   const actor = await getFieldActorForRequest();
   const result = await confirmFieldEvidenceUpload({
     actor,
@@ -107,6 +116,10 @@ export async function confirmFieldEvidenceUploadAction(
 export async function completeFieldEvidenceSubmissionAction(
   attemptId: string
 ): Promise<FieldEvidenceActionResult<{ redirectTo: string }>> {
+  if (isV1FieldScreeningBlocked()) {
+    return { message: V1_FIELD_SCREENING_BLOCK_MESSAGE, ok: false };
+  }
+
   const actor = await getFieldActorForRequest();
   const repository = createFieldRepository();
   let result: Awaited<ReturnType<typeof completeFieldEvidenceSubmission>>;

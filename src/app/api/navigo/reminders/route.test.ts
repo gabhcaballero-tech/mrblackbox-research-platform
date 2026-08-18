@@ -21,6 +21,8 @@ describe("Navigo reminder cron route", () => {
     delete process.env.CRON_SECRET;
     delete process.env.NEXT_PUBLIC_APP_URL;
     delete process.env.APP_URL;
+    delete process.env.WHATSAPP_AUTOMATION_ENABLED;
+    delete process.env.WHATSAPP_NAVIGO_AUTO_SEND_ENABLED;
     vi.stubEnv("NODE_ENV", "test");
     processRemindersMock.mockResolvedValue({
       data: {
@@ -34,15 +36,14 @@ describe("Navigo reminder cron route", () => {
     });
   });
 
-  it("registers the Vercel cron every five minutes for the reminders endpoint", () => {
+  it("does not register the V1 Navigo reminders cron in Vercel", () => {
     const config = JSON.parse(readFileSync(join(process.cwd(), "vercel.json"), "utf8")) as {
       crons?: Array<{ path: string; schedule: string }>;
     };
 
-    expect(config.crons).toContainEqual({
-      path: "/api/navigo/reminders",
-      schedule: "*/5 * * * *"
-    });
+    expect(config.crons ?? []).not.toContainEqual(expect.objectContaining({
+      path: "/api/navigo/reminders"
+    }));
   });
 
   it("processes due Navigo reminders with the dedicated cron secret", async () => {
@@ -69,6 +70,50 @@ describe("Navigo reminder cron route", () => {
       requestOrigin: "https://mrblackbox-research-platform.vercel.app",
       studyId: "study-1"
     });
+  });
+
+  it("does not process Navigo reminders when V1 operational communications are disabled", async () => {
+    process.env.NAVIGO_REMINDER_CRON_SECRET = "navigo-secret";
+    process.env.WHATSAPP_AUTOMATION_ENABLED = "false";
+
+    const response = await POST(
+      new NextRequest("https://mrblackbox-research-platform.vercel.app/api/navigo/reminders", {
+        headers: {
+          authorization: "Bearer navigo-secret"
+        },
+        method: "POST"
+      })
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      code: "AUTOMATION_DISABLED",
+      message: "Comunicación operativa deshabilitada en V1. Utilice V2.",
+      ok: false
+    });
+    expect(response.status).toBe(200);
+    expect(processRemindersMock).not.toHaveBeenCalled();
+  });
+
+  it("does not process Navigo reminders when Navigo automatic sends are disabled", async () => {
+    process.env.NAVIGO_REMINDER_CRON_SECRET = "navigo-secret";
+    process.env.WHATSAPP_NAVIGO_AUTO_SEND_ENABLED = "false";
+
+    const response = await POST(
+      new NextRequest("https://mrblackbox-research-platform.vercel.app/api/navigo/reminders", {
+        headers: {
+          authorization: "Bearer navigo-secret"
+        },
+        method: "POST"
+      })
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      code: "AUTOMATION_DISABLED",
+      message: "Comunicación operativa deshabilitada en V1. Utilice V2.",
+      ok: false
+    });
+    expect(response.status).toBe(200);
+    expect(processRemindersMock).not.toHaveBeenCalled();
   });
 
   it("also accepts the standard Vercel CRON_SECRET header", async () => {

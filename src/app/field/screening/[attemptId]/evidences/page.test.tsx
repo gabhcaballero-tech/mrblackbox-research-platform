@@ -39,29 +39,32 @@ vi.mock("./FieldPerfumeEvidenceStep", () => ({
 }));
 
 describe("Field evidence page", () => {
-  it("renders the public field perfume evidence step without an internal session", async () => {
+  it("shows the V2 migration message instead of the perfume evidence step", async () => {
     render(
       await FieldEvidencePage({
         params: Promise.resolve({ attemptId: "attempt-1" })
       })
     );
 
-    expect(screen.getByText("Fragancia Masculina")).toBeInTheDocument();
-    expect(screen.getByText("Agrega fotos de las marcas de perfumes que usas para completar la evidencia del filtro.")).toBeInTheDocument();
-    expect(screen.getByTestId("field-perfume-evidence-step")).toHaveTextContent("Evidencias attempt-1");
+    expect(screen.getByText("Filtro migrado a V2")).toBeInTheDocument();
+    expect(screen.getByText("La captura de evidencias del filtro ya no está disponible en V1.")).toBeInTheDocument();
+    expect(screen.getByText("Este estudio ahora se gestiona en la plataforma V2. Por favor continúe el registro en V2.")).toBeInTheDocument();
+    expect(screen.queryByTestId("field-perfume-evidence-step")).not.toBeInTheDocument();
   });
 
-  it("redirects to selfie when perfume photos are opened before selfie", async () => {
+  it("does not redirect into the legacy selfie flow when V1 screening is blocked", async () => {
     vi.mocked(getFieldEvidenceScreen).mockResolvedValueOnce({
       data: fieldEvidenceScreen({ perfumePhotos: 0, selfie: 0 }),
       ok: true
     });
 
-    await expect(
-      FieldEvidencePage({
+    render(
+      await FieldEvidencePage({
         params: Promise.resolve({ attemptId: "attempt-1" })
       })
-    ).rejects.toThrow("redirect:/field/screening/attempt-1/selfie");
+    );
+
+    expect(screen.getByText("Registro migrado a V2")).toBeInTheDocument();
   });
 });
 

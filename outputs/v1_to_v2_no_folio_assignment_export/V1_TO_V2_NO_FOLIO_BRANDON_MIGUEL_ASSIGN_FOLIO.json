@@ -1,0 +1,415 @@
+{
+  "schemaVersion": "v1-to-v2.no-folio-assignment-export.1",
+  "source": {
+    "project": "mrblackbox-research-platform",
+    "exportedAt": "2026-08-15T20:07:04.315Z",
+    "exportedAtMexicoCity": "15/08/26, 14:07:04",
+    "readOnly": true,
+    "requestedNames": [
+      "BRANDON SANTIAGO SORIA",
+      "MIGUEL ANGEL CASTAÑEDA"
+    ]
+  },
+  "summary": {
+    "requested": 2,
+    "exported": 2,
+    "participants": [
+      {
+        "name": "MIGUEL ANGEL CASTAÑEDA",
+        "status": "TERMINATED",
+        "attempts": 1,
+        "answers": 18
+      },
+      {
+        "name": "BRANDON SANTIAGO SORIA",
+        "status": "TERMINATED",
+        "attempts": 1,
+        "answers": 5
+      }
+    ]
+  },
+  "participants": [
+    {
+      "migrationCategory": "ASSIGN_NEW_FOLIO_IN_V2",
+      "migrationReady": false,
+      "reason": "V1 participant exists without ParticipantConfirmation/NAV/HUT master codes. V2 must assign folio and create master codes.",
+      "participant": {
+        "ids": {
+          "participantProfileId": "1b660e8a-2a9c-47af-89fe-f440aed52bf0",
+          "studyParticipantId": "212ac0e6-7509-4cfc-b7ef-c8398c38fc1e",
+          "participantConfirmationId": null
+        },
+        "navFolio": null,
+        "hutFolio": null,
+        "name": "MIGUEL ANGEL CASTAÑEDA",
+        "phone": "+525546196763",
+        "email": "miguel.angel.castaneda.mac@gmail.com",
+        "profileStatus": "ACTIVE",
+        "screeningStatus": "TERMINATED",
+        "operationalStatus": "SCREENING_TERMINATED",
+        "createdAt": "2026-08-15T17:00:31.117Z",
+        "createdAtMexicoCity": "15/08/26, 11:00:31",
+        "updatedAt": "2026-08-15T17:19:26.516Z",
+        "updatedAtMexicoCity": "15/08/26, 11:19:26"
+      },
+      "codes": [],
+      "screening": {
+        "attempts": [
+          {
+            "id": "172d5cb1-2232-4797-b0c0-0e64ef849bf8",
+            "source": "PARTICIPANT_PORTAL",
+            "status": "TERMINATED",
+            "terminationCode": "nse_not_eligible",
+            "terminationReason": "La clasificacion calculada no es elegible para este estudio.",
+            "nseScore": 207,
+            "nseClass": "RANGO-1",
+            "evaluationJson": {
+              "nse": {
+                "code": "nse",
+                "label": "NSE",
+                "score": 207,
+                "eligible": false,
+                "classCode": "RANGO-1",
+                "classLabel": "A/B:",
+                "missingQuestionIds": []
+              },
+              "flags": [],
+              "result": "NOT_ELIGIBLE",
+              "status": "TERMINATED",
+              "reasons": [
+                {
+                  "code": "nse_not_eligible",
+                  "reason": "La clasificacion calculada no es elegible para este estudio."
+                }
+              ],
+              "schemaVersion": "screening-evaluation.v1",
+              "safeExplanation": "La clasificacion calculada no es elegible para este estudio.",
+              "closureDiagnostics": {
+                "result": "NOT_ELIGIBLE",
+                "status": "TERMINATED",
+                "closedBy": "participant_portal",
+                "flagCodes": [],
+                "reasonCodes": [
+                  "nse_not_eligible"
+                ],
+                "triggerQuestionId": "D6_CUARTOS_DORMIR",
+                "missingQuestionIds": []
+              },
+              "missingQuestionIds": []
+            },
+            "startedAt": "2026-08-15T17:00:31.238Z",
+            "startedAtMexicoCity": "15/08/26, 11:00:31",
+            "completedAt": "2026-08-15T17:19:26.341Z",
+            "completedAtMexicoCity": "15/08/26, 11:19:26",
+            "study": {
+              "code": "FMASCULINA-NAVIGO-2026",
+              "id": "90f25436-2353-46fa-817a-4f187edea59d",
+              "name": "Fragancia Masculina — Navigo Homme"
+            },
+            "questionnaireVersionId": "7a0dc40d-c40b-434e-b9ce-868e6ee2e781",
+            "answers": [
+              {
+                "questionId": "OP1_RECLUTADOR",
+                "answerJson": "KARINA GONZALEZ",
+                "createdAt": "2026-08-15T17:11:56.370Z",
+                "createdAtMexicoCity": "15/08/26, 11:11:56",
+                "updatedAt": "2026-08-15T17:11:56.370Z"
+              },
+              {
+                "questionId": "CONSENTIMIENTO",
+                "answerJson": "SI",
+                "createdAt": "2026-08-15T17:12:06.011Z",
+                "createdAtMexicoCity": "15/08/26, 11:12:06",
+                "updatedAt": "2026-08-15T17:12:06.011Z"
+              },
+              {
+                "questionId": "F1_GENERO",
+                "answerJson": "HOMBRE",
+                "createdAt": "2026-08-15T17:12:10.641Z",
+                "createdAtMexicoCity": "15/08/26, 11:12:10",
+                "updatedAt": "2026-08-15T17:12:10.641Z"
+              },
+              {
+                "questionId": "F2_EDAD",
+                "answerJson": 35,
+                "createdAt": "2026-08-15T17:12:19.560Z",
+                "createdAtMexicoCity": "15/08/26, 11:12:19",
+                "updatedAt": "2026-08-15T17:12:19.560Z"
+              },
+              {
+                "questionId": "F3_EXCLUSION_LABORAL",
+                "answerJson": "NINGUNA",
+                "createdAt": "2026-08-15T17:12:30.357Z",
+                "createdAtMexicoCity": "15/08/26, 11:12:30",
+                "updatedAt": "2026-08-15T17:12:30.357Z"
+              },
+              {
+                "questionId": "F4_PARTICIPACION_RECIENTE_PERFUMES",
+                "answerJson": "NO",
+                "createdAt": "2026-08-15T17:12:37.486Z",
+                "createdAtMexicoCity": "15/08/26, 11:12:37",
+                "updatedAt": "2026-08-15T17:12:37.486Z"
+              },
+              {
+                "questionId": "F5_CONDICIONES_FISICAS",
+                "answerJson": "NINGUNA",
+                "createdAt": "2026-08-15T17:12:45.109Z",
+                "createdAtMexicoCity": "15/08/26, 11:12:45",
+                "updatedAt": "2026-08-15T17:12:45.109Z"
+              },
+              {
+                "questionId": "F6_MARCAS_UTILIZA",
+                "answerJson": "CARLO CORINTO JAFRA HIGO BOSS FRAICHE",
+                "createdAt": "2026-08-15T17:14:17.474Z",
+                "createdAtMexicoCity": "15/08/26, 11:14:17",
+                "updatedAt": "2026-08-15T17:14:17.474Z"
+              },
+              {
+                "questionId": "F7_Marca_Frecuente",
+                "answerJson": {
+                  "values": [
+                    "Otro"
+                  ],
+                  "otherText": "FRAICHE Y HUGO BOSS"
+                },
+                "createdAt": "2026-08-15T17:15:03.202Z",
+                "createdAtMexicoCity": "15/08/26, 11:15:03",
+                "updatedAt": "2026-08-15T17:15:03.202Z"
+              },
+              {
+                "questionId": "F8_VARIANTE_COLOR",
+                "answerJson": "AZUL",
+                "createdAt": "2026-08-15T17:15:15.394Z",
+                "createdAtMexicoCity": "15/08/26, 11:15:15",
+                "updatedAt": "2026-08-15T17:15:15.394Z"
+              },
+              {
+                "questionId": "F9_FRECUENCIA_SEMANAL",
+                "answerJson": "SIETE_DIAS",
+                "createdAt": "2026-08-15T17:17:26.942Z",
+                "createdAtMexicoCity": "15/08/26, 11:17:26",
+                "updatedAt": "2026-08-15T17:17:26.942Z"
+              },
+              {
+                "questionId": "F10_ULTIMA_COMPRA",
+                "answerJson": "1 SEMANA",
+                "createdAt": "2026-08-15T17:17:34.986Z",
+                "createdAtMexicoCity": "15/08/26, 11:17:34",
+                "updatedAt": "2026-08-15T17:17:34.986Z"
+              },
+              {
+                "questionId": "D1_ESCOLARIDAD_JEFE_HOGAR",
+                "answerJson": "LICENCIATURA_COMPLETA",
+                "createdAt": "2026-08-15T17:17:55.681Z",
+                "createdAtMexicoCity": "15/08/26, 11:17:55",
+                "updatedAt": "2026-08-15T17:17:55.681Z"
+              },
+              {
+                "questionId": "D2_BANOS_COMPLETOS",
+                "answerJson": "DOS_O_MAS_BANOS_COMPLETOS",
+                "createdAt": "2026-08-15T17:18:02.668Z",
+                "createdAtMexicoCity": "15/08/26, 11:18:02",
+                "updatedAt": "2026-08-15T17:18:02.668Z"
+              },
+              {
+                "questionId": "D3_AUTOMOVILES_HOGAR",
+                "answerJson": "UN_AUTO",
+                "createdAt": "2026-08-15T17:18:58.689Z",
+                "createdAtMexicoCity": "15/08/26, 11:18:58",
+                "updatedAt": "2026-08-15T17:18:58.689Z"
+              },
+              {
+                "questionId": "D4_INTERNET_HOGAR",
+                "answerJson": "SI_TIENE_INTERNET",
+                "createdAt": "2026-08-15T17:19:06.266Z",
+                "createdAtMexicoCity": "15/08/26, 11:19:06",
+                "updatedAt": "2026-08-15T17:19:06.266Z"
+              },
+              {
+                "questionId": "D5_PERSONAS_TRABAJARON",
+                "answerJson": "DOS_PERSONAS",
+                "createdAt": "2026-08-15T17:19:17.769Z",
+                "createdAtMexicoCity": "15/08/26, 11:19:17",
+                "updatedAt": "2026-08-15T17:19:17.769Z"
+              },
+              {
+                "questionId": "D6_CUARTOS_DORMIR",
+                "answerJson": "DOS_CUARTOS",
+                "createdAt": "2026-08-15T17:19:26.323Z",
+                "createdAtMexicoCity": "15/08/26, 11:19:26",
+                "updatedAt": "2026-08-15T17:19:26.323Z"
+              }
+            ],
+            "evidence": [
+              {
+                "id": "9389e194-bfc7-4b0e-8f9e-b4f564d13dbf",
+                "type": "PERFUME_PHOTO",
+                "relatedQuestionId": "F6_MARCAS_UTILIZA",
+                "storageBucket": "participant-evidence",
+                "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/1b660e8a-2a9c-47af-89fe-f440aed52bf0/screening-attempts/172d5cb1-2232-4797-b0c0-0e64ef849bf8/perfume_photo/c025c1ad-c7c0-4fa7-bd32-f8c09db0b17b.jpg",
+                "originalFilename": "perfume_photo-1786814047754.jpg",
+                "mimeType": "image/jpeg",
+                "uploadedAt": "2026-08-15T17:14:13.644Z",
+                "uploadedAtMexicoCity": "15/08/26, 11:14:13",
+                "reviewStatus": "PENDING"
+              }
+            ],
+            "review": null
+          }
+        ],
+        "latestAttemptId": "172d5cb1-2232-4797-b0c0-0e64ef849bf8",
+        "latestStatus": "TERMINATED"
+      },
+      "operationalProgress": {
+        "cltSessions": [],
+        "navigoActivities": [],
+        "hut": null,
+        "totals": {
+          "cltAnswers": 0,
+          "navigoResponses": 0,
+          "hutAnswers": 0,
+          "participantEvidence": 1
+        }
+      },
+      "warnings": [
+        "NO_NAV_FOLIO_IN_V1",
+        "NO_REFERENCE_CODES_IN_V1",
+        "V2_MUST_ASSIGN_FOLIO_AND_CODES",
+        "PRIVATE_EVIDENCE_EXPORTED_WITH_STORAGE_KEY_ONLY"
+      ]
+    },
+    {
+      "migrationCategory": "ASSIGN_NEW_FOLIO_IN_V2",
+      "migrationReady": false,
+      "reason": "V1 participant exists without ParticipantConfirmation/NAV/HUT master codes. V2 must assign folio and create master codes.",
+      "participant": {
+        "ids": {
+          "participantProfileId": "823aae77-5b61-4061-ad79-3d93a59c3575",
+          "studyParticipantId": "14524731-561f-47c3-8cf7-23b0472b0033",
+          "participantConfirmationId": null
+        },
+        "navFolio": null,
+        "hutFolio": null,
+        "name": "BRANDON SANTIAGO SORIA",
+        "phone": "+525534258866",
+        "email": "santiagosoriabrandon@gmail.com",
+        "profileStatus": "ACTIVE",
+        "screeningStatus": "TERMINATED",
+        "operationalStatus": "SCREENING_TERMINATED",
+        "createdAt": "2026-08-15T16:24:10.544Z",
+        "createdAtMexicoCity": "15/08/26, 10:24:10",
+        "updatedAt": "2026-08-15T16:28:53.480Z",
+        "updatedAtMexicoCity": "15/08/26, 10:28:53"
+      },
+      "codes": [],
+      "screening": {
+        "attempts": [
+          {
+            "id": "1a96cc7a-5341-464e-8b7a-a3c3e109b1b0",
+            "source": "PARTICIPANT_PORTAL",
+            "status": "TERMINATED",
+            "terminationCode": "EXCLUSION_LABORAL",
+            "terminationReason": "Existe una relación familiar con una industria excluyente para el estudio.",
+            "nseScore": null,
+            "nseClass": null,
+            "evaluationJson": {
+              "nse": null,
+              "flags": [],
+              "result": "NOT_ELIGIBLE",
+              "status": "TERMINATED",
+              "reasons": [
+                {
+                  "code": "EXCLUSION_LABORAL",
+                  "reason": "Existe una relación familiar con una industria excluyente para el estudio.",
+                  "questionId": "F3_EXCLUSION_LABORAL"
+                }
+              ],
+              "schemaVersion": "screening-evaluation.v1",
+              "safeExplanation": "Existe una relación familiar con una industria excluyente para el estudio.",
+              "closureDiagnostics": {
+                "result": "NOT_ELIGIBLE",
+                "status": "TERMINATED",
+                "closedBy": "participant_portal",
+                "flagCodes": [],
+                "reasonCodes": [
+                  "EXCLUSION_LABORAL"
+                ],
+                "triggerQuestionId": "F3_EXCLUSION_LABORAL",
+                "missingQuestionIds": []
+              },
+              "missingQuestionIds": []
+            },
+            "startedAt": "2026-08-15T16:24:10.650Z",
+            "startedAtMexicoCity": "15/08/26, 10:24:10",
+            "completedAt": "2026-08-15T16:28:53.292Z",
+            "completedAtMexicoCity": "15/08/26, 10:28:53",
+            "study": {
+              "code": "FMASCULINA-NAVIGO-2026",
+              "id": "90f25436-2353-46fa-817a-4f187edea59d",
+              "name": "Fragancia Masculina — Navigo Homme"
+            },
+            "questionnaireVersionId": "7a0dc40d-c40b-434e-b9ce-868e6ee2e781",
+            "answers": [
+              {
+                "questionId": "OP1_RECLUTADOR",
+                "answerJson": "MARICELA GÓMEZ",
+                "createdAt": "2026-08-15T16:24:35.227Z",
+                "createdAtMexicoCity": "15/08/26, 10:24:35",
+                "updatedAt": "2026-08-15T16:24:35.227Z"
+              },
+              {
+                "questionId": "CONSENTIMIENTO",
+                "answerJson": "SI",
+                "createdAt": "2026-08-15T16:27:01.453Z",
+                "createdAtMexicoCity": "15/08/26, 10:27:01",
+                "updatedAt": "2026-08-15T16:27:01.453Z"
+              },
+              {
+                "questionId": "F1_GENERO",
+                "answerJson": "HOMBRE",
+                "createdAt": "2026-08-15T16:27:41.384Z",
+                "createdAtMexicoCity": "15/08/26, 10:27:41",
+                "updatedAt": "2026-08-15T16:27:41.384Z"
+              },
+              {
+                "questionId": "F2_EDAD",
+                "answerJson": 33,
+                "createdAt": "2026-08-15T16:27:53.559Z",
+                "createdAtMexicoCity": "15/08/26, 10:27:53",
+                "updatedAt": "2026-08-15T16:27:53.559Z"
+              },
+              {
+                "questionId": "F3_EXCLUSION_LABORAL",
+                "answerJson": "MEDIOS_COMUNICACION",
+                "createdAt": "2026-08-15T16:28:53.275Z",
+                "createdAtMexicoCity": "15/08/26, 10:28:53",
+                "updatedAt": "2026-08-15T16:28:53.275Z"
+              }
+            ],
+            "evidence": [],
+            "review": null
+          }
+        ],
+        "latestAttemptId": "1a96cc7a-5341-464e-8b7a-a3c3e109b1b0",
+        "latestStatus": "TERMINATED"
+      },
+      "operationalProgress": {
+        "cltSessions": [],
+        "navigoActivities": [],
+        "hut": null,
+        "totals": {
+          "cltAnswers": 0,
+          "navigoResponses": 0,
+          "hutAnswers": 0,
+          "participantEvidence": 0
+        }
+      },
+      "warnings": [
+        "NO_NAV_FOLIO_IN_V1",
+        "NO_REFERENCE_CODES_IN_V1",
+        "V2_MUST_ASSIGN_FOLIO_AND_CODES",
+        "PRIVATE_EVIDENCE_EXPORTED_WITH_STORAGE_KEY_ONLY"
+      ]
+    }
+  ]
+}

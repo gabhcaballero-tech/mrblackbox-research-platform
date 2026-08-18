@@ -8,6 +8,10 @@ import {
 } from "@/modules/navigo-app/repository";
 import { createOneuiWhatsAppRepository } from "./repository";
 import {
+  V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE,
+  areV1OperationalCommunicationsDisabled
+} from "./service";
+import {
   WHATSAPP_INVALID_PUBLIC_ORIGIN,
   WHATSAPP_MISSING_PUBLIC_ORIGIN_CONFIG,
   publicOriginValidationAuditMetadata,
@@ -143,6 +147,10 @@ export function createWhatsAppParticipantSupportService(dependencies: WhatsAppPa
       studyId: string;
       studyParticipantId?: string | null;
     }): Promise<WhatsAppParticipantSupportSendResult> {
+      if (areV1OperationalCommunicationsDisabled()) {
+        return supportFailure(V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE, "AUTOMATION_DISABLED");
+      }
+
       const reason = input.reason.trim();
 
       if (!reason) {

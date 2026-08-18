@@ -51,15 +51,16 @@ vi.mock("./FieldSelfieStep", () => ({
 }));
 
 describe("Field selfie page", () => {
-  it("renders the public field selfie step without an internal session", async () => {
+  it("shows the V2 migration message instead of the selfie step", async () => {
     render(
       await FieldSelfiePage({
         params: Promise.resolve({ attemptId: "attempt-1" })
       })
     );
 
-    expect(screen.getByText("Fragancia Masculina")).toBeInTheDocument();
-    expect(screen.getByText("Toma una selfie final para enviar la participación a revisión.")).toBeInTheDocument();
-    expect(screen.getByTestId("field-selfie-step")).toHaveTextContent("Selfie attempt-1");
+    expect(screen.getByText("Filtro migrado a V2")).toBeInTheDocument();
+    expect(screen.getByText("La captura de evidencias del filtro ya no está disponible en V1.")).toBeInTheDocument();
+    expect(screen.getByText("Este estudio ahora se gestiona en la plataforma V2. Por favor continúe el registro en V2.")).toBeInTheDocument();
+    expect(screen.queryByTestId("field-selfie-step")).not.toBeInTheDocument();
   });
 });

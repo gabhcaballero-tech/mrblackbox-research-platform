@@ -1,0 +1,3156 @@
+{
+  "metadata": {
+    "exportType": "V1_TO_V2_SCREENING_APPROVED_NO_CLT_ALL",
+    "sourceStudyCode": "FMASCULINA-NAVIGO-2026",
+    "sourceStudyName": "Fragancia Masculina — Navigo Homme",
+    "generatedAt": "2026-08-14T23:01:13.641Z",
+    "readOnly": true,
+    "totalCandidatos": 144,
+    "criteria": [
+      "Screening completado",
+      "Screening aprobado/elegible",
+      "CLT iniciado = NO",
+      "CLT respuestas = 0",
+      "ParticipantReferenceCode slots 1,2,3 presentes"
+    ],
+    "excludedData": [
+      "respuestas CLT",
+      "respuestas HUT",
+      "evidencias",
+      "actividades posteriores"
+    ]
+  },
+  "participants": [
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-001",
+        "HUT_FOLIO": "HUT-001"
+      },
+      "datos": {
+        "nombre": "JOSE ROBERTO GUZMÁN ESTRADA",
+        "telefono": "+525662459232",
+        "email": "ddolcegabanna39@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-08T02:41:11.307Z"
+      },
+      "codigos": {
+        "codigo1": "JQN8",
+        "codigo2": "8V3B",
+        "codigo3": "MYHC",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-004",
+        "HUT_FOLIO": "HUT-004"
+      },
+      "datos": {
+        "nombre": "ETHAN SÁNCHEZ",
+        "telefono": "+525578542797",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-25T19:13:36.361Z"
+      },
+      "codigos": {
+        "codigo1": "B3M3",
+        "codigo2": "M929",
+        "codigo3": "UAW7",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-005",
+        "HUT_FOLIO": "HUT-005"
+      },
+      "datos": {
+        "nombre": "ANGEL FEDERICO ONOFRE BARRANCO",
+        "telefono": "+525525153450",
+        "email": "anyel_chimoco22@hotmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-25T19:19:53.299Z"
+      },
+      "codigos": {
+        "codigo1": "GFTU",
+        "codigo2": "PBEK",
+        "codigo3": "AX64",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-007",
+        "HUT_FOLIO": "HUT-007"
+      },
+      "datos": {
+        "nombre": "JONATHAN YAIR FLORES JUAREZ",
+        "telefono": "+525567795764",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-26T03:50:50.210Z"
+      },
+      "codigos": {
+        "codigo1": "2SNX",
+        "codigo2": "MBUQ",
+        "codigo3": "MWB8",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-008",
+        "HUT_FOLIO": "HUT-008"
+      },
+      "datos": {
+        "nombre": "GUILLERMO GARCÍA",
+        "telefono": "+525638080018",
+        "email": "nemobikers@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-26T20:07:58.690Z"
+      },
+      "codigos": {
+        "codigo1": "MACA",
+        "codigo2": "G7K2",
+        "codigo3": "V8P3",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-009",
+        "HUT_FOLIO": null
+      },
+      "datos": {
+        "nombre": "Marcos Espinoza",
+        "telefono": "55 5951 8529",
+        "email": "cadres.rahmen@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-14T02:15:25.563Z"
+      },
+      "codigos": {
+        "codigo1": "FD9Y",
+        "codigo2": "FKRY",
+        "codigo3": "G3W2",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-010",
+        "HUT_FOLIO": null
+      },
+      "datos": {
+        "nombre": "DAN ALEXANDER SAUCEDO",
+        "telefono": "+525643081489",
+        "email": "saucedodan2107@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-27T01:41:19.808Z"
+      },
+      "codigos": {
+        "codigo1": "VM2P",
+        "codigo2": "UTS4",
+        "codigo3": "8ZB6",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-011",
+        "HUT_FOLIO": "HUT-011"
+      },
+      "datos": {
+        "nombre": "HERIBERTO MADRID ALARCON",
+        "telefono": "+525630822700",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-27T03:26:39.493Z"
+      },
+      "codigos": {
+        "codigo1": "38FQ",
+        "codigo2": "FW2F",
+        "codigo3": "JSEC",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-012",
+        "HUT_FOLIO": "HUT-012"
+      },
+      "datos": {
+        "nombre": "ERIC SALAMANCA SANCHEZ",
+        "telefono": "+525610817254",
+        "email": "eric_salamanca@hotmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-27T07:12:31.910Z"
+      },
+      "codigos": {
+        "codigo1": "JGTB",
+        "codigo2": "HYWE",
+        "codigo3": "G9RR",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-013",
+        "HUT_FOLIO": "HUT-013"
+      },
+      "datos": {
+        "nombre": "ANGEL DANIEL HERNÁNDEZ",
+        "telefono": "+525659459664",
+        "email": "salamancaangeldaniel07@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-27T07:12:51.126Z"
+      },
+      "codigos": {
+        "codigo1": "EKPE",
+        "codigo2": "VF88",
+        "codigo3": "BQUN",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-014",
+        "HUT_FOLIO": "HUT-014"
+      },
+      "datos": {
+        "nombre": "ANGEL MARTINEZ MARTINEZ",
+        "telefono": "+525643261713",
+        "email": "tatismartinez8501@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-28T00:52:16.139Z"
+      },
+      "codigos": {
+        "codigo1": "NX6E",
+        "codigo2": "8VHF",
+        "codigo3": "K8Y3",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-015",
+        "HUT_FOLIO": "HUT-015"
+      },
+      "datos": {
+        "nombre": "JULIO OSVALDO ARISTA VÁZQUEZ",
+        "telefono": "+525533740579",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-28T03:06:38.349Z"
+      },
+      "codigos": {
+        "codigo1": "AUHH",
+        "codigo2": "6PP2",
+        "codigo3": "W2UQ",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-016",
+        "HUT_FOLIO": "HUT-016"
+      },
+      "datos": {
+        "nombre": "EDER IVAN BUSTAMANTE MIRANDA",
+        "telefono": "+527772007699",
+        "email": "mirandaivan2627@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-29T00:46:47.704Z"
+      },
+      "codigos": {
+        "codigo1": "QPUP",
+        "codigo2": "M4TK",
+        "codigo3": "78TV",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-017",
+        "HUT_FOLIO": "HUT-017"
+      },
+      "datos": {
+        "nombre": "ALFREDO SILVESTRE HERNADEZ",
+        "telefono": "+524271003012",
+        "email": "solvestrealfreso134@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-29T05:04:03.534Z"
+      },
+      "codigos": {
+        "codigo1": "XRXR",
+        "codigo2": "P33D",
+        "codigo3": "H8Z2",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-018",
+        "HUT_FOLIO": "HUT-018"
+      },
+      "datos": {
+        "nombre": "GEOVANYY LINARES RAYA",
+        "telefono": "+525641270400",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-29T15:02:02.309Z"
+      },
+      "codigos": {
+        "codigo1": "AH3G",
+        "codigo2": "287H",
+        "codigo3": "SCJ3",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-019",
+        "HUT_FOLIO": "HUT-019"
+      },
+      "datos": {
+        "nombre": "ROBERTO YAÑEZ CHAVOYA",
+        "telefono": "+525652407449",
+        "email": "robear8406@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-29T15:47:26.741Z"
+      },
+      "codigos": {
+        "codigo1": "ECNK",
+        "codigo2": "FHBZ",
+        "codigo3": "C8PA",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-020",
+        "HUT_FOLIO": "HUT-020"
+      },
+      "datos": {
+        "nombre": "GUSTAVO SANCHEZ CRUZ",
+        "telefono": "+525656499321",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-29T16:30:35.951Z"
+      },
+      "codigos": {
+        "codigo1": "G3GZ",
+        "codigo2": "D2UG",
+        "codigo3": "QU2R",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-021",
+        "HUT_FOLIO": "HUT-021"
+      },
+      "datos": {
+        "nombre": "ANGEL EDUARDO GOMEZ ORTIZ",
+        "telefono": "+525549577442",
+        "email": "eduardogomezortiz1990@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-29T16:41:01.825Z"
+      },
+      "codigos": {
+        "codigo1": "PDC7",
+        "codigo2": "MTMV",
+        "codigo3": "7AJR",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-022",
+        "HUT_FOLIO": "HUT-022"
+      },
+      "datos": {
+        "nombre": "OMAR DE LA CRUZ LAURIANO",
+        "telefono": "+525581221563",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-29T17:14:30.955Z"
+      },
+      "codigos": {
+        "codigo1": "ETZJ",
+        "codigo2": "7ERY",
+        "codigo3": "AVVS",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-023",
+        "HUT_FOLIO": "HUT-023"
+      },
+      "datos": {
+        "nombre": "DIEGO YAEL VICTORIANO CONTRERAS",
+        "telefono": "+525653853333",
+        "email": "diegoyael850@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-29T17:49:38.055Z"
+      },
+      "codigos": {
+        "codigo1": "HW2U",
+        "codigo2": "T8MG",
+        "codigo3": "38VJ",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-024",
+        "HUT_FOLIO": "HUT-024"
+      },
+      "datos": {
+        "nombre": "BRANDON SUSEJ PEREZ ARROYO",
+        "telefono": "+527861181855",
+        "email": "susejaroyo7@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-29T18:49:25.061Z"
+      },
+      "codigos": {
+        "codigo1": "TMUG",
+        "codigo2": "SHYB",
+        "codigo3": "ST97",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-025",
+        "HUT_FOLIO": "HUT-025"
+      },
+      "datos": {
+        "nombre": "BRANDON ANTONIO ORTEGA",
+        "telefono": "+525579522408",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-29T19:03:33.491Z"
+      },
+      "codigos": {
+        "codigo1": "37NC",
+        "codigo2": "2JZ8",
+        "codigo3": "368V",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-026",
+        "HUT_FOLIO": "HUT-026"
+      },
+      "datos": {
+        "nombre": "ALEXIS GONZALE",
+        "telefono": "+525613151713",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-29T19:27:22.720Z"
+      },
+      "codigos": {
+        "codigo1": "CT9S",
+        "codigo2": "W7BA",
+        "codigo3": "HEQR",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-027",
+        "HUT_FOLIO": "HUT-027"
+      },
+      "datos": {
+        "nombre": "DANIEL MARTINEZ",
+        "telefono": "+525566799002",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T00:50:16.439Z"
+      },
+      "codigos": {
+        "codigo1": "VN7H",
+        "codigo2": "YTRW",
+        "codigo3": "7QW8",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-028",
+        "HUT_FOLIO": "HUT-028"
+      },
+      "datos": {
+        "nombre": "GERARDO RODRIGUEZ",
+        "telefono": "+525535947286",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T01:18:15.509Z"
+      },
+      "codigos": {
+        "codigo1": "KXSS",
+        "codigo2": "GMYW",
+        "codigo3": "2M2S",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-029",
+        "HUT_FOLIO": "HUT-029"
+      },
+      "datos": {
+        "nombre": "JUAN CRUZ",
+        "telefono": "+525636925682",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T01:37:40.029Z"
+      },
+      "codigos": {
+        "codigo1": "87HV",
+        "codigo2": "8GN8",
+        "codigo3": "CPMG",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-030",
+        "HUT_FOLIO": "HUT-030"
+      },
+      "datos": {
+        "nombre": "BRUNO MANUEL MUÑOZ GARCIA",
+        "telefono": "+525524129825",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T01:48:23.583Z"
+      },
+      "codigos": {
+        "codigo1": "6J3G",
+        "codigo2": "KXVF",
+        "codigo3": "48KJ",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-031",
+        "HUT_FOLIO": "HUT-031"
+      },
+      "datos": {
+        "nombre": "CARLOS MARTINEZ MANZANO",
+        "telefono": "+525585591954",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T02:07:22.752Z"
+      },
+      "codigos": {
+        "codigo1": "3RMN",
+        "codigo2": "Z739",
+        "codigo3": "3SUR",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-032",
+        "HUT_FOLIO": "HUT-032"
+      },
+      "datos": {
+        "nombre": "BRAULIO PEREZ CONTRERAS",
+        "telefono": "+525614174050",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T02:51:21.933Z"
+      },
+      "codigos": {
+        "codigo1": "K3JB",
+        "codigo2": "MWQU",
+        "codigo3": "K4GZ",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-033",
+        "HUT_FOLIO": "HUT-033"
+      },
+      "datos": {
+        "nombre": "ROLANDO AGUIRRE MATA",
+        "telefono": "+525581198716",
+        "email": "aguirrerolando03@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T03:23:41.045Z"
+      },
+      "codigos": {
+        "codigo1": "GQTS",
+        "codigo2": "DKGB",
+        "codigo3": "ZBW3",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-034",
+        "HUT_FOLIO": "HUT-034"
+      },
+      "datos": {
+        "nombre": "ANGEL GABRIEL CAYET BONILLA",
+        "telefono": "+525564638244",
+        "email": "morralesangel362@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T03:24:47.972Z"
+      },
+      "codigos": {
+        "codigo1": "F44G",
+        "codigo2": "F48G",
+        "codigo3": "X9SK",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-035",
+        "HUT_FOLIO": "HUT-035"
+      },
+      "datos": {
+        "nombre": "OSCAR PERE QUINTANAR",
+        "telefono": "+525560310147",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T03:50:58.461Z"
+      },
+      "codigos": {
+        "codigo1": "2KRF",
+        "codigo2": "V7DY",
+        "codigo3": "6SMF",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-036",
+        "HUT_FOLIO": "HUT-036"
+      },
+      "datos": {
+        "nombre": "VICTOR CORONA",
+        "telefono": "+525515019893",
+        "email": "bandatierralejana0501@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T15:45:06.738Z"
+      },
+      "codigos": {
+        "codigo1": "EQZX",
+        "codigo2": "X3HS",
+        "codigo3": "826T",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-037",
+        "HUT_FOLIO": "HUT-037"
+      },
+      "datos": {
+        "nombre": "CARLOS GARCIA LOPEZ",
+        "telefono": "+525631373879",
+        "email": "moicaz@hotmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T16:29:16.414Z"
+      },
+      "codigos": {
+        "codigo1": "8M4S",
+        "codigo2": "N6EG",
+        "codigo3": "UM8C",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-038",
+        "HUT_FOLIO": "HUT-038"
+      },
+      "datos": {
+        "nombre": "ABRAHAM TAMAYO GARCÍA",
+        "telefono": "+525616250685",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T16:36:30.490Z"
+      },
+      "codigos": {
+        "codigo1": "BS24",
+        "codigo2": "KDJH",
+        "codigo3": "8VYE",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-039",
+        "HUT_FOLIO": "HUT-039"
+      },
+      "datos": {
+        "nombre": "LUIS MIGUEL VELASQUEZ ESPAÑA",
+        "telefono": "+525566594605",
+        "email": "luismvs@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T17:16:16.217Z"
+      },
+      "codigos": {
+        "codigo1": "PAKC",
+        "codigo2": "EZ4B",
+        "codigo3": "SY6V",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-040",
+        "HUT_FOLIO": "HUT-040"
+      },
+      "datos": {
+        "nombre": "RAFAEL FLORES ROMERO",
+        "telefono": "+525537829596",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T18:58:20.163Z"
+      },
+      "codigos": {
+        "codigo1": "UGXJ",
+        "codigo2": "BN7U",
+        "codigo3": "UBVT",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-042",
+        "HUT_FOLIO": "HUT-042"
+      },
+      "datos": {
+        "nombre": "JONATHAN HERNÁNDEZ MORAN",
+        "telefono": "+525537500274",
+        "email": "jothanhernandezmoran89@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T20:20:06.788Z"
+      },
+      "codigos": {
+        "codigo1": "6STK",
+        "codigo2": "QTHP",
+        "codigo3": "3DUP",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-043",
+        "HUT_FOLIO": "HUT-043"
+      },
+      "datos": {
+        "nombre": "BRYAN HERNÁNDEZ LÓPEZ",
+        "telefono": "+525641556554",
+        "email": "brianhernandezlopez0830@gmai.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T20:32:22.021Z"
+      },
+      "codigos": {
+        "codigo1": "FYC8",
+        "codigo2": "7MPY",
+        "codigo3": "AG26",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-044",
+        "HUT_FOLIO": "HUT-044"
+      },
+      "datos": {
+        "nombre": "JOSUÉ ENCARNACIÓN SAYAGO",
+        "telefono": "+525578893843",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T20:55:33.439Z"
+      },
+      "codigos": {
+        "codigo1": "RMVK",
+        "codigo2": "NMVQ",
+        "codigo3": "UKCU",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-045",
+        "HUT_FOLIO": "HUT-045"
+      },
+      "datos": {
+        "nombre": "ROBER AGUILAR",
+        "telefono": "+525582321902",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T21:14:33.061Z"
+      },
+      "codigos": {
+        "codigo1": "CT4B",
+        "codigo2": "JDTX",
+        "codigo3": "N8B9",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-046",
+        "HUT_FOLIO": "HUT-046"
+      },
+      "datos": {
+        "nombre": "prueba definitiva solo CTL",
+        "telefono": "5599990000",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-08T05:40:21.509Z"
+      },
+      "codigos": {
+        "codigo1": "NFBS",
+        "codigo2": "RTTN",
+        "codigo3": "USDR",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-047",
+        "HUT_FOLIO": "HUT-047"
+      },
+      "datos": {
+        "nombre": "LUIS FERNANDO MORENO ESCAMILLA",
+        "telefono": "+525620503755",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T21:56:54.887Z"
+      },
+      "codigos": {
+        "codigo1": "XSW6",
+        "codigo2": "87Q4",
+        "codigo3": "BY9Y",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-048",
+        "HUT_FOLIO": "HUT-048"
+      },
+      "datos": {
+        "nombre": "LUIS MANUEL DOMINGUEZ",
+        "telefono": "+526245152889",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T22:08:45.765Z"
+      },
+      "codigos": {
+        "codigo1": "NUU7",
+        "codigo2": "2PPB",
+        "codigo3": "AM3U",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-049",
+        "HUT_FOLIO": "HUT-049"
+      },
+      "datos": {
+        "nombre": "FERMIN HERNANDEZ HDZ",
+        "telefono": "+525548827562",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T22:32:47.878Z"
+      },
+      "codigos": {
+        "codigo1": "VUG8",
+        "codigo2": "3K2N",
+        "codigo3": "3G76",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-050",
+        "HUT_FOLIO": "HUT-050"
+      },
+      "datos": {
+        "nombre": "ANGEL NOE REYNOSO SANTANA",
+        "telefono": "+525542976469",
+        "email": "areynososantaana@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T22:34:29.678Z"
+      },
+      "codigos": {
+        "codigo1": "GS68",
+        "codigo2": "C36F",
+        "codigo3": "SXPT",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-051",
+        "HUT_FOLIO": "HUT-051"
+      },
+      "datos": {
+        "nombre": "JORGE LUIS LOPEZ",
+        "telefono": "+525629947908",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T23:01:09.255Z"
+      },
+      "codigos": {
+        "codigo1": "VFAM",
+        "codigo2": "UJRC",
+        "codigo3": "WS8H",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-052",
+        "HUT_FOLIO": "HUT-052"
+      },
+      "datos": {
+        "nombre": "MANUEL HERNÁNDEZ",
+        "telefono": "+525581697113",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-30T23:17:51.771Z"
+      },
+      "codigos": {
+        "codigo1": "9VEG",
+        "codigo2": "7JH3",
+        "codigo3": "QVX4",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-053",
+        "HUT_FOLIO": null
+      },
+      "datos": {
+        "nombre": "JORDAN PICAZO",
+        "telefono": "+525582207934",
+        "email": "jordanjpicazol@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-14T17:07:28.398Z"
+      },
+      "codigos": {
+        "codigo1": "BRH4",
+        "codigo2": "MEXP",
+        "codigo3": "DSQJ",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-054",
+        "HUT_FOLIO": "HUT-054"
+      },
+      "datos": {
+        "nombre": "LUIS ANGEL TENJHAY CRUZ",
+        "telefono": "+525515018545",
+        "email": "a.tenjhay23@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T00:49:29.677Z"
+      },
+      "codigos": {
+        "codigo1": "KRNV",
+        "codigo2": "8MZK",
+        "codigo3": "Q2E7",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-055",
+        "HUT_FOLIO": "HUT-055"
+      },
+      "datos": {
+        "nombre": "MARCO ANTONIO TENJHAY CRUZ",
+        "telefono": "+525633230306",
+        "email": "marco.tenjhay@hotmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T01:00:02.245Z"
+      },
+      "codigos": {
+        "codigo1": "EGHS",
+        "codigo2": "2WK2",
+        "codigo3": "2U6W",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-056",
+        "HUT_FOLIO": "HUT-056"
+      },
+      "datos": {
+        "nombre": "DAGORBERTO CANCINO NAVARRETE",
+        "telefono": "+525561824995",
+        "email": "ddago4135@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T01:08:27.468Z"
+      },
+      "codigos": {
+        "codigo1": "GQKQ",
+        "codigo2": "GZBE",
+        "codigo3": "9BTN",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-057",
+        "HUT_FOLIO": "HUT-057"
+      },
+      "datos": {
+        "nombre": "CARLOS CORTES REYES",
+        "telefono": "+525532933811",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T01:19:50.553Z"
+      },
+      "codigos": {
+        "codigo1": "WEGE",
+        "codigo2": "9NRJ",
+        "codigo3": "PSY2",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-058",
+        "HUT_FOLIO": null
+      },
+      "datos": {
+        "nombre": "EDGAR MARTINES MACEDO",
+        "telefono": "+525525657487",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T01:43:26.732Z"
+      },
+      "codigos": {
+        "codigo1": "SFDU",
+        "codigo2": "QPFT",
+        "codigo3": "TQ4G",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-059",
+        "HUT_FOLIO": "HUT-059"
+      },
+      "datos": {
+        "nombre": "ELIEL CICONE CRUZ",
+        "telefono": "+525630700641",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T02:17:30.769Z"
+      },
+      "codigos": {
+        "codigo1": "RWQ4",
+        "codigo2": "HTH7",
+        "codigo3": "RNB8",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-060",
+        "HUT_FOLIO": "HUT-060"
+      },
+      "datos": {
+        "nombre": "FERMIN AGUIRRE MATA",
+        "telefono": "+525661846780",
+        "email": "ferm1nmatagusman@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T02:18:25.236Z"
+      },
+      "codigos": {
+        "codigo1": "2NUU",
+        "codigo2": "9QPH",
+        "codigo3": "9VQZ",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-061",
+        "HUT_FOLIO": "HUT-061"
+      },
+      "datos": {
+        "nombre": "ALEJANDRO GARCÍA",
+        "telefono": "+525541125616",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T02:43:46.921Z"
+      },
+      "codigos": {
+        "codigo1": "J4XC",
+        "codigo2": "3J33",
+        "codigo3": "W3V7",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-062",
+        "HUT_FOLIO": "HUT-062"
+      },
+      "datos": {
+        "nombre": "LUIS JAVIER RAMIREZ VARGAS",
+        "telefono": "+525652558138",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T02:45:43.282Z"
+      },
+      "codigos": {
+        "codigo1": "T493",
+        "codigo2": "Q3NY",
+        "codigo3": "J9MB",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-064",
+        "HUT_FOLIO": "HUT-064"
+      },
+      "datos": {
+        "nombre": "ANTONIO CARDONA",
+        "telefono": "+525549119782",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T03:12:14.660Z"
+      },
+      "codigos": {
+        "codigo1": "P8TX",
+        "codigo2": "J7KP",
+        "codigo3": "EBFW",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-065",
+        "HUT_FOLIO": "HUT-065"
+      },
+      "datos": {
+        "nombre": "CEFERINO RANGEL SOTO",
+        "telefono": "+525581221511",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T03:40:01.130Z"
+      },
+      "codigos": {
+        "codigo1": "7G8T",
+        "codigo2": "8DR9",
+        "codigo3": "T7QH",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-066",
+        "HUT_FOLIO": "HUT-066"
+      },
+      "datos": {
+        "nombre": "ERICK MICHELL VELÁZQUEZ",
+        "telefono": "+525660967244",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T05:21:26.074Z"
+      },
+      "codigos": {
+        "codigo1": "XQY2",
+        "codigo2": "HHC3",
+        "codigo3": "E88H",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-067",
+        "HUT_FOLIO": "HUT-067"
+      },
+      "datos": {
+        "nombre": "LUIS JESÚS MURILLO MONRROY",
+        "telefono": "+525576625416",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T18:33:53.262Z"
+      },
+      "codigos": {
+        "codigo1": "GVTV",
+        "codigo2": "CMS4",
+        "codigo3": "6ZKG",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-068",
+        "HUT_FOLIO": "HUT-068"
+      },
+      "datos": {
+        "nombre": "SAMUEL CRUZ CRUZ",
+        "telefono": "+525510280293",
+        "email": "samuelcruz19591959.sc@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T20:26:51.505Z"
+      },
+      "codigos": {
+        "codigo1": "NJ2N",
+        "codigo2": "AKPV",
+        "codigo3": "R8CJ",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-069",
+        "HUT_FOLIO": "HUT-069"
+      },
+      "datos": {
+        "nombre": "OSCAR IVAN RAMIREZ SORIANO",
+        "telefono": "+525652031370",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T21:00:55.013Z"
+      },
+      "codigos": {
+        "codigo1": "AZRM",
+        "codigo2": "2MTA",
+        "codigo3": "JKSJ",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-070",
+        "HUT_FOLIO": "HUT-070"
+      },
+      "datos": {
+        "nombre": "SEBASTIÁN SEGURA CEDILLO",
+        "telefono": "+525583528389",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T22:19:12.333Z"
+      },
+      "codigos": {
+        "codigo1": "P4C2",
+        "codigo2": "ZEZD",
+        "codigo3": "XYJ8",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-071",
+        "HUT_FOLIO": "HUT-071"
+      },
+      "datos": {
+        "nombre": "ALFREDO JIMÉNEZ LEON",
+        "telefono": "+525543122707",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T22:26:44.384Z"
+      },
+      "codigos": {
+        "codigo1": "6C7B",
+        "codigo2": "GXSH",
+        "codigo3": "6CTQ",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-072",
+        "HUT_FOLIO": "HUT-072"
+      },
+      "datos": {
+        "nombre": "DANTE PAZ",
+        "telefono": "+525636749767",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T22:34:17.134Z"
+      },
+      "codigos": {
+        "codigo1": "B3PU",
+        "codigo2": "Y2CT",
+        "codigo3": "TX7D",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-073",
+        "HUT_FOLIO": "HUT-073"
+      },
+      "datos": {
+        "nombre": "JOSHUA AXEL DE MARCOS CERVANTES",
+        "telefono": "+525649118940",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T22:55:42.693Z"
+      },
+      "codigos": {
+        "codigo1": "ZQT7",
+        "codigo2": "QF44",
+        "codigo3": "BD7N",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-074",
+        "HUT_FOLIO": "HUT-074"
+      },
+      "datos": {
+        "nombre": "EMILIO AYALA MEDINA",
+        "telefono": "+525577985153",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-07-31T23:25:34.782Z"
+      },
+      "codigos": {
+        "codigo1": "4USK",
+        "codigo2": "M2KW",
+        "codigo3": "VYAZ",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-075",
+        "HUT_FOLIO": "HUT-075"
+      },
+      "datos": {
+        "nombre": "ISRRAEL ROMUALDO",
+        "telefono": "+525584320922",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-01T00:17:10.887Z"
+      },
+      "codigos": {
+        "codigo1": "XUW4",
+        "codigo2": "33KK",
+        "codigo3": "9E2J",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-076",
+        "HUT_FOLIO": "HUT-076"
+      },
+      "datos": {
+        "nombre": "MAURICIO IBAÑEZ PRESAS",
+        "telefono": "+529831200995",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-01T01:19:36.131Z"
+      },
+      "codigos": {
+        "codigo1": "3JCP",
+        "codigo2": "F2W4",
+        "codigo3": "7CA2",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-077",
+        "HUT_FOLIO": "HUT-077"
+      },
+      "datos": {
+        "nombre": "CARLOS JESÚS AMEZQUITA JASSO",
+        "telefono": "+525613413538",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-01T01:28:53.727Z"
+      },
+      "codigos": {
+        "codigo1": "DBK6",
+        "codigo2": "NKDF",
+        "codigo3": "87TE",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-079",
+        "HUT_FOLIO": "HUT-079"
+      },
+      "datos": {
+        "nombre": "JOSÉ JUAN SAYAS RODRÍGUEZ",
+        "telefono": "+525651910235",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-01T01:50:31.099Z"
+      },
+      "codigos": {
+        "codigo1": "Y8SW",
+        "codigo2": "JYCR",
+        "codigo3": "8CUH",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-080",
+        "HUT_FOLIO": "HUT-080"
+      },
+      "datos": {
+        "nombre": "JOSÉ AURELIO MUÑOZ ZAVALA",
+        "telefono": "+525583011202",
+        "email": "josef.0609duende@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-01T20:47:48.088Z"
+      },
+      "codigos": {
+        "codigo1": "7N7Z",
+        "codigo2": "NZSH",
+        "codigo3": "MCKX",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-081",
+        "HUT_FOLIO": "HUT-081"
+      },
+      "datos": {
+        "nombre": "MACARIO PELAEZ MATA",
+        "telefono": "+525561856779",
+        "email": "karen.bautista.berenice07@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-01T21:29:49.902Z"
+      },
+      "codigos": {
+        "codigo1": "PDS9",
+        "codigo2": "K749",
+        "codigo3": "M9Z4",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-082",
+        "HUT_FOLIO": "HUT-082"
+      },
+      "datos": {
+        "nombre": "JESUS ANGEL MARQUEZ HERNANDEZ",
+        "telefono": "+525657792215",
+        "email": "jesusangel02marquez14@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-01T21:39:12.279Z"
+      },
+      "codigos": {
+        "codigo1": "GG4X",
+        "codigo2": "C6WN",
+        "codigo3": "XSJS",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-083",
+        "HUT_FOLIO": "HUT-083"
+      },
+      "datos": {
+        "nombre": "IRVING RAUL PEDRAZA",
+        "telefono": "+525547025000",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-01T22:04:21.212Z"
+      },
+      "codigos": {
+        "codigo1": "SGA6",
+        "codigo2": "4ATP",
+        "codigo3": "N9GF",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-084",
+        "HUT_FOLIO": "HUT-084"
+      },
+      "datos": {
+        "nombre": "MIGUEL ANGEL MERINO MENDOZA",
+        "telefono": "+525669446318",
+        "email": "alitzel16@icloud.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-01T22:56:10.126Z"
+      },
+      "codigos": {
+        "codigo1": "C423",
+        "codigo2": "9FYB",
+        "codigo3": "8SJB",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-085",
+        "HUT_FOLIO": "HUT-085"
+      },
+      "datos": {
+        "nombre": "JONATHAN ERNESTO SANTO YO GONZÁLEZ",
+        "telefono": "+525616687847",
+        "email": "santoyopppp@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-02T02:05:25.578Z"
+      },
+      "codigos": {
+        "codigo1": "3PMX",
+        "codigo2": "2WYZ",
+        "codigo3": "ETK3",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-086",
+        "HUT_FOLIO": "HUT-086"
+      },
+      "datos": {
+        "nombre": "DANIEL DE LA TORRE",
+        "telefono": "+525542627869",
+        "email": "danieldelatorregardunos@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-02T23:33:01.875Z"
+      },
+      "codigos": {
+        "codigo1": "EQCG",
+        "codigo2": "XABE",
+        "codigo3": "VBGB",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-087",
+        "HUT_FOLIO": "HUT-087"
+      },
+      "datos": {
+        "nombre": "ALBERTO SHEL AGUILAR",
+        "telefono": "+525655858377",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-03T00:21:24.797Z"
+      },
+      "codigos": {
+        "codigo1": "XWUQ",
+        "codigo2": "WJRP",
+        "codigo3": "7PQK",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-088",
+        "HUT_FOLIO": "HUT-088"
+      },
+      "datos": {
+        "nombre": "ABEL LERISTA LÓPEZ",
+        "telefono": "+525510599782",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-03T00:29:44.440Z"
+      },
+      "codigos": {
+        "codigo1": "V7GG",
+        "codigo2": "PCKW",
+        "codigo3": "SE7R",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-089",
+        "HUT_FOLIO": "HUT-089"
+      },
+      "datos": {
+        "nombre": "OMAR DE LA CRUZ MARTINES",
+        "telefono": "+525569757812",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-03T00:55:36.996Z"
+      },
+      "codigos": {
+        "codigo1": "SEGZ",
+        "codigo2": "SVXG",
+        "codigo3": "Y9BU",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-091",
+        "HUT_FOLIO": "HUT-091"
+      },
+      "datos": {
+        "nombre": "JUAN ANTONIO GARZON QUINTAN",
+        "telefono": "+525628128681",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-03T21:24:29.811Z"
+      },
+      "codigos": {
+        "codigo1": "CK9Y",
+        "codigo2": "EQW4",
+        "codigo3": "98RF",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-092",
+        "HUT_FOLIO": "HUT-092"
+      },
+      "datos": {
+        "nombre": "URIEL GARZON",
+        "telefono": "+525584896827",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-03T21:40:54.023Z"
+      },
+      "codigos": {
+        "codigo1": "JYBT",
+        "codigo2": "QYDG",
+        "codigo3": "YE43",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-093",
+        "HUT_FOLIO": "HUT-093"
+      },
+      "datos": {
+        "nombre": "FIDENCIO GUEVARA",
+        "telefono": "+525614390094",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-03T23:04:40.318Z"
+      },
+      "codigos": {
+        "codigo1": "R82D",
+        "codigo2": "KUZC",
+        "codigo3": "UDNQ",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-094",
+        "HUT_FOLIO": "HUT-094"
+      },
+      "datos": {
+        "nombre": "JOSÉ ROBERTO GARCÍA CENTENO",
+        "telefono": "+525618372477",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-04T02:22:30.511Z"
+      },
+      "codigos": {
+        "codigo1": "A97P",
+        "codigo2": "CP92",
+        "codigo3": "MRFR",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-095",
+        "HUT_FOLIO": "HUT-095"
+      },
+      "datos": {
+        "nombre": "JOSUÉ RODRÍGUEZ",
+        "telefono": "+522202435512",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-04T15:31:01.485Z"
+      },
+      "codigos": {
+        "codigo1": "9QFJ",
+        "codigo2": "TEZ3",
+        "codigo3": "REN7",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-096",
+        "HUT_FOLIO": "HUT-096"
+      },
+      "datos": {
+        "nombre": "JAVIER DOMÍNGUEZ CHÁVEZ",
+        "telefono": "+525573479902",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-04T15:57:33.322Z"
+      },
+      "codigos": {
+        "codigo1": "ESQW",
+        "codigo2": "2U8P",
+        "codigo3": "8982",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-097",
+        "HUT_FOLIO": "HUT-097"
+      },
+      "datos": {
+        "nombre": "DANIEL RODRÍGUEZ",
+        "telefono": "+525638209311",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-04T17:11:10.342Z"
+      },
+      "codigos": {
+        "codigo1": "B9ZQ",
+        "codigo2": "DQSY",
+        "codigo3": "AC7N",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-099",
+        "HUT_FOLIO": "HUT-099"
+      },
+      "datos": {
+        "nombre": "ESLY ROBLES",
+        "telefono": "+525645701889",
+        "email": "teterayito@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-04T20:30:52.877Z"
+      },
+      "codigos": {
+        "codigo1": "MMGM",
+        "codigo2": "6VTE",
+        "codigo3": "FJVH",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-101",
+        "HUT_FOLIO": "HUT-101"
+      },
+      "datos": {
+        "nombre": "LUIS HERNÁNDEZ",
+        "telefono": "+525515872894",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-05T01:54:02.874Z"
+      },
+      "codigos": {
+        "codigo1": "JVMB",
+        "codigo2": "KCHX",
+        "codigo3": "XKW4",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-102",
+        "HUT_FOLIO": "HUT-102"
+      },
+      "datos": {
+        "nombre": "ROBERTO MARTINEZ",
+        "telefono": "+525669458344",
+        "email": null,
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-05T02:27:17.169Z"
+      },
+      "codigos": {
+        "codigo1": "TUYX",
+        "codigo2": "SPBZ",
+        "codigo3": "HBWX",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-112",
+        "HUT_FOLIO": "HUT-112"
+      },
+      "datos": {
+        "nombre": "MARCO TULIO CULEBRO ESPINOSA",
+        "telefono": "+525544894236",
+        "email": "marcotulio92@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-07T03:39:41.734Z"
+      },
+      "codigos": {
+        "codigo1": "3ADJ",
+        "codigo2": "26NZ",
+        "codigo3": "EMXS",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-113",
+        "HUT_FOLIO": "HUT-113"
+      },
+      "datos": {
+        "nombre": "JORGE IVAN CASTAÑEDA CORNEJO",
+        "telefono": "+525523975917",
+        "email": "ivandrago0406@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-07T04:25:18.763Z"
+      },
+      "codigos": {
+        "codigo1": "AFSG",
+        "codigo2": "NEZ4",
+        "codigo3": "FR4C",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-116",
+        "HUT_FOLIO": "HUT-116"
+      },
+      "datos": {
+        "nombre": "ARTURO ALBERTO GÓMEZ ROMÁN",
+        "telefono": "+525527620364",
+        "email": "housewok303@hotmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-07T17:51:48.322Z"
+      },
+      "codigos": {
+        "codigo1": "ZKWM",
+        "codigo2": "QGVQ",
+        "codigo3": "77TN",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-118",
+        "HUT_FOLIO": "HUT-118"
+      },
+      "datos": {
+        "nombre": "ADOLFO SEPULVEDA",
+        "telefono": "+525554199061",
+        "email": "asepulvedas73@hotmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-08T01:14:20.406Z"
+      },
+      "codigos": {
+        "codigo1": "YYB8",
+        "codigo2": "GB8F",
+        "codigo3": "KZY3",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-126",
+        "HUT_FOLIO": "HUT-126"
+      },
+      "datos": {
+        "nombre": "Mario Alberto Montes Rodríguez",
+        "telefono": "5544833492",
+        "email": "montesquio@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-10T16:17:54.809Z"
+      },
+      "codigos": {
+        "codigo1": "BG7J",
+        "codigo2": "J4T9",
+        "codigo3": "VEDV",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-132",
+        "HUT_FOLIO": "HUT-132"
+      },
+      "datos": {
+        "nombre": "Vjjk",
+        "telefono": "5569844752",
+        "email": "vbnk@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-10T19:08:23.684Z"
+      },
+      "codigos": {
+        "codigo1": "CJMZ",
+        "codigo2": "HZC3",
+        "codigo3": "TGJY",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-133",
+        "HUT_FOLIO": "HUT-133"
+      },
+      "datos": {
+        "nombre": "FRANCISCO JAVIER AGUILAR MURILLO",
+        "telefono": "+525529658583",
+        "email": "pacoaguilar07@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-10T20:15:10.295Z"
+      },
+      "codigos": {
+        "codigo1": "6FTG",
+        "codigo2": "QH3C",
+        "codigo3": "6HSG",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    },
+    {
+      "identificacion": {
+        "NAV_FOLIO": "NAV-143",
+        "HUT_FOLIO": "HUT-143"
+      },
+      "datos": {
+        "nombre": "OSCAR ZAMORA HERNÁNDEZ",
+        "telefono": "+525535150576",
+        "email": "zamos6687@gmail.com",
+        "reclutador": null
+      },
+      "screening": {
+        "screeningStatus": "PASSED",
+        "screeningResult": "APPROVED_ELIGIBLE",
+        "fechaAprobacion": "2026-08-14T18:35:39.468Z"
+      },
+      "codigos": {
+        "codigo1": "MHW9",
+        "codigo2": "QB7V",
+        "codigo3": "Z9DV",
+        "source": "V1 ParticipantReferenceCode.slot/code"
+      },
+      "validacionOperativa": {
+        "cltIniciado": false,
+        "cltRespuestas": 0,
+        "resultadoMigracion": "MIGRAR"
+      }
+    }
+  ],
+  "excluded": [
+    {
+      "NAV_FOLIO": "QA-FB8BC2DD",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 4,
+      "reason": "CLT iniciado; CLT respuestas = 4"
+    },
+    {
+      "NAV_FOLIO": "NAV-002",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 75,
+      "reason": "CLT iniciado; CLT respuestas = 75"
+    },
+    {
+      "NAV_FOLIO": "NAV-003",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-006",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 5,
+      "reason": "CLT iniciado; CLT respuestas = 5"
+    },
+    {
+      "NAV_FOLIO": "NAV-041",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-063",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-078",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-090",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-098",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 5,
+      "reason": "CLT iniciado; CLT respuestas = 5"
+    },
+    {
+      "NAV_FOLIO": "NAV-100",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-103",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-104",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-105",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 62,
+      "reason": "CLT iniciado; CLT respuestas = 62"
+    },
+    {
+      "NAV_FOLIO": "NAV-106",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-107",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-108",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-109",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 3,
+      "reason": "CLT iniciado; CLT respuestas = 3"
+    },
+    {
+      "NAV_FOLIO": "NAV-110",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-111",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-114",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 5,
+      "reason": "CLT iniciado; CLT respuestas = 5"
+    },
+    {
+      "NAV_FOLIO": "NAV-115",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 74,
+      "reason": "CLT iniciado; CLT respuestas = 74"
+    },
+    {
+      "NAV_FOLIO": "NAV-117",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-119",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-120",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-121",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-122",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-123",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-124",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 73,
+      "reason": "CLT iniciado; CLT respuestas = 73"
+    },
+    {
+      "NAV_FOLIO": "NAV-125",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-127",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-128",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 62,
+      "reason": "CLT iniciado; CLT respuestas = 62"
+    },
+    {
+      "NAV_FOLIO": "NAV-129",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-130",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-131",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 61,
+      "reason": "CLT iniciado; CLT respuestas = 61"
+    },
+    {
+      "NAV_FOLIO": "NAV-134",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 75,
+      "reason": "CLT iniciado; CLT respuestas = 75"
+    },
+    {
+      "NAV_FOLIO": "NAV-135",
+      "screeningStatus": "PENDING_REVIEW",
+      "cltIniciado": false,
+      "cltRespuestas": 0,
+      "reason": "screening no aprobado (PENDING_REVIEW)"
+    },
+    {
+      "NAV_FOLIO": "NAV-136",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 100,
+      "reason": "CLT iniciado; CLT respuestas = 100"
+    },
+    {
+      "NAV_FOLIO": "NAV-137",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 75,
+      "reason": "CLT iniciado; CLT respuestas = 75"
+    },
+    {
+      "NAV_FOLIO": "NAV-138",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 75,
+      "reason": "CLT iniciado; CLT respuestas = 75"
+    },
+    {
+      "NAV_FOLIO": "NAV-139",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 76,
+      "reason": "CLT iniciado; CLT respuestas = 76"
+    },
+    {
+      "NAV_FOLIO": "NAV-140",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 75,
+      "reason": "CLT iniciado; CLT respuestas = 75"
+    },
+    {
+      "NAV_FOLIO": "NAV-141",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 75,
+      "reason": "CLT iniciado; CLT respuestas = 75"
+    },
+    {
+      "NAV_FOLIO": "NAV-142",
+      "screeningStatus": "PASSED",
+      "cltIniciado": true,
+      "cltRespuestas": 75,
+      "reason": "CLT iniciado; CLT respuestas = 75"
+    }
+  ]
+}

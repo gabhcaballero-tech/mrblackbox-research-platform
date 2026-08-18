@@ -1,0 +1,4357 @@
+{
+  "metadata": {
+    "generatedAt": "2026-08-15T13:53:55.056Z",
+    "readOnly": true,
+    "studyCode": "FMASCULINA-NAVIGO-2026",
+    "studyId": "90f25436-2353-46fa-817a-4f187edea59d",
+    "studyName": "Fragancia Masculina — Navigo Homme",
+    "requestedFolios": [
+      "NAV-038",
+      "NAV-043",
+      "NAV-009",
+      "NAV-023",
+      "NAV-024",
+      "NAV-044",
+      "NAV-053",
+      "NAV-054",
+      "NAV-055",
+      "NAV-056",
+      "NAV-058",
+      "NAV-068",
+      "NAV-079",
+      "NAV-080",
+      "NAV-081",
+      "NAV-082",
+      "NAV-084",
+      "NAV-085",
+      "NAV-089",
+      "NAV-096"
+    ]
+  },
+  "summary": {
+    "byClassification": {
+      "A) LISTO PARA MIGRAR": 20
+    },
+    "total": 20,
+    "v1Found": 20,
+    "v1Missing": 0
+  },
+  "v2": {
+    "checked": false,
+    "reason": "No hay variable de conexion V2 configurada en el entorno local. Variables detectadas: DATABASE_URL solamente.",
+    "requiredForFinalOccupationCheck": "Configurar una conexion V2 de solo lectura, por ejemplo V2_DATABASE_URL."
+  },
+  "rows": [
+    {
+      "folio": "NAV-038",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-038",
+        "hutFolio": "HUT-038",
+        "participantProfileId": "6131a678-8cf6-43a3-b8bd-48018b3bebb7",
+        "studyParticipantId": "e0822763-1f40-4f37-9104-cfe1dd57dd31",
+        "hutParticipantId": "f2e5cd3b-7f98-4fb5-9469-90529ba09948",
+        "name": "ABRAHAM TAMAYO GARCÍA",
+        "phone": "+525616250685",
+        "email": null,
+        "protocol": "CLT_NAVIGO_HUT",
+        "qa": false,
+        "codes": {
+          "codigo1": "BS24",
+          "codigo2": "KDJH",
+          "codigo3": "8VYE",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-06T00:52:47.871Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 3,
+          "hutAnswers": 0,
+          "hutExists": true,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [
+          {
+            "completedAt": null,
+            "kind": "HUT",
+            "startedAt": null,
+            "status": "NOT_STARTED"
+          }
+        ],
+        "answers": {
+          "screening": [
+            {
+              "answer": "JAZMÍN RAMIREZ",
+              "answeredAt": "2026-07-30T16:14:38.153Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-07-30T16:24:35.714Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-07-30T16:24:48.149Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 20,
+              "answeredAt": "2026-07-30T16:25:01.364Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-30T16:25:26.495Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-07-30T16:25:40.077Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-30T16:25:57.628Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "NAVIGO AZUL HOME",
+              "answeredAt": "2026-07-30T16:32:19.660Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-07-30T16:33:03.381Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "AZUL",
+              "answeredAt": "2026-07-30T16:33:22.847Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "CINCO_DIAS",
+              "answeredAt": "2026-07-30T16:33:45.925Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "HACE UNA SEMANA",
+              "answeredAt": "2026-07-30T16:34:35.583Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "PREPARATORIA_COMPLETA",
+              "answeredAt": "2026-07-30T16:35:10.047Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "DOS_O_MAS_BANOS_COMPLETOS",
+              "answeredAt": "2026-07-30T16:35:32.252Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "UN_AUTO",
+              "answeredAt": "2026-07-30T16:35:40.450Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-07-30T16:35:54.156Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "UNA_PERSONA",
+              "answeredAt": "2026-07-30T16:36:14.951Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "DOS_CUARTOS",
+              "answeredAt": "2026-07-30T16:36:30.058Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-30T16:28:21.092Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/6131a678-8cf6-43a3-b8bd-48018b3bebb7/screening-attempts/f052039f-46b6-4bf5-89f4-279017d435af/perfume_photo/27748a22-1bd5-4dd9-8a4d-b24e91702036.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-30T16:32:16.934Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/6131a678-8cf6-43a3-b8bd-48018b3bebb7/screening-attempts/f052039f-46b6-4bf5-89f4-279017d435af/perfume_photo/81d76f70-a96c-4185-b29f-82d6b88fe039.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-30T16:37:43.191Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/6131a678-8cf6-43a3-b8bd-48018b3bebb7/screening-attempts/f052039f-46b6-4bf5-89f4-279017d435af/selfie_identification/89374045-5c53-4c80-98f7-1429d8d3a276.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": {
+            "rotationCode": "NAV-038__583__247",
+            "rotationPlanName": "NAV-038__583__247",
+            "arms": [
+              {
+                "arm": "LEFT",
+                "applicationOrder": 1,
+                "product": "583"
+              },
+              {
+                "arm": "RIGHT",
+                "applicationOrder": 2,
+                "product": "247"
+              }
+            ]
+          },
+          "triangular": {
+            "pr1": "K-247",
+            "pr2": "0-472",
+            "pr3": "H-358",
+            "veri1": "H-358",
+            "pr4": "Z-724",
+            "pr5": "C-583",
+            "pr6": "G-835",
+            "veri2": "Z-724"
+          },
+          "hut": {
+            "eva1": "583",
+            "eva2": "247"
+          }
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-043",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-043",
+        "hutFolio": "HUT-043",
+        "participantProfileId": "f46942c5-91a3-42b4-aab9-fc87f4b3dbc2",
+        "studyParticipantId": "372a593a-a4da-4de4-a64b-447b6dfca0f1",
+        "hutParticipantId": "3737aae5-1665-4a05-a703-bb5f7a8dfdb3",
+        "name": "BRYAN HERNÁNDEZ LÓPEZ",
+        "phone": "+525641556554",
+        "email": "brianhernandezlopez0830@gmai.com",
+        "protocol": "CLT_NAVIGO_HUT",
+        "qa": false,
+        "codes": {
+          "codigo1": "FYC8",
+          "codigo2": "7MPY",
+          "codigo3": "AG26",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-06T00:50:56.019Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 3,
+          "hutAnswers": 0,
+          "hutExists": true,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [
+          {
+            "completedAt": null,
+            "kind": "HUT",
+            "startedAt": null,
+            "status": "NOT_STARTED"
+          }
+        ],
+        "answers": {
+          "screening": [
+            {
+              "answer": "JAZMIN RAMIREZ",
+              "answeredAt": "2026-07-30T20:25:51.053Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-07-30T20:26:07.744Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-07-30T20:26:15.169Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 20,
+              "answeredAt": "2026-07-30T20:26:31.607Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-30T20:26:40.825Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-07-30T20:26:46.947Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-30T20:26:57.872Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "ATRACCIÓN AWAKEN,NAVIGO JAFRA",
+              "answeredAt": "2026-07-30T20:30:08.421Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-07-30T20:30:25.868Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "NAVIGO AZUL",
+              "answeredAt": "2026-07-30T20:30:39.471Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "CUATRO_DIAS",
+              "answeredAt": "2026-07-30T20:30:46.811Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "4 MESES",
+              "answeredAt": "2026-07-30T20:31:03.609Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "PREPARATORIA_COMPLETA",
+              "answeredAt": "2026-07-30T20:31:19.387Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "UN_BANO_COMPLETO",
+              "answeredAt": "2026-07-30T20:31:35.685Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "CERO_AUTOS",
+              "answeredAt": "2026-07-30T20:31:52.444Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-07-30T20:31:59.780Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "DOS_PERSONAS",
+              "answeredAt": "2026-07-30T20:32:13.844Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "UN_CUARTO",
+              "answeredAt": "2026-07-30T20:32:21.601Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-30T20:29:10.110Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/f46942c5-91a3-42b4-aab9-fc87f4b3dbc2/screening-attempts/75754590-e0a7-466a-83ee-8f4aa3a8222e/perfume_photo/bb60c9fd-200a-449e-ba53-0a4451f9ac3c.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-30T20:30:05.749Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/f46942c5-91a3-42b4-aab9-fc87f4b3dbc2/screening-attempts/75754590-e0a7-466a-83ee-8f4aa3a8222e/perfume_photo/50573887-0ae4-40ec-9629-fdc691b9cf9d.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-30T20:32:45.040Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/f46942c5-91a3-42b4-aab9-fc87f4b3dbc2/screening-attempts/75754590-e0a7-466a-83ee-8f4aa3a8222e/selfie_identification/5eeffc10-eae5-4062-8863-fdd84c3082f9.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": {
+            "rotationCode": "NAV-043__247__583",
+            "rotationPlanName": "NAV-043__247__583",
+            "arms": [
+              {
+                "arm": "LEFT",
+                "applicationOrder": 1,
+                "product": "247"
+              },
+              {
+                "arm": "RIGHT",
+                "applicationOrder": 2,
+                "product": "583"
+              }
+            ]
+          },
+          "triangular": {
+            "pr1": "H-358",
+            "pr2": "K-247",
+            "pr3": "0-472",
+            "veri1": "H-358",
+            "pr4": "C-583",
+            "pr5": "G-835",
+            "pr6": "Z-724",
+            "veri2": "Z-724"
+          },
+          "hut": {
+            "eva1": "247",
+            "eva2": "583"
+          }
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-009",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-009",
+        "hutFolio": null,
+        "participantProfileId": "87d95079-e2cd-40a3-93db-7ebbb3b5b228",
+        "studyParticipantId": "84820ef7-e5d6-41a7-bb25-7d4edaaa0ee2",
+        "hutParticipantId": null,
+        "name": "Marcos Espinoza",
+        "phone": "55 5951 8529",
+        "email": "cadres.rahmen@gmail.com",
+        "protocol": null,
+        "qa": false,
+        "codes": {
+          "codigo1": "FD9Y",
+          "codigo2": "FKRY",
+          "codigo3": "G3W2",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-14T02:24:33.391Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 2,
+          "hutAnswers": 0,
+          "hutExists": false,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [],
+        "answers": {
+          "screening": [
+            {
+              "answer": "Isabel Ramirez",
+              "answeredAt": "2026-08-14T02:04:54.555Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-08-14T02:05:13.654Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-08-14T02:05:29.497Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 26,
+              "answeredAt": "2026-08-14T02:05:35.146Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-14T02:05:46.316Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-08-14T02:06:07.671Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-14T02:06:15.466Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "Navigo \r\nJF9\r\nJ-sport",
+              "answeredAt": "2026-08-14T02:13:10.300Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": {
+                "values": [
+                  "Navigo",
+                  "Otro"
+                ],
+                "otherText": "J-Sport"
+              },
+              "answeredAt": "2026-08-14T02:13:25.390Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "Azul",
+              "answeredAt": "2026-08-14T02:14:29.151Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "SEIS_DIAS",
+              "answeredAt": "2026-08-14T02:14:38.351Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "Hace 3 semanas",
+              "answeredAt": "2026-08-14T02:14:50.316Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "PREPARATORIA_COMPLETA",
+              "answeredAt": "2026-08-14T02:14:59.134Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "UN_BANO_COMPLETO",
+              "answeredAt": "2026-08-14T02:15:04.289Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "CERO_AUTOS",
+              "answeredAt": "2026-08-14T02:15:09.242Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-08-14T02:15:14.525Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "TRES_PERSONAS",
+              "answeredAt": "2026-08-14T02:15:20.469Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "DOS_CUARTOS",
+              "answeredAt": "2026-08-14T02:15:25.013Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-14T02:13:04.408Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/87d95079-e2cd-40a3-93db-7ebbb3b5b228/screening-attempts/8880b068-54c0-4d4d-8208-eed61c0ae6f4/perfume_photo/627e259a-ce05-4d10-9f1d-144d48a70484.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-14T02:18:35.873Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/87d95079-e2cd-40a3-93db-7ebbb3b5b228/screening-attempts/8880b068-54c0-4d4d-8208-eed61c0ae6f4/selfie_identification/37c262a9-eaa7-41b4-83b8-8ce83c71a36f.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": null,
+          "triangular": null,
+          "hut": null
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-023",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-023",
+        "hutFolio": "HUT-023",
+        "participantProfileId": "083b431c-76de-4b7e-b66e-82bc106b0d72",
+        "studyParticipantId": "ecc2143b-5c8c-4e7a-b923-665cffb3f429",
+        "hutParticipantId": "7f487e16-0205-4f98-b3b8-01994a8d414a",
+        "name": "DIEGO YAEL VICTORIANO CONTRERAS",
+        "phone": "+525653853333",
+        "email": "diegoyael850@gmail.com",
+        "protocol": "CLT_NAVIGO_HUT",
+        "qa": false,
+        "codes": {
+          "codigo1": "HW2U",
+          "codigo2": "T8MG",
+          "codigo3": "38VJ",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-06T01:20:32.740Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 2,
+          "hutAnswers": 0,
+          "hutExists": true,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [
+          {
+            "completedAt": null,
+            "kind": "HUT",
+            "startedAt": null,
+            "status": "NOT_STARTED"
+          }
+        ],
+        "answers": {
+          "screening": [
+            {
+              "answer": "JAZMIN PÉREZ",
+              "answeredAt": "2026-07-29T17:41:01.759Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-07-29T17:42:11.297Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-07-29T17:42:20.389Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 20,
+              "answeredAt": "2026-07-29T17:42:39.167Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-29T17:42:52.904Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-07-29T17:43:13.637Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-29T17:43:23.965Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "NAVIGO, JAFRA, PARÍS, DIOR",
+              "answeredAt": "2026-07-29T17:46:41.145Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-07-29T17:46:56.823Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "NAVIGO AZUL",
+              "answeredAt": "2026-07-29T17:47:26.107Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "SIETE_DIAS",
+              "answeredAt": "2026-07-29T17:47:51.299Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "HACE UN MES",
+              "answeredAt": "2026-07-29T17:48:19.381Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "PREPARATORIA_COMPLETA",
+              "answeredAt": "2026-07-29T17:48:36.088Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "UN_BANO_COMPLETO",
+              "answeredAt": "2026-07-29T17:48:45.272Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "UN_AUTO",
+              "answeredAt": "2026-07-29T17:48:57.657Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-07-29T17:49:11.605Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "DOS_PERSONAS",
+              "answeredAt": "2026-07-29T17:49:27.945Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "DOS_CUARTOS",
+              "answeredAt": "2026-07-29T17:49:37.618Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-29T17:45:55.156Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/083b431c-76de-4b7e-b66e-82bc106b0d72/screening-attempts/7c0967af-9f8d-4c9f-95d7-4099a8f8908f/perfume_photo/ea4570dd-5989-46e4-b1d7-ac0e91435a01.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-29T17:50:16.931Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/083b431c-76de-4b7e-b66e-82bc106b0d72/screening-attempts/7c0967af-9f8d-4c9f-95d7-4099a8f8908f/selfie_identification/20643626-49d0-47cc-98bb-f167e4787378.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": {
+            "rotationCode": "NAV-023__247__583",
+            "rotationPlanName": "NAV-023__247__583",
+            "arms": [
+              {
+                "arm": "LEFT",
+                "applicationOrder": 1,
+                "product": "247"
+              },
+              {
+                "arm": "RIGHT",
+                "applicationOrder": 2,
+                "product": "583"
+              }
+            ]
+          },
+          "triangular": {
+            "pr1": "0-472",
+            "pr2": "H-358",
+            "pr3": "K-247",
+            "veri1": "H-358",
+            "pr4": "C-583",
+            "pr5": "G-835",
+            "pr6": "Z-724",
+            "veri2": "Z-724"
+          },
+          "hut": {
+            "eva1": "247",
+            "eva2": "583"
+          }
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-024",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-024",
+        "hutFolio": "HUT-024",
+        "participantProfileId": "78918b1d-c340-42d9-912e-7e3703799ccd",
+        "studyParticipantId": "00dc0759-1359-4884-af1e-ee1c7e43b222",
+        "hutParticipantId": "9a1c43ad-36ea-4a07-8d9d-ae0f9e689d42",
+        "name": "BRANDON SUSEJ PEREZ ARROYO",
+        "phone": "+527861181855",
+        "email": "susejaroyo7@gmail.com",
+        "protocol": "CLT_NAVIGO_HUT",
+        "qa": false,
+        "codes": {
+          "codigo1": "TMUG",
+          "codigo2": "SHYB",
+          "codigo3": "ST97",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-06T01:19:32.203Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 2,
+          "hutAnswers": 0,
+          "hutExists": true,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [
+          {
+            "completedAt": null,
+            "kind": "HUT",
+            "startedAt": null,
+            "status": "NOT_STARTED"
+          }
+        ],
+        "answers": {
+          "screening": [
+            {
+              "answer": "JAZMIN PÉREZ",
+              "answeredAt": "2026-07-29T18:41:36.590Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-07-29T18:41:51.389Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-07-29T18:42:00.971Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 24,
+              "answeredAt": "2026-07-29T18:42:12.445Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-29T18:42:19.602Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-07-29T18:42:27.083Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-29T18:42:34.522Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "NAVIGO",
+              "answeredAt": "2026-07-29T18:47:09.025Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-07-29T18:47:26.448Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "HOMME AZUL",
+              "answeredAt": "2026-07-29T18:47:40.005Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "CUATRO_DIAS",
+              "answeredAt": "2026-07-29T18:47:54.071Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "2 MESES",
+              "answeredAt": "2026-07-29T18:48:24.957Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "PREPARATORIA_COMPLETA",
+              "answeredAt": "2026-07-29T18:48:40.751Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "UN_BANO_COMPLETO",
+              "answeredAt": "2026-07-29T18:48:46.013Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "UN_AUTO",
+              "answeredAt": "2026-07-29T18:48:58.497Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-07-29T18:49:10.068Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "DOS_PERSONAS",
+              "answeredAt": "2026-07-29T18:49:17.969Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "DOS_CUARTOS",
+              "answeredAt": "2026-07-29T18:49:24.695Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-29T18:46:54.778Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/78918b1d-c340-42d9-912e-7e3703799ccd/screening-attempts/4446c260-faa3-4dcd-8f47-5f2a85fe0884/perfume_photo/9976ddd9-5f3d-4814-8a73-01fb44afd8a5.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-29T18:53:10.435Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/78918b1d-c340-42d9-912e-7e3703799ccd/screening-attempts/4446c260-faa3-4dcd-8f47-5f2a85fe0884/selfie_identification/df1dbfde-b86e-410d-a062-f97282b1d58e.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": {
+            "rotationCode": "NAV-024__583__247",
+            "rotationPlanName": "NAV-024__583__247",
+            "arms": [
+              {
+                "arm": "LEFT",
+                "applicationOrder": 1,
+                "product": "583"
+              },
+              {
+                "arm": "RIGHT",
+                "applicationOrder": 2,
+                "product": "247"
+              }
+            ]
+          },
+          "triangular": {
+            "pr1": "0-472",
+            "pr2": "H-358",
+            "pr3": "K-247",
+            "veri1": "H-358",
+            "pr4": "G-835",
+            "pr5": "Z-724",
+            "pr6": "C-583",
+            "veri2": "Z-724"
+          },
+          "hut": {
+            "eva1": "583",
+            "eva2": "247"
+          }
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-044",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-044",
+        "hutFolio": "HUT-044",
+        "participantProfileId": "42486f20-907c-4874-a8fc-ea58102b7857",
+        "studyParticipantId": "8c36d4ba-b00e-4ce5-b2e4-58d637c898d2",
+        "hutParticipantId": "a4ab068d-e84d-4ed7-a592-5f40c30ae87c",
+        "name": "JOSUÉ ENCARNACIÓN SAYAGO",
+        "phone": "+525578893843",
+        "email": null,
+        "protocol": "CLT_NAVIGO_HUT",
+        "qa": false,
+        "codes": {
+          "codigo1": "RMVK",
+          "codigo2": "NMVQ",
+          "codigo3": "UKCU",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-06T00:50:24.883Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 3,
+          "hutAnswers": 0,
+          "hutExists": true,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [
+          {
+            "completedAt": null,
+            "kind": "HUT",
+            "startedAt": null,
+            "status": "NOT_STARTED"
+          }
+        ],
+        "answers": {
+          "screening": [
+            {
+              "answer": "JAZMÍN RAMIREZ",
+              "answeredAt": "2026-07-30T20:44:15.828Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-07-30T20:44:27.344Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-07-30T20:44:35.939Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 22,
+              "answeredAt": "2026-07-30T20:44:46.479Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-30T20:44:53.198Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-07-30T20:44:59.406Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-30T20:45:16.863Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "JAFRA NAVIGO AZUL, DIABLITO JAFRA",
+              "answeredAt": "2026-07-30T20:53:13.427Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-07-30T20:53:26.052Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "NAVIGO AZUL JAFRA",
+              "answeredAt": "2026-07-30T20:53:46.324Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "CINCO_DIAS",
+              "answeredAt": "2026-07-30T20:54:12.051Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "3 MESES",
+              "answeredAt": "2026-07-30T20:54:32.859Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "LICENCIATURA_COMPLETA",
+              "answeredAt": "2026-07-30T20:54:52.141Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "DOS_O_MAS_BANOS_COMPLETOS",
+              "answeredAt": "2026-07-30T20:54:59.759Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "CERO_AUTOS",
+              "answeredAt": "2026-07-30T20:55:06.438Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-07-30T20:55:13.856Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "DOS_PERSONAS",
+              "answeredAt": "2026-07-30T20:55:25.035Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "TRES_CUARTOS",
+              "answeredAt": "2026-07-30T20:55:32.923Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-30T20:49:55.470Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/42486f20-907c-4874-a8fc-ea58102b7857/screening-attempts/f59aa1f4-9ca3-40c9-b463-c5cd172ea06b/perfume_photo/4406c3d5-eb8b-4c6d-a749-dbb058dc6b1b.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-30T20:52:45.967Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/42486f20-907c-4874-a8fc-ea58102b7857/screening-attempts/f59aa1f4-9ca3-40c9-b463-c5cd172ea06b/perfume_photo/f78a2008-1730-40b7-9a82-15e323bf07bc.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-30T20:56:01.890Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/42486f20-907c-4874-a8fc-ea58102b7857/screening-attempts/f59aa1f4-9ca3-40c9-b463-c5cd172ea06b/selfie_identification/62f34aee-b63d-4121-9fc8-134d2d091bbd.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": {
+            "rotationCode": "NAV-044__583__247",
+            "rotationPlanName": "NAV-044__583__247",
+            "arms": [
+              {
+                "arm": "LEFT",
+                "applicationOrder": 1,
+                "product": "583"
+              },
+              {
+                "arm": "RIGHT",
+                "applicationOrder": 2,
+                "product": "247"
+              }
+            ]
+          },
+          "triangular": {
+            "pr1": "H-358",
+            "pr2": "0-472",
+            "pr3": "K-247",
+            "veri1": "H-358",
+            "pr4": "G-835",
+            "pr5": "Z-724",
+            "pr6": "C-583",
+            "veri2": "Z-724"
+          },
+          "hut": {
+            "eva1": "583",
+            "eva2": "247"
+          }
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-053",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-053",
+        "hutFolio": null,
+        "participantProfileId": "c3cbb58d-ef3f-4281-bbab-854590e4bd8e",
+        "studyParticipantId": "e3325ed8-7187-4d2a-ab02-cec8a3c783c6",
+        "hutParticipantId": null,
+        "name": "JORDAN PICAZO",
+        "phone": "+525582207934",
+        "email": "jordanjpicazol@gmail.com",
+        "protocol": null,
+        "qa": false,
+        "codes": {
+          "codigo1": "BRH4",
+          "codigo2": "MEXP",
+          "codigo3": "DSQJ",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-14T17:07:27.933Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 2,
+          "hutAnswers": 0,
+          "hutExists": false,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [],
+        "answers": {
+          "screening": [
+            {
+              "answer": "KARINA GONZALEZ",
+              "answeredAt": "2026-08-14T16:34:47.454Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-08-14T16:45:54.500Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-08-14T16:46:07.255Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 34,
+              "answeredAt": "2026-08-14T16:46:21.500Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-14T16:46:52.273Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-08-14T16:47:53.312Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-14T17:00:43.615Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "JAFRA",
+              "answeredAt": "2026-08-14T17:01:56.102Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-08-14T17:04:25.605Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "AZUL- HOMME",
+              "answeredAt": "2026-08-14T17:05:06.619Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "TRES_DIAS",
+              "answeredAt": "2026-08-14T17:05:28.040Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "HACE 1 MES EXACTAMENTE",
+              "answeredAt": "2026-08-14T17:06:14.548Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "LICENCIATURA_INCOMPLETA",
+              "answeredAt": "2026-08-14T17:06:36.036Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "UN_BANO_COMPLETO",
+              "answeredAt": "2026-08-14T17:06:52.277Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "UN_AUTO",
+              "answeredAt": "2026-08-14T17:06:59.682Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-08-14T17:07:10.232Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "DOS_PERSONAS",
+              "answeredAt": "2026-08-14T17:07:19.099Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "DOS_CUARTOS",
+              "answeredAt": "2026-08-14T17:07:27.913Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-14T17:01:50.396Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/c3cbb58d-ef3f-4281-bbab-854590e4bd8e/screening-attempts/d4337287-df0a-48bd-a7dc-55204c75aade/perfume_photo/b45e102a-cfa5-43cb-bdc4-eae5b13bee67.jpg",
+            "status": "PENDING",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-14T17:09:11.238Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/c3cbb58d-ef3f-4281-bbab-854590e4bd8e/screening-attempts/d4337287-df0a-48bd-a7dc-55204c75aade/selfie_identification/cdbdfe11-de10-4965-b207-218da047556e.jpg",
+            "status": "PENDING",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": null,
+          "triangular": null,
+          "hut": null
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-054",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-054",
+        "hutFolio": "HUT-054",
+        "participantProfileId": "0daa5c60-d185-4009-9888-ee70aac2e435",
+        "studyParticipantId": "ca77e5b0-85a6-4038-9067-17cc7634fbef",
+        "hutParticipantId": "959404e4-4d32-4513-b9c9-a214d28d615e",
+        "name": "LUIS ANGEL TENJHAY CRUZ",
+        "phone": "+525515018545",
+        "email": "a.tenjhay23@gmail.com",
+        "protocol": "CLT_NAVIGO_HUT",
+        "qa": false,
+        "codes": {
+          "codigo1": "KRNV",
+          "codigo2": "8MZK",
+          "codigo3": "Q2E7",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-06T00:18:47.128Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 3,
+          "hutAnswers": 0,
+          "hutExists": true,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [
+          {
+            "completedAt": null,
+            "kind": "HUT",
+            "startedAt": null,
+            "status": "NOT_STARTED"
+          }
+        ],
+        "answers": {
+          "screening": [
+            {
+              "answer": "JAZMIN RAMIREZ",
+              "answeredAt": "2026-07-31T00:40:44.449Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-07-31T00:41:02.588Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-07-31T00:41:18.737Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 34,
+              "answeredAt": "2026-07-31T00:41:46.040Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-31T00:42:10.472Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-07-31T00:42:23.258Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-31T00:42:42.620Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "NAVIGO, JAFRA, CK CALVIN KLEIN",
+              "answeredAt": "2026-07-31T00:46:34.091Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-07-31T00:46:45.469Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "AZUL",
+              "answeredAt": "2026-07-31T00:46:55.392Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "CUATRO_DIAS",
+              "answeredAt": "2026-07-31T00:47:11.289Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "1 MES",
+              "answeredAt": "2026-07-31T00:47:29.078Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "PREPARATORIA_COMPLETA",
+              "answeredAt": "2026-07-31T00:47:52.206Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "UN_BANO_COMPLETO",
+              "answeredAt": "2026-07-31T00:48:10.920Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "CERO_AUTOS",
+              "answeredAt": "2026-07-31T00:48:39.465Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-07-31T00:48:52.642Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "DOS_PERSONAS",
+              "answeredAt": "2026-07-31T00:49:10.082Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "TRES_CUARTOS",
+              "answeredAt": "2026-07-31T00:49:29.259Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-31T00:44:58.318Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/0daa5c60-d185-4009-9888-ee70aac2e435/screening-attempts/cb300a03-7845-4730-91f5-f8b1829d2723/perfume_photo/38804951-2822-4f9a-805e-1d09f24717dc.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-31T00:46:31.479Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/0daa5c60-d185-4009-9888-ee70aac2e435/screening-attempts/cb300a03-7845-4730-91f5-f8b1829d2723/perfume_photo/8ad8e2a2-ebd7-4411-86d7-b29d8724bf00.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-31T00:50:03.931Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/0daa5c60-d185-4009-9888-ee70aac2e435/screening-attempts/cb300a03-7845-4730-91f5-f8b1829d2723/selfie_identification/1536ca59-2691-4c51-b318-5ec8f798b3e4.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": {
+            "rotationCode": "NAV-054__583__247",
+            "rotationPlanName": "NAV-054__583__247",
+            "arms": [
+              {
+                "arm": "LEFT",
+                "applicationOrder": 1,
+                "product": "583"
+              },
+              {
+                "arm": "RIGHT",
+                "applicationOrder": 2,
+                "product": "247"
+              }
+            ]
+          },
+          "triangular": {
+            "pr1": "G-835",
+            "pr2": "C-583",
+            "pr3": "Z-724",
+            "veri1": "Z-724",
+            "pr4": "0-472",
+            "pr5": "K-247",
+            "pr6": "H-358",
+            "veri2": "H-358"
+          },
+          "hut": {
+            "eva1": "583",
+            "eva2": "247"
+          }
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-055",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-055",
+        "hutFolio": "HUT-055",
+        "participantProfileId": "b4357a3b-6bea-41f7-b5d3-96e647017675",
+        "studyParticipantId": "a30c9874-2a2d-45cb-9163-2bde22bf5d38",
+        "hutParticipantId": "e69ec46d-58ef-4ad5-b511-209d456ed58f",
+        "name": "MARCO ANTONIO TENJHAY CRUZ",
+        "phone": "+525633230306",
+        "email": "marco.tenjhay@hotmail.com",
+        "protocol": "CLT_NAVIGO_HUT",
+        "qa": false,
+        "codes": {
+          "codigo1": "EGHS",
+          "codigo2": "2WK2",
+          "codigo3": "2U6W",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-06T00:30:36.966Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 4,
+          "hutAnswers": 0,
+          "hutExists": true,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [
+          {
+            "completedAt": null,
+            "kind": "HUT",
+            "startedAt": null,
+            "status": "NOT_STARTED"
+          }
+        ],
+        "answers": {
+          "screening": [
+            {
+              "answer": "JAZMIN RAMIREZ",
+              "answeredAt": "2026-07-31T00:53:21.179Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-07-31T00:53:38.329Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-07-31T00:53:43.668Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 38,
+              "answeredAt": "2026-07-31T00:53:56.735Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-31T00:54:05.315Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-07-31T00:54:20.628Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-31T00:54:34.043Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "JAFRA NAVIGO AZUL HOME",
+              "answeredAt": "2026-07-31T00:57:51.583Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-07-31T00:58:05.509Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "AZUL",
+              "answeredAt": "2026-07-31T00:58:15.059Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "CINCO_DIAS",
+              "answeredAt": "2026-07-31T00:58:39.835Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "2 MESES",
+              "answeredAt": "2026-07-31T00:59:00.186Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "PREPARATORIA_COMPLETA",
+              "answeredAt": "2026-07-31T00:59:13.409Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "UN_BANO_COMPLETO",
+              "answeredAt": "2026-07-31T00:59:20.061Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "CERO_AUTOS",
+              "answeredAt": "2026-07-31T00:59:34.117Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-07-31T00:59:40.509Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "DOS_PERSONAS",
+              "answeredAt": "2026-07-31T00:59:51.223Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "UN_CUARTO",
+              "answeredAt": "2026-07-31T01:00:00.713Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-31T00:55:38.818Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/b4357a3b-6bea-41f7-b5d3-96e647017675/screening-attempts/8b860e15-eafd-4b01-b444-33abe97e8d40/perfume_photo/c8efa5fc-ddf1-4fe2-86aa-0deeb566d8ba.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-31T00:56:10.394Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/b4357a3b-6bea-41f7-b5d3-96e647017675/screening-attempts/8b860e15-eafd-4b01-b444-33abe97e8d40/perfume_photo/3cf03ef3-50be-45da-883a-176e7c0fc496.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-31T00:57:49.552Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/b4357a3b-6bea-41f7-b5d3-96e647017675/screening-attempts/8b860e15-eafd-4b01-b444-33abe97e8d40/perfume_photo/98e1f408-b0c4-4955-914b-954994b1dd68.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-31T01:00:27.917Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/b4357a3b-6bea-41f7-b5d3-96e647017675/screening-attempts/8b860e15-eafd-4b01-b444-33abe97e8d40/selfie_identification/3ddb0004-2b1a-4c11-96fc-886452b04848.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": {
+            "rotationCode": "NAV-055__247__583",
+            "rotationPlanName": "NAV-055__247__583",
+            "arms": [
+              {
+                "arm": "LEFT",
+                "applicationOrder": 1,
+                "product": "247"
+              },
+              {
+                "arm": "RIGHT",
+                "applicationOrder": 2,
+                "product": "583"
+              }
+            ]
+          },
+          "triangular": {
+            "pr1": "K-247",
+            "pr2": "0-472",
+            "pr3": "H-358",
+            "veri1": "H-358",
+            "pr4": "G-835",
+            "pr5": "Z-724",
+            "pr6": "C-583",
+            "veri2": "Z-724"
+          },
+          "hut": {
+            "eva1": "247",
+            "eva2": "583"
+          }
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-056",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-056",
+        "hutFolio": "HUT-056",
+        "participantProfileId": "f55dd2b8-712b-4d67-a850-e54eb3b818e0",
+        "studyParticipantId": "8ea719d6-1eb8-4ddc-9a8f-47320c911c7f",
+        "hutParticipantId": "48dfe137-aafe-4776-a3a8-aa34e2f51f72",
+        "name": "DAGORBERTO CANCINO NAVARRETE",
+        "phone": "+525561824995",
+        "email": "ddago4135@gmail.com",
+        "protocol": "CLT_NAVIGO_HUT",
+        "qa": false,
+        "codes": {
+          "codigo1": "GQKQ",
+          "codigo2": "GZBE",
+          "codigo3": "9BTN",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-06T00:30:12.633Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 2,
+          "hutAnswers": 0,
+          "hutExists": true,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [
+          {
+            "completedAt": null,
+            "kind": "HUT",
+            "startedAt": null,
+            "status": "NOT_STARTED"
+          }
+        ],
+        "answers": {
+          "screening": [
+            {
+              "answer": "JAZMIN PÉREZ",
+              "answeredAt": "2026-07-31T01:03:11.542Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-07-31T01:03:17.590Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-07-31T01:03:22.344Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 50,
+              "answeredAt": "2026-07-31T01:03:33.177Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-31T01:03:40.770Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-07-31T01:03:48.383Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-31T01:03:55.324Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "NAVIGO AZUL, SELVACE",
+              "answeredAt": "2026-07-31T01:06:15.974Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-07-31T01:06:26.486Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "NAVIGO AZUL",
+              "answeredAt": "2026-07-31T01:06:55.620Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "SEIS_DIAS",
+              "answeredAt": "2026-07-31T01:07:12.673Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "HACE 10 DÍAS",
+              "answeredAt": "2026-07-31T01:07:32.628Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "SECUNDARIA_COMPLETA",
+              "answeredAt": "2026-07-31T01:07:49.684Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "UN_BANO_COMPLETO",
+              "answeredAt": "2026-07-31T01:08:00.631Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "UN_AUTO",
+              "answeredAt": "2026-07-31T01:08:07.257Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-07-31T01:08:12.326Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "DOS_PERSONAS",
+              "answeredAt": "2026-07-31T01:08:21.053Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "DOS_CUARTOS",
+              "answeredAt": "2026-07-31T01:08:27.052Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-31T01:04:59.553Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/f55dd2b8-712b-4d67-a850-e54eb3b818e0/screening-attempts/62165aa5-b031-4ef4-bf4b-d9553f74411d/perfume_photo/0b65f417-353f-4c3a-99ba-d7f926fc8b1b.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-31T01:08:45.062Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/f55dd2b8-712b-4d67-a850-e54eb3b818e0/screening-attempts/62165aa5-b031-4ef4-bf4b-d9553f74411d/selfie_identification/7d5db6dd-c236-48dd-9763-07bfe73912a2.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": {
+            "rotationCode": "NAV-056__583__247",
+            "rotationPlanName": "NAV-056__583__247",
+            "arms": [
+              {
+                "arm": "LEFT",
+                "applicationOrder": 1,
+                "product": "583"
+              },
+              {
+                "arm": "RIGHT",
+                "applicationOrder": 2,
+                "product": "247"
+              }
+            ]
+          },
+          "triangular": {
+            "pr1": "K-247",
+            "pr2": "0-472",
+            "pr3": "H-358",
+            "veri1": "H-358",
+            "pr4": "Z-724",
+            "pr5": "C-583",
+            "pr6": "G-835",
+            "veri2": "Z-724"
+          },
+          "hut": {
+            "eva1": "583",
+            "eva2": "247"
+          }
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-058",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-058",
+        "hutFolio": null,
+        "participantProfileId": "892f784c-c0dc-42a2-a8f5-e7c7705ea518",
+        "studyParticipantId": "6b175005-9ec9-4eff-918d-649a8827ec75",
+        "hutParticipantId": null,
+        "name": "EDGAR MARTINES MACEDO",
+        "phone": "+525525657487",
+        "email": null,
+        "protocol": null,
+        "qa": false,
+        "codes": {
+          "codigo1": "SFDU",
+          "codigo2": "QPFT",
+          "codigo3": "TQ4G",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-07-31T01:43:26.335Z",
+          "rejectionReason": "no utiliza NAvigo Homme Azul"
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 2,
+          "hutAnswers": 0,
+          "hutExists": false,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [],
+        "answers": {
+          "screening": [
+            {
+              "answer": "JAZMIN PEREZ",
+              "answeredAt": "2026-07-31T01:40:26.711Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-07-31T01:40:34.816Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-07-31T01:40:38.881Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 35,
+              "answeredAt": "2026-07-31T01:40:49.973Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-31T01:40:54.040Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-07-31T01:40:57.555Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-31T01:41:02.385Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "NAVIGO PROFUNDO",
+              "answeredAt": "2026-07-31T01:41:32.087Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-07-31T01:41:36.975Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "NAVIGO PROFUNDO",
+              "answeredAt": "2026-07-31T01:41:52.642Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "SIETE_DIAS",
+              "answeredAt": "2026-07-31T01:42:00.764Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "TENGO VON EL COMO 2 MESES",
+              "answeredAt": "2026-07-31T01:42:16.342Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "PRIMARIA_COMPLETA",
+              "answeredAt": "2026-07-31T01:42:32.478Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "UN_BANO_COMPLETO",
+              "answeredAt": "2026-07-31T01:42:44.857Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "UN_AUTO",
+              "answeredAt": "2026-07-31T01:42:50.875Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-07-31T01:42:58.693Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "TRES_PERSONAS",
+              "answeredAt": "2026-07-31T01:43:13.882Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "DOS_CUARTOS",
+              "answeredAt": "2026-07-31T01:43:26.313Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-31T01:41:30.615Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/892f784c-c0dc-42a2-a8f5-e7c7705ea518/screening-attempts/47d86752-2301-4cbb-a3e0-d3a9bab14105/perfume_photo/76a47933-8a2a-40db-a846-557411b13f62.jpg",
+            "status": "REJECTED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-31T01:44:10.117Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/892f784c-c0dc-42a2-a8f5-e7c7705ea518/screening-attempts/47d86752-2301-4cbb-a3e0-d3a9bab14105/selfie_identification/40a5e92c-e80d-459a-b79d-923336c71996.jpg",
+            "status": "REJECTED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": null,
+          "triangular": null,
+          "hut": null
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-068",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-068",
+        "hutFolio": "HUT-068",
+        "participantProfileId": "dce47442-bb68-4cb7-bb30-c655a4704b52",
+        "studyParticipantId": "13c9bd78-7792-4483-bff3-4466410a8073",
+        "hutParticipantId": "9b503a32-4c39-4ee4-adca-24d8e61a1f52",
+        "name": "SAMUEL CRUZ CRUZ",
+        "phone": "+525510280293",
+        "email": "samuelcruz19591959.sc@gmail.com",
+        "protocol": "CLT_NAVIGO_HUT",
+        "qa": false,
+        "codes": {
+          "codigo1": "NJ2N",
+          "codigo2": "AKPV",
+          "codigo3": "R8CJ",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-06T00:10:22.645Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 3,
+          "hutAnswers": 0,
+          "hutExists": true,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [
+          {
+            "completedAt": null,
+            "kind": "HUT",
+            "startedAt": null,
+            "status": "NOT_STARTED"
+          }
+        ],
+        "answers": {
+          "screening": [
+            {
+              "answer": "JAZMIN PEREZ",
+              "answeredAt": "2026-07-31T20:22:06.396Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-07-31T20:22:16.906Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-07-31T20:22:23.592Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 47,
+              "answeredAt": "2026-07-31T20:22:29.932Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-31T20:22:38.875Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-07-31T20:22:46.322Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-07-31T20:22:52.308Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "NAVIGO AZUL, DIABLITO NEGRO",
+              "answeredAt": "2026-07-31T20:24:44.804Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-07-31T20:24:56.711Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "NAVIGO AZUL",
+              "answeredAt": "2026-07-31T20:25:12.442Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "CINCO_DIAS",
+              "answeredAt": "2026-07-31T20:25:19.381Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "HACE 21 DÍAS",
+              "answeredAt": "2026-07-31T20:25:40.911Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "SECUNDARIA_COMPLETA",
+              "answeredAt": "2026-07-31T20:26:20.066Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "UN_BANO_COMPLETO",
+              "answeredAt": "2026-07-31T20:26:26.524Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "CERO_AUTOS",
+              "answeredAt": "2026-07-31T20:26:31.521Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-07-31T20:26:37.911Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "TRES_PERSONAS",
+              "answeredAt": "2026-07-31T20:26:43.585Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "DOS_CUARTOS",
+              "answeredAt": "2026-07-31T20:26:51.139Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-31T20:23:35.590Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/dce47442-bb68-4cb7-bb30-c655a4704b52/screening-attempts/a2da6bde-00da-4960-9193-a7df73e9dd82/perfume_photo/ad5842ad-023e-4a28-b9f4-dae7b6a3f388.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-31T20:24:42.668Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/dce47442-bb68-4cb7-bb30-c655a4704b52/screening-attempts/a2da6bde-00da-4960-9193-a7df73e9dd82/perfume_photo/2e444c26-c290-4fd8-95ac-f5d8b4a6e833.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-07-31T20:27:06.044Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/dce47442-bb68-4cb7-bb30-c655a4704b52/screening-attempts/a2da6bde-00da-4960-9193-a7df73e9dd82/selfie_identification/f569a040-81d0-4828-aebc-2dafe6efcd04.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": {
+            "rotationCode": "NAV-068__583__247",
+            "rotationPlanName": "NAV-068__583__247",
+            "arms": [
+              {
+                "arm": "LEFT",
+                "applicationOrder": 1,
+                "product": "583"
+              },
+              {
+                "arm": "RIGHT",
+                "applicationOrder": 2,
+                "product": "247"
+              }
+            ]
+          },
+          "triangular": {
+            "pr1": "C-583",
+            "pr2": "Z-724",
+            "pr3": "G-835",
+            "veri1": "Z-724",
+            "pr4": "H-358",
+            "pr5": "0-472",
+            "pr6": "K-247",
+            "veri2": "H-358"
+          },
+          "hut": {
+            "eva1": "583",
+            "eva2": "247"
+          }
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-079",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-079",
+        "hutFolio": "HUT-079",
+        "participantProfileId": "616c105b-37d0-432a-a47a-4d57c5712eb9",
+        "studyParticipantId": "d1ad66d2-546c-42a3-ae5d-c3c7126e69c8",
+        "hutParticipantId": "93de2abf-f985-4f07-bcbf-af4d6b9532da",
+        "name": "JOSÉ JUAN SAYAS RODRÍGUEZ",
+        "phone": "+525651910235",
+        "email": null,
+        "protocol": "CLT_NAVIGO_HUT",
+        "qa": false,
+        "codes": {
+          "codigo1": "Y8SW",
+          "codigo2": "JYCR",
+          "codigo3": "8CUH",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-06T00:02:33.730Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 2,
+          "hutAnswers": 0,
+          "hutExists": true,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [
+          {
+            "completedAt": null,
+            "kind": "HUT",
+            "startedAt": null,
+            "status": "NOT_STARTED"
+          }
+        ],
+        "answers": {
+          "screening": [
+            {
+              "answer": "JAZMIN PÉREZ",
+              "answeredAt": "2026-08-01T01:43:48.161Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-08-01T01:43:56.543Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-08-01T01:44:08.920Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 20,
+              "answeredAt": "2026-08-01T01:44:17.812Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-01T01:44:25.660Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-08-01T01:44:30.797Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-01T01:44:36.882Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "VERSACE EROS PARFUM",
+              "answeredAt": "2026-08-01T01:48:19.477Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-08-01T01:48:25.028Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "NAVIGO AZUL JAFRA",
+              "answeredAt": "2026-08-01T01:48:54.429Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "SIETE_DIAS",
+              "answeredAt": "2026-08-01T01:49:00.598Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "15",
+              "answeredAt": "2026-08-01T01:49:16.142Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "LICENCIATURA_COMPLETA",
+              "answeredAt": "2026-08-01T01:49:38.822Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "UN_BANO_COMPLETO",
+              "answeredAt": "2026-08-01T01:49:46.888Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "UN_AUTO",
+              "answeredAt": "2026-08-01T01:49:54.540Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-08-01T01:50:01.889Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "NINGUNA_PERSONA",
+              "answeredAt": "2026-08-01T01:50:14.220Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "DOS_CUARTOS",
+              "answeredAt": "2026-08-01T01:50:30.592Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-01T01:48:14.096Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/616c105b-37d0-432a-a47a-4d57c5712eb9/screening-attempts/2ee2986a-761a-4cb4-87dc-c489f7eba30e/perfume_photo/b13bef1a-0efa-465f-9db3-ff31271b7fae.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-01T01:50:59.764Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/616c105b-37d0-432a-a47a-4d57c5712eb9/screening-attempts/2ee2986a-761a-4cb4-87dc-c489f7eba30e/selfie_identification/a728c75c-8d32-4535-a41c-f434e171f4a2.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": {
+            "rotationCode": "NAV-079__247__583",
+            "rotationPlanName": "NAV-079__247__583",
+            "arms": [
+              {
+                "arm": "LEFT",
+                "applicationOrder": 1,
+                "product": "247"
+              },
+              {
+                "arm": "RIGHT",
+                "applicationOrder": 2,
+                "product": "583"
+              }
+            ]
+          },
+          "triangular": {
+            "pr1": "Z-724",
+            "pr2": "G-835",
+            "pr3": "C-583",
+            "veri1": "Z-724",
+            "pr4": "K-247",
+            "pr5": "0-472",
+            "pr6": "H-358",
+            "veri2": "H-358"
+          },
+          "hut": {
+            "eva1": "247",
+            "eva2": "583"
+          }
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-080",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-080",
+        "hutFolio": "HUT-080",
+        "participantProfileId": "595f4076-d085-45f5-8e2a-b095cc86c0e1",
+        "studyParticipantId": "332dadc5-3c71-471f-95ee-e5080cd00ceb",
+        "hutParticipantId": "8ec1fdf4-430d-4aa6-a6ec-d4956df8063e",
+        "name": "JOSÉ AURELIO MUÑOZ ZAVALA",
+        "phone": "+525583011202",
+        "email": "josef.0609duende@gmail.com",
+        "protocol": "CLT_NAVIGO_HUT",
+        "qa": false,
+        "codes": {
+          "codigo1": "7N7Z",
+          "codigo2": "NZSH",
+          "codigo3": "MCKX",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-06T00:02:03.748Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 2,
+          "hutAnswers": 0,
+          "hutExists": true,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [
+          {
+            "completedAt": null,
+            "kind": "HUT",
+            "startedAt": null,
+            "status": "NOT_STARTED"
+          }
+        ],
+        "answers": {
+          "screening": [
+            {
+              "answer": "JAZMIN PÉREZ",
+              "answeredAt": "2026-08-01T20:39:04.179Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-08-01T20:39:11.055Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-08-01T20:39:21.648Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 38,
+              "answeredAt": "2026-08-01T20:39:46.148Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-01T20:39:53.393Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-08-01T20:40:00.949Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-01T20:40:19.723Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "NAVIGO AZUL, DIABLITO NEGRO, EAU D AROMES AZUL",
+              "answeredAt": "2026-08-01T20:44:31.371Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-08-01T20:44:41.144Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "NAVIGO AZUL",
+              "answeredAt": "2026-08-01T20:44:54.087Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "SIETE_DIAS",
+              "answeredAt": "2026-08-01T20:45:06.085Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "HACE 40 DÍAS",
+              "answeredAt": "2026-08-01T20:46:17.932Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "PREPARATORIA_COMPLETA",
+              "answeredAt": "2026-08-01T20:47:11.641Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "UN_BANO_COMPLETO",
+              "answeredAt": "2026-08-01T20:47:15.858Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "UN_AUTO",
+              "answeredAt": "2026-08-01T20:47:20.549Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-08-01T20:47:32.607Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "DOS_PERSONAS",
+              "answeredAt": "2026-08-01T20:47:39.785Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "TRES_CUARTOS",
+              "answeredAt": "2026-08-01T20:47:47.642Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-01T20:44:22.611Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/595f4076-d085-45f5-8e2a-b095cc86c0e1/screening-attempts/185b15fe-311b-4a1b-939a-16841edb8948/perfume_photo/82a07395-1649-4dd6-af98-beb16e8aef8e.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-01T20:48:10.831Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/595f4076-d085-45f5-8e2a-b095cc86c0e1/screening-attempts/185b15fe-311b-4a1b-939a-16841edb8948/selfie_identification/662f8f13-0ede-4466-9cf1-519736817e29.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": {
+            "rotationCode": "NAV-080__583__247",
+            "rotationPlanName": "NAV-080__583__247",
+            "arms": [
+              {
+                "arm": "LEFT",
+                "applicationOrder": 1,
+                "product": "583"
+              },
+              {
+                "arm": "RIGHT",
+                "applicationOrder": 2,
+                "product": "247"
+              }
+            ]
+          },
+          "triangular": {
+            "pr1": "G-835",
+            "pr2": "C-583",
+            "pr3": "Z-724",
+            "veri1": "Z-724",
+            "pr4": "K-247",
+            "pr5": "H-358",
+            "pr6": "0-472",
+            "veri2": "H-358"
+          },
+          "hut": {
+            "eva1": "583",
+            "eva2": "247"
+          }
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-081",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-081",
+        "hutFolio": "HUT-081",
+        "participantProfileId": "47d723b5-c8e1-4e13-8168-eb547949e580",
+        "studyParticipantId": "4bdd66d0-71e3-429d-bc6b-1d2d787ff4c2",
+        "hutParticipantId": "14ce9669-6af2-4285-b37c-f7fea049931c",
+        "name": "MACARIO PELAEZ MATA",
+        "phone": "+525561856779",
+        "email": "karen.bautista.berenice07@gmail.com",
+        "protocol": "CLT_NAVIGO_HUT",
+        "qa": false,
+        "codes": {
+          "codigo1": "PDS9",
+          "codigo2": "K749",
+          "codigo3": "M9Z4",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-06T00:01:43.042Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 2,
+          "hutAnswers": 0,
+          "hutExists": true,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [
+          {
+            "completedAt": null,
+            "kind": "HUT",
+            "startedAt": null,
+            "status": "NOT_STARTED"
+          }
+        ],
+        "answers": {
+          "screening": [
+            {
+              "answer": "JAZMÍN PÉREZ",
+              "answeredAt": "2026-08-01T21:23:58.874Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-08-01T21:24:06.365Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-08-01T21:24:11.559Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 30,
+              "answeredAt": "2026-08-01T21:24:30.027Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-01T21:24:36.347Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-08-01T21:24:53.718Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-01T21:25:03.684Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "NAVIGO AZUL, CUBA GOLD",
+              "answeredAt": "2026-08-01T21:26:59.567Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-08-01T21:27:05.396Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "NAVIGO AZUL",
+              "answeredAt": "2026-08-01T21:27:30.577Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "CINCO_DIAS",
+              "answeredAt": "2026-08-01T21:27:41.468Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "HACE 35 AÑOS",
+              "answeredAt": "2026-08-01T21:28:07.829Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "PREPARATORIA_COMPLETA",
+              "answeredAt": "2026-08-01T21:29:03.181Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "DOS_O_MAS_BANOS_COMPLETOS",
+              "answeredAt": "2026-08-01T21:29:14.102Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "DOS_O_MAS_AUTOS",
+              "answeredAt": "2026-08-01T21:29:21.634Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-08-01T21:29:26.712Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "UNA_PERSONA",
+              "answeredAt": "2026-08-01T21:29:41.602Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "DOS_CUARTOS",
+              "answeredAt": "2026-08-01T21:29:49.453Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-01T21:26:34.554Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/47d723b5-c8e1-4e13-8168-eb547949e580/screening-attempts/0223c72b-2279-4dc3-b8c0-9cebf2adb0b9/perfume_photo/19f3b48d-288a-4f72-8e28-cd70a95ae655.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-01T21:30:35.183Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/47d723b5-c8e1-4e13-8168-eb547949e580/screening-attempts/0223c72b-2279-4dc3-b8c0-9cebf2adb0b9/selfie_identification/aa28e2fd-0a2b-4a1a-99f9-22e381e5160e.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": {
+            "rotationCode": "NAV-081__247__583",
+            "rotationPlanName": "NAV-081__247__583",
+            "arms": [
+              {
+                "arm": "LEFT",
+                "applicationOrder": 1,
+                "product": "247"
+              },
+              {
+                "arm": "RIGHT",
+                "applicationOrder": 2,
+                "product": "583"
+              }
+            ]
+          },
+          "triangular": {
+            "pr1": "C-583",
+            "pr2": "Z-724",
+            "pr3": "G-835",
+            "veri1": "Z-724",
+            "pr4": "H-358",
+            "pr5": "K-247",
+            "pr6": "0-472",
+            "veri2": "H-358"
+          },
+          "hut": {
+            "eva1": "247",
+            "eva2": "583"
+          }
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-082",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-082",
+        "hutFolio": "HUT-082",
+        "participantProfileId": "5ee2cb3b-6e1e-4f52-a115-8f84eaaa1000",
+        "studyParticipantId": "ce181c1e-cba0-4765-9ce6-8990680b3271",
+        "hutParticipantId": "79780c67-2195-41de-a1a4-afd11f149a58",
+        "name": "JESUS ANGEL MARQUEZ HERNANDEZ",
+        "phone": "+525657792215",
+        "email": "jesusangel02marquez14@gmail.com",
+        "protocol": "CLT_NAVIGO_HUT",
+        "qa": false,
+        "codes": {
+          "codigo1": "GG4X",
+          "codigo2": "C6WN",
+          "codigo3": "XSJS",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-06T00:01:08.958Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 2,
+          "hutAnswers": 0,
+          "hutExists": true,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [
+          {
+            "completedAt": null,
+            "kind": "HUT",
+            "startedAt": null,
+            "status": "NOT_STARTED"
+          }
+        ],
+        "answers": {
+          "screening": [
+            {
+              "answer": "JAZMIN PEREZ",
+              "answeredAt": "2026-08-01T21:34:52.472Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-08-01T21:34:58.649Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-08-01T21:35:06.487Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 20,
+              "answeredAt": "2026-08-01T21:35:18.367Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-01T21:35:33.302Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-08-01T21:35:41.143Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-01T21:35:46.812Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "NAVIGO AZUL, SELVACE",
+              "answeredAt": "2026-08-01T21:37:26.786Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-08-01T21:37:33.040Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "NAVIGO AZUL",
+              "answeredAt": "2026-08-01T21:37:53.698Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "SIETE_DIAS",
+              "answeredAt": "2026-08-01T21:38:01.528Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "HACE 18 DIAS",
+              "answeredAt": "2026-08-01T21:38:15.191Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "SECUNDARIA_COMPLETA",
+              "answeredAt": "2026-08-01T21:38:34.304Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "UN_BANO_COMPLETO",
+              "answeredAt": "2026-08-01T21:38:44.545Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "CERO_AUTOS",
+              "answeredAt": "2026-08-01T21:38:48.577Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-08-01T21:38:54.409Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "DOS_PERSONAS",
+              "answeredAt": "2026-08-01T21:39:05.012Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "DOS_CUARTOS",
+              "answeredAt": "2026-08-01T21:39:11.922Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-01T21:36:59.435Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/5ee2cb3b-6e1e-4f52-a115-8f84eaaa1000/screening-attempts/488356e9-b933-4c23-96d0-c1490a9147c4/perfume_photo/6bd55151-4448-407a-9f0e-937e209b7528.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-01T21:40:19.386Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/5ee2cb3b-6e1e-4f52-a115-8f84eaaa1000/screening-attempts/488356e9-b933-4c23-96d0-c1490a9147c4/selfie_identification/7892b9da-f878-44fd-a526-271bb005d906.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": {
+            "rotationCode": "NAV-082__583__247",
+            "rotationPlanName": "NAV-082__583__247",
+            "arms": [
+              {
+                "arm": "LEFT",
+                "applicationOrder": 1,
+                "product": "583"
+              },
+              {
+                "arm": "RIGHT",
+                "applicationOrder": 2,
+                "product": "247"
+              }
+            ]
+          },
+          "triangular": {
+            "pr1": "K-247",
+            "pr2": "0-472",
+            "pr3": "H-358",
+            "veri1": "H-358",
+            "pr4": "Z-724",
+            "pr5": "G-835",
+            "pr6": "C-583",
+            "veri2": "Z-724"
+          },
+          "hut": {
+            "eva1": "583",
+            "eva2": "247"
+          }
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-084",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-084",
+        "hutFolio": "HUT-084",
+        "participantProfileId": "f1b5ae84-038d-482f-9d3c-aa5e7049ce0b",
+        "studyParticipantId": "2ef5ee2e-f475-468c-876e-6ac5f108864e",
+        "hutParticipantId": "9de52597-09b1-41e6-9f87-83382b4f5c48",
+        "name": "MIGUEL ANGEL MERINO MENDOZA",
+        "phone": "+525669446318",
+        "email": "alitzel16@icloud.com",
+        "protocol": "CLT_NAVIGO_HUT",
+        "qa": false,
+        "codes": {
+          "codigo1": "C423",
+          "codigo2": "9FYB",
+          "codigo3": "8SJB",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-06T00:00:15.360Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 2,
+          "hutAnswers": 0,
+          "hutExists": true,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [
+          {
+            "completedAt": null,
+            "kind": "HUT",
+            "startedAt": null,
+            "status": "NOT_STARTED"
+          }
+        ],
+        "answers": {
+          "screening": [
+            {
+              "answer": "JAZMIN MENDOZA",
+              "answeredAt": "2026-08-01T22:51:22.062Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-08-01T22:51:38.170Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-08-01T22:51:42.659Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 21,
+              "answeredAt": "2026-08-01T22:51:54.127Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-01T22:52:06.505Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-08-01T22:52:12.945Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-01T22:52:28.109Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "NAVIGO AZUL,EMPIRE",
+              "answeredAt": "2026-08-01T22:53:52.127Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-08-01T22:53:59.544Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "NAVIGO AZUL",
+              "answeredAt": "2026-08-01T22:54:33.595Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "CINCO_DIAS",
+              "answeredAt": "2026-08-01T22:54:53.852Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "HACE 36 DIAS",
+              "answeredAt": "2026-08-01T22:55:06.945Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "PREPARATORIA_INCOMPLETA",
+              "answeredAt": "2026-08-01T22:55:23.802Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "DOS_O_MAS_BANOS_COMPLETOS",
+              "answeredAt": "2026-08-01T22:55:37.406Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "UN_AUTO",
+              "answeredAt": "2026-08-01T22:55:42.304Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-08-01T22:55:47.065Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "DOS_PERSONAS",
+              "answeredAt": "2026-08-01T22:56:01.394Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "DOS_CUARTOS",
+              "answeredAt": "2026-08-01T22:56:09.679Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-01T22:53:46.461Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/f1b5ae84-038d-482f-9d3c-aa5e7049ce0b/screening-attempts/ba03d158-9cae-4fad-8621-79d5ac654160/perfume_photo/7dbebec7-2df2-465e-878d-071ec77bb123.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-01T22:57:37.232Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/f1b5ae84-038d-482f-9d3c-aa5e7049ce0b/screening-attempts/ba03d158-9cae-4fad-8621-79d5ac654160/selfie_identification/1d9dc60f-9f9c-4271-9ba4-5609c4b5a587.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": {
+            "rotationCode": "NAV-084__583__247",
+            "rotationPlanName": "NAV-084__583__247",
+            "arms": [
+              {
+                "arm": "LEFT",
+                "applicationOrder": 1,
+                "product": "583"
+              },
+              {
+                "arm": "RIGHT",
+                "applicationOrder": 2,
+                "product": "247"
+              }
+            ]
+          },
+          "triangular": {
+            "pr1": "H-358",
+            "pr2": "0-472",
+            "pr3": "K-247",
+            "veri1": "H-358",
+            "pr4": "G-835",
+            "pr5": "Z-724",
+            "pr6": "C-583",
+            "veri2": "Z-724"
+          },
+          "hut": {
+            "eva1": "583",
+            "eva2": "247"
+          }
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-085",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-085",
+        "hutFolio": "HUT-085",
+        "participantProfileId": "33143bf9-593e-43aa-acca-ad7109202f74",
+        "studyParticipantId": "68e9a3c1-44f4-4afa-b063-93c6c8a4a2c7",
+        "hutParticipantId": "2439c6dc-423a-46c9-b0a1-8618e5035c3e",
+        "name": "JONATHAN ERNESTO SANTO YO GONZÁLEZ",
+        "phone": "+525616687847",
+        "email": "santoyopppp@gmail.com",
+        "protocol": "CLT_NAVIGO_HUT",
+        "qa": false,
+        "codes": {
+          "codigo1": "3PMX",
+          "codigo2": "2WYZ",
+          "codigo3": "ETK3",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-05T23:59:50.274Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 2,
+          "hutAnswers": 0,
+          "hutExists": true,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [
+          {
+            "completedAt": null,
+            "kind": "HUT",
+            "startedAt": null,
+            "status": "NOT_STARTED"
+          }
+        ],
+        "answers": {
+          "screening": [
+            {
+              "answer": "JAZMÍN PÉREZ",
+              "answeredAt": "2026-08-02T02:00:20.275Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-08-02T02:00:26.481Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-08-02T02:00:30.342Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 36,
+              "answeredAt": "2026-08-02T02:00:36.969Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-02T02:00:43.103Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-08-02T02:00:48.673Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-02T02:00:59.158Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "NAVIGO AZUL, DIABLITO NEGRO, EUA D AROMES HOMME",
+              "answeredAt": "2026-08-02T02:03:37.748Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-08-02T02:03:43.932Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "NAVIGO AZUL",
+              "answeredAt": "2026-08-02T02:03:57.176Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "CINCO_DIAS",
+              "answeredAt": "2026-08-02T02:04:06.748Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "27 DÍAS",
+              "answeredAt": "2026-08-02T02:04:25.670Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "SECUNDARIA_COMPLETA",
+              "answeredAt": "2026-08-02T02:04:52.112Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "UN_BANO_COMPLETO",
+              "answeredAt": "2026-08-02T02:04:59.031Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "UN_AUTO",
+              "answeredAt": "2026-08-02T02:05:07.436Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-08-02T02:05:11.253Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "DOS_PERSONAS",
+              "answeredAt": "2026-08-02T02:05:17.426Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "UN_CUARTO",
+              "answeredAt": "2026-08-02T02:05:25.183Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-02T02:03:08.320Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/33143bf9-593e-43aa-acca-ad7109202f74/screening-attempts/3fd13fe2-fd0f-4154-857d-cd7c768b61e5/perfume_photo/429be2cc-308e-459f-a3f1-1b68162475b6.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-02T02:05:45.909Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/33143bf9-593e-43aa-acca-ad7109202f74/screening-attempts/3fd13fe2-fd0f-4154-857d-cd7c768b61e5/selfie_identification/351e82ab-b8e4-498a-906a-e88edd8452b0.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": {
+            "rotationCode": "NAV-085__247__583",
+            "rotationPlanName": "NAV-085__247__583",
+            "arms": [
+              {
+                "arm": "LEFT",
+                "applicationOrder": 1,
+                "product": "247"
+              },
+              {
+                "arm": "RIGHT",
+                "applicationOrder": 2,
+                "product": "583"
+              }
+            ]
+          },
+          "triangular": {
+            "pr1": "G-835",
+            "pr2": "Z-724",
+            "pr3": "C-583",
+            "veri1": "Z-724",
+            "pr4": "K-247",
+            "pr5": "0-472",
+            "pr6": "H-358",
+            "veri2": "H-358"
+          },
+          "hut": {
+            "eva1": "247",
+            "eva2": "583"
+          }
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-089",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-089",
+        "hutFolio": "HUT-089",
+        "participantProfileId": "0f4832f6-8a83-4d7a-b4d2-a1ae8924e8c3",
+        "studyParticipantId": "b164d248-0471-4ac5-b2d4-21f676aa80e2",
+        "hutParticipantId": "2c5c812a-29ca-49ba-ae89-34438713c172",
+        "name": "OMAR DE LA CRUZ MARTINES",
+        "phone": "+525569757812",
+        "email": null,
+        "protocol": "CLT_NAVIGO_HUT",
+        "qa": false,
+        "codes": {
+          "codigo1": "SEGZ",
+          "codigo2": "SVXG",
+          "codigo3": "Y9BU",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-05T23:58:09.285Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 2,
+          "hutAnswers": 0,
+          "hutExists": true,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [
+          {
+            "completedAt": null,
+            "kind": "HUT",
+            "startedAt": null,
+            "status": "NOT_STARTED"
+          }
+        ],
+        "answers": {
+          "screening": [
+            {
+              "answer": "JAZMIN",
+              "answeredAt": "2026-08-03T00:52:41.297Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-08-03T00:52:45.982Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-08-03T00:52:50.721Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 20,
+              "answeredAt": "2026-08-03T00:53:06.853Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-03T00:53:13.901Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-08-03T00:53:19.520Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-03T00:53:33.668Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "NAVIGO AZUL",
+              "answeredAt": "2026-08-03T00:54:14.457Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-08-03T00:54:20.017Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "NAVIGO AZUL",
+              "answeredAt": "2026-08-03T00:54:33.527Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "TRES_DIAS",
+              "answeredAt": "2026-08-03T00:54:44.029Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "ANTIER",
+              "answeredAt": "2026-08-03T00:54:57.727Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "PREPARATORIA_COMPLETA",
+              "answeredAt": "2026-08-03T00:55:10.811Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "UN_BANO_COMPLETO",
+              "answeredAt": "2026-08-03T00:55:17.374Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "UN_AUTO",
+              "answeredAt": "2026-08-03T00:55:20.596Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-08-03T00:55:24.412Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "DOS_PERSONAS",
+              "answeredAt": "2026-08-03T00:55:29.768Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "UN_CUARTO",
+              "answeredAt": "2026-08-03T00:55:36.505Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-03T00:53:54.443Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/0f4832f6-8a83-4d7a-b4d2-a1ae8924e8c3/screening-attempts/31611f7f-e128-4371-be22-3150c7e66048/perfume_photo/7b9fbefd-f3d2-4962-a287-472a14efbf24.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-03T00:56:09.767Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/0f4832f6-8a83-4d7a-b4d2-a1ae8924e8c3/screening-attempts/31611f7f-e128-4371-be22-3150c7e66048/selfie_identification/40c344e6-70b0-482f-8b93-22d943d65249.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": {
+            "rotationCode": "NAV-089__247__583",
+            "rotationPlanName": "NAV-089__247__583",
+            "arms": [
+              {
+                "arm": "LEFT",
+                "applicationOrder": 1,
+                "product": "247"
+              },
+              {
+                "arm": "RIGHT",
+                "applicationOrder": 2,
+                "product": "583"
+              }
+            ]
+          },
+          "triangular": {
+            "pr1": "C-583",
+            "pr2": "G-835",
+            "pr3": "Z-724",
+            "veri1": "Z-724",
+            "pr4": "0-472",
+            "pr5": "H-358",
+            "pr6": "K-247",
+            "veri2": "H-358"
+          },
+          "hut": {
+            "eva1": "247",
+            "eva2": "583"
+          }
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    },
+    {
+      "folio": "NAV-096",
+      "classification": "A) LISTO PARA MIGRAR",
+      "recommendation": "Migrar si V2 confirma folio libre.",
+      "v1": {
+        "exists": true,
+        "navFolio": "NAV-096",
+        "hutFolio": "HUT-096",
+        "participantProfileId": "14b08239-af64-4834-9f1f-d19b67a936d1",
+        "studyParticipantId": "556404c4-7f8c-4053-bd71-b00a3a91ccce",
+        "hutParticipantId": "e18a4c45-1018-424b-9e17-81f76f6a724f",
+        "name": "JAVIER DOMÍNGUEZ CHÁVEZ",
+        "phone": "+525573479902",
+        "email": null,
+        "protocol": "CLT_NAVIGO_HUT",
+        "qa": false,
+        "codes": {
+          "codigo1": "ESQW",
+          "codigo2": "2U8P",
+          "codigo3": "8982",
+          "count": 3
+        },
+        "screening": {
+          "aggregateStatus": "PASSED",
+          "operationalStatus": "SCREENING_PASSED",
+          "attemptCount": 1,
+          "latestStatus": "PASSED",
+          "completed": true,
+          "approved": true,
+          "rejected": false,
+          "completedAt": "2026-08-05T23:54:59.311Z",
+          "rejectionReason": null
+        },
+        "progress": {
+          "cltAnswers": 0,
+          "cltCompleted": false,
+          "cltStarted": false,
+          "evidenceCount": 2,
+          "hutAnswers": 0,
+          "hutExists": true,
+          "hutPhotos": 0,
+          "hutStarted": false,
+          "navigoActivities": 0,
+          "navigoCompleted": false,
+          "navigoResponses": 0,
+          "navigoStarted": false,
+          "operationalEvidenceCount": 0,
+          "operationalResponseCount": 0,
+          "responseCount": 18
+        },
+        "activities": [
+          {
+            "completedAt": null,
+            "kind": "HUT",
+            "startedAt": null,
+            "status": "NOT_STARTED"
+          }
+        ],
+        "answers": {
+          "screening": [
+            {
+              "answer": "MARISELA GÓMEZ",
+              "answeredAt": "2026-08-04T15:55:26.462Z",
+              "questionKey": "OP1_RECLUTADOR"
+            },
+            {
+              "answer": "SI",
+              "answeredAt": "2026-08-04T15:55:32.241Z",
+              "questionKey": "CONSENTIMIENTO"
+            },
+            {
+              "answer": "HOMBRE",
+              "answeredAt": "2026-08-04T15:55:36.896Z",
+              "questionKey": "F1_GENERO"
+            },
+            {
+              "answer": 44,
+              "answeredAt": "2026-08-04T15:55:43.637Z",
+              "questionKey": "F2_EDAD"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-04T15:55:48.743Z",
+              "questionKey": "F3_EXCLUSION_LABORAL"
+            },
+            {
+              "answer": "NO",
+              "answeredAt": "2026-08-04T15:55:53.121Z",
+              "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES"
+            },
+            {
+              "answer": "NINGUNA",
+              "answeredAt": "2026-08-04T15:55:58.483Z",
+              "questionKey": "F5_CONDICIONES_FISICAS"
+            },
+            {
+              "answer": "NAVIGO",
+              "answeredAt": "2026-08-04T15:56:25.047Z",
+              "questionKey": "F6_MARCAS_UTILIZA"
+            },
+            {
+              "answer": [
+                "Navigo"
+              ],
+              "answeredAt": "2026-08-04T15:56:29.857Z",
+              "questionKey": "F7_Marca_Frecuente"
+            },
+            {
+              "answer": "AZUL CLARO",
+              "answeredAt": "2026-08-04T15:56:37.421Z",
+              "questionKey": "F8_VARIANTE_COLOR"
+            },
+            {
+              "answer": "SEIS_DIAS",
+              "answeredAt": "2026-08-04T15:56:47.902Z",
+              "questionKey": "F9_FRECUENCIA_SEMANAL"
+            },
+            {
+              "answer": "HACE 2 MESES",
+              "answeredAt": "2026-08-04T15:56:59.351Z",
+              "questionKey": "F10_ULTIMA_COMPRA"
+            },
+            {
+              "answer": "PREPARATORIA_COMPLETA",
+              "answeredAt": "2026-08-04T15:57:09.361Z",
+              "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR"
+            },
+            {
+              "answer": "UN_BANO_COMPLETO",
+              "answeredAt": "2026-08-04T15:57:13.562Z",
+              "questionKey": "D2_BANOS_COMPLETOS"
+            },
+            {
+              "answer": "UN_AUTO",
+              "answeredAt": "2026-08-04T15:57:18.438Z",
+              "questionKey": "D3_AUTOMOVILES_HOGAR"
+            },
+            {
+              "answer": "SI_TIENE_INTERNET",
+              "answeredAt": "2026-08-04T15:57:22.368Z",
+              "questionKey": "D4_INTERNET_HOGAR"
+            },
+            {
+              "answer": "DOS_PERSONAS",
+              "answeredAt": "2026-08-04T15:57:28.282Z",
+              "questionKey": "D5_PERSONAS_TRABAJARON"
+            },
+            {
+              "answer": "UN_CUARTO",
+              "answeredAt": "2026-08-04T15:57:32.801Z",
+              "questionKey": "D6_CUARTOS_DORMIR"
+            }
+          ],
+          "clt": [],
+          "navigo": [],
+          "hut": []
+        },
+        "evidence": [
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-04T15:56:23.304Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/14b08239-af64-4834-9f1f-d19b67a936d1/screening-attempts/347f193e-e0fa-4395-b668-fe8d7e4a9be6/perfume_photo/a01683d6-f3b2-4d20-811e-c8cc32af4039.jpg",
+            "status": "APPROVED",
+            "type": "PERFUME_PHOTO"
+          },
+          {
+            "source": "ParticipantEvidence",
+            "capturedAt": "2026-08-04T15:57:59.018Z",
+            "file": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/14b08239-af64-4834-9f1f-d19b67a936d1/screening-attempts/347f193e-e0fa-4395-b668-fe8d7e4a9be6/selfie_identification/52eaf204-5d08-4f1f-9a20-e9d54288f714.jpg",
+            "status": "APPROVED",
+            "type": "SELFIE_IDENTIFICATION"
+          }
+        ],
+        "rotations": {
+          "clt": {
+            "rotationCode": "NAV-096__583__247",
+            "rotationPlanName": "NAV-096__583__247",
+            "arms": [
+              {
+                "arm": "LEFT",
+                "applicationOrder": 1,
+                "product": "583"
+              },
+              {
+                "arm": "RIGHT",
+                "applicationOrder": 2,
+                "product": "247"
+              }
+            ]
+          },
+          "triangular": {
+            "pr1": "H-358",
+            "pr2": "0-472",
+            "pr3": "K-247",
+            "veri1": "H-358",
+            "pr4": "Z-724",
+            "pr5": "G-835",
+            "pr6": "C-583",
+            "veri2": "Z-724"
+          },
+          "hut": {
+            "eva1": "583",
+            "eva2": "247"
+          }
+        }
+      },
+      "v2": {
+        "checked": false,
+        "participantExists": null,
+        "occupation": "NO_VERIFICADO_SIN_CONEXION_V2",
+        "origin": null,
+        "status": null,
+        "activities": null,
+        "responses": null,
+        "evidence": null,
+        "claimedRotations": null
+      }
+    }
+  ]
+}

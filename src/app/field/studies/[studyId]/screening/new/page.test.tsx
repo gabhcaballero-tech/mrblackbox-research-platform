@@ -45,7 +45,7 @@ vi.mock("../../../../_components/ParticipantStartForm", () => ({
 }));
 
 describe("NewScreeningPage public access", () => {
-  it("renders the new field screening form without an internal session", async () => {
+  it("shows the V2 migration message instead of the V1 screening form", async () => {
     render(
       await NewScreeningPage({
         params: Promise.resolve({ studyId: "study-1" }),
@@ -53,8 +53,10 @@ describe("NewScreeningPage public access", () => {
       })
     );
 
-    expect(screen.getByText("Iniciar filtro · Fragancia Masculina")).toBeInTheDocument();
-    expect(screen.getByTestId("participant-start-form")).toHaveTextContent("Inicio publico study-1");
+    expect(screen.getByText("Filtro cerrado · Fragancia Masculina")).toBeInTheDocument();
+    expect(screen.getByText("Registro migrado a V2")).toBeInTheDocument();
+    expect(screen.getByText("Este estudio ahora se gestiona en la plataforma V2. Por favor continúe el registro en V2.")).toBeInTheDocument();
+    expect(screen.queryByTestId("participant-start-form")).not.toBeInTheDocument();
     expect(screen.queryByText("Volver al estudio")).not.toBeInTheDocument();
   });
 

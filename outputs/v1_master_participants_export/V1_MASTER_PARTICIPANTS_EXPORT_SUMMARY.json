@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-08-18T01:48:57.704Z",
+  "studyCode": "FMASCULINA-NAVIGO-2026",
+  "studyName": "Fragancia Masculina — Navigo Homme",
+  "counts": {
+    "activities": 1844,
+    "answers": 7417,
+    "cltStarted": 43,
+    "codes": 1362,
+    "evidence": 681,
+    "hutStarted": 40,
+    "rotations": 449,
+    "screeningApproved": 160,
+    "screeningRejected": 16,
+    "totalParticipants": 415,
+    "withAnswers": 202,
+    "withEvidence": 176
+  },
+  "byClassification": {
+    "OTRO": 239,
+    "MIGRAR_AVANCE": 37,
+    "MIGRAR_SCREENING": 75,
+    "RECHAZADO": 16,
+    "LIBERAR": 47,
+    "QA": 1
+  }
+}

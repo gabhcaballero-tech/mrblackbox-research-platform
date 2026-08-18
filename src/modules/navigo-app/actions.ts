@@ -40,6 +40,10 @@ import {
 import type { NavigoParticipantImportActionState } from "./participant-import-state";
 import type { EvidenceUploadMetadata } from "@/modules/participant-portal/evidence-storage";
 import { cleanupNavigoTestRotations } from "./rotation-cleanup";
+import {
+  V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE,
+  areV1OperationalCommunicationsDisabled
+} from "@/modules/oneui-whatsapp";
 
 export async function startNavigoT0Action(studyId: string, studyParticipantId: string, formData: FormData) {
   const actor = await requireCapability("application-time:record");
@@ -182,6 +186,10 @@ export async function sendNavigoEvaluationLinkWhatsAppAction(
   requestOrigin: string
 ): Promise<NavigoEvaluationLinkWhatsAppActionResult> {
   const actor = await requireCapability("screening:review");
+  if (areV1OperationalCommunicationsDisabled()) {
+    return { message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE, ok: false };
+  }
+
   const result = await createNavigoAppRepository().sendEvaluationLinkWhatsApp({
     actorUserId: actor.id,
     requestOrigin,
@@ -223,6 +231,10 @@ export async function sendNavigoParticipantLinksWhatsAppAction(
   linkType: NavigoParticipantLinkSendType
 ): Promise<NavigoParticipantLinksWhatsAppActionResult> {
   const actor = await requireCapability("screening:review");
+  if (areV1OperationalCommunicationsDisabled()) {
+    return { message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE, ok: false };
+  }
+
   const result = await createNavigoAppRepository().sendParticipantLinksWhatsApp({
     actorUserId: actor.id,
     linkType,
@@ -278,6 +290,10 @@ export async function sendNavigoEvaluationReminderNowAction(
   requestOrigin: string
 ): Promise<NavigoEvaluationReminderNowActionResult> {
   const actor = await requireCapability("screening:review");
+  if (areV1OperationalCommunicationsDisabled()) {
+    return { message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE, ok: false };
+  }
+
   const result = await createNavigoAppRepository().sendEvaluationReminderNow({
     actorUserId: actor.id,
     participantActivityId,

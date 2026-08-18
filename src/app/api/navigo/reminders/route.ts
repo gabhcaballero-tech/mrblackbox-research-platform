@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createNavigoAppRepository } from "@/modules/navigo-app/repository";
+import {
+  V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE,
+  areV1NavigoAutomaticCommunicationsDisabled
+} from "@/modules/oneui-whatsapp";
 import { resolvePublicLinkOrigin } from "@/shared/utils/request-origin";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +30,14 @@ async function processNavigoRemindersRequest(request: NextRequest) {
     }
   } else if (process.env.NODE_ENV === "production") {
     return NextResponse.json({ message: "Cron secret not configured", ok: false }, { status: 500 });
+  }
+
+  if (areV1NavigoAutomaticCommunicationsDisabled()) {
+    return NextResponse.json({
+      code: "AUTOMATION_DISABLED",
+      message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE,
+      ok: false
+    });
   }
 
   const requestOrigin = resolvePublicLinkOrigin(request.nextUrl.origin);

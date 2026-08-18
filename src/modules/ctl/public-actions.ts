@@ -13,6 +13,10 @@ import type {
 } from "@/modules/navigo-app/actions";
 import type { NavigoParticipantLinkSendType } from "@/modules/navigo-app/repository";
 import {
+  V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE,
+  areV1OperationalCommunicationsDisabled
+} from "@/modules/oneui-whatsapp";
+import {
   createCtlPublicSessionToken,
   ctlPublicSessionCookieName,
   ctlPublicSessionMaxAgeSeconds
@@ -333,6 +337,10 @@ export async function sendPublicCtlNavigoEvaluationLinkWhatsAppAction(
     };
   }
 
+  if (areV1OperationalCommunicationsDisabled()) {
+    return { message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE, ok: false };
+  }
+
   const result = await createNavigoAppRepository().sendEvaluationLinkWhatsApp({
     actorUserId: session.responsibleUserId,
     requestOrigin,
@@ -397,6 +405,10 @@ export async function sendPublicCtlParticipantLinksWhatsAppAction(
       message: "No encontramos el responsable interno para enviar WhatsApp.",
       ok: false
     };
+  }
+
+  if (areV1OperationalCommunicationsDisabled()) {
+    return { message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE, ok: false };
   }
 
   const result = await createNavigoAppRepository().sendParticipantLinksWhatsApp({

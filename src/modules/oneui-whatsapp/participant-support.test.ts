@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createWhatsAppParticipantSupportService } from "./participant-support";
+import { V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE } from "./service";
 import { WHATSAPP_INVALID_PUBLIC_ORIGIN } from "./templates";
 
 describe("WhatsApp participant support", () => {
@@ -100,6 +101,34 @@ describe("WhatsApp participant support", () => {
         })
       })
     });
+  });
+
+  it("bloquea envios manuales de soporte cuando V1 esta desactivado", async () => {
+    vi.stubEnv("WHATSAPP_AUTOMATION_ENABLED", "false");
+    const sendParticipantLinksWhatsApp = vi.fn();
+    const auditCreate = vi.fn().mockResolvedValue({});
+    const prisma = createPrismaMock({ auditCreate });
+    const service = createWhatsAppParticipantSupportService({
+      navigoRepository: { sendParticipantLinksWhatsApp } as never,
+      prisma
+    });
+
+    const result = await service.sendManualSupportMessage({
+      actorUserId: "admin-1",
+      reason: "Soporte manual",
+      sendKind: "BOTH",
+      studyId: "study-1",
+      studyParticipantId: "study-participant-1"
+    });
+
+    expect(result).toEqual({
+      message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE,
+      ok: false,
+      reason: "AUTOMATION_DISABLED"
+    });
+    expect(sendParticipantLinksWhatsApp).not.toHaveBeenCalled();
+    expect(auditCreate).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
   });
 
   it("envia Navigo con origen estable de produccion para el participante seleccionado", async () => {

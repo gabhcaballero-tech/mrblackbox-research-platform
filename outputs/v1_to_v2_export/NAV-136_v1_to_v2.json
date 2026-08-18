@@ -1,0 +1,3941 @@
+{
+  "schemaVersion": "v1-to-v2.participant-export.1",
+  "source": {
+    "project": "mrblackbox-research-platform",
+    "studyCode": "FMASCULINA-NAVIGO-2026",
+    "studyName": "Fragancia Masculina — Navigo Homme",
+    "exportedAt": "2026-08-15T01:00:51.178Z",
+    "exportedAtMexicoCity": "14/08/2026, 19:00:51",
+    "readOnly": true,
+    "publicOrigin": "https://mrblackbox-research-platform.vercel.app"
+  },
+  "participant": {
+    "navFolio": "NAV-136",
+    "hutFolio": "HUT-136",
+    "name": "JOSE DE JESUS SAN HERNÁNDEZ",
+    "phone": "+525631451806",
+    "email": "garysanchwsito10prr@gmail.com",
+    "protocol": "CLT_NAVIGO_HUT",
+    "products": {
+      "eva1": {
+        "code": "583",
+        "label": "Segunda fragancia",
+        "arm": "LEFT",
+        "armLabel": "Brazo izquierdo",
+        "applicationOrder": 1,
+        "participantVisibleLabel": "Primera fragancia"
+      },
+      "eva2": {
+        "code": "247",
+        "label": "Primera fragancia",
+        "arm": "RIGHT",
+        "armLabel": "Brazo derecho",
+        "applicationOrder": 2,
+        "participantVisibleLabel": "Segunda fragancia"
+      },
+      "arms": [
+        {
+          "code": "583",
+          "label": "Segunda fragancia",
+          "arm": "LEFT",
+          "armLabel": "Brazo izquierdo",
+          "applicationOrder": 1,
+          "participantVisibleLabel": "Primera fragancia"
+        },
+        {
+          "code": "247",
+          "label": "Primera fragancia",
+          "arm": "RIGHT",
+          "armLabel": "Brazo derecho",
+          "applicationOrder": 2,
+          "participantVisibleLabel": "Segunda fragancia"
+        }
+      ]
+    },
+    "ids": {
+      "participantProfileId": "f9b41d3d-bcac-4fd1-9609-bc0ccb1db220",
+      "studyParticipantId": "10543266-6a23-4e91-9810-3e5b1fa27e03",
+      "participantConfirmationId": "358dc941-ffe2-49bf-9b1c-dd9ae5f4029d",
+      "hutParticipantId": "7203db28-49d0-4c6b-a895-87912dc3642a"
+    },
+    "statuses": {
+      "screeningStatus": "PASSED",
+      "operationalStatus": "IN_PROGRESS",
+      "hutStatus": "NOT_STARTED"
+    },
+    "createdAt": "2026-08-11T15:59:26.387Z",
+    "updatedAt": "2026-08-12T17:46:55.830Z"
+  },
+  "codes": [
+    {
+      "slot": 1,
+      "code": "VUY3",
+      "source": "ParticipantReferenceCode",
+      "createdAt": "2026-08-11T16:12:07.480Z"
+    },
+    {
+      "slot": 2,
+      "code": "TXH7",
+      "source": "ParticipantReferenceCode",
+      "createdAt": "2026-08-11T16:12:07.480Z"
+    },
+    {
+      "slot": 3,
+      "code": "URAM",
+      "source": "ParticipantReferenceCode",
+      "createdAt": "2026-08-11T16:12:07.480Z"
+    }
+  ],
+  "rotations": {
+    "clt": {
+      "rotationPlanName": "NAV-136__583__247",
+      "rotationCode": "NAV-136__583__247",
+      "eva1": {
+        "code": "583",
+        "label": "Segunda fragancia",
+        "arm": "LEFT",
+        "armLabel": "Brazo izquierdo",
+        "applicationOrder": 1,
+        "participantVisibleLabel": "Primera fragancia"
+      },
+      "eva2": {
+        "code": "247",
+        "label": "Primera fragancia",
+        "arm": "RIGHT",
+        "armLabel": "Brazo derecho",
+        "applicationOrder": 2,
+        "participantVisibleLabel": "Segunda fragancia"
+      },
+      "pr1": "H-358",
+      "pr2": "0-472",
+      "pr3": "K-247",
+      "pr4": "C-583",
+      "pr5": "G-835",
+      "pr6": "Z-724",
+      "veri1": "H-358",
+      "veri2": "Z-724",
+      "triangularSource": "CtlTriangularRotationAssignment",
+      "importedAt": "2026-08-12T17:13:28.809Z"
+    },
+    "hut": {
+      "eva1": "583",
+      "eva2": "247",
+      "source": "HutParticipant"
+    }
+  },
+  "activities": [
+    {
+      "type": "CLT_SESSION",
+      "code": "CLT",
+      "status": "CANCELLED",
+      "startedAt": "2026-08-12T17:14:39.239Z",
+      "completedAt": "2026-08-12T17:17:38.898Z",
+      "metadata": {
+        "ctlSessionId": "8d716e4a-9269-40c5-8bec-e16a3259b7d4",
+        "claimedAt": "2026-08-12T17:14:39.239Z",
+        "triangularRotationSnapshot": {
+          "triangular1": {
+            "pr1": "H-358",
+            "pr2": "0-472",
+            "pr3": "K-247",
+            "verify": "H-358"
+          },
+          "triangular2": {
+            "pr1": "C-583",
+            "pr2": "G-835",
+            "pr3": "Z-724",
+            "verify": "Z-724"
+          },
+          "assignmentId": "ff7daf0c-8e8a-4a3b-bd28-4df1fc09e5ff"
+        }
+      }
+    },
+    {
+      "type": "CLT_PHASE",
+      "code": "COLOCACION",
+      "status": "IN_PROGRESS",
+      "startedAt": "2026-08-12T17:14:39.239Z",
+      "completedAt": null,
+      "metadata": {
+        "ctlPhaseProgressId": "1f56c3bb-08b7-469d-b5a8-e4708dff3f1a",
+        "referenceCodeSlot": 1,
+        "productCode": "583",
+        "arm": "IZQUIERDO",
+        "validatedAt": null
+      }
+    },
+    {
+      "type": "CLT_PHASE",
+      "code": "EVALUACION_1",
+      "status": "PENDING",
+      "startedAt": null,
+      "completedAt": null,
+      "metadata": {
+        "ctlPhaseProgressId": "afe95d49-85f3-43f8-b15a-96c7218d70dc",
+        "referenceCodeSlot": 2,
+        "productCode": "247",
+        "arm": "DERECHO",
+        "validatedAt": null
+      }
+    },
+    {
+      "type": "CLT_PHASE",
+      "code": "EVALUACION_2",
+      "status": "PENDING",
+      "startedAt": null,
+      "completedAt": null,
+      "metadata": {
+        "ctlPhaseProgressId": "c65b3983-e735-4b46-a0c3-be23c0c2f6b5",
+        "referenceCodeSlot": 3,
+        "productCode": "247",
+        "arm": null,
+        "validatedAt": null
+      }
+    },
+    {
+      "type": "CLT_SESSION",
+      "code": "CLT",
+      "status": "CANCELLED",
+      "startedAt": "2026-08-12T17:18:07.783Z",
+      "completedAt": "2026-08-12T17:19:40.501Z",
+      "metadata": {
+        "ctlSessionId": "46c2af01-e3f2-4061-a576-680cd0b58cc2",
+        "claimedAt": "2026-08-12T17:18:07.783Z",
+        "triangularRotationSnapshot": {
+          "triangular1": {
+            "pr1": "H-358",
+            "pr2": "0-472",
+            "pr3": "K-247",
+            "verify": "H-358"
+          },
+          "triangular2": {
+            "pr1": "C-583",
+            "pr2": "G-835",
+            "pr3": "Z-724",
+            "verify": "Z-724"
+          },
+          "assignmentId": "ff7daf0c-8e8a-4a3b-bd28-4df1fc09e5ff"
+        }
+      }
+    },
+    {
+      "type": "CLT_PHASE",
+      "code": "COLOCACION",
+      "status": "IN_PROGRESS",
+      "startedAt": "2026-08-12T17:18:07.783Z",
+      "completedAt": null,
+      "metadata": {
+        "ctlPhaseProgressId": "d457e951-5817-498f-8e68-a19929b8570f",
+        "referenceCodeSlot": 1,
+        "productCode": "583",
+        "arm": "IZQUIERDO",
+        "validatedAt": null
+      }
+    },
+    {
+      "type": "CLT_PHASE",
+      "code": "EVALUACION_1",
+      "status": "PENDING",
+      "startedAt": null,
+      "completedAt": null,
+      "metadata": {
+        "ctlPhaseProgressId": "5a6694c7-a9d3-4cde-ba7b-9389e3c024a3",
+        "referenceCodeSlot": 2,
+        "productCode": "247",
+        "arm": "DERECHO",
+        "validatedAt": null
+      }
+    },
+    {
+      "type": "CLT_PHASE",
+      "code": "EVALUACION_2",
+      "status": "PENDING",
+      "startedAt": null,
+      "completedAt": null,
+      "metadata": {
+        "ctlPhaseProgressId": "d1a0787d-6993-4bde-9ba5-3e923db99fe8",
+        "referenceCodeSlot": 3,
+        "productCode": "247",
+        "arm": null,
+        "validatedAt": null
+      }
+    },
+    {
+      "type": "CLT_SESSION",
+      "code": "CLT",
+      "status": "COMPLETED",
+      "startedAt": "2026-08-12T17:20:31.628Z",
+      "completedAt": "2026-08-12T17:51:05.183Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "claimedAt": "2026-08-12T17:20:31.628Z",
+        "triangularRotationSnapshot": {
+          "triangular1": {
+            "pr1": "H-358",
+            "pr2": "0-472",
+            "pr3": "K-247",
+            "verify": "H-358"
+          },
+          "triangular2": {
+            "pr1": "C-583",
+            "pr2": "G-835",
+            "pr3": "Z-724",
+            "verify": "Z-724"
+          },
+          "assignmentId": "ff7daf0c-8e8a-4a3b-bd28-4df1fc09e5ff"
+        }
+      }
+    },
+    {
+      "type": "CLT_PHASE",
+      "code": "COLOCACION",
+      "status": "IN_PROGRESS",
+      "startedAt": "2026-08-12T17:20:31.628Z",
+      "completedAt": null,
+      "metadata": {
+        "ctlPhaseProgressId": "6b732f5a-8783-4e93-b4b2-3f63ef3de01f",
+        "referenceCodeSlot": 1,
+        "productCode": "583",
+        "arm": "IZQUIERDO",
+        "validatedAt": null
+      }
+    },
+    {
+      "type": "CLT_PHASE",
+      "code": "EVALUACION_1",
+      "status": "PENDING",
+      "startedAt": null,
+      "completedAt": null,
+      "metadata": {
+        "ctlPhaseProgressId": "e4a4efd6-8515-4983-bfda-40e7c7f3b5ea",
+        "referenceCodeSlot": 2,
+        "productCode": "247",
+        "arm": "DERECHO",
+        "validatedAt": null
+      }
+    },
+    {
+      "type": "CLT_PHASE",
+      "code": "EVALUACION_2",
+      "status": "PENDING",
+      "startedAt": null,
+      "completedAt": null,
+      "metadata": {
+        "ctlPhaseProgressId": "f43c5323-7779-46bd-bf32-d3c85de57645",
+        "referenceCodeSlot": 3,
+        "productCode": "247",
+        "arm": null,
+        "validatedAt": null
+      }
+    },
+    {
+      "type": "NAVIGO_ACTIVITY",
+      "code": "T3_HORAS",
+      "status": "EXPIRED",
+      "scheduledAt": "2026-08-12T20:46:55.301Z",
+      "availableFrom": "2026-08-12T20:16:55.301Z",
+      "availableUntil": "2026-08-13T03:46:55.301Z",
+      "startedAt": null,
+      "completedAt": null,
+      "metadata": {
+        "participantActivityId": "063ef5e0-b4fb-426f-8041-74959e5920ed",
+        "scheduleName": "Medicion 3 horas",
+        "scheduleType": "QUESTIONNAIRE_MEASUREMENT",
+        "occurrenceKey": "DEFAULT",
+        "lastSavedAt": null,
+        "reopenedAt": null,
+        "reopenReason": null,
+        "reminders": [
+          {
+            "id": "df84546b-b9d6-46be-aaf3-2135e7d0e3b0",
+            "channel": "INTERNAL_FOLLOWUP",
+            "status": "COMPLETED",
+            "scheduledFor": "2026-08-12T20:16:55.301Z",
+            "sentAt": "2026-08-12T20:20:33.949Z",
+            "metadataJson": {
+              "source": "CRON",
+              "status": "SENT",
+              "message": "Recordatorio enviado.",
+              "adminUserId": null,
+              "activityCode": "T3_HORAS",
+              "reminderType": "NAVIGO_WHATSAPP_EVALUATION_REMINDER",
+              "templateName": "navigo_recordatorio_evaluacion",
+              "timeZoneIana": "America/Mexico_City",
+              "metaMessageId": "wamid.HBgNNTIxNTYzMTQ1MTgwNhUCABEYEkIwRkNCMkRFQ0VGMUJDQkIyMgA=",
+              "whatsappMessageId": "7938f7c1-f6d4-42fa-8b9a-c2f545378d72"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "NAVIGO_ACTIVITY",
+      "code": "T4_5_HORAS",
+      "status": "EXPIRED",
+      "scheduledAt": "2026-08-12T22:16:55.301Z",
+      "availableFrom": "2026-08-12T21:46:55.301Z",
+      "availableUntil": "2026-08-13T03:46:55.301Z",
+      "startedAt": null,
+      "completedAt": null,
+      "metadata": {
+        "participantActivityId": "e4f29a20-ca79-4a06-b55e-faeec28e6b7d",
+        "scheduleName": "Medicion 4.5 horas",
+        "scheduleType": "QUESTIONNAIRE_MEASUREMENT",
+        "occurrenceKey": "DEFAULT",
+        "lastSavedAt": null,
+        "reopenedAt": null,
+        "reopenReason": null,
+        "reminders": []
+      }
+    },
+    {
+      "type": "NAVIGO_ACTIVITY",
+      "code": "T6_HORAS",
+      "status": "EXPIRED",
+      "scheduledAt": "2026-08-12T23:46:55.301Z",
+      "availableFrom": "2026-08-12T23:16:55.301Z",
+      "availableUntil": "2026-08-13T03:46:55.301Z",
+      "startedAt": null,
+      "completedAt": null,
+      "metadata": {
+        "participantActivityId": "36041ec1-b007-486a-9676-cdb7c5f30e8c",
+        "scheduleName": "Medicion 6 horas",
+        "scheduleType": "QUESTIONNAIRE_MEASUREMENT",
+        "occurrenceKey": "DEFAULT",
+        "lastSavedAt": null,
+        "reopenedAt": null,
+        "reopenReason": null,
+        "reminders": []
+      }
+    },
+    {
+      "type": "HUT_PARTICIPANT",
+      "code": "HUT-136",
+      "status": "NOT_STARTED",
+      "startedAt": null,
+      "completedAt": null,
+      "metadata": {
+        "hutParticipantId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "origin": "CLT_HUT",
+        "protocolVersion": "APPLICATION_PHOTO",
+        "currentBlockNumber": 1,
+        "currentVideoSequence": 1,
+        "testMode": false
+      }
+    },
+    {
+      "type": "HUT_PHASE_CODE",
+      "code": "COLOCACION",
+      "status": "GENERATED",
+      "completedAt": null,
+      "metadata": {
+        "hutParticipantPhaseCodeId": "7f2c976e-0ba7-4da6-982f-83f13d272af4",
+        "slot": 1,
+        "sentAt": null,
+        "validatedAt": null,
+        "usedAt": null
+      }
+    },
+    {
+      "type": "HUT_PHASE_CODE",
+      "code": "REGRESO_1",
+      "status": "GENERATED",
+      "completedAt": null,
+      "metadata": {
+        "hutParticipantPhaseCodeId": "c2924f55-d9a4-43f2-b5ae-dc4cc2a65648",
+        "slot": 2,
+        "sentAt": null,
+        "validatedAt": null,
+        "usedAt": null
+      }
+    },
+    {
+      "type": "HUT_PHASE_CODE",
+      "code": "REGRESO_2",
+      "status": "GENERATED",
+      "completedAt": null,
+      "metadata": {
+        "hutParticipantPhaseCodeId": "dcdb28a3-f7d6-4d9c-bb59-23a7787d2c40",
+        "slot": 3,
+        "sentAt": null,
+        "validatedAt": null,
+        "usedAt": null
+      }
+    },
+    {
+      "type": "HUT_QUESTIONNAIRE_ATTEMPT",
+      "code": "HUT_QUESTIONNAIRE",
+      "status": "IN_PROGRESS",
+      "startedAt": "2026-08-12T17:59:34.031Z",
+      "completedAt": null,
+      "metadata": {
+        "hutQuestionnaireAttemptId": "9bcdc2a4-f98d-4a3e-9b12-1f36d43f3a88",
+        "terminatedAt": null,
+        "terminationReason": null
+      }
+    },
+    {
+      "type": "HUT_VISIT_PROGRESS",
+      "code": "DATOS_GENERALES",
+      "status": "IN_PROGRESS",
+      "startedAt": "2026-08-12T17:54:55.365Z",
+      "completedAt": null,
+      "metadata": {
+        "hutVisitProgressId": "b67b1726-a88c-407f-a7d4-3a52868b81ef"
+      }
+    },
+    {
+      "type": "HUT_VISIT_PROGRESS",
+      "code": "PRIMERA_VISITA",
+      "status": "IN_PROGRESS",
+      "startedAt": "2026-08-12T17:59:34.031Z",
+      "completedAt": null,
+      "metadata": {
+        "hutVisitProgressId": "ffd5e62f-8f2c-4d57-aae1-970389df63ba"
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-10T22:00:01.538Z",
+      "metadata": {
+        "auditLogId": "97a12c14-1532-4d6e-96dd-3be094ab3270",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-10T23:01:22.058Z",
+      "metadata": {
+        "auditLogId": "12f8a204-441b-4f25-a301-2665d12b81dd",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T00:02:46.381Z",
+      "metadata": {
+        "auditLogId": "a3d7a57b-5a03-4f66-b43e-d65b5717bf57",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T01:00:29.185Z",
+      "metadata": {
+        "auditLogId": "74bc3506-9466-456c-b2b1-8be51dc7e6fc",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T02:00:29.463Z",
+      "metadata": {
+        "auditLogId": "6bdcdb42-5bd6-4fa6-bed2-040882bb9572",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T03:01:17.231Z",
+      "metadata": {
+        "auditLogId": "bcbbd40a-83ad-48d0-8767-fef18c433de7",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T04:01:20.878Z",
+      "metadata": {
+        "auditLogId": "872b730a-9bd6-4972-8d19-063856e5e919",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T05:00:31.853Z",
+      "metadata": {
+        "auditLogId": "1f3ab204-351c-48a2-a3fe-2305f11163a5",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T06:01:20.603Z",
+      "metadata": {
+        "auditLogId": "621fffa6-c8f5-49a1-9c22-ddd6fd19c395",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T07:00:29.198Z",
+      "metadata": {
+        "auditLogId": "5271310f-bb15-4b79-9877-7613589dc426",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T08:01:27.689Z",
+      "metadata": {
+        "auditLogId": "c62f6582-4205-47d0-8ffc-730466c7ea8c",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T09:01:22.680Z",
+      "metadata": {
+        "auditLogId": "b83c08f8-947a-4cc0-9193-58ec04626a63",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T10:01:19.233Z",
+      "metadata": {
+        "auditLogId": "8c958baf-b91f-4294-a4fd-5350a3675867",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T11:01:24.999Z",
+      "metadata": {
+        "auditLogId": "9fc322e4-35f5-4f84-ab6c-ca0067601d63",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T12:01:28.455Z",
+      "metadata": {
+        "auditLogId": "d5245cb5-d877-4807-872b-356d47de33a2",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T13:00:29.263Z",
+      "metadata": {
+        "auditLogId": "eba96b29-6f14-47b2-86fb-5a66a9f7e301",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T14:01:23.837Z",
+      "metadata": {
+        "auditLogId": "e1d43dfb-455d-41fd-9a81-b04b28bf9139",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T15:00:29.143Z",
+      "metadata": {
+        "auditLogId": "771d169b-d295-4ca8-a333-7241e507cc5a",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ]
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-11T16:01:07.691Z",
+      "metadata": {
+        "auditLogId": "500fae0d-96f8-4914-869c-12bd3a42265f",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": null,
+          "source": "CRON",
+          "message": "El recordatorio HUT automatico solo se envia de 15:00 a 18:00 hrs CDMX.",
+          "slotTitle": null,
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "OUTSIDE_OPERATIONAL_WINDOW",
+          "exclusionReasons": [
+            "OUTSIDE_OPERATIONAL_WINDOW"
+          ],
+          "evaluatedAtMexicoCity": "11/08/2026, 10:01 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-12T17:52:02.577Z",
+      "metadata": {
+        "auditLogId": "447c1c99-8c64-407b-9321-e0bea47c0d50",
+        "entityType": "StudyParticipant",
+        "entityId": "10543266-6a23-4e91-9810-3e5b1fa27e03",
+        "reason": "Envio manual de enlace BOTH",
+        "beforeJson": null,
+        "afterJson": {
+          "folio": "NAV-136",
+          "origin": "MANUAL",
+          "message": "HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN",
+          "warnings": [],
+          "hutUrlDomain": "https://mrblackbox-research-platform.vercel.app",
+          "linkTypeSent": "BOTH",
+          "templateName": "navigo_hut_links",
+          "deploymentUrl": "mrblackbox-research-platform-lmdey1goh-oneui.vercel.app",
+          "metaMessageId": null,
+          "whatsappStatus": "ERROR",
+          "hutUrlAvailable": true,
+          "hutParticipantId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+          "sentAtMexicoCity": "12/08/2026, 11:52 hrs CDMX",
+          "linkTypeRequested": "BOTH",
+          "navigoUrlAvailable": true,
+          "deploymentEnvironment": "production"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-12T17:53:58.477Z",
+      "metadata": {
+        "auditLogId": "1b0e9b33-4297-45c4-8e43-d24ebdb9fda8",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "Captura HUT de campo",
+        "beforeJson": null,
+        "afterJson": {
+          "status": "ANSWER_SAVED",
+          "fieldAccess": {
+            "accessType": "ENCUESTADOR",
+            "codeMasked": "UL***26"
+          },
+          "questionCode": "HUT_DG_NOMBRE",
+          "questionPairRotation": null
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-12T17:54:10.020Z",
+      "metadata": {
+        "auditLogId": "9aa6944f-e3fb-4ef9-9463-50067a3066ac",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "Captura HUT de campo",
+        "beforeJson": null,
+        "afterJson": {
+          "status": "ANSWER_SAVED",
+          "fieldAccess": {
+            "accessType": "ENCUESTADOR",
+            "codeMasked": "UL***26"
+          },
+          "questionCode": "HUT_DG_FOLIO",
+          "questionPairRotation": null
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-12T17:54:35.222Z",
+      "metadata": {
+        "auditLogId": "4f3958ab-b595-4687-9a03-08606e227e94",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "Captura HUT de campo",
+        "beforeJson": null,
+        "afterJson": {
+          "status": "ANSWER_SAVED",
+          "fieldAccess": {
+            "accessType": "ENCUESTADOR",
+            "codeMasked": "UL***26"
+          },
+          "questionCode": "HUT_DG_COLONIA",
+          "questionPairRotation": null
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-12T17:54:55.435Z",
+      "metadata": {
+        "auditLogId": "d0602af5-887d-48b2-bdaf-c5455262ef6a",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "Captura HUT de campo",
+        "beforeJson": null,
+        "afterJson": {
+          "status": "ANSWER_SAVED",
+          "fieldAccess": {
+            "accessType": "ENCUESTADOR",
+            "codeMasked": "UL***26"
+          },
+          "questionCode": "HUT_DG_TELEFONO",
+          "questionPairRotation": null
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-12T17:58:30.407Z",
+      "metadata": {
+        "auditLogId": "130d2438-9992-4867-bf91-90a3af919465",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "Captura HUT de campo",
+        "beforeJson": null,
+        "afterJson": {
+          "status": "ANSWER_SAVED",
+          "fieldAccess": {
+            "accessType": "ENCUESTADOR",
+            "codeMasked": "UL***26"
+          },
+          "questionCode": "HUT_V1_ACEPTA_USAR_PRODUCTO",
+          "questionPairRotation": null
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-12T17:59:23.189Z",
+      "metadata": {
+        "auditLogId": "e84605e4-f736-42ba-bbc3-304bb7943663",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "Captura HUT de campo",
+        "beforeJson": null,
+        "afterJson": {
+          "status": "ANSWER_SAVED",
+          "fieldAccess": {
+            "accessType": "ENCUESTADOR",
+            "codeMasked": "UL***26"
+          },
+          "questionCode": "HUT_V1_CONFIRMACION_ENTREGA",
+          "questionPairRotation": null
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-12T17:59:34.085Z",
+      "metadata": {
+        "auditLogId": "7c9fe8a3-45dd-475d-b42c-1e9e8cc32077",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "Captura HUT de campo",
+        "beforeJson": null,
+        "afterJson": {
+          "status": "ANSWER_SAVED",
+          "fieldAccess": {
+            "accessType": "ENCUESTADOR",
+            "codeMasked": "UL***26"
+          },
+          "questionCode": "HUT_V1_OBSERVACIONES",
+          "questionPairRotation": null
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-12T18:27:19.642Z",
+      "metadata": {
+        "auditLogId": "e8fa1b35-104d-4c88-bdc8-2bc6f262528a",
+        "entityType": "StudyParticipant",
+        "entityId": "10543266-6a23-4e91-9810-3e5b1fa27e03",
+        "reason": "Envio manual de enlace BOTH",
+        "beforeJson": null,
+        "afterJson": {
+          "folio": "NAV-136",
+          "origin": "MANUAL",
+          "message": "Enlace enviado por WhatsApp.",
+          "warnings": [],
+          "hutUrlDomain": "https://mrblackbox-research-platform.vercel.app",
+          "linkTypeSent": "BOTH",
+          "templateName": "navigo_hut_links",
+          "deploymentUrl": "mrblackbox-research-platform-h6yvckomg-oneui.vercel.app",
+          "metaMessageId": "wamid.HBgNNTIxNTYzMTQ1MTgwNhUCABEYEjdBRTNBMTc4M0ExQjAwREQ4NAA=",
+          "participantId": "10543266-6a23-4e91-9810-3e5b1fa27e03",
+          "whatsappStatus": "ENVIADO",
+          "generatedHutUrl": "https://mrblackbox-research-platform.vercel.app/hut/p/2c422eb2-fd27-41c6-9dd3-5cf12348b75f",
+          "hutUrlAvailable": true,
+          "hutParticipantId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+          "sentAtMexicoCity": "12/08/2026, 12:27 hrs CDMX",
+          "linkTypeRequested": "BOTH",
+          "generatedNavigoUrl": "https://mrblackbox-research-platform.vercel.app/p/8bd02ccb-55a7-42ad-98e4-4636edd57711/activities",
+          "navigoUrlAvailable": true,
+          "whatsappErrorReason": null,
+          "publicOriginDetected": "https://mrblackbox-research-platform.vercel.app",
+          "publicOriginExpected": "https://mrblackbox-research-platform.vercel.app",
+          "deploymentEnvironment": "production",
+          "publicOriginFailureCode": null,
+          "publicOriginFailureMessage": null
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-12T18:27:19.657Z",
+      "metadata": {
+        "auditLogId": "2f939122-427c-46a0-9f3b-0fa4a8026443",
+        "entityType": "StudyParticipant",
+        "entityId": "10543266-6a23-4e91-9810-3e5b1fa27e03",
+        "reason": "soporte manual",
+        "beforeJson": null,
+        "afterJson": {
+          "phone": "+525631451806",
+          "source": "MANUAL_SUPPORT",
+          "linkDomain": "https://mrblackbox-research-platform.vercel.app",
+          "hutUrlDomain": "https://mrblackbox-research-platform.vercel.app",
+          "linkTypeSent": "BOTH",
+          "templateName": "navigo_hut_links",
+          "deploymentUrl": "mrblackbox-research-platform-h6yvckomg-oneui.vercel.app",
+          "whatsappError": null,
+          "whatsappStatus": "ENVIADO",
+          "generatedHutUrl": "https://mrblackbox-research-platform.vercel.app/hut/p/2c422eb2-fd27-41c6-9dd3-5cf12348b75f",
+          "hutUrlAvailable": true,
+          "sentAtMexicoCity": "12/08/2026, 12:27 hrs CDMX",
+          "whatsappMessageId": "wamid.HBgNNTIxNTYzMTQ1MTgwNhUCABEYEjdBRTNBMTc4M0ExQjAwREQ4NAA=",
+          "generatedNavigoUrl": "https://mrblackbox-research-platform.vercel.app/p/8bd02ccb-55a7-42ad-98e4-4636edd57711/activities",
+          "navigoUrlAvailable": true,
+          "publicOriginDetected": "https://mrblackbox-research-platform.vercel.app",
+          "publicOriginExpected": "https://mrblackbox-research-platform.vercel.app",
+          "deploymentEnvironment": "production",
+          "publicOriginFailureCode": null,
+          "publicOriginFailureMessage": null
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-12T21:01:31.865Z",
+      "metadata": {
+        "auditLogId": "960b8163-8014-4673-a736-6f9dcae59d43",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "12/08/2026, 15:01 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-12T22:00:34.171Z",
+      "metadata": {
+        "auditLogId": "a5f91701-6832-413d-9b29-0da65393cd39",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "12/08/2026, 16:00 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-12T23:00:38.421Z",
+      "metadata": {
+        "auditLogId": "7fbde208-792c-4e4f-9372-f143c5d3b4ab",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "12/08/2026, 17:00 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-13T21:00:06.321Z",
+      "metadata": {
+        "auditLogId": "0c1e98d5-e320-4cb7-8b51-e3c35587dfa3",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "13/08/2026, 15:00 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-13T22:00:58.353Z",
+      "metadata": {
+        "auditLogId": "c5401f8d-25cd-4809-83eb-2347ae993782",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "13/08/2026, 16:00 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-13T23:01:02.833Z",
+      "metadata": {
+        "auditLogId": "621c2565-16eb-4ea0-bab6-5c22e25f1076",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "13/08/2026, 17:01 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-14T21:00:59.393Z",
+      "metadata": {
+        "auditLogId": "132f8c04-fb2e-48f5-bc7c-71b0be920d63",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "14/08/2026, 15:00 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-14T22:00:55.143Z",
+      "metadata": {
+        "auditLogId": "d3495014-284a-4589-a73e-4eb18301a6a2",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "14/08/2026, 16:00 hrs CDMX"
+        }
+      }
+    },
+    {
+      "type": "AUDIT_EVENT",
+      "code": "PARTICIPANT_MODIFIED",
+      "status": "RECORDED",
+      "completedAt": "2026-08-14T23:00:58.924Z",
+      "metadata": {
+        "auditLogId": "6c40d6ff-929b-4aa8-be3f-1f5a9c717b2c",
+        "entityType": "HutParticipant",
+        "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+        "beforeJson": null,
+        "afterJson": {
+          "slotId": "DELIVERY",
+          "source": "CRON",
+          "message": "El protocolo HUT no ha iniciado.",
+          "slotTitle": "Entrega del producto",
+          "reminderType": "HUT_PHOTO_REMINDER",
+          "templateName": "hut_photo_reminder",
+          "whatsappStatus": "OMITIDO",
+          "exclusionReason": "NO_STARTED",
+          "exclusionReasons": [
+            "NO_STARTED",
+            "WAITING_DELIVERY"
+          ],
+          "evaluatedAtMexicoCity": "14/08/2026, 17:00 hrs CDMX"
+        }
+      }
+    }
+  ],
+  "answers": [
+    {
+      "activity": "SCREENING",
+      "questionKey": "OP1_RECLUTADOR",
+      "answerValue": "AVELINA",
+      "answeredAt": "2026-08-11T15:59:39.041Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "82bcb7f8-bedf-4d82-a983-05424c6c74ec"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "CONSENTIMIENTO",
+      "answerValue": "SI",
+      "answeredAt": "2026-08-11T16:04:12.111Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "13b937a9-d035-4898-9c6b-df2ab47d8909"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F1_GENERO",
+      "answerValue": "HOMBRE",
+      "answeredAt": "2026-08-11T16:04:31.162Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "3ed7034f-7458-47b5-a23c-bd58aa21a666"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F2_EDAD",
+      "answerValue": 26,
+      "answeredAt": "2026-08-11T16:04:48.716Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "9aa69c42-90ab-4be9-bb3e-04213ed30db4"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F3_EXCLUSION_LABORAL",
+      "answerValue": "NINGUNA",
+      "answeredAt": "2026-08-11T16:05:11.547Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "bbfc6279-f555-4011-aed0-9ed0d0eae382"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES",
+      "answerValue": "NO",
+      "answeredAt": "2026-08-11T16:05:42.207Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "431b0c28-6028-414d-8977-dcd81c135a5a"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F5_CONDICIONES_FISICAS",
+      "answerValue": "NINGUNA",
+      "answeredAt": "2026-08-11T16:06:04.616Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "7ce33f6a-ad92-463f-a65d-ff86d0ca3ffd"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F6_MARCAS_UTILIZA",
+      "answerValue": "NAVIGO Y HUMOR NATURA",
+      "answeredAt": "2026-08-11T16:07:49.231Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "9f874a67-6e95-4012-b05f-cc99f6f9528e"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F7_Marca_Frecuente",
+      "answerValue": [
+        "Navigo"
+      ],
+      "answeredAt": "2026-08-11T16:08:22.981Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "16aab72c-0680-41fb-951e-6865c66db028"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F8_VARIANTE_COLOR",
+      "answerValue": "AZUL",
+      "answeredAt": "2026-08-11T16:08:50.728Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "241a07c8-f9f9-4506-af89-7d675b30b824"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F9_FRECUENCIA_SEMANAL",
+      "answerValue": "CUATRO_DIAS",
+      "answeredAt": "2026-08-11T16:09:17.635Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "befbd21e-1bda-40fb-806a-261d99abc311"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F10_ULTIMA_COMPRA",
+      "answerValue": "HACE DOS MESES",
+      "answeredAt": "2026-08-11T16:09:45.186Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "48630d15-9db1-4cb1-a79d-8e717a6fc6c8"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR",
+      "answerValue": "SECUNDARIA_COMPLETA",
+      "answeredAt": "2026-08-11T16:10:12.984Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "31f3b3c8-78d3-4af9-ab37-3b79384856dd"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D2_BANOS_COMPLETOS",
+      "answerValue": "DOS_O_MAS_BANOS_COMPLETOS",
+      "answeredAt": "2026-08-11T16:10:29.418Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "ee7a7b50-c7e3-4155-8a6a-e79b2eb406c9"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D3_AUTOMOVILES_HOGAR",
+      "answerValue": "UN_AUTO",
+      "answeredAt": "2026-08-11T16:10:47.808Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "99b19e8b-145e-4ecc-abcf-6da8af2dec93"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D4_INTERNET_HOGAR",
+      "answerValue": "SI_TIENE_INTERNET",
+      "answeredAt": "2026-08-11T16:11:14.576Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "6a391b14-db69-436d-bf84-20c181ce640c"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D5_PERSONAS_TRABAJARON",
+      "answerValue": "DOS_PERSONAS",
+      "answeredAt": "2026-08-11T16:11:45.340Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "efe41651-4bbd-4274-92b7-474b645246a0"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D6_CUARTOS_DORMIR",
+      "answerValue": "TRES_CUARTOS",
+      "answeredAt": "2026-08-11T16:12:06.901Z",
+      "metadata": {
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "screeningAnswerId": "e1554aac-82e1-4b0c-8426-d32f97eee0c0"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_NOMBRE",
+      "answerValue": "JOSE DE JESUS SAN HERNÁNDEZ",
+      "answeredAt": "2026-08-12T17:14:39.610Z",
+      "metadata": {
+        "ctlSessionId": "8d716e4a-9269-40c5-8bec-e16a3259b7d4",
+        "ctlAnswerId": "5676ae4d-321f-4d1b-b84a-f31741ef68e4"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_FECHA",
+      "answerValue": "12/08/2026",
+      "answeredAt": "2026-08-12T17:14:39.628Z",
+      "metadata": {
+        "ctlSessionId": "8d716e4a-9269-40c5-8bec-e16a3259b7d4",
+        "ctlAnswerId": "6065ae4e-88cf-4f97-a1a9-dc749479fbd8"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_HORA_INICIO",
+      "answerValue": "11:14 a.m.",
+      "answeredAt": "2026-08-12T17:14:39.649Z",
+      "metadata": {
+        "ctlSessionId": "8d716e4a-9269-40c5-8bec-e16a3259b7d4",
+        "ctlAnswerId": "6d5b6b44-66c5-485e-be39-f585285cc731"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "SYS_EVA1_TRACE",
+      "answerValue": {
+        "order": 1,
+        "armCode": "LEFT",
+        "armLabel": "Brazo izquierdo",
+        "productCode": "583"
+      },
+      "answeredAt": "2026-08-12T17:14:39.666Z",
+      "metadata": {
+        "ctlSessionId": "8d716e4a-9269-40c5-8bec-e16a3259b7d4",
+        "ctlAnswerId": "17cfe815-7859-4f57-a7d7-f4835a7d9ec3"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "SYS_EVA2_TRACE",
+      "answerValue": {
+        "order": 2,
+        "armCode": "RIGHT",
+        "armLabel": "Brazo derecho",
+        "productCode": "247"
+      },
+      "answeredAt": "2026-08-12T17:14:39.683Z",
+      "metadata": {
+        "ctlSessionId": "8d716e4a-9269-40c5-8bec-e16a3259b7d4",
+        "ctlAnswerId": "7166f5a9-8b1a-4bf2-b872-dcb9d6eac0c8"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_DIRECCION",
+      "answerValue": "COLONIA:CAMPAMENTO 2 DE OCTUBRE DELEGACIÓN IZTACALCO",
+      "answeredAt": "2026-08-12T17:16:48.952Z",
+      "metadata": {
+        "ctlSessionId": "8d716e4a-9269-40c5-8bec-e16a3259b7d4",
+        "ctlAnswerId": "a633468b-529f-4b21-b247-2335f090a695"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_COLONIA",
+      "answerValue": "CAMPAMENTO 2 DE OCTUBRE",
+      "answeredAt": "2026-08-12T17:16:50.843Z",
+      "metadata": {
+        "ctlSessionId": "8d716e4a-9269-40c5-8bec-e16a3259b7d4",
+        "ctlAnswerId": "1a3caa6b-26ec-4863-a26f-798b39d7578c"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_MUNICIPIO",
+      "answerValue": "IZTACALCO",
+      "answeredAt": "2026-08-12T17:16:53.313Z",
+      "metadata": {
+        "ctlSessionId": "8d716e4a-9269-40c5-8bec-e16a3259b7d4",
+        "ctlAnswerId": "ddb84473-b715-4bae-95d8-ce2a01aae521"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_TELEFONO",
+      "answerValue": "5631451806",
+      "answeredAt": "2026-08-12T17:17:09.303Z",
+      "metadata": {
+        "ctlSessionId": "8d716e4a-9269-40c5-8bec-e16a3259b7d4",
+        "ctlAnswerId": "d7edf3c4-f58f-4ada-9574-e1faa3917fb8"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F0",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:17:14.559Z",
+      "metadata": {
+        "ctlSessionId": "8d716e4a-9269-40c5-8bec-e16a3259b7d4",
+        "ctlAnswerId": "639a02b8-91df-4619-a355-aca91bc8200d"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F1",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:17:18.439Z",
+      "metadata": {
+        "ctlSessionId": "8d716e4a-9269-40c5-8bec-e16a3259b7d4",
+        "ctlAnswerId": "8dc712e4-9fec-4a45-93de-7097c3efffb0"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F2",
+      "answerValue": {
+        "exactAge": 26,
+        "rangeCode": "1",
+        "rangeLabel": "29 años o menos"
+      },
+      "answeredAt": "2026-08-12T17:17:38.580Z",
+      "metadata": {
+        "ctlSessionId": "8d716e4a-9269-40c5-8bec-e16a3259b7d4",
+        "ctlAnswerId": "89f32e0c-675b-4400-83cc-8ed447499eb4"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_NOMBRE",
+      "answerValue": "JOSE DE JESUS SAN HERNÁNDEZ",
+      "answeredAt": "2026-08-12T17:18:08.048Z",
+      "metadata": {
+        "ctlSessionId": "46c2af01-e3f2-4061-a576-680cd0b58cc2",
+        "ctlAnswerId": "4a068d1c-86c9-4f64-b57f-f11a05c49ab7"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_FECHA",
+      "answerValue": "12/08/2026",
+      "answeredAt": "2026-08-12T17:18:08.064Z",
+      "metadata": {
+        "ctlSessionId": "46c2af01-e3f2-4061-a576-680cd0b58cc2",
+        "ctlAnswerId": "a4a0b500-ba4b-4210-a7ff-7d2c4cbc204f"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_HORA_INICIO",
+      "answerValue": "11:18 a.m.",
+      "answeredAt": "2026-08-12T17:18:08.084Z",
+      "metadata": {
+        "ctlSessionId": "46c2af01-e3f2-4061-a576-680cd0b58cc2",
+        "ctlAnswerId": "6e671c6c-dfd4-4419-bb93-8bbf5aa2ac5e"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "SYS_EVA1_TRACE",
+      "answerValue": {
+        "order": 1,
+        "armCode": "LEFT",
+        "armLabel": "Brazo izquierdo",
+        "productCode": "583"
+      },
+      "answeredAt": "2026-08-12T17:18:08.101Z",
+      "metadata": {
+        "ctlSessionId": "46c2af01-e3f2-4061-a576-680cd0b58cc2",
+        "ctlAnswerId": "3ec70fad-5516-4701-814f-55c643225898"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "SYS_EVA2_TRACE",
+      "answerValue": {
+        "order": 2,
+        "armCode": "RIGHT",
+        "armLabel": "Brazo derecho",
+        "productCode": "247"
+      },
+      "answeredAt": "2026-08-12T17:18:08.117Z",
+      "metadata": {
+        "ctlSessionId": "46c2af01-e3f2-4061-a576-680cd0b58cc2",
+        "ctlAnswerId": "35b5914e-6605-48c0-946d-f4528baced04"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_DIRECCION",
+      "answerValue": "CALLE PABLO ALVARADO",
+      "answeredAt": "2026-08-12T17:18:50.495Z",
+      "metadata": {
+        "ctlSessionId": "46c2af01-e3f2-4061-a576-680cd0b58cc2",
+        "ctlAnswerId": "18517670-8de0-4f1d-8cce-323ee6550a56"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_COLONIA",
+      "answerValue": "CAMPAMENTO 2 DE OCTUBRE",
+      "answeredAt": "2026-08-12T17:19:00.978Z",
+      "metadata": {
+        "ctlSessionId": "46c2af01-e3f2-4061-a576-680cd0b58cc2",
+        "ctlAnswerId": "536a1283-d5a9-41aa-b61a-7f901a80f7b7"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_MUNICIPIO",
+      "answerValue": "IZTACALCO",
+      "answeredAt": "2026-08-12T17:19:08.392Z",
+      "metadata": {
+        "ctlSessionId": "46c2af01-e3f2-4061-a576-680cd0b58cc2",
+        "ctlAnswerId": "b6970288-ce50-477c-bff2-bf78639d7b67"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_TELEFONO",
+      "answerValue": "5631451806",
+      "answeredAt": "2026-08-12T17:19:21.414Z",
+      "metadata": {
+        "ctlSessionId": "46c2af01-e3f2-4061-a576-680cd0b58cc2",
+        "ctlAnswerId": "5259afd1-e9aa-4e5d-bd22-74b5c1db1d84"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F0",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:19:26.249Z",
+      "metadata": {
+        "ctlSessionId": "46c2af01-e3f2-4061-a576-680cd0b58cc2",
+        "ctlAnswerId": "572bf3a7-c702-4dba-b1ea-97feb121514d"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F1",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:19:29.540Z",
+      "metadata": {
+        "ctlSessionId": "46c2af01-e3f2-4061-a576-680cd0b58cc2",
+        "ctlAnswerId": "fbcd2c30-1fcb-4f82-881a-515a829dcfa0"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F2",
+      "answerValue": {
+        "exactAge": 26,
+        "rangeCode": "1",
+        "rangeLabel": "29 años o menos"
+      },
+      "answeredAt": "2026-08-12T17:19:40.224Z",
+      "metadata": {
+        "ctlSessionId": "46c2af01-e3f2-4061-a576-680cd0b58cc2",
+        "ctlAnswerId": "788c2f3f-1fcf-4a9c-bd16-bb22c642d100"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_NOMBRE",
+      "answerValue": "JOSE DE JESUS SAN HERNÁNDEZ",
+      "answeredAt": "2026-08-12T17:51:04.106Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "cf535998-1a10-4ec5-96e3-1d80ace9b6c4"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_FECHA",
+      "answerValue": "12/08/2026",
+      "answeredAt": "2026-08-12T17:51:04.196Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "ae4c7d5b-b5f7-40e4-afca-d87627ee8c89"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_HORA_INICIO",
+      "answerValue": "11:20 A.M.",
+      "answeredAt": "2026-08-12T17:51:04.211Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "64cd441e-1754-4547-9aa8-5f26310e1a8b"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "SYS_EVA1_TRACE",
+      "answerValue": {
+        "order": 1,
+        "armCode": "LEFT",
+        "armLabel": "Brazo izquierdo",
+        "productCode": "583"
+      },
+      "answeredAt": "2026-08-12T17:20:31.863Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "aa18e351-4568-49b9-8738-8a83a2afcdd6"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "SYS_EVA2_TRACE",
+      "answerValue": {
+        "order": 2,
+        "armCode": "RIGHT",
+        "armLabel": "Brazo derecho",
+        "productCode": "247"
+      },
+      "answeredAt": "2026-08-12T17:20:31.876Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "b6dd2d71-caee-480c-af07-8dcf5e6e7431"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_DIRECCION",
+      "answerValue": "CALLÉ PABLO ALVARADO",
+      "answeredAt": "2026-08-12T17:51:04.122Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "02c867de-c778-4538-aac8-5a2d73223867"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_COLONIA",
+      "answerValue": "CAMPAMENTO 2 DE OCTUBRE",
+      "answeredAt": "2026-08-12T17:51:04.151Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "6f3dbf87-e483-47d9-b648-dd4e6b7a5a99"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_MUNICIPIO",
+      "answerValue": "IZTACALCO",
+      "answeredAt": "2026-08-12T17:51:04.166Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "ed10216a-2a2a-4d4b-8b90-b80c40b938ac"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_TELEFONO",
+      "answerValue": "5631451806",
+      "answeredAt": "2026-08-12T17:51:04.182Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "ffcd04e1-844c-43e7-a319-08c61b0658a7"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F0",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:51:04.225Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "e0f2c21d-e661-40d0-a664-8524e896422e"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F1",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:51:04.239Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "8a7eab38-8dd8-4134-9dda-7fb044625549"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F2",
+      "answerValue": {
+        "exactAge": 30,
+        "rangeCode": "2",
+        "rangeLabel": "30 a 45 años"
+      },
+      "answeredAt": "2026-08-12T17:51:04.253Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "cf00178b-bc11-43a3-9a26-50de869dd142"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F3",
+      "answerValue": "7",
+      "answeredAt": "2026-08-12T17:51:04.268Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "f5209a30-abcd-497a-8384-d55b7270214a"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F4",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:51:04.282Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "20e15635-75e8-4d54-a383-adc984b98f0f"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F5",
+      "answerValue": "7",
+      "answeredAt": "2026-08-12T17:51:04.297Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "97db9518-1d05-4f9a-ad6d-92b8002c4cd7"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F6",
+      "answerValue": "JAFRA",
+      "answeredAt": "2026-08-12T17:51:04.311Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "d59f00e4-c194-4166-b9b5-f3665861fa28"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F7",
+      "answerValue": "JAFRA",
+      "answeredAt": "2026-08-12T17:51:04.326Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "5e31101a-5e66-45dc-8f48-1a100dabce0b"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F8",
+      "answerValue": "NAVIGO HOME",
+      "answeredAt": "2026-08-12T17:51:04.341Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "a81e2576-3d68-4cfb-98c0-d2c640221884"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F9",
+      "answerValue": "5",
+      "answeredAt": "2026-08-12T17:51:04.356Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "fd3cc9a3-8ca0-4c18-bf3c-4a3ffe3e37af"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F10",
+      "answerValue": "HACE 2 MESES",
+      "answeredAt": "2026-08-12T17:51:04.371Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "6eafc0b9-3c67-4a96-a73a-e831d458d9e1"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F11",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:51:04.385Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "10525af3-a983-4bef-a52a-ea871d08f3a1"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F11A",
+      "answerValue": "LA DURABILIDAD Y EL OLOR , CUANDO SUDAS SE VUELVE MÁS INTENSO",
+      "answeredAt": "2026-08-12T17:51:04.401Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "32b7a681-0cf6-4c81-8c7e-108dcdffd4eb"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F12",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:51:04.415Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "57a2fe13-cb1e-4413-8504-28c221cfed2f"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F13",
+      "answerValue": "5",
+      "answeredAt": "2026-08-12T17:51:04.430Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "ccc4b145-47f1-4441-adce-0703c6a5ed3e"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "F14",
+      "answerValue": "2",
+      "answeredAt": "2026-08-12T17:51:04.444Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "f3398902-de8d-4e97-b71e-bbfa43021bef"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "TRI1_CONFIRMED_POS1",
+      "answerValue": "H-358",
+      "answeredAt": "2026-08-12T17:51:04.458Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "a0de995d-0b2d-4c9d-9357-c11afad0624b"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "TRI1_CONFIRMED_POS2",
+      "answerValue": "0-472",
+      "answeredAt": "2026-08-12T17:51:04.472Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "d9f13cae-2ea0-4c80-bfad-21cf0c6efda0"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "TRI1_CONFIRMED_POS3",
+      "answerValue": "K-247",
+      "answeredAt": "2026-08-12T17:51:04.486Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "2b16816a-fbb0-4774-b8e6-658ad935be6c"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P1",
+      "answerValue": {
+        "correct": 1,
+        "positions": {
+          "PR1": "H-358",
+          "PR2": "0-472",
+          "PR3": "K-247"
+        },
+        "selectedKey": "H-358",
+        "deliveryOrder": [
+          "H-358",
+          "0-472",
+          "K-247"
+        ],
+        "selectedPosition": "PR1"
+      },
+      "answeredAt": "2026-08-12T17:51:04.501Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "78c1eda6-f486-4591-b796-512037b71dc5"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P2",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:51:04.515Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "cb3cc664-8847-4bbf-b24d-fe72863f9934"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "TRI2_CONFIRMED_POS1",
+      "answerValue": "C-583",
+      "answeredAt": "2026-08-12T17:51:04.531Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "83fe8731-b781-4e47-9374-687c3123ccdf"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "TRI2_CONFIRMED_POS2",
+      "answerValue": "G-835",
+      "answeredAt": "2026-08-12T17:51:04.547Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "e98abdb6-c731-4230-bbfa-e3f5cebc2500"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "TRI2_CONFIRMED_POS3",
+      "answerValue": "Z-724",
+      "answeredAt": "2026-08-12T17:51:04.561Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "f6d410b9-2c31-4980-9721-ef605c7cbc3d"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P3",
+      "answerValue": {
+        "correct": 0,
+        "positions": {
+          "PR1": "C-583",
+          "PR2": "G-835",
+          "PR3": "Z-724"
+        },
+        "selectedKey": "C-583",
+        "deliveryOrder": [
+          "C-583",
+          "G-835",
+          "Z-724"
+        ],
+        "selectedPosition": "PR1"
+      },
+      "answeredAt": "2026-08-12T17:51:04.576Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "ca601326-0e5f-4b9a-b482-ea089c62adb7"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P4",
+      "answerValue": "3",
+      "answeredAt": "2026-08-12T17:51:04.590Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "87ae7258-03b1-41f8-aec6-15fb4d72d95d"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "EVA1_CONFIRMED_PRODUCT",
+      "answerValue": "583",
+      "answeredAt": "2026-08-12T17:51:04.604Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "f8e75c10-bcac-4e93-9c90-43fcf6105cbb"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "EVA1_CONFIRMED_ARM",
+      "answerValue": "BRAZO IZQUIERDO",
+      "answeredAt": "2026-08-12T17:51:04.619Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "44d4483d-3cf0-4afc-afca-ff02a099d611"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "EVA1_CONFIRMED_ORDER",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:51:04.633Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "9ac04567-6def-4264-9813-50d207942fef"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P5A",
+      "answerValue": 7,
+      "answeredAt": "2026-08-12T17:51:04.648Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "d5aabc30-ba08-45ed-ba74-fa924cbae75a"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P6A",
+      "answerValue": 5,
+      "answeredAt": "2026-08-12T17:51:04.662Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "14643bcf-e967-41e6-a10a-fee84586b783"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P7A",
+      "answerValue": 7,
+      "answeredAt": "2026-08-12T17:51:04.677Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "4bedcde2-80ed-4773-8ec4-949b4135bf2b"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P8A",
+      "answerValue": {
+        "FRESCA": "4",
+        "LIMPIA": "4",
+        "MODERNA": "4",
+        "ADICTIVA": "5",
+        "ELEGANTE": "5",
+        "VERSATIL": "5",
+        "ATEMPORAL": "4",
+        "ATRACTIVA": "4",
+        "LLAMATIVA": "5",
+        "MASCULINA": "5",
+        "SEDUCTORA": "4",
+        "ARTIFICIAL": "1",
+        "INNOVADORA": "5",
+        "ENERGIZANTE": "5",
+        "ALTA_CALIDAD": "4",
+        "TIENE_CARACTER": "5",
+        "PARA_ALGUIEN_COMO_YO": "5",
+        "ME_HACE_SENTIR_COMODO": "5",
+        "ME_HACE_SENTIR_SEGURO": "5",
+        "ME_TRANSMITE_LIBERTAD": "5"
+      },
+      "answeredAt": "2026-08-12T17:51:04.691Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "d94d4bf9-96f7-487c-975a-4ff050ab6658"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P9A",
+      "answerValue": {
+        "DULCE": "2",
+        "FLORAL": "1",
+        "FRUTAL": "1",
+        "HERBAL": "1",
+        "JUGOSA": "1",
+        "MARINA": "1",
+        "ALCOHOL": "2",
+        "CITRICA": "1",
+        "LAVANDA": "2",
+        "ATALCADA": "1",
+        "ESPECIADA": "1",
+        "EMPALAGOSA": "2",
+        "AMADERADA_MADEROSA": "2"
+      },
+      "answeredAt": "2026-08-12T17:51:04.706Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "f1183e6e-b34d-42f5-a2a5-23d4307f0998"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P10A",
+      "answerValue": 5,
+      "answeredAt": "2026-08-12T17:51:04.720Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "c24f8ef7-6bda-427e-a03a-b837d0b333f7"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P11A",
+      "answerValue": 5,
+      "answeredAt": "2026-08-12T17:51:04.734Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "d5b8e225-f6e6-4842-bf99-74b3cf610850"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P12A",
+      "answerValue": 3,
+      "answeredAt": "2026-08-12T17:51:04.748Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "7f2da819-2dbe-42af-afbb-26aee949659b"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P13A",
+      "answerValue": 4,
+      "answeredAt": "2026-08-12T17:51:04.763Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "78d9f070-0cab-4e98-9ac8-e67e358eb0ed"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "EVA2_CONFIRMED_PRODUCT",
+      "answerValue": "247",
+      "answeredAt": "2026-08-12T17:51:04.777Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "7e97eab1-b947-4c9d-839f-cac4a8396d3b"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "EVA2_CONFIRMED_ARM",
+      "answerValue": "BRAZO DERECHO",
+      "answeredAt": "2026-08-12T17:51:04.792Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "569bc51f-9598-4177-8f6c-d47feb7b0832"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "EVA2_CONFIRMED_ORDER",
+      "answerValue": "2",
+      "answeredAt": "2026-08-12T17:51:04.806Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "2fd7ccae-a5d3-416e-9dd8-8da54d344959"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P5B",
+      "answerValue": 6,
+      "answeredAt": "2026-08-12T17:51:04.820Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "4a543695-db9d-4b64-9736-3747cd81bb56"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P6B",
+      "answerValue": 4,
+      "answeredAt": "2026-08-12T17:51:04.835Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "56fb665d-79dc-4c37-b9b1-51baf7402edf"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P7B",
+      "answerValue": 5,
+      "answeredAt": "2026-08-12T17:51:04.849Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "81e1651b-d6eb-4830-a03d-7eae2d89e8b7"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P8B",
+      "answerValue": {
+        "FRESCA": "4",
+        "LIMPIA": "4",
+        "MODERNA": "4",
+        "ADICTIVA": "4",
+        "ELEGANTE": "4",
+        "VERSATIL": "4",
+        "ATEMPORAL": "4",
+        "ATRACTIVA": "4",
+        "LLAMATIVA": "4",
+        "MASCULINA": "4",
+        "SEDUCTORA": "3",
+        "ARTIFICIAL": "2",
+        "INNOVADORA": "4",
+        "ENERGIZANTE": "4",
+        "ALTA_CALIDAD": "4",
+        "TIENE_CARACTER": "4",
+        "PARA_ALGUIEN_COMO_YO": "4",
+        "ME_HACE_SENTIR_COMODO": "2",
+        "ME_HACE_SENTIR_SEGURO": "4",
+        "ME_TRANSMITE_LIBERTAD": "4"
+      },
+      "answeredAt": "2026-08-12T17:51:04.867Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "c5c010f5-88ab-4758-bae3-3a6eb680eccf"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P9B",
+      "answerValue": {
+        "DULCE": "2",
+        "FLORAL": "1",
+        "FRUTAL": "1",
+        "HERBAL": "1",
+        "JUGOSA": "2",
+        "MARINA": "2",
+        "ALCOHOL": "1",
+        "CITRICA": "1",
+        "LAVANDA": "2",
+        "ATALCADA": "2",
+        "ESPECIADA": "2",
+        "EMPALAGOSA": "2",
+        "AMADERADA_MADEROSA": "2"
+      },
+      "answeredAt": "2026-08-12T17:51:04.881Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "4919495f-7164-4ef5-ac71-25ae82547f58"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P10B",
+      "answerValue": 4,
+      "answeredAt": "2026-08-12T17:51:04.895Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "7134e7af-816a-400e-ad3e-f417a6368501"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P11B",
+      "answerValue": 4,
+      "answeredAt": "2026-08-12T17:51:04.910Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "3ea73864-2daf-4fab-a0f6-f4d35f6b5a5a"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P12B",
+      "answerValue": 3,
+      "answeredAt": "2026-08-12T17:51:04.924Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "0ec46aac-386c-48af-bf7b-0c4805a7e3fb"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P13B",
+      "answerValue": 4,
+      "answeredAt": "2026-08-12T17:51:04.938Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "fd80b2fe-e4da-43c5-b084-524bf830316c"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P14",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:51:04.952Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "6ab84d81-95f2-4a6d-9426-d249cc8b19e3"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P14A",
+      "answerValue": "HUELE CON MÁS PROFUNDIDAD Y NO TAN FRUTAL Y NO HUELE A LIMÓN Y POR MI PH ME QUEDARÍA MEJOR",
+      "answeredAt": "2026-08-12T17:51:04.966Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "2cad19ef-df40-42bd-b3d6-a369a70323b5"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P15",
+      "answerValue": "2",
+      "answeredAt": "2026-08-12T17:51:04.981Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "d29ed6e6-0997-4859-ad72-93ef6b437fa5"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P16",
+      "answerValue": 5,
+      "answeredAt": "2026-08-12T17:51:04.995Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "70678c1b-93c3-4d90-b122-9db0dd064858"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P17",
+      "answerValue": 5,
+      "answeredAt": "2026-08-12T17:51:05.009Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "d01f34ce-bdeb-4e43-b7dd-bbec41e6769f"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P18",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:51:05.023Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "6581f587-f309-4b9c-9450-29dabceb7fe8"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P19",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:51:05.037Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "e057bc50-ffef-404b-b119-91fc87ee8338"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "P20",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:51:05.052Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "432b4b5b-5aeb-4216-b06c-8b77c38345d4"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR",
+      "answerValue": "4",
+      "answeredAt": "2026-08-12T17:51:05.066Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "cff9a731-8beb-44d1-af8b-1c4d6964f8d5"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "D2_BANOS_COMPLETOS",
+      "answerValue": "2",
+      "answeredAt": "2026-08-12T17:51:05.080Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "bb2c7475-b4d1-4bc2-b889-56d5825f6e93"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "D3_AUTOS",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:51:05.094Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "e39d51aa-4661-4d1c-9260-d42f570f1ecd"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "D4_INTERNET",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:51:05.109Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "94c5ddd4-98d2-48b1-a28a-d078b80306ea"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "D5_PERSONAS_TRABAJARON",
+      "answerValue": "3",
+      "answeredAt": "2026-08-12T17:51:05.123Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "26533d32-64e4-4976-a8c8-3a2499a5bc41"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "D6_CUARTOS_DORMIR",
+      "answerValue": "3",
+      "answeredAt": "2026-08-12T17:51:05.138Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "b2366c21-8023-46c2-8f89-90ec9d180c1b"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "D_TOTAL_PUNTOS_NSE",
+      "answerValue": "189",
+      "answeredAt": "2026-08-12T17:51:05.184Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "c4855450-5ee2-4ac4-b8e8-5603e227cc0c"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "D_NSE_CLASIFICACION",
+      "answerValue": "C_PLUS",
+      "answeredAt": "2026-08-12T17:51:05.199Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "c0aef99c-24e2-4f5e-94a8-454ab6b516e4"
+      }
+    },
+    {
+      "activity": "CLT",
+      "questionKey": "DG_HORA_TERMINO",
+      "answerValue": "11:51 a.m.",
+      "answeredAt": "2026-08-12T17:51:05.214Z",
+      "metadata": {
+        "ctlSessionId": "6770b9dc-bcba-4b05-b51b-b316f42d0e72",
+        "ctlAnswerId": "4f70466d-68bf-4aed-9b61-1ee93240549f"
+      }
+    },
+    {
+      "activity": "HUT:DATOS_GENERALES",
+      "questionKey": "HUT_DG_NOMBRE",
+      "answerValue": "JOSÉ DE JESÚS SAN HERNÁNDEZ",
+      "answeredAt": "2026-08-12T17:53:58.450Z",
+      "metadata": {
+        "hutQuestionnaireAttemptId": "9bcdc2a4-f98d-4a3e-9b12-1f36d43f3a88",
+        "hutAnswerId": "cae3a6cc-de43-4f43-8139-4b33e8194f77",
+        "hutVisitProgressId": "b67b1726-a88c-407f-a7d4-3a52868b81ef"
+      }
+    },
+    {
+      "activity": "HUT:DATOS_GENERALES",
+      "questionKey": "HUT_DG_FOLIO",
+      "answerValue": "136",
+      "answeredAt": "2026-08-12T17:54:10.001Z",
+      "metadata": {
+        "hutQuestionnaireAttemptId": "9bcdc2a4-f98d-4a3e-9b12-1f36d43f3a88",
+        "hutAnswerId": "fa7b7daf-98d0-44e9-a5e0-cdefcc7598e9",
+        "hutVisitProgressId": "b67b1726-a88c-407f-a7d4-3a52868b81ef"
+      }
+    },
+    {
+      "activity": "HUT:DATOS_GENERALES",
+      "questionKey": "HUT_DG_COLONIA",
+      "answerValue": "CAMPAMENTO 2 DE OCTUBRE",
+      "answeredAt": "2026-08-12T17:54:35.203Z",
+      "metadata": {
+        "hutQuestionnaireAttemptId": "9bcdc2a4-f98d-4a3e-9b12-1f36d43f3a88",
+        "hutAnswerId": "959556ed-e71a-4f44-8a56-bccb60c99ba2",
+        "hutVisitProgressId": "b67b1726-a88c-407f-a7d4-3a52868b81ef"
+      }
+    },
+    {
+      "activity": "HUT:DATOS_GENERALES",
+      "questionKey": "HUT_DG_TELEFONO",
+      "answerValue": "5631451806",
+      "answeredAt": "2026-08-12T17:54:55.419Z",
+      "metadata": {
+        "hutQuestionnaireAttemptId": "9bcdc2a4-f98d-4a3e-9b12-1f36d43f3a88",
+        "hutAnswerId": "822cd299-e6ce-45ca-a590-0db276c924e4",
+        "hutVisitProgressId": "b67b1726-a88c-407f-a7d4-3a52868b81ef"
+      }
+    },
+    {
+      "activity": "HUT:PRIMERA_VISITA",
+      "questionKey": "HUT_V1_ACEPTA_USAR_PRODUCTO",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:58:30.389Z",
+      "metadata": {
+        "hutQuestionnaireAttemptId": "9bcdc2a4-f98d-4a3e-9b12-1f36d43f3a88",
+        "hutAnswerId": "af2f3b25-f506-4626-8bff-5e20bb3d8597",
+        "hutVisitProgressId": "ffd5e62f-8f2c-4d57-aae1-970389df63ba"
+      }
+    },
+    {
+      "activity": "HUT:PRIMERA_VISITA",
+      "questionKey": "HUT_V1_CONFIRMACION_ENTREGA",
+      "answerValue": "1",
+      "answeredAt": "2026-08-12T17:59:23.170Z",
+      "metadata": {
+        "hutQuestionnaireAttemptId": "9bcdc2a4-f98d-4a3e-9b12-1f36d43f3a88",
+        "hutAnswerId": "08d13124-d305-4dce-ab44-c76da9b4ae82",
+        "hutVisitProgressId": "ffd5e62f-8f2c-4d57-aae1-970389df63ba"
+      }
+    },
+    {
+      "activity": "HUT:PRIMERA_VISITA",
+      "questionKey": "HUT_V1_OBSERVACIONES",
+      "answerValue": "ENTREGA DE PRODUCTO",
+      "answeredAt": "2026-08-12T17:59:34.065Z",
+      "metadata": {
+        "hutQuestionnaireAttemptId": "9bcdc2a4-f98d-4a3e-9b12-1f36d43f3a88",
+        "hutAnswerId": "dbb291c6-d118-4305-948a-3239a345963b",
+        "hutVisitProgressId": "ffd5e62f-8f2c-4d57-aae1-970389df63ba"
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "type": "SCREENING:PERFUME_PHOTO",
+      "url": null,
+      "fecha": "2026-08-11T16:07:10.448Z",
+      "fechaMexicoCity": "11/08/2026, 10:07:10",
+      "storage": {
+        "storageBucket": "participant-evidence",
+        "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/f9b41d3d-bcac-4fd1-9609-bc0ccb1db220/screening-attempts/2e07c05b-22d8-4d2b-94c8-4f9e98035072/perfume_photo/c2cb73e1-435f-4239-add9-95d0e03f6322.jpg",
+        "originalFilename": "perfume_photo-1786464424785.jpg",
+        "mimeType": "image/jpeg",
+        "extension": "jpg",
+        "sizeBytes": 67844
+      },
+      "metadata": {
+        "participantEvidenceId": "39ff8e6a-7eec-4e4a-91dd-1b41fd0afba8",
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "relatedQuestionId": "F6_MARCAS_UTILIZA",
+        "reviewStatus": "APPROVED",
+        "reviewedAt": "2026-08-12T17:13:28.047Z"
+      }
+    },
+    {
+      "type": "SCREENING:PERFUME_PHOTO",
+      "url": null,
+      "fecha": "2026-08-11T16:07:47.404Z",
+      "fechaMexicoCity": "11/08/2026, 10:07:47",
+      "storage": {
+        "storageBucket": "participant-evidence",
+        "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/f9b41d3d-bcac-4fd1-9609-bc0ccb1db220/screening-attempts/2e07c05b-22d8-4d2b-94c8-4f9e98035072/perfume_photo/420b1e68-09ee-462f-b668-6bf66bc7d771.jpg",
+        "originalFilename": "perfume_photo-1786464463095.jpg",
+        "mimeType": "image/jpeg",
+        "extension": "jpg",
+        "sizeBytes": 68829
+      },
+      "metadata": {
+        "participantEvidenceId": "d8f10698-4890-42c5-8a4c-4bee8223c4da",
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "relatedQuestionId": "F6_MARCAS_UTILIZA",
+        "reviewStatus": "APPROVED",
+        "reviewedAt": "2026-08-12T17:13:28.047Z"
+      }
+    },
+    {
+      "type": "SCREENING:SELFIE_IDENTIFICATION",
+      "url": null,
+      "fecha": "2026-08-11T16:13:38.087Z",
+      "fechaMexicoCity": "11/08/2026, 10:13:38",
+      "storage": {
+        "storageBucket": "participant-evidence",
+        "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/f9b41d3d-bcac-4fd1-9609-bc0ccb1db220/screening-attempts/2e07c05b-22d8-4d2b-94c8-4f9e98035072/selfie_identification/4c8d7438-6949-4703-9f09-df0e7fde1d03.jpg",
+        "originalFilename": "selfie_identification-1786464810652.jpg",
+        "mimeType": "image/jpeg",
+        "extension": "jpg",
+        "sizeBytes": 142797
+      },
+      "metadata": {
+        "participantEvidenceId": "a4b2e798-a553-4273-9cbb-0cc33fd89203",
+        "screeningAttemptId": "2e07c05b-22d8-4d2b-94c8-4f9e98035072",
+        "relatedQuestionId": null,
+        "reviewStatus": "APPROVED",
+        "reviewedAt": "2026-08-12T17:13:28.047Z"
+      }
+    }
+  ],
+  "audit": [
+    {
+      "id": "97a12c14-1532-4d6e-96dd-3be094ab3270",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-10T22:00:01.538Z",
+      "createdAtMexicoCity": "10/08/2026, 16:00:01",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "12f8a204-441b-4f25-a301-2665d12b81dd",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-10T23:01:22.058Z",
+      "createdAtMexicoCity": "10/08/2026, 17:01:22",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "a3d7a57b-5a03-4f66-b43e-d65b5717bf57",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T00:02:46.381Z",
+      "createdAtMexicoCity": "10/08/2026, 18:02:46",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "74bc3506-9466-456c-b2b1-8be51dc7e6fc",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T01:00:29.185Z",
+      "createdAtMexicoCity": "10/08/2026, 19:00:29",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "6bdcdb42-5bd6-4fa6-bed2-040882bb9572",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T02:00:29.463Z",
+      "createdAtMexicoCity": "10/08/2026, 20:00:29",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "bcbbd40a-83ad-48d0-8767-fef18c433de7",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T03:01:17.231Z",
+      "createdAtMexicoCity": "10/08/2026, 21:01:17",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "872b730a-9bd6-4972-8d19-063856e5e919",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T04:01:20.878Z",
+      "createdAtMexicoCity": "10/08/2026, 22:01:20",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "1f3ab204-351c-48a2-a3fe-2305f11163a5",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T05:00:31.853Z",
+      "createdAtMexicoCity": "10/08/2026, 23:00:31",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "621fffa6-c8f5-49a1-9c22-ddd6fd19c395",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T06:01:20.603Z",
+      "createdAtMexicoCity": "11/08/2026, 00:01:20",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "5271310f-bb15-4b79-9877-7613589dc426",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T07:00:29.198Z",
+      "createdAtMexicoCity": "11/08/2026, 01:00:29",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "c62f6582-4205-47d0-8ffc-730466c7ea8c",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T08:01:27.689Z",
+      "createdAtMexicoCity": "11/08/2026, 02:01:27",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "b83c08f8-947a-4cc0-9193-58ec04626a63",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T09:01:22.680Z",
+      "createdAtMexicoCity": "11/08/2026, 03:01:22",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "8c958baf-b91f-4294-a4fd-5350a3675867",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T10:01:19.233Z",
+      "createdAtMexicoCity": "11/08/2026, 04:01:19",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "9fc322e4-35f5-4f84-ab6c-ca0067601d63",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T11:01:24.999Z",
+      "createdAtMexicoCity": "11/08/2026, 05:01:24",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "d5245cb5-d877-4807-872b-356d47de33a2",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T12:01:28.455Z",
+      "createdAtMexicoCity": "11/08/2026, 06:01:28",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "eba96b29-6f14-47b2-86fb-5a66a9f7e301",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T13:00:29.263Z",
+      "createdAtMexicoCity": "11/08/2026, 07:00:29",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "e1d43dfb-455d-41fd-9a81-b04b28bf9139",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T14:01:23.837Z",
+      "createdAtMexicoCity": "11/08/2026, 08:01:23",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "771d169b-d295-4ca8-a333-7241e507cc5a",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T15:00:29.143Z",
+      "createdAtMexicoCity": "11/08/2026, 09:00:29",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ]
+      }
+    },
+    {
+      "id": "500fae0d-96f8-4914-869c-12bd3a42265f",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-11T16:01:07.691Z",
+      "createdAtMexicoCity": "11/08/2026, 10:01:07",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": null,
+        "source": "CRON",
+        "message": "El recordatorio HUT automatico solo se envia de 15:00 a 18:00 hrs CDMX.",
+        "slotTitle": null,
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "OUTSIDE_OPERATIONAL_WINDOW",
+        "exclusionReasons": [
+          "OUTSIDE_OPERATIONAL_WINDOW"
+        ],
+        "evaluatedAtMexicoCity": "11/08/2026, 10:01 hrs CDMX"
+      }
+    },
+    {
+      "id": "447c1c99-8c64-407b-9321-e0bea47c0d50",
+      "entityType": "StudyParticipant",
+      "entityId": "10543266-6a23-4e91-9810-3e5b1fa27e03",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": "3959cf76-1459-41d8-ab91-97370c2304b3",
+      "reason": "Envio manual de enlace BOTH",
+      "createdAt": "2026-08-12T17:52:02.577Z",
+      "createdAtMexicoCity": "12/08/2026, 11:52:02",
+      "beforeJson": null,
+      "afterJson": {
+        "folio": "NAV-136",
+        "origin": "MANUAL",
+        "message": "HUT_WHATSAPP_INVALID_PUBLIC_ORIGIN",
+        "warnings": [],
+        "hutUrlDomain": "https://mrblackbox-research-platform.vercel.app",
+        "linkTypeSent": "BOTH",
+        "templateName": "navigo_hut_links",
+        "deploymentUrl": "mrblackbox-research-platform-lmdey1goh-oneui.vercel.app",
+        "metaMessageId": null,
+        "whatsappStatus": "ERROR",
+        "hutUrlAvailable": true,
+        "hutParticipantId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "sentAtMexicoCity": "12/08/2026, 11:52 hrs CDMX",
+        "linkTypeRequested": "BOTH",
+        "navigoUrlAvailable": true,
+        "deploymentEnvironment": "production"
+      }
+    },
+    {
+      "id": "1b0e9b33-4297-45c4-8e43-d24ebdb9fda8",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "Captura HUT de campo",
+      "createdAt": "2026-08-12T17:53:58.477Z",
+      "createdAtMexicoCity": "12/08/2026, 11:53:58",
+      "beforeJson": null,
+      "afterJson": {
+        "status": "ANSWER_SAVED",
+        "fieldAccess": {
+          "accessType": "ENCUESTADOR",
+          "codeMasked": "UL***26"
+        },
+        "questionCode": "HUT_DG_NOMBRE",
+        "questionPairRotation": null
+      }
+    },
+    {
+      "id": "9aa6944f-e3fb-4ef9-9463-50067a3066ac",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "Captura HUT de campo",
+      "createdAt": "2026-08-12T17:54:10.020Z",
+      "createdAtMexicoCity": "12/08/2026, 11:54:10",
+      "beforeJson": null,
+      "afterJson": {
+        "status": "ANSWER_SAVED",
+        "fieldAccess": {
+          "accessType": "ENCUESTADOR",
+          "codeMasked": "UL***26"
+        },
+        "questionCode": "HUT_DG_FOLIO",
+        "questionPairRotation": null
+      }
+    },
+    {
+      "id": "4f3958ab-b595-4687-9a03-08606e227e94",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "Captura HUT de campo",
+      "createdAt": "2026-08-12T17:54:35.222Z",
+      "createdAtMexicoCity": "12/08/2026, 11:54:35",
+      "beforeJson": null,
+      "afterJson": {
+        "status": "ANSWER_SAVED",
+        "fieldAccess": {
+          "accessType": "ENCUESTADOR",
+          "codeMasked": "UL***26"
+        },
+        "questionCode": "HUT_DG_COLONIA",
+        "questionPairRotation": null
+      }
+    },
+    {
+      "id": "d0602af5-887d-48b2-bdaf-c5455262ef6a",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "Captura HUT de campo",
+      "createdAt": "2026-08-12T17:54:55.435Z",
+      "createdAtMexicoCity": "12/08/2026, 11:54:55",
+      "beforeJson": null,
+      "afterJson": {
+        "status": "ANSWER_SAVED",
+        "fieldAccess": {
+          "accessType": "ENCUESTADOR",
+          "codeMasked": "UL***26"
+        },
+        "questionCode": "HUT_DG_TELEFONO",
+        "questionPairRotation": null
+      }
+    },
+    {
+      "id": "130d2438-9992-4867-bf91-90a3af919465",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "Captura HUT de campo",
+      "createdAt": "2026-08-12T17:58:30.407Z",
+      "createdAtMexicoCity": "12/08/2026, 11:58:30",
+      "beforeJson": null,
+      "afterJson": {
+        "status": "ANSWER_SAVED",
+        "fieldAccess": {
+          "accessType": "ENCUESTADOR",
+          "codeMasked": "UL***26"
+        },
+        "questionCode": "HUT_V1_ACEPTA_USAR_PRODUCTO",
+        "questionPairRotation": null
+      }
+    },
+    {
+      "id": "e84605e4-f736-42ba-bbc3-304bb7943663",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "Captura HUT de campo",
+      "createdAt": "2026-08-12T17:59:23.189Z",
+      "createdAtMexicoCity": "12/08/2026, 11:59:23",
+      "beforeJson": null,
+      "afterJson": {
+        "status": "ANSWER_SAVED",
+        "fieldAccess": {
+          "accessType": "ENCUESTADOR",
+          "codeMasked": "UL***26"
+        },
+        "questionCode": "HUT_V1_CONFIRMACION_ENTREGA",
+        "questionPairRotation": null
+      }
+    },
+    {
+      "id": "7c9fe8a3-45dd-475d-b42c-1e9e8cc32077",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "Captura HUT de campo",
+      "createdAt": "2026-08-12T17:59:34.085Z",
+      "createdAtMexicoCity": "12/08/2026, 11:59:34",
+      "beforeJson": null,
+      "afterJson": {
+        "status": "ANSWER_SAVED",
+        "fieldAccess": {
+          "accessType": "ENCUESTADOR",
+          "codeMasked": "UL***26"
+        },
+        "questionCode": "HUT_V1_OBSERVACIONES",
+        "questionPairRotation": null
+      }
+    },
+    {
+      "id": "e8fa1b35-104d-4c88-bdc8-2bc6f262528a",
+      "entityType": "StudyParticipant",
+      "entityId": "10543266-6a23-4e91-9810-3e5b1fa27e03",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": "3959cf76-1459-41d8-ab91-97370c2304b3",
+      "reason": "Envio manual de enlace BOTH",
+      "createdAt": "2026-08-12T18:27:19.642Z",
+      "createdAtMexicoCity": "12/08/2026, 12:27:19",
+      "beforeJson": null,
+      "afterJson": {
+        "folio": "NAV-136",
+        "origin": "MANUAL",
+        "message": "Enlace enviado por WhatsApp.",
+        "warnings": [],
+        "hutUrlDomain": "https://mrblackbox-research-platform.vercel.app",
+        "linkTypeSent": "BOTH",
+        "templateName": "navigo_hut_links",
+        "deploymentUrl": "mrblackbox-research-platform-h6yvckomg-oneui.vercel.app",
+        "metaMessageId": "wamid.HBgNNTIxNTYzMTQ1MTgwNhUCABEYEjdBRTNBMTc4M0ExQjAwREQ4NAA=",
+        "participantId": "10543266-6a23-4e91-9810-3e5b1fa27e03",
+        "whatsappStatus": "ENVIADO",
+        "generatedHutUrl": "https://mrblackbox-research-platform.vercel.app/hut/p/2c422eb2-fd27-41c6-9dd3-5cf12348b75f",
+        "hutUrlAvailable": true,
+        "hutParticipantId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+        "sentAtMexicoCity": "12/08/2026, 12:27 hrs CDMX",
+        "linkTypeRequested": "BOTH",
+        "generatedNavigoUrl": "https://mrblackbox-research-platform.vercel.app/p/8bd02ccb-55a7-42ad-98e4-4636edd57711/activities",
+        "navigoUrlAvailable": true,
+        "whatsappErrorReason": null,
+        "publicOriginDetected": "https://mrblackbox-research-platform.vercel.app",
+        "publicOriginExpected": "https://mrblackbox-research-platform.vercel.app",
+        "deploymentEnvironment": "production",
+        "publicOriginFailureCode": null,
+        "publicOriginFailureMessage": null
+      }
+    },
+    {
+      "id": "2f939122-427c-46a0-9f3b-0fa4a8026443",
+      "entityType": "StudyParticipant",
+      "entityId": "10543266-6a23-4e91-9810-3e5b1fa27e03",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": "3959cf76-1459-41d8-ab91-97370c2304b3",
+      "reason": "soporte manual",
+      "createdAt": "2026-08-12T18:27:19.657Z",
+      "createdAtMexicoCity": "12/08/2026, 12:27:19",
+      "beforeJson": null,
+      "afterJson": {
+        "phone": "+525631451806",
+        "source": "MANUAL_SUPPORT",
+        "linkDomain": "https://mrblackbox-research-platform.vercel.app",
+        "hutUrlDomain": "https://mrblackbox-research-platform.vercel.app",
+        "linkTypeSent": "BOTH",
+        "templateName": "navigo_hut_links",
+        "deploymentUrl": "mrblackbox-research-platform-h6yvckomg-oneui.vercel.app",
+        "whatsappError": null,
+        "whatsappStatus": "ENVIADO",
+        "generatedHutUrl": "https://mrblackbox-research-platform.vercel.app/hut/p/2c422eb2-fd27-41c6-9dd3-5cf12348b75f",
+        "hutUrlAvailable": true,
+        "sentAtMexicoCity": "12/08/2026, 12:27 hrs CDMX",
+        "whatsappMessageId": "wamid.HBgNNTIxNTYzMTQ1MTgwNhUCABEYEjdBRTNBMTc4M0ExQjAwREQ4NAA=",
+        "generatedNavigoUrl": "https://mrblackbox-research-platform.vercel.app/p/8bd02ccb-55a7-42ad-98e4-4636edd57711/activities",
+        "navigoUrlAvailable": true,
+        "publicOriginDetected": "https://mrblackbox-research-platform.vercel.app",
+        "publicOriginExpected": "https://mrblackbox-research-platform.vercel.app",
+        "deploymentEnvironment": "production",
+        "publicOriginFailureCode": null,
+        "publicOriginFailureMessage": null
+      }
+    },
+    {
+      "id": "960b8163-8014-4673-a736-6f9dcae59d43",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-12T21:01:31.865Z",
+      "createdAtMexicoCity": "12/08/2026, 15:01:31",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "12/08/2026, 15:01 hrs CDMX"
+      }
+    },
+    {
+      "id": "a5f91701-6832-413d-9b29-0da65393cd39",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-12T22:00:34.171Z",
+      "createdAtMexicoCity": "12/08/2026, 16:00:34",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "12/08/2026, 16:00 hrs CDMX"
+      }
+    },
+    {
+      "id": "7fbde208-792c-4e4f-9372-f143c5d3b4ab",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-12T23:00:38.421Z",
+      "createdAtMexicoCity": "12/08/2026, 17:00:38",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "12/08/2026, 17:00 hrs CDMX"
+      }
+    },
+    {
+      "id": "0c1e98d5-e320-4cb7-8b51-e3c35587dfa3",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-13T21:00:06.321Z",
+      "createdAtMexicoCity": "13/08/2026, 15:00:06",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "13/08/2026, 15:00 hrs CDMX"
+      }
+    },
+    {
+      "id": "c5401f8d-25cd-4809-83eb-2347ae993782",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-13T22:00:58.353Z",
+      "createdAtMexicoCity": "13/08/2026, 16:00:58",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "13/08/2026, 16:00 hrs CDMX"
+      }
+    },
+    {
+      "id": "621c2565-16eb-4ea0-bab6-5c22e25f1076",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-13T23:01:02.833Z",
+      "createdAtMexicoCity": "13/08/2026, 17:01:02",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "13/08/2026, 17:01 hrs CDMX"
+      }
+    },
+    {
+      "id": "132f8c04-fb2e-48f5-bc7c-71b0be920d63",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-14T21:00:59.393Z",
+      "createdAtMexicoCity": "14/08/2026, 15:00:59",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "14/08/2026, 15:00 hrs CDMX"
+      }
+    },
+    {
+      "id": "d3495014-284a-4589-a73e-4eb18301a6a2",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-14T22:00:55.143Z",
+      "createdAtMexicoCity": "14/08/2026, 16:00:55",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "14/08/2026, 16:00 hrs CDMX"
+      }
+    },
+    {
+      "id": "6c40d6ff-929b-4aa8-be3f-1f5a9c717b2c",
+      "entityType": "HutParticipant",
+      "entityId": "7203db28-49d0-4c6b-a895-87912dc3642a",
+      "action": "PARTICIPANT_MODIFIED",
+      "actorUserId": null,
+      "reason": "HUT_PHOTO_REMINDER_CRON_SKIPPED",
+      "createdAt": "2026-08-14T23:00:58.924Z",
+      "createdAtMexicoCity": "14/08/2026, 17:00:58",
+      "beforeJson": null,
+      "afterJson": {
+        "slotId": "DELIVERY",
+        "source": "CRON",
+        "message": "El protocolo HUT no ha iniciado.",
+        "slotTitle": "Entrega del producto",
+        "reminderType": "HUT_PHOTO_REMINDER",
+        "templateName": "hut_photo_reminder",
+        "whatsappStatus": "OMITIDO",
+        "exclusionReason": "NO_STARTED",
+        "exclusionReasons": [
+          "NO_STARTED",
+          "WAITING_DELIVERY"
+        ],
+        "evaluatedAtMexicoCity": "14/08/2026, 17:00 hrs CDMX"
+      }
+    }
+  ],
+  "warnings": [
+    "PRIVATE_EVIDENCE_EXPORTED_WITH_STORAGE_KEY_ONLY"
+  ]
+}

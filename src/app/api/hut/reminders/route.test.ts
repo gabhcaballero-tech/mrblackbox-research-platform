@@ -31,6 +31,8 @@ describe("HUT photo reminder cron route", () => {
     delete process.env.NEXT_PUBLIC_APP_URL;
     delete process.env.APP_URL;
     delete process.env.VERCEL_ENV;
+    delete process.env.WHATSAPP_AUTOMATION_ENABLED;
+    delete process.env.WHATSAPP_HUT_AUTO_SEND_ENABLED;
     vi.stubEnv("NODE_ENV", "test");
     processRemindersMock.mockResolvedValue({
       data: {
@@ -44,15 +46,14 @@ describe("HUT photo reminder cron route", () => {
     auditLogCreateMock.mockResolvedValue({});
   });
 
-  it("registers the Vercel cron every hour for the HUT reminders endpoint", () => {
+  it("does not register the V1 HUT reminders cron in Vercel", () => {
     const config = JSON.parse(readFileSync(join(process.cwd(), "vercel.json"), "utf8")) as {
       crons?: Array<{ path: string; schedule: string }>;
     };
 
-    expect(config.crons).toContainEqual({
-      path: "/api/hut/reminders",
-      schedule: "0 * * * *"
-    });
+    expect(config.crons ?? []).not.toContainEqual(expect.objectContaining({
+      path: "/api/hut/reminders"
+    }));
   });
 
   it("processes due HUT photo reminders with the dedicated cron secret", async () => {
@@ -81,6 +82,52 @@ describe("HUT photo reminder cron route", () => {
       requestOrigin: "https://mrblackbox-research-platform.vercel.app",
       studyId: "study-1"
     });
+  });
+
+  it("does not process HUT reminders when V1 operational communications are disabled", async () => {
+    process.env.HUT_REMINDER_CRON_SECRET = "hut-secret";
+    process.env.WHATSAPP_AUTOMATION_ENABLED = "false";
+
+    const response = await POST(
+      new NextRequest("https://mrblackbox-research-platform.vercel.app/api/hut/reminders?now=2026-08-09T21:30:00.000Z", {
+        headers: {
+          authorization: "Bearer hut-secret"
+        },
+        method: "POST"
+      })
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      code: "AUTOMATION_DISABLED",
+      message: "Comunicación operativa deshabilitada en V1. Utilice V2.",
+      ok: false
+    });
+    expect(response.status).toBe(200);
+    expect(auditLogCreateMock).not.toHaveBeenCalled();
+    expect(processRemindersMock).not.toHaveBeenCalled();
+  });
+
+  it("does not process HUT reminders when HUT automatic sends are disabled", async () => {
+    process.env.HUT_REMINDER_CRON_SECRET = "hut-secret";
+    process.env.WHATSAPP_HUT_AUTO_SEND_ENABLED = "false";
+
+    const response = await POST(
+      new NextRequest("https://mrblackbox-research-platform.vercel.app/api/hut/reminders?now=2026-08-09T21:30:00.000Z", {
+        headers: {
+          authorization: "Bearer hut-secret"
+        },
+        method: "POST"
+      })
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      code: "AUTOMATION_DISABLED",
+      message: "Comunicación operativa deshabilitada en V1. Utilice V2.",
+      ok: false
+    });
+    expect(response.status).toBe(200);
+    expect(auditLogCreateMock).not.toHaveBeenCalled();
+    expect(processRemindersMock).not.toHaveBeenCalled();
   });
 
   it("uses the configured production origin even when Vercel cron hits a preview deployment", async () => {

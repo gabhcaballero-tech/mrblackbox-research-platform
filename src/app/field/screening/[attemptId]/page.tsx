@@ -1,13 +1,9 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
 import { getFieldActorForRequest } from "@/modules/field/auth";
 import { isPublicFieldActor } from "@/modules/field/service";
 import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
-import { createFieldRepository } from "@/modules/field/repository";
-import { getFieldScreeningAttemptScreen } from "@/modules/field/service";
-import { ScreeningQuestionForm } from "../../_components/FieldComponents";
+import { V1ScreeningBlockedNotice } from "../../_components/V1ScreeningBlockedNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -22,62 +18,20 @@ type ScreeningAttemptPageProps = {
 };
 
 export default async function ScreeningAttemptPage({ params, searchParams }: ScreeningAttemptPageProps) {
-  const { attemptId } = await params;
-  const resolvedSearchParams = await searchParams;
+  await params;
+  await searchParams;
   const actor = await getFieldActorForRequest();
-  const result = await getFieldScreeningAttemptScreen({
-    actor,
-    attemptId,
-    questionId: resolvedSearchParams?.question,
-    repository: createFieldRepository()
-  });
-
-  if (!result.ok) {
-    if (result.code === "ATTEMPT_NOT_FOUND") {
-      notFound();
-    }
-
-    throw new Error(result.message);
-  }
-
-  const screen = result.data;
 
   const content = (
     <>
       <PageHeader
-        actions={<StatusBadge status="ready">{`Versión ${screen.attempt.questionnaireVersion.versionNumber}`}</StatusBadge>}
-        description={`Participante: ${screen.attempt.studyParticipant.participantProfile.name}`}
+        actions={<StatusBadge status="planned">Cerrado en V1</StatusBadge>}
+        description="Este filtro ya no admite captura desde V1."
         eyebrow="Aplicación de screener"
-        title={screen.attempt.questionnaireVersion.study.name}
+        title="Filtro migrado a V2"
       />
 
-      <div className="mb-6 flex flex-wrap gap-3">
-        {isPublicFieldActor(actor) ? null : (
-          <Link className="text-sm font-semibold text-teal-700 transition hover:text-teal-800" href="/field">
-            Volver a Campo
-          </Link>
-        )}
-        <Link
-          className="text-sm font-semibold text-zinc-700 transition hover:text-zinc-950"
-          href={`/field/screening/${attemptId}/result`}
-        >
-          Ver resultado
-        </Link>
-      </div>
-
-      <div className="mb-4 h-2 overflow-hidden rounded-full bg-zinc-100" aria-label="Progreso del filtro">
-        <div
-          className="h-full rounded-full bg-teal-600"
-          style={{
-            width:
-              screen.progress.totalVisibleQuestions > 0
-                ? `${Math.round((screen.progress.answeredVisibleQuestions / screen.progress.totalVisibleQuestions) * 100)}%`
-                : "0%"
-          }}
-        />
-      </div>
-
-      <ScreeningQuestionForm error={resolvedSearchParams?.error} screen={screen} />
+      <V1ScreeningBlockedNotice showFieldLinks={!isPublicFieldActor(actor)} />
     </>
   );
 

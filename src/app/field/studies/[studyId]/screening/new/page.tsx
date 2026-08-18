@@ -5,7 +5,7 @@ import { getFieldStudy, isPublicFieldActor } from "@/modules/field/service";
 import { AppShell } from "@/shared/ui/AppShell";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
-import { ParticipantStartForm } from "../../../../_components/ParticipantStartForm";
+import { V1ScreeningBlockedNotice } from "../../../../_components/V1ScreeningBlockedNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,7 @@ type NewScreeningPageProps = {
 
 export default async function NewScreeningPage({ params, searchParams }: NewScreeningPageProps) {
   const { studyId } = await params;
-  const resolvedSearchParams = await searchParams;
+  await searchParams;
   const actor = await getFieldActorForRequest();
   const result = await getFieldStudy({
     actor,
@@ -39,10 +39,10 @@ export default async function NewScreeningPage({ params, searchParams }: NewScre
   const content = (
     <>
       <PageHeader
-        actions={<StatusBadge status="ready">Nuevo intento</StatusBadge>}
-        description="Crea o reutiliza un participante mínimo para iniciar la aplicación del filtro."
+        actions={<StatusBadge status="planned">Cerrado en V1</StatusBadge>}
+        description="El registro operativo del estudio continúa en la plataforma V2."
         eyebrow="Campo"
-        title={`Iniciar filtro · ${result.data.name}`}
+        title={`Filtro cerrado · ${result.data.name}`}
       />
 
       {isPublicFieldActor(actor) ? null : <div className="mb-6">
@@ -51,7 +51,7 @@ export default async function NewScreeningPage({ params, searchParams }: NewScre
         </Link>
       </div>}
 
-      <ParticipantStartForm error={resolvedSearchParams?.error} studyId={studyId} />
+      <V1ScreeningBlockedNotice showFieldLinks={!isPublicFieldActor(actor)} />
     </>
   );
 

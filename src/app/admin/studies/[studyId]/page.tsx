@@ -172,6 +172,14 @@ export default async function StudyConfigurationPage({ params }: StudyConfigurat
               Operacion HUT
             </Link>
           ) : null}
+          {config.study.code === NAVIGO_STUDY_CODE ? (
+            <Link
+              className="text-sm font-semibold text-teal-700 transition hover:text-teal-800"
+              href={`/admin/studies/${studyId}/analytic-export`}
+            >
+              Export analitico final
+            </Link>
+          ) : null}
         </div>
       </div>
 

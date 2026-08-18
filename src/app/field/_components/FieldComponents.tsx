@@ -11,6 +11,7 @@ import { fieldAttemptStatusLabel } from "@/modules/field/status-labels";
 import { getStudyBehavior } from "@/modules/study-templates/study-behavior";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { FieldPerfumePhotoCapture } from "./FieldPerfumePhotoCapture";
+import { V1ScreeningBlockedNotice } from "./V1ScreeningBlockedNotice";
 
 const FIELD_PERFUME_EVIDENCE_QUESTION_ID = "F6_MARCAS_UTILIZA";
 
@@ -26,7 +27,7 @@ type ScreeningResultCardProps = {
 export function FieldStudyCard({ study }: { study: FieldStudySummary }) {
   return (
     <article className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+      <div className="flex flex-col gap-4">
         <div>
           <h2 className="text-lg font-semibold text-zinc-950">{study.name}</h2>
           <p className="mt-1 break-all font-mono text-xs text-zinc-500">{study.code}</p>
@@ -45,9 +46,7 @@ export function FieldStudyCard({ study }: { study: FieldStudySummary }) {
             </div>
           </dl>
         </div>
-        <Link className={primaryButtonClass} href={`/field/studies/${study.id}`}>
-          Aplicar filtro
-        </Link>
+        <V1ScreeningBlockedNotice />
       </div>
     </article>
   );

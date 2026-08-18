@@ -1,0 +1,26 @@
+{
+  "generatedAt": "2026-08-18T06:23:40.919Z",
+  "source": "C:\\Projects\\mrblackbox-research-platform\\outputs\\v1_master_participants_export\\V1_MASTER_PARTICIPANTS_EXPORT.json",
+  "v2SourcePresent": false,
+  "sheets": [
+    "REPORTE CLT",
+    "REPORTE HUT"
+  ],
+  "rows": {
+    "reporteClt": 415,
+    "reporteHut": 415
+  },
+  "columns": {
+    "reporteClt": 180,
+    "reporteHut": 123
+  },
+  "validation": {
+    "onlyTwoSheets": true,
+    "removedSheets": [
+      "REPORTE FILTRO",
+      "REPORTE COMPLETO"
+    ],
+    "duplicateHeadersClt": [],
+    "duplicateHeadersHut": []
+  }
+}

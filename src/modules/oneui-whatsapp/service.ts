@@ -26,6 +26,7 @@ export type OneuiWhatsAppSendReplyResult =
   | {
       ok: false;
       code:
+        | "AUTOMATION_DISABLED"
         | "CONFIGURATION_ERROR"
         | "CONVERSATION_NOT_FOUND"
         | "EMPTY_MESSAGE"
@@ -109,6 +110,20 @@ export const ONEUI_WHATSAPP_SOURCE_LABELS: Record<OneuiWhatsAppSourceModule, str
   OTHER: "Otro"
 };
 
+export const V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE = "Comunicación operativa deshabilitada en V1. Utilice V2.";
+
+export function areV1OperationalCommunicationsDisabled(env: Partial<NodeJS.ProcessEnv> = process.env): boolean {
+  return env.WHATSAPP_AUTOMATION_ENABLED === "false";
+}
+
+export function areV1HutAutomaticCommunicationsDisabled(env: Partial<NodeJS.ProcessEnv> = process.env): boolean {
+  return areV1OperationalCommunicationsDisabled(env) || env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false";
+}
+
+export function areV1NavigoAutomaticCommunicationsDisabled(env: Partial<NodeJS.ProcessEnv> = process.env): boolean {
+  return areV1OperationalCommunicationsDisabled(env) || env.WHATSAPP_NAVIGO_AUTO_SEND_ENABLED === "false";
+}
+
 export function canAccessOneuiWhatsAppInbox(actor: OneuiWhatsAppInboxActor): boolean {
   return Boolean(actor && actor.status !== "INACTIVE" && (actor.role === "ADMIN" || actor.role === "SUPERVISOR"));
 }
@@ -157,10 +172,10 @@ export async function sendOneuiWhatsAppTemplate(input: {
 }): Promise<OneuiWhatsAppSendTemplateResult> {
   const env = input.env ?? process.env;
 
-  if (env.WHATSAPP_AUTOMATION_ENABLED === "false") {
+  if (areV1OperationalCommunicationsDisabled(env)) {
     return {
       code: "AUTOMATION_DISABLED",
-      message: "El envio automatico de WhatsApp esta desactivado.",
+      message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE,
       ok: false
     };
   }
@@ -375,6 +390,15 @@ export async function sendOneuiWhatsAppTextReply(input: {
     };
   }
 
+  const env = input.env ?? process.env;
+  if (areV1OperationalCommunicationsDisabled(env)) {
+    return {
+      code: "AUTOMATION_DISABLED",
+      message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE,
+      ok: false
+    };
+  }
+
   const repository = input.repository ?? createOneuiWhatsAppRepository();
   const conversation = await repository.getConversationWithMessages(input.conversationId);
 
@@ -397,7 +421,6 @@ export async function sendOneuiWhatsAppTextReply(input: {
     };
   }
 
-  const env = input.env ?? process.env;
   const accessToken = env.WHATSAPP_ACCESS_TOKEN;
   const phoneNumberId = env.WHATSAPP_PHONE_NUMBER_ID;
   const fromPhone = env.WHATSAPP_ONEUI_PHONE_NUMBER ?? env.WHATSAPP_PHONE_NUMBER_ID ?? "UNKNOWN";

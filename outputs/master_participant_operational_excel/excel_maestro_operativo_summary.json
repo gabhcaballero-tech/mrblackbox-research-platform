@@ -1,0 +1,15 @@
+{
+  "auditRows": 849,
+  "generatedAt": "13/08/2026, 03:28 hrs CDMX",
+  "hutOperationRows": 330,
+  "masterRows": 330,
+  "outputPublicOrigin": "https://mrblackbox-research-platform.vercel.app",
+  "studyCode": "FMASCULINA-NAVIGO-2026",
+  "studyId": "90f25436-2353-46fa-817a-4f187edea59d",
+  "studyName": "Fragancia Masculina — Navigo Homme",
+  "totals": {
+    "PARTICIPANTE_OPERATIVO": 142,
+    "RESERVA_HUT": 158,
+    "SIN_REGISTRO": 30
+  }
+}

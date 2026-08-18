@@ -38,22 +38,20 @@ vi.mock("@/modules/field/service", async (importOriginal) => {
 });
 
 describe("Field screening result page", () => {
-  it("shows the perfume photos CTA first when final evidence is incomplete", async () => {
+  it("shows the V2 migration message instead of the perfume photos CTA", async () => {
     render(
       await ScreeningResultPage({
         params: Promise.resolve({ attemptId: "attempt-1" })
       })
     );
 
-    expect(screen.getByText("Agrega fotos de marcas de perfumes")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Agregar fotos de marcas de perfumes" })).toHaveAttribute(
-      "href",
-      "/field/screening/attempt-1/evidences"
-    );
+    expect(screen.getByText("Registro migrado a V2")).toBeInTheDocument();
+    expect(screen.getByText("Este estudio ahora se gestiona en la plataforma V2. Por favor continúe el registro en V2.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Agregar fotos de marcas de perfumes" })).not.toBeInTheDocument();
     expect(screen.queryByText("Campo no disponible")).not.toBeInTheDocument();
   });
 
-  it("shows a clear selfie CTA after F6 perfume photos are complete", async () => {
+  it("shows the V2 migration message instead of the selfie CTA", async () => {
     vi.mocked(getFieldScreeningReviewReadiness).mockResolvedValueOnce(
       readinessFixture({
         hasRequiredPerfumePhotos: true,
@@ -69,11 +67,9 @@ describe("Field screening result page", () => {
       })
     );
 
-    expect(screen.getByText("Completa la selfie para enviar a revisión")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Completar selfie" })).toHaveAttribute(
-      "href",
-      "/field/screening/attempt-1/selfie"
-    );
+    expect(screen.getByText("Registro migrado a V2")).toBeInTheDocument();
+    expect(screen.getByText("Este estudio ahora se gestiona en la plataforma V2. Por favor continúe el registro en V2.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Completar selfie" })).not.toBeInTheDocument();
     expect(screen.queryByText("Campo no disponible")).not.toBeInTheDocument();
   });
 

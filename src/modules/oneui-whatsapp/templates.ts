@@ -1,4 +1,6 @@
 import {
+  V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE,
+  areV1OperationalCommunicationsDisabled,
   sendOneuiWhatsAppTemplate,
   type OneuiWhatsAppSendTemplateResult,
   type OneuiWhatsAppTemplateParameter
@@ -78,8 +80,8 @@ export async function sendNavigoConfirmationWhatsApp(input: {
 }): Promise<OneuiWhatsAppSendTemplateResult | { ok: false; code: "SKIPPED"; message: string }> {
   const env = input.env ?? process.env;
 
-  if (env.WHATSAPP_NAVIGO_AUTO_SEND_ENABLED === "false") {
-    return { code: "SKIPPED", message: "Envio automatico Navigo desactivado.", ok: false };
+  if (areV1OperationalCommunicationsDisabled(env) || env.WHATSAPP_NAVIGO_AUTO_SEND_ENABLED === "false") {
+    return { code: "SKIPPED", message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE, ok: false };
   }
 
   if (input.existingMessage && input.existingMessage.status !== "failed" && isCompleteNavigoCodesWhatsApp(input.existingMessage)) {
@@ -171,8 +173,8 @@ export async function sendNavigoEvaluationLinkWhatsApp(input: {
 }): Promise<OneuiWhatsAppSendTemplateResult | { ok: false; code: "SKIPPED"; message: string }> {
   const env = input.env ?? process.env;
 
-  if (env.WHATSAPP_NAVIGO_AUTO_SEND_ENABLED === "false") {
-    return { code: "SKIPPED", message: "Envio automatico Navigo desactivado.", ok: false };
+  if (areV1OperationalCommunicationsDisabled(env) || env.WHATSAPP_NAVIGO_AUTO_SEND_ENABLED === "false") {
+    return { code: "SKIPPED", message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE, ok: false };
   }
 
   if (!input.participantName || !input.phone || !input.evaluationUrl || !input.folio) {
@@ -244,8 +246,8 @@ export async function sendHutParticipantLinkWhatsApp(input: {
 }): Promise<OneuiWhatsAppSendTemplateResult | WhatsAppTemplateSkippedResult> {
   const env = input.env ?? process.env;
 
-  if (env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
-    return { code: "SKIPPED", message: "Envio automatico HUT desactivado.", ok: false };
+  if (areV1OperationalCommunicationsDisabled(env) || env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
+    return { code: "SKIPPED", message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE, ok: false };
   }
 
   if (!input.participantName || !input.phone || !input.hutUrl) {
@@ -298,8 +300,12 @@ export async function sendNavigoHutLinksWhatsApp(input: {
 }): Promise<OneuiWhatsAppSendTemplateResult | WhatsAppTemplateSkippedResult> {
   const env = input.env ?? process.env;
 
-  if (env.WHATSAPP_NAVIGO_AUTO_SEND_ENABLED === "false" || env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
-    return { code: "SKIPPED", message: "Envio automatico de enlaces Navigo/HUT desactivado.", ok: false };
+  if (
+    areV1OperationalCommunicationsDisabled(env) ||
+    env.WHATSAPP_NAVIGO_AUTO_SEND_ENABLED === "false" ||
+    env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false"
+  ) {
+    return { code: "SKIPPED", message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE, ok: false };
   }
 
   if (!input.participantName || !input.phone || !input.navigoUrl || !input.hutUrl) {
@@ -392,8 +398,8 @@ export async function sendNavigoEvaluationReminderWhatsApp(input: {
 }): Promise<OneuiWhatsAppSendTemplateResult | WhatsAppTemplateSkippedResult> {
   const env = input.env ?? process.env;
 
-  if (env.WHATSAPP_NAVIGO_AUTO_SEND_ENABLED === "false") {
-    return { code: "SKIPPED", message: "Envio automatico Navigo desactivado.", ok: false };
+  if (areV1OperationalCommunicationsDisabled(env) || env.WHATSAPP_NAVIGO_AUTO_SEND_ENABLED === "false") {
+    return { code: "SKIPPED", message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE, ok: false };
   }
 
   if (!input.participantName || !input.phone || !input.evaluationUrl || !input.activityCode) {
@@ -440,8 +446,8 @@ export async function sendHutPhotoReminderWhatsApp(input: {
 }): Promise<OneuiWhatsAppSendTemplateResult | WhatsAppTemplateSkippedResult> {
   const env = input.env ?? process.env;
 
-  if (env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
-    return { code: "SKIPPED", message: "Envio automatico HUT desactivado.", ok: false };
+  if (areV1OperationalCommunicationsDisabled(env) || env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
+    return { code: "SKIPPED", message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE, ok: false };
   }
 
   if (!input.participantName || !input.phone || !input.hutUrl) {
@@ -593,8 +599,8 @@ export async function sendHutCompletionWhatsApp(input: {
 }): Promise<OneuiWhatsAppSendTemplateResult | WhatsAppTemplateSkippedResult> {
   const env = input.env ?? process.env;
 
-  if (env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
-    return { code: "SKIPPED", message: "Envio automatico HUT desactivado.", ok: false };
+  if (areV1OperationalCommunicationsDisabled(env) || env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
+    return { code: "SKIPPED", message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE, ok: false };
   }
 
   if (!input.participantName || !input.phone) {
@@ -686,8 +692,8 @@ export async function sendHutRegistrationWhatsApp(input: {
 }): Promise<OneuiWhatsAppSendTemplateResult | WhatsAppTemplateSkippedResult> {
   const env = input.env ?? process.env;
 
-  if (env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
-    return { code: "SKIPPED", message: "Envio automatico HUT desactivado.", ok: false };
+  if (areV1OperationalCommunicationsDisabled(env) || env.WHATSAPP_HUT_AUTO_SEND_ENABLED === "false") {
+    return { code: "SKIPPED", message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE, ok: false };
   }
 
   if (!input.force && input.existingMessage && input.existingMessage.status !== "failed") {

@@ -20,7 +20,8 @@ import {
   normalizeWhatsAppRecipient,
   processOneuiWhatsAppWebhookPayload,
   sendOneuiWhatsAppTemplate,
-  sendOneuiWhatsAppTextReply
+  sendOneuiWhatsAppTextReply,
+  V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE
 } from "./service";
 import {
   buildNavigoCodesWhatsAppBody,
@@ -112,6 +113,36 @@ describe("ONEUI WhatsApp webhook processing", () => {
 });
 
 describe("ONEUI WhatsApp manual replies", () => {
+  it("bloquea respuestas libres cuando V1 tiene comunicaciones operativas deshabilitadas", async () => {
+    const repository = createFakeRepository();
+    repository.conversations.push(createConversation({
+      id: "conversation-1",
+      lastInboundAt: new Date("2026-07-09T16:00:00.000Z")
+    }));
+    const fetcher = viFetch({ messages: [{ id: "wamid.outbound-1" }] });
+
+    const result = await sendOneuiWhatsAppTextReply({
+      actor: { role: "ADMIN", status: "ACTIVE" },
+      bodyText: "Hola",
+      conversationId: "conversation-1",
+      env: {
+        ...whatsappEnv(),
+        WHATSAPP_AUTOMATION_ENABLED: "false"
+      },
+      fetcher,
+      now: new Date("2026-07-09T17:00:00.000Z"),
+      repository
+    });
+
+    expect(result).toMatchObject({
+      code: "AUTOMATION_DISABLED",
+      message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE,
+      ok: false
+    });
+    expect(fetcher.calls).toHaveLength(0);
+    expect(repository.messages).toHaveLength(0);
+  });
+
   it("envía texto por API, guarda OUTBOUND con metaMessageId y actualiza conversación", async () => {
     const repository = createFakeRepository();
     const conversation = createConversation({
@@ -327,6 +358,36 @@ describe("ONEUI WhatsApp template sending", () => {
       metaMessageId: "wamid.navigo-1",
       status: "accepted"
     });
+  });
+
+  it("bloquea plantillas cuando V1 tiene comunicaciones operativas deshabilitadas", async () => {
+    const repository = createFakeRepository();
+    const fetcher = viFetch({
+      messages: [{ id: "wamid.navigo-disabled-1", message_status: "accepted" }]
+    });
+
+    const result = await sendOneuiWhatsAppTemplate({
+      bodyText: "Confirmacion Navigo",
+      env: {
+        ...whatsappEnv(),
+        WHATSAPP_AUTOMATION_ENABLED: "false"
+      },
+      fetcher,
+      language: "es",
+      parameters: [{ text: "ANA", type: "text" }],
+      repository,
+      sourceModule: "NAVIGO",
+      templateName: "oneui_navigo_confirmation_participacion",
+      toPhone: "5512345678"
+    });
+
+    expect(result).toMatchObject({
+      code: "AUTOMATION_DISABLED",
+      message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE,
+      ok: false
+    });
+    expect(fetcher.calls).toHaveLength(0);
+    expect(repository.messages).toHaveLength(0);
   });
 
   it("arma payload de plantilla Navigo acceso con nombre, enlace y folio", async () => {

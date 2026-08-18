@@ -1,0 +1,321 @@
+{
+  "schemaVersion": "v1-to-v2.participant-export.1",
+  "source": {
+    "project": "mrblackbox-research-platform",
+    "studyCode": "FMASCULINA-NAVIGO-2026",
+    "studyName": "Fragancia Masculina — Navigo Homme",
+    "exportedAt": "2026-08-18T01:08:49.240Z",
+    "exportedAtMexicoCity": "17/08/2026, 19:08:49",
+    "readOnly": true,
+    "publicOrigin": "https://mrblackbox-research-platform.vercel.app"
+  },
+  "participant": {
+    "navFolio": "NAV-009",
+    "hutFolio": null,
+    "name": "Marcos Espinoza",
+    "phone": "55 5951 8529",
+    "email": "cadres.rahmen@gmail.com",
+    "protocol": "CLT_NAVIGO_HUT",
+    "products": {
+      "eva1": null,
+      "eva2": null,
+      "arms": []
+    },
+    "ids": {
+      "participantProfileId": "87d95079-e2cd-40a3-93db-7ebbb3b5b228",
+      "studyParticipantId": "84820ef7-e5d6-41a7-bb25-7d4edaaa0ee2",
+      "participantConfirmationId": "82d8812e-655f-48b2-b982-a33f5642d4df",
+      "hutParticipantId": null
+    },
+    "statuses": {
+      "screeningStatus": "PASSED",
+      "operationalStatus": "SCREENING_PASSED",
+      "hutStatus": null
+    },
+    "createdAt": "2026-08-14T02:04:01.947Z",
+    "updatedAt": "2026-08-14T02:24:33.433Z"
+  },
+  "codes": [
+    {
+      "slot": 1,
+      "code": "FD9Y",
+      "source": "ParticipantReferenceCode",
+      "createdAt": "2026-08-14T02:15:25.605Z"
+    },
+    {
+      "slot": 2,
+      "code": "FKRY",
+      "source": "ParticipantReferenceCode",
+      "createdAt": "2026-08-14T02:15:25.605Z"
+    },
+    {
+      "slot": 3,
+      "code": "G3W2",
+      "source": "ParticipantReferenceCode",
+      "createdAt": "2026-08-14T02:15:25.605Z"
+    }
+  ],
+  "rotations": {
+    "clt": {
+      "rotationPlanName": null,
+      "rotationCode": null,
+      "eva1": null,
+      "eva2": null,
+      "pr1": null,
+      "pr2": null,
+      "pr3": null,
+      "pr4": null,
+      "pr5": null,
+      "pr6": null,
+      "veri1": null,
+      "veri2": null,
+      "triangularSource": null,
+      "importedAt": null
+    },
+    "hut": {
+      "eva1": null,
+      "eva2": null,
+      "source": null
+    }
+  },
+  "activities": [],
+  "answers": [
+    {
+      "activity": "SCREENING",
+      "questionKey": "OP1_RECLUTADOR",
+      "answerValue": "Isabel Ramirez",
+      "answeredAt": "2026-08-14T02:04:54.555Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "90f68528-4dba-402c-b2ec-c340a19e4dad"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "CONSENTIMIENTO",
+      "answerValue": "SI",
+      "answeredAt": "2026-08-14T02:05:13.654Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "a5ef0a2e-bb07-46b0-994e-74dafbde1e8f"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F1_GENERO",
+      "answerValue": "HOMBRE",
+      "answeredAt": "2026-08-14T02:05:29.497Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "c6ffbbd8-8911-4256-b802-a7d3ed6c3f87"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F2_EDAD",
+      "answerValue": 26,
+      "answeredAt": "2026-08-14T02:05:35.146Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "a29fd453-a881-45ee-87d9-d2d565dfd38c"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F3_EXCLUSION_LABORAL",
+      "answerValue": "NINGUNA",
+      "answeredAt": "2026-08-14T02:05:46.316Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "497a162d-1d07-4f4c-b07b-cd91880dfe73"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES",
+      "answerValue": "NO",
+      "answeredAt": "2026-08-14T02:06:07.671Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "3333b162-3c2c-42c9-a2d8-91f55cb124a2"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F5_CONDICIONES_FISICAS",
+      "answerValue": "NINGUNA",
+      "answeredAt": "2026-08-14T02:06:15.466Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "8171fcaa-3a6d-4c18-9fb4-8e1d78e93754"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F6_MARCAS_UTILIZA",
+      "answerValue": "Navigo \r\nJF9\r\nJ-sport",
+      "answeredAt": "2026-08-14T02:13:10.300Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "1925b14f-59f9-4d6c-b972-b7840112e720"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F7_Marca_Frecuente",
+      "answerValue": {
+        "values": [
+          "Navigo",
+          "Otro"
+        ],
+        "otherText": "J-Sport"
+      },
+      "answeredAt": "2026-08-14T02:13:25.390Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "ac4b5e7c-df31-40f7-921b-a1a348258644"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F8_VARIANTE_COLOR",
+      "answerValue": "Azul",
+      "answeredAt": "2026-08-14T02:14:29.151Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "fdd27149-3f48-4f6a-a938-c761b8da0854"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F9_FRECUENCIA_SEMANAL",
+      "answerValue": "SEIS_DIAS",
+      "answeredAt": "2026-08-14T02:14:38.351Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "bef43e04-d637-4fa1-adef-ad47893a90ab"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "F10_ULTIMA_COMPRA",
+      "answerValue": "Hace 3 semanas",
+      "answeredAt": "2026-08-14T02:14:50.316Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "54f3ac89-edd7-4b21-8a47-ce3591ab0a37"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR",
+      "answerValue": "PREPARATORIA_COMPLETA",
+      "answeredAt": "2026-08-14T02:14:59.134Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "149876ab-bb24-41a3-8ff2-b26ad1ba0c14"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D2_BANOS_COMPLETOS",
+      "answerValue": "UN_BANO_COMPLETO",
+      "answeredAt": "2026-08-14T02:15:04.289Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "9b025086-23e7-4c92-84cb-41e824c233a1"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D3_AUTOMOVILES_HOGAR",
+      "answerValue": "CERO_AUTOS",
+      "answeredAt": "2026-08-14T02:15:09.242Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "fb624bca-6d02-43b1-a0ac-0b6705e08293"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D4_INTERNET_HOGAR",
+      "answerValue": "SI_TIENE_INTERNET",
+      "answeredAt": "2026-08-14T02:15:14.525Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "4bfbcc37-2cb3-4829-a2bd-478665cb8a4b"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D5_PERSONAS_TRABAJARON",
+      "answerValue": "TRES_PERSONAS",
+      "answeredAt": "2026-08-14T02:15:20.469Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "881b94c7-7455-4a29-a1ab-6840bec3fbeb"
+      }
+    },
+    {
+      "activity": "SCREENING",
+      "questionKey": "D6_CUARTOS_DORMIR",
+      "answerValue": "DOS_CUARTOS",
+      "answeredAt": "2026-08-14T02:15:25.013Z",
+      "metadata": {
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "screeningAnswerId": "81ea671b-8145-499d-ba68-e5d25735ed5b"
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "type": "SCREENING:PERFUME_PHOTO",
+      "url": null,
+      "fecha": "2026-08-14T02:13:04.408Z",
+      "fechaMexicoCity": "13/08/2026, 20:13:04",
+      "storage": {
+        "storageBucket": "participant-evidence",
+        "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/87d95079-e2cd-40a3-93db-7ebbb3b5b228/screening-attempts/8880b068-54c0-4d4d-8208-eed61c0ae6f4/perfume_photo/627e259a-ce05-4d10-9f1d-144d48a70484.jpg",
+        "originalFilename": "perfume-photo-1786673580383.jpg",
+        "mimeType": "image/jpeg",
+        "extension": "jpg",
+        "sizeBytes": 60786
+      },
+      "metadata": {
+        "participantEvidenceId": "a23737d1-b6f4-4159-9a39-e4b1973b01ac",
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "relatedQuestionId": "F6_MARCAS_UTILIZA",
+        "reviewStatus": "APPROVED",
+        "reviewedAt": "2026-08-14T02:24:33.391Z"
+      }
+    },
+    {
+      "type": "SCREENING:SELFIE_IDENTIFICATION",
+      "url": null,
+      "fecha": "2026-08-14T02:18:35.873Z",
+      "fechaMexicoCity": "13/08/2026, 20:18:35",
+      "storage": {
+        "storageBucket": "participant-evidence",
+        "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/87d95079-e2cd-40a3-93db-7ebbb3b5b228/screening-attempts/8880b068-54c0-4d4d-8208-eed61c0ae6f4/selfie_identification/37c262a9-eaa7-41b4-83b8-8ce83c71a36f.jpg",
+        "originalFilename": "selfie-identification-1786673890360.jpg",
+        "mimeType": "image/jpeg",
+        "extension": "jpg",
+        "sizeBytes": 45238
+      },
+      "metadata": {
+        "participantEvidenceId": "0679f7ab-c463-4b16-ad2b-6e6631bae0fa",
+        "screeningAttemptId": "8880b068-54c0-4d4d-8208-eed61c0ae6f4",
+        "relatedQuestionId": null,
+        "reviewStatus": "APPROVED",
+        "reviewedAt": "2026-08-14T02:24:33.391Z"
+      }
+    }
+  ],
+  "audit": [],
+  "warnings": [
+    "HUT_PARTICIPANT_NOT_FOUND",
+    "CLT_EVA_ROTATION_INCOMPLETE",
+    "CLT_TRIANGULAR_ROTATION_INCOMPLETE",
+    "PRIVATE_EVIDENCE_EXPORTED_WITH_STORAGE_KEY_ONLY"
+  ]
+}

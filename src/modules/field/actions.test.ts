@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   sendNavigoConfirmationWhatsApp: vi.fn()
 }));
 
+const blockMessage = "Este estudio ahora se gestiona en la plataforma V2. Por favor continúe el registro en V2.";
+
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
@@ -67,50 +69,16 @@ describe("field actions public access", () => {
     vi.clearAllMocks();
   });
 
-  it("starts a field screening attempt without an internal session", async () => {
-    const { startFieldScreeningAttemptAction } = await import("./actions");
-    const { PUBLIC_FIELD_ACTOR } = await import("./service");
-    const { startFieldScreeningAttempt } = await import("./service");
-
-    vi.mocked(startFieldScreeningAttempt).mockResolvedValueOnce({
-      data: {
-        attemptId: "attempt-public-1",
-        kind: "started",
-        participantProfileId: "profile-1",
-        reusedParticipantProfile: false,
-        studyParticipantId: "study-participant-1"
-      },
-      ok: true
-    });
-
-    const formData = new FormData();
-    formData.set("name", "Persona publica");
-    formData.set("phone", "5551112222");
-
-    await expect(startFieldScreeningAttemptAction("study-1", {}, formData)).rejects.toThrow(
-      "redirect:/field/screening/attempt-public-1"
-    );
-
-    expect(startFieldScreeningAttempt).toHaveBeenCalledWith(
-      expect.objectContaining({
-        actor: PUBLIC_FIELD_ACTOR,
-        studyId: "study-1"
-      })
-    );
-  });
-
-  it("returns a visible error instead of throwing the field error boundary when start fails", async () => {
+  it("blocks starting a field screening attempt from V1", async () => {
     const { startFieldScreeningAttemptAction } = await import("./actions");
     const { startFieldScreeningAttempt } = await import("./service");
-
-    vi.mocked(startFieldScreeningAttempt).mockRejectedValueOnce(new Error("database unavailable"));
 
     const formData = new FormData();
     formData.set("name", "Persona publica");
     formData.set("phone", "5551112222");
 
     await expect(startFieldScreeningAttemptAction("study-1", {}, formData)).resolves.toEqual({
-      error: "No fue posible iniciar el filtro. Intenta nuevamente.",
+      error: blockMessage,
       values: {
         email: "",
         externalReference: "",
@@ -118,141 +86,68 @@ describe("field actions public access", () => {
         phone: "5551112222"
       }
     });
+    expect(startFieldScreeningAttempt).not.toHaveBeenCalled();
   });
 
-  it("generates folio and codes without sending WhatsApp, and then redirects to selfie when review is required", async () => {
-    const { saveFieldScreeningAnswerAction } = await import("./actions");
-    const { PUBLIC_FIELD_ACTOR } = await import("./service");
-    const { saveFieldScreeningAnswer } = await import("./service");
+  it("does not hit the start service while V1 screening is blocked", async () => {
+    const { startFieldScreeningAttemptAction } = await import("./actions");
+    const { startFieldScreeningAttempt } = await import("./service");
 
-    vi.mocked(saveFieldScreeningAnswer).mockResolvedValueOnce({
-      data: {
-        attemptId: "attempt-public-1",
-        closed: true,
-        nextQuestionId: null,
-        status: "PASSED"
-      },
-      ok: true
+    const formData = new FormData();
+    formData.set("name", "Persona publica");
+    formData.set("phone", "5551112222");
+
+    await expect(startFieldScreeningAttemptAction("study-1", {}, formData)).resolves.toEqual({
+      error: blockMessage,
+      values: {
+        email: "",
+        externalReference: "",
+        name: "Persona publica",
+        phone: "5551112222"
+      }
     });
-    mocks.ensureFilterOnlyConfirmation.mockResolvedValueOnce({
-      actorUserId: "admin-1",
-      confirmation: {
-        folio: "NAV-001",
-        folioSequence: 1,
-        referenceCodes: [
-          { code: "A7K4", slot: 1 },
-          { code: "M3P9", slot: 2 },
-          { code: "T8R2", slot: 3 }
-        ]
-      },
-      created: true,
-      ok: true,
-      studyParticipantId: "study-participant-1"
-    });
-    mocks.getAttempt.mockResolvedValueOnce({
-      id: "attempt-public-1",
-      questionnaireVersion: {
-        study: {
-          code: "FMASCULINA-NAVIGO-2026",
-          id: "study-1"
-        }
-      },
-      studyParticipant: {
-        participantProfile: {
-          name: "Persona publica",
-          phone: "5551112222"
-        }
-      },
-      studyParticipantId: "study-participant-1"
-    });
+    expect(startFieldScreeningAttempt).not.toHaveBeenCalled();
+  });
+
+  it("blocks saving answers and does not generate folio or codes", async () => {
+    const { saveFieldScreeningAnswerAction } = await import("./actions");
+    const { saveFieldScreeningAnswer } = await import("./service");
     const formData = new FormData();
     formData.set("value", "SI");
 
     await expect(saveFieldScreeningAnswerAction("attempt-public-1", "CONSENTIMIENTO", formData)).rejects.toThrow(
-      "redirect:/field/screening/attempt-public-1/selfie"
+      "redirect:/field/screening/attempt-public-1?question=CONSENTIMIENTO&error=Este+estudio+ahora+se+gestiona+en+la+plataforma+V2.+Por+favor+contin%C3%BAe+el+registro+en+V2."
     );
 
-    expect(saveFieldScreeningAnswer).toHaveBeenCalledWith(
-      expect.objectContaining({
-        actor: PUBLIC_FIELD_ACTOR,
-        attemptId: "attempt-public-1"
-      })
-    );
-    expect(mocks.ensureFilterOnlyConfirmation).toHaveBeenCalledWith(
-      expect.objectContaining({
-        attemptId: "attempt-public-1"
-      })
-    );
+    expect(saveFieldScreeningAnswer).not.toHaveBeenCalled();
+    expect(mocks.ensureFilterOnlyConfirmation).not.toHaveBeenCalled();
     expect(mocks.sendNavigoConfirmationWhatsApp).not.toHaveBeenCalled();
   });
 
-  it("goes straight to result when a passed public field study does not require selfie", async () => {
+  it("blocks saving answers for other studies while V1 screening is disabled", async () => {
     const { saveFieldScreeningAnswerAction } = await import("./actions");
     const { saveFieldScreeningAnswer } = await import("./service");
-
-    vi.mocked(saveFieldScreeningAnswer).mockResolvedValueOnce({
-      data: {
-        attemptId: "attempt-detergents-1",
-        closed: true,
-        nextQuestionId: null,
-        status: "PASSED"
-      },
-      ok: true
-    });
-    mocks.ensureFilterOnlyConfirmation.mockResolvedValueOnce({
-      actorUserId: "admin-1",
-      confirmation: {
-        folio: "DET-001",
-        folioSequence: 1,
-        referenceCodes: [
-          { code: "A7K4", slot: 1 },
-          { code: "M3P9", slot: 2 },
-          { code: "T8R2", slot: 3 }
-        ]
-      },
-      created: true,
-      ok: true,
-      studyParticipantId: "study-participant-detergents-1"
-    });
-    mocks.getAttempt.mockResolvedValueOnce({
-      id: "attempt-detergents-1",
-      questionnaireVersion: {
-        study: {
-          code: "DETERGENTES-ROPA-2026",
-          id: "study-detergents"
-        }
-      },
-      studyParticipant: {
-        participantProfile: {
-          name: "Persona publica",
-          phone: "5551112222"
-        }
-      },
-      studyParticipantId: "study-participant-1"
-    });
     const formData = new FormData();
     formData.set("value", "SI");
 
     await expect(saveFieldScreeningAnswerAction("attempt-detergents-1", "CONSENTIMIENTO", formData)).rejects.toThrow(
-      "redirect:/field/screening/attempt-detergents-1/result"
+      "redirect:/field/screening/attempt-detergents-1?question=CONSENTIMIENTO&error=Este+estudio+ahora+se+gestiona+en+la+plataforma+V2.+Por+favor+contin%C3%BAe+el+registro+en+V2."
     );
+    expect(saveFieldScreeningAnswer).not.toHaveBeenCalled();
     expect(mocks.sendNavigoConfirmationWhatsApp).not.toHaveBeenCalled();
   });
 
-  it("redirects back to the field question with a clear error when saving fails unexpectedly", async () => {
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  it("returns the V2 message before unexpected save failures can occur", async () => {
     const { saveFieldScreeningAnswerAction } = await import("./actions");
     const { saveFieldScreeningAnswer } = await import("./service");
-
-    vi.mocked(saveFieldScreeningAnswer).mockRejectedValueOnce(new Error("database unavailable"));
 
     const formData = new FormData();
     formData.set("value", "SI");
 
     await expect(saveFieldScreeningAnswerAction("attempt-public-1", "OP1_RECLUTADOR", formData)).rejects.toThrow(
-      "redirect:/field/screening/attempt-public-1?question=OP1_RECLUTADOR&error=No+se+pudo+guardar+la+respuesta.+Intenta+nuevamente."
+      "redirect:/field/screening/attempt-public-1?question=OP1_RECLUTADOR&error=Este+estudio+ahora+se+gestiona+en+la+plataforma+V2.+Por+favor+contin%C3%BAe+el+registro+en+V2."
     );
 
-    consoleErrorSpy.mockRestore();
+    expect(saveFieldScreeningAnswer).not.toHaveBeenCalled();
   });
 });

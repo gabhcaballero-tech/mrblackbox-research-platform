@@ -1,0 +1,307 @@
+{
+  "schemaVersion": "v1-to-v2.screening-activity-import.1",
+  "source": {
+    "project": "mrblackbox-research-platform",
+    "studyCode": "FMASCULINA-NAVIGO-2026",
+    "exportedAt": "2026-08-15T20:39:34.246Z",
+    "readOnly": true
+  },
+  "participant": {
+    "navFolio": "NAV-156",
+    "hutFolio": "HUT-156",
+    "name": "JOSÉ LUIS RAMIREZ AGUILAR",
+    "phone": "+525536372162",
+    "email": "luisraciel001@gmail.com",
+    "protocol": "CLT_NAVIGO_HUT",
+    "ids": {
+      "participantProfileId": "d5584999-9bc8-46be-a531-1f3bdd61ea01",
+      "studyParticipantId": "3df8235a-7d68-44f4-b692-e20a29e6047e",
+      "participantConfirmationId": "429a45c6-3d56-47cf-a58a-924dea1d4138",
+      "hutParticipantId": "309206a8-677e-45cd-8eb7-ad7c5c7932c2"
+    },
+    "statuses": {
+      "screeningStatus": "PENDING_REVIEW",
+      "operationalStatus": "SCREENING_PASSED",
+      "hutStatus": "NOT_STARTED"
+    }
+  },
+  "operationalApproval": {
+    "participantConfirmationId": "429a45c6-3d56-47cf-a58a-924dea1d4138",
+    "approvedAt": "2026-08-15T19:33:19.289Z",
+    "screeningStatusInV1": "PENDING_REVIEW",
+    "operationalStatusInV1": "SCREENING_PASSED",
+    "resultForV2": "APPROVED",
+    "note": "V1 conserva screeningStatus=PENDING_REVIEW, pero existe ParticipantConfirmation y operationalStatus=SCREENING_PASSED; importar como screening aprobado operativo."
+  },
+  "codes": [
+    {
+      "slot": 1,
+      "code": "EACU",
+      "source": "ParticipantReferenceCode",
+      "createdAt": "2026-08-15T19:33:19.314Z"
+    },
+    {
+      "slot": 2,
+      "code": "CFWK",
+      "source": "ParticipantReferenceCode",
+      "createdAt": "2026-08-15T19:33:19.314Z"
+    },
+    {
+      "slot": 3,
+      "code": "AU4Y",
+      "source": "ParticipantReferenceCode",
+      "createdAt": "2026-08-15T19:33:19.314Z"
+    }
+  ],
+  "screeningActivity": {
+    "sourceAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+    "source": "FIELD",
+    "status": "COMPLETED_PENDING_REVIEW_IN_V1",
+    "resultForV2": "APPROVED",
+    "startedAt": "2026-08-15T19:13:47.958Z",
+    "completedAt": "2026-08-15T19:33:18.836Z",
+    "answers": [
+      {
+        "activity": "SCREENING",
+        "questionKey": "OP1_RECLUTADOR",
+        "answerValue": "Avelina",
+        "answeredAt": "2026-08-15T19:14:43.586Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "0c952cb2-1518-4c5d-b6c8-fada14cc89fc"
+        }
+      },
+      {
+        "activity": "SCREENING",
+        "questionKey": "CONSENTIMIENTO",
+        "answerValue": "SI",
+        "answeredAt": "2026-08-15T19:14:46.541Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "2d290dd1-3493-4de3-9265-cbd0850b1df6"
+        }
+      },
+      {
+        "activity": "SCREENING",
+        "questionKey": "F1_GENERO",
+        "answerValue": "HOMBRE",
+        "answeredAt": "2026-08-15T19:14:49.348Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "aed48b00-55ce-4404-a10b-b9a17792ea4c"
+        }
+      },
+      {
+        "activity": "SCREENING",
+        "questionKey": "F2_EDAD",
+        "answerValue": 41,
+        "answeredAt": "2026-08-15T19:15:17.391Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "84d5075c-cc01-4809-8c82-cf855ebf035f"
+        }
+      },
+      {
+        "activity": "SCREENING",
+        "questionKey": "F3_EXCLUSION_LABORAL",
+        "answerValue": "NINGUNA",
+        "answeredAt": "2026-08-15T19:15:22.634Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "188094d9-0840-41c8-88bf-c45b23da5da8"
+        }
+      },
+      {
+        "activity": "SCREENING",
+        "questionKey": "F4_PARTICIPACION_RECIENTE_PERFUMES",
+        "answerValue": "NO",
+        "answeredAt": "2026-08-15T19:15:41.022Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "2c1ac54f-5335-46eb-8b96-89717d5732be"
+        }
+      },
+      {
+        "activity": "SCREENING",
+        "questionKey": "F5_CONDICIONES_FISICAS",
+        "answerValue": "NINGUNA",
+        "answeredAt": "2026-08-15T19:15:45.234Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "6f905c51-c9e6-4563-b307-2ef0ce2f8df9"
+        }
+      },
+      {
+        "activity": "SCREENING",
+        "questionKey": "F6_MARCAS_UTILIZA",
+        "answerValue": "Navigo",
+        "answeredAt": "2026-08-15T19:18:08.627Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "d6f0ea4c-f655-47b1-9eac-f2a045a32309"
+        }
+      },
+      {
+        "activity": "SCREENING",
+        "questionKey": "F7_Marca_Frecuente",
+        "answerValue": [
+          "Navigo"
+        ],
+        "answeredAt": "2026-08-15T19:18:22.312Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "4db5ccec-2f93-4e43-8c18-508c97edd6d2"
+        }
+      },
+      {
+        "activity": "SCREENING",
+        "questionKey": "F8_VARIANTE_COLOR",
+        "answerValue": "Homme azul",
+        "answeredAt": "2026-08-15T19:18:33.091Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "c6b71748-76d8-4cdb-9b87-17d365e49613"
+        }
+      },
+      {
+        "activity": "SCREENING",
+        "questionKey": "F9_FRECUENCIA_SEMANAL",
+        "answerValue": "SIETE_DIAS",
+        "answeredAt": "2026-08-15T19:19:30.710Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "dc2ab4dc-b0f7-4c8c-a24b-8e67b8c90337"
+        }
+      },
+      {
+        "activity": "SCREENING",
+        "questionKey": "F10_ULTIMA_COMPRA",
+        "answerValue": "3 meses",
+        "answeredAt": "2026-08-15T19:21:21.260Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "e683b9d4-706b-4d23-a9eb-720fd9346e0c"
+        }
+      },
+      {
+        "activity": "SCREENING",
+        "questionKey": "D1_ESCOLARIDAD_JEFE_HOGAR",
+        "answerValue": "PREPARATORIA_COMPLETA",
+        "answeredAt": "2026-08-15T19:26:09.648Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "4ec245b8-2f8e-4153-b991-80fde247bb1c"
+        }
+      },
+      {
+        "activity": "SCREENING",
+        "questionKey": "D2_BANOS_COMPLETOS",
+        "answerValue": "UN_BANO_COMPLETO",
+        "answeredAt": "2026-08-15T19:26:52.624Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "c9f727ce-4016-441a-9a13-a3e19f310307"
+        }
+      },
+      {
+        "activity": "SCREENING",
+        "questionKey": "D3_AUTOMOVILES_HOGAR",
+        "answerValue": "UN_AUTO",
+        "answeredAt": "2026-08-15T19:29:24.584Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "c78a8fef-dc8b-4307-b6bd-b0326b1d7839"
+        }
+      },
+      {
+        "activity": "SCREENING",
+        "questionKey": "D4_INTERNET_HOGAR",
+        "answerValue": "SI_TIENE_INTERNET",
+        "answeredAt": "2026-08-15T19:29:41.205Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "8cb41c03-13b2-48c1-99a1-a734e5b9122c"
+        }
+      },
+      {
+        "activity": "SCREENING",
+        "questionKey": "D5_PERSONAS_TRABAJARON",
+        "answerValue": "UNA_PERSONA",
+        "answeredAt": "2026-08-15T19:32:42.501Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "72f757d3-718f-4d30-bef9-de61f165d9a9"
+        }
+      },
+      {
+        "activity": "SCREENING",
+        "questionKey": "D6_CUARTOS_DORMIR",
+        "answerValue": "DOS_CUARTOS",
+        "answeredAt": "2026-08-15T19:33:18.816Z",
+        "metadata": {
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "screeningAnswerId": "36fc87bc-d27c-40bd-b3df-1f61ac22e28c"
+        }
+      }
+    ],
+    "evidence": [
+      {
+        "type": "SCREENING:PERFUME_PHOTO",
+        "url": null,
+        "fecha": "2026-08-15T19:17:55.367Z",
+        "fechaMexicoCity": "15/08/2026, 13:17:55",
+        "storage": {
+          "storageBucket": "participant-evidence",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/d5584999-9bc8-46be-a531-1f3bdd61ea01/screening-attempts/eb4acf90-0e0a-498a-84ac-18359dd8c8cd/perfume_photo/cc3ffbc9-ac86-4ee3-8577-9930c2e07a30.jpg",
+          "originalFilename": "IMG-20260815-WA0012.jpg",
+          "mimeType": "image/jpeg",
+          "extension": "jpg",
+          "sizeBytes": 118383
+        },
+        "metadata": {
+          "participantEvidenceId": "7fc949d7-8e92-425b-a886-1ee8de8383bf",
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "relatedQuestionId": "F6_MARCAS_UTILIZA",
+          "reviewStatus": "PENDING",
+          "reviewedAt": null
+        }
+      },
+      {
+        "type": "SCREENING:SELFIE_IDENTIFICATION",
+        "url": null,
+        "fecha": "2026-08-15T19:33:34.105Z",
+        "fechaMexicoCity": "15/08/2026, 13:33:34",
+        "storage": {
+          "storageBucket": "participant-evidence",
+          "privateStorageKey": "studies/90f25436-2353-46fa-817a-4f187edea59d/participants/d5584999-9bc8-46be-a531-1f3bdd61ea01/screening-attempts/eb4acf90-0e0a-498a-84ac-18359dd8c8cd/selfie_identification/92a3d1bf-7bb8-4acf-a116-c222fc0b95ae.jpg",
+          "originalFilename": "IMG-20260815-WA0011.jpg",
+          "mimeType": "image/jpeg",
+          "extension": "jpg",
+          "sizeBytes": 180703
+        },
+        "metadata": {
+          "participantEvidenceId": "0bbfd6ca-688f-41e1-9827-1b9aab9d37c0",
+          "screeningAttemptId": "eb4acf90-0e0a-498a-84ac-18359dd8c8cd",
+          "relatedQuestionId": null,
+          "reviewStatus": "PENDING",
+          "reviewedAt": null
+        }
+      }
+    ]
+  },
+  "historicalPreviousScreeningAttempt": {
+    "sourceAttemptId": "905f2b59-85bd-49e3-a9bc-ac98bcbad84b",
+    "status": "TERMINATED",
+    "startedAt": "2026-08-08T05:41:26.417Z",
+    "completedAt": "2026-08-08T05:52:02.873Z",
+    "answerCount": 7,
+    "recommendation": "No importar como actividad vigente; conservar sólo si V2 requiere bitácora histórica de intentos."
+  },
+  "migrationValidation": {
+    "cltStarted": false,
+    "cltAnswers": 0,
+    "navigoStarted": false,
+    "hutStarted": false,
+    "recommendation": "IMPORTAR_SCREENING_APROBADO"
+  }
+}

@@ -6,6 +6,7 @@ import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { createFieldRepository } from "@/modules/field/repository";
 import { getFieldStudy } from "@/modules/field/service";
+import { V1ScreeningBlockedNotice } from "../../_components/V1ScreeningBlockedNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -69,12 +70,7 @@ export default async function FieldStudyPage({ params }: FieldStudyPageProps) {
           </div>
         </dl>
         <div className="mt-6">
-          <Link
-            className="inline-flex w-fit rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-800"
-            href={`/field/studies/${study.id}/screening/new`}
-          >
-            Iniciar filtro
-          </Link>
+          <V1ScreeningBlockedNotice />
         </div>
       </section>
     </AppShell>

@@ -19,6 +19,10 @@ import type { NavigoFaceVerificationClientResult } from "@/modules/navigo-app/fa
 import { parseNavigoDateTimeLocal } from "@/modules/navigo-app";
 import { createFieldOperationsRepository } from "@/modules/field-operations";
 import type { CltOperationsDetail } from "@/modules/clt-operations/types";
+import {
+  V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE,
+  areV1OperationalCommunicationsDisabled
+} from "@/modules/oneui-whatsapp";
 
 export async function createHutParticipantAction(studyId: string, formData: FormData) {
   await requireCapability("screening:review");
@@ -111,6 +115,10 @@ export async function reconcileReservedHutNavParticipantsAction(studyId: string,
 
 export async function sendHutRegistrationWhatsAppAction(studyId: string, participantId: string, formData: FormData) {
   await requireCapability("screening:review");
+  if (areV1OperationalCommunicationsDisabled()) {
+    redirectWithHutMessage(studyId, { message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE, ok: false }, participantId);
+  }
+
   const result = await createHutRepository().sendRegistrationWhatsApp({
     force: true,
     participantId,
@@ -123,6 +131,10 @@ export async function sendHutRegistrationWhatsAppAction(studyId: string, partici
 
 export async function sendHutPhotoReminderWhatsAppAction(studyId: string, participantId: string, formData: FormData) {
   const actor = await requireCapability("screening:review");
+  if (areV1OperationalCommunicationsDisabled()) {
+    redirectWithHutMessage(studyId, { message: V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE, ok: false }, participantId);
+  }
+
   const result = await createHutRepository().sendPhotoReminderWhatsApp({
     actorUserId: actor.id,
     participantId,
