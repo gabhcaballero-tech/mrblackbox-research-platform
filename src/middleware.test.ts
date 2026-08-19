@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
-import { proxy } from "../proxy";
+import { proxy } from "./proxy";
 
 async function runMiddleware(pathname: string) {
   return proxy(new NextRequest(`https://mrblackbox-research-platform.vercel.app${pathname}`));
