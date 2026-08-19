@@ -17,6 +17,11 @@ import {
   areV1OperationalCommunicationsDisabled
 } from "@/modules/oneui-whatsapp";
 import {
+  V1_PARTICIPANT_MIGRATION_MESSAGE,
+  createV1ParticipantMigrationBlockedResult,
+  isV1ParticipantOperationBlocked
+} from "@/modules/v1-migration";
+import {
   createCtlPublicSessionToken,
   ctlPublicSessionCookieName,
   ctlPublicSessionMaxAgeSeconds
@@ -33,6 +38,10 @@ import {
 } from "./service";
 
 export async function loginPublicCtlInterviewerAction(studyCode: string, formData: FormData) {
+  if (isV1ParticipantOperationBlocked()) {
+    redirect("/migracion-v1");
+  }
+
   const secret = getCtlPublicSessionSecret();
   const includeQa = formData.get("qa") === "1";
 
@@ -74,6 +83,10 @@ export async function logoutPublicCtlInterviewerAction(studyCode: string) {
 }
 
 export async function claimPublicCtlFolioAction(studyCode: string, formData: FormData) {
+  if (isV1ParticipantOperationBlocked()) {
+    redirect("/migracion-v1");
+  }
+
   const actor = await getPublicCtlInterviewerActor({ studyCode });
   const includeQa = formData.get("qa") === "1";
 
@@ -97,6 +110,10 @@ export async function claimPublicCtlFolioAction(studyCode: string, formData: For
 }
 
 export async function savePublicCtlAnswersAction(studyCode: string, sessionId: string, formData: FormData) {
+  if (isV1ParticipantOperationBlocked()) {
+    redirect("/migracion-v1");
+  }
+
   const actor = await getPublicCtlInterviewerActor({ studyCode });
 
   if (!actor) {
@@ -143,6 +160,10 @@ export async function validatePublicCtlPhaseCodeAction(
   phase: CtlOperationalPhase,
   formData: FormData
 ) {
+  if (isV1ParticipantOperationBlocked()) {
+    return createV1ParticipantMigrationBlockedResult();
+  }
+
   const actor = await getPublicCtlInterviewerActor({ studyCode });
 
   if (!actor) {
@@ -180,6 +201,10 @@ export async function savePublicCtlQuestionAnswerAction(
   questionCode: string,
   formData: FormData
 ) {
+  if (isV1ParticipantOperationBlocked()) {
+    return createV1ParticipantMigrationBlockedResult();
+  }
+
   const actor = await getPublicCtlInterviewerActor({ studyCode });
 
   if (!actor) {
@@ -261,6 +286,10 @@ export async function savePublicCtlQuestionAnswerAction(
 }
 
 export async function markPublicCtlComparativeStartedAction(studyCode: string, sessionId: string) {
+  if (isV1ParticipantOperationBlocked()) {
+    return createV1ParticipantMigrationBlockedResult();
+  }
+
   const actor = await getPublicCtlInterviewerActor({ studyCode });
 
   if (!actor) {
@@ -312,6 +341,10 @@ export async function sendPublicCtlNavigoEvaluationLinkWhatsAppAction(
   sessionId: string,
   requestOrigin: string
 ): Promise<NavigoEvaluationLinkWhatsAppActionResult> {
+  if (isV1ParticipantOperationBlocked()) {
+    return { message: V1_PARTICIPANT_MIGRATION_MESSAGE, ok: false };
+  }
+
   const actor = await getPublicCtlInterviewerActor({ studyCode });
 
   if (!actor) {
@@ -382,6 +415,10 @@ export async function sendPublicCtlParticipantLinksWhatsAppAction(
   requestOrigin: string,
   linkType: NavigoParticipantLinkSendType
 ): Promise<NavigoParticipantLinksWhatsAppActionResult> {
+  if (isV1ParticipantOperationBlocked()) {
+    return { message: V1_PARTICIPANT_MIGRATION_MESSAGE, ok: false };
+  }
+
   const actor = await getPublicCtlInterviewerActor({ studyCode });
 
   if (!actor) {
@@ -460,6 +497,10 @@ function publicLinkSentSuccessMessage(linkType: NavigoParticipantLinkSendType): 
 }
 
 export async function finishPublicCtlSessionAction(studyCode: string, sessionId: string, formData: FormData) {
+  if (isV1ParticipantOperationBlocked()) {
+    return createV1ParticipantMigrationBlockedResult();
+  }
+
   const actor = await getPublicCtlInterviewerActor({ studyCode });
 
   if (!actor) {

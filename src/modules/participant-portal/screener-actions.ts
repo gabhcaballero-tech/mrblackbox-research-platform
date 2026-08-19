@@ -9,6 +9,7 @@ import { createParticipantPortalRepository } from "./repository";
 import { createParticipantPortalScreenerRepository } from "./screener-repository";
 import { saveParticipantPortalScreenerAnswer } from "./screener-service";
 import { participantPortalStudyCodeSchema } from "./validation";
+import { isV1ParticipantOperationBlocked } from "@/modules/v1-migration";
 
 function portalFilterPath(studyCode: string, questionId?: string | null, message?: string) {
   const params = new URLSearchParams();
@@ -32,6 +33,11 @@ export async function saveParticipantPortalScreenerAnswerAction(
   formData: FormData
 ): Promise<void> {
   const studyCode = normalizeStudyCodeOrRedirect(studyCodeInput);
+
+  if (isV1ParticipantOperationBlocked()) {
+    redirect(`/participar/${encodeURIComponent(studyCode)}`);
+  }
+
   const portalRepository = createParticipantPortalRepository();
   const auth = await getParticipantPortalAuth({ repository: portalRepository, studyCode });
 

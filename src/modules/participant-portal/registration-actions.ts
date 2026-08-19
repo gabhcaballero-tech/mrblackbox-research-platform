@@ -23,6 +23,7 @@ import { createParticipantPortalRepository } from "./repository";
 import { createParticipantPortalRegistrationRepository } from "./registration-repository";
 import { registerParticipantInPortal } from "./registration-service";
 import { verifyParticipantPortalTurnstile } from "./turnstile";
+import { V1_PARTICIPANT_MIGRATION_MESSAGE, isV1ParticipantOperationBlocked } from "@/modules/v1-migration";
 
 export async function registerParticipantPortalAction(
   studyCode: string,
@@ -30,6 +31,15 @@ export async function registerParticipantPortalAction(
   formData: FormData
 ): Promise<ParticipantPortalActionState> {
   const formValues = extractRegistrationFormValues(formData);
+
+  if (isV1ParticipantOperationBlocked()) {
+    return {
+      formValues,
+      message: V1_PARTICIPANT_MIGRATION_MESSAGE,
+      status: "error"
+    };
+  }
+
   const portalRepository = createParticipantPortalRepository();
   const availability = await getParticipantPortalAvailability({
     repository: portalRepository,

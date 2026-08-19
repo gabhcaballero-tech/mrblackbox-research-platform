@@ -38,6 +38,7 @@ import {
   type NavigoRotationWorkbookRowInput
 } from "./rotation-workbook";
 import type { NavigoParticipantImportActionState } from "./participant-import-state";
+import { V1_PARTICIPANT_MIGRATION_MESSAGE, isV1ParticipantOperationBlocked } from "@/modules/v1-migration";
 import type { EvidenceUploadMetadata } from "@/modules/participant-portal/evidence-storage";
 import { cleanupNavigoTestRotations } from "./rotation-cleanup";
 import {
@@ -1096,6 +1097,13 @@ export async function requestNavigoActivitySelfieUploadAction(
   activityId: string,
   metadata: EvidenceUploadMetadata
 ): Promise<NavigoActionResult<NavigoSignedActivityUpload>> {
+  if (isV1ParticipantOperationBlocked()) {
+    return {
+      message: V1_PARTICIPANT_MIGRATION_MESSAGE,
+      ok: false
+    };
+  }
+
   const token = parseToken(tokenInput);
   const result = await createNavigoAppRepository().requestActivitySelfieUpload({
     activityId,
@@ -1119,6 +1127,13 @@ export async function confirmNavigoActivitySelfieUploadAction(
   reviewStatus: "APPROVED" | "PENDING" | "REJECTED";
   selfieCount: number;
 }>> {
+  if (isV1ParticipantOperationBlocked()) {
+    return {
+      message: V1_PARTICIPANT_MIGRATION_MESSAGE,
+      ok: false
+    };
+  }
+
   const token = parseToken(tokenInput);
   const result = await createNavigoAppRepository().confirmActivitySelfieUpload({
     activityId,
@@ -1136,6 +1151,13 @@ export async function submitNavigoActivityResponsesAction(
   activityId: string,
   formData: FormData
 ): Promise<NavigoActionResult<{ completedAt: string; message: string }>> {
+  if (isV1ParticipantOperationBlocked()) {
+    return {
+      message: V1_PARTICIPANT_MIGRATION_MESSAGE,
+      ok: false
+    };
+  }
+
   const token = parseToken(tokenInput);
   const answers: Record<string, FormDataEntryValue | null> = {};
 
@@ -1178,6 +1200,10 @@ export async function submitNavigoActivityResponsesAction(
 }
 
 export async function registerNavigoInitialApplicationAction(tokenInput: string, formData: FormData) {
+  if (isV1ParticipantOperationBlocked()) {
+    redirect("/migracion-v1");
+  }
+
   const token = parseToken(tokenInput);
   const testModeParams = readNavigoTestModeParams(formData);
   const result = await createNavigoAppRepository().registerInitialApplication({
@@ -1207,6 +1233,13 @@ export async function confirmNavigoT0IdentityAction(
   activityId: string,
   identityConfirmed: "NO" | "YES"
 ): Promise<NavigoActionResult<{ identityStatus: "CONFIRMED" | "REJECTED" }>> {
+  if (isV1ParticipantOperationBlocked()) {
+    return {
+      message: V1_PARTICIPANT_MIGRATION_MESSAGE,
+      ok: false
+    };
+  }
+
   const token = parseToken(tokenInput);
 
   return createNavigoAppRepository().confirmT0Identity({

@@ -23,6 +23,7 @@ import {
   V1_OPERATIONAL_COMMUNICATIONS_DISABLED_MESSAGE,
   areV1OperationalCommunicationsDisabled
 } from "@/modules/oneui-whatsapp";
+import { V1_PARTICIPANT_MIGRATION_MESSAGE, isV1ParticipantOperationBlocked } from "@/modules/v1-migration";
 
 export async function createHutParticipantAction(studyId: string, formData: FormData) {
   await requireCapability("screening:review");
@@ -317,6 +318,10 @@ export async function authorizeHutSecondStageForFieldAction(
   studyId: string,
   formData: FormData
 ) {
+  if (isV1ParticipantOperationBlocked()) {
+    redirect("/migracion-v1");
+  }
+
   const fieldAccess = await resolveFieldHutActionAccess(folio, formData);
   if (!fieldAccess.ok) {
     redirectToFieldHut(folio, null, fieldAccess.message, null, fieldAccess);
@@ -339,6 +344,10 @@ export async function authorizeHutThirdStageForFieldAction(
   studyId: string,
   formData: FormData
 ) {
+  if (isV1ParticipantOperationBlocked()) {
+    redirect("/migracion-v1");
+  }
+
   const fieldAccess = await resolveFieldHutActionAccess(folio, formData);
   if (!fieldAccess.ok) {
     redirectToFieldHut(folio, null, fieldAccess.message, null, fieldAccess);
@@ -581,6 +590,10 @@ export async function confirmHutReferenceSelfieUploadAction(
 }
 
 export async function validateHutPhaseCodeAction(token: string, phase: HutPhase, formData: FormData) {
+  if (isV1ParticipantOperationBlocked()) {
+    redirect("/migracion-v1");
+  }
+
   const result = await createHutRepository().validatePhaseCode({
     code: String(formData.get("phaseCode") ?? ""),
     phase,
@@ -599,6 +612,10 @@ export async function validateHutPhaseCodeAction(token: string, phase: HutPhase,
 }
 
 export async function saveHutQuestionnaireAnswerAction(token: string, questionCode: string, formData: FormData) {
+  if (isV1ParticipantOperationBlocked()) {
+    redirect("/migracion-v1");
+  }
+
   const result = await createHutRepository().saveQuestionnaireAnswerByToken({
     answerInput: hutFormDataToAnswerInput(formData),
     questionCode,
@@ -623,6 +640,10 @@ export async function saveHutQuestionnaireAnswerForFieldAction(
   questionCode: string,
   formData: FormData
 ) {
+  if (isV1ParticipantOperationBlocked()) {
+    redirect("/migracion-v1");
+  }
+
   const fieldAccess = await resolveFieldHutActionAccess(folio, formData);
   if (!fieldAccess.ok) {
     redirectToFieldHut(folio, null, fieldAccess.message, questionCode, fieldAccess);
@@ -666,6 +687,10 @@ export async function completeHutQuestionnaireSectionForFieldAction(
   section: HutQuestionnaireSectionId,
   formData: FormData
 ) {
+  if (isV1ParticipantOperationBlocked()) {
+    redirect("/migracion-v1");
+  }
+
   const fieldAccess = await resolveFieldHutActionAccess(folio, formData);
   if (!fieldAccess.ok) {
     redirectToFieldHut(folio, null, fieldAccess.message, null, fieldAccess);
@@ -689,6 +714,13 @@ export async function requestHutRegistrationSelfieUploadAction(
   token: string,
   metadata: HutSelfieUploadMetadata
 ): Promise<HutActionResult<HutSignedSelfieUpload>> {
+  if (isV1ParticipantOperationBlocked()) {
+    return {
+      message: V1_PARTICIPANT_MIGRATION_MESSAGE,
+      ok: false
+    };
+  }
+
   return createHutRepository().requestRegistrationSelfieUpload({
     metadata,
     token
@@ -709,6 +741,13 @@ export async function completeHutRegistrationAction(
     requestOrigin: string;
   }
 ): Promise<HutActionResult<{ participantLink: string; participantId: string }>> {
+  if (isV1ParticipantOperationBlocked()) {
+    return {
+      message: V1_PARTICIPANT_MIGRATION_MESSAGE,
+      ok: false
+    };
+  }
+
   return createHutRepository().completeRegistration({
     ...formData,
     metadata,
@@ -720,6 +759,13 @@ export async function requestHutVideoUploadAction(
   token: string,
   metadata: HutVideoUploadMetadata
 ): Promise<HutActionResult<HutSignedVideoUpload>> {
+  if (isV1ParticipantOperationBlocked()) {
+    return {
+      message: V1_PARTICIPANT_MIGRATION_MESSAGE,
+      ok: false
+    };
+  }
+
   return createHutRepository().requestVideoUpload({
     metadata,
     token
@@ -730,6 +776,13 @@ export async function requestHutDailySelfieUploadAction(
   token: string,
   metadata: HutSelfieUploadMetadata
 ): Promise<HutActionResult<HutSignedSelfieUpload & { referenceSelfieSignedUrl: string }>> {
+  if (isV1ParticipantOperationBlocked()) {
+    return {
+      message: V1_PARTICIPANT_MIGRATION_MESSAGE,
+      ok: false
+    };
+  }
+
   return createHutRepository().requestDailySelfieUpload({
     metadata,
     token
@@ -741,6 +794,13 @@ export async function requestHutApplicationPhotoUploadAction(
   slotId: HutPhotoTimelineSlotId | null,
   metadata: HutApplicationPhotoUploadMetadata
 ): Promise<HutActionResult<HutSignedApplicationPhotoUpload & { phase: HutPhase; productCode: string | null }>> {
+  if (isV1ParticipantOperationBlocked()) {
+    return {
+      message: V1_PARTICIPANT_MIGRATION_MESSAGE,
+      ok: false
+    };
+  }
+
   return createHutRepository().requestApplicationPhotoUpload({
     metadata,
     slotId,
@@ -756,6 +816,13 @@ export async function confirmHutApplicationPhotoUploadAction(
     storageBucket: string;
   }
 ): Promise<HutActionResult<{ phase: HutPhase }>> {
+  if (isV1ParticipantOperationBlocked()) {
+    return {
+      message: V1_PARTICIPANT_MIGRATION_MESSAGE,
+      ok: false
+    };
+  }
+
   const result = await createHutRepository().confirmApplicationPhotoUpload({
     metadata,
     slotId,
@@ -778,6 +845,13 @@ export async function confirmHutDailySelfieUploadAction(
     storageBucket: string;
   }
 ): Promise<HutActionResult<{ status: "MATCHED" | "NOT_MATCHED" | "PENDING_REVIEW" | "UNCERTAIN" }>> {
+  if (isV1ParticipantOperationBlocked()) {
+    return {
+      message: V1_PARTICIPANT_MIGRATION_MESSAGE,
+      ok: false
+    };
+  }
+
   const result = await createHutRepository().confirmDailySelfieUpload({
     faceVerification: metadata.faceVerification,
     metadata,
@@ -796,6 +870,13 @@ export async function confirmHutVideoUploadAction(
     storageBucket: string;
   }
 ): Promise<HutActionResult<{ blockNumber: number; sequenceNumber: number }>> {
+  if (isV1ParticipantOperationBlocked()) {
+    return {
+      message: V1_PARTICIPANT_MIGRATION_MESSAGE,
+      ok: false
+    };
+  }
+
   const result = await createHutRepository().confirmVideoUpload({
     metadata,
     token

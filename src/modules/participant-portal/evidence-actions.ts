@@ -18,6 +18,7 @@ import {
   type EvidenceUploadMetadata
 } from "./evidence-storage";
 import { participantPortalStudyCodeSchema } from "./validation";
+import { V1_PARTICIPANT_MIGRATION_MESSAGE, isV1ParticipantOperationBlocked } from "@/modules/v1-migration";
 
 type ParticipantEvidenceActionResult<T = unknown> =
   | {
@@ -42,6 +43,14 @@ export async function requestParticipantEvidenceUploadAction(
 ): Promise<ParticipantEvidenceActionResult<ParticipantSignedUploadActionResult>> {
   try {
     const studyCode = normalizeStudyCode(studyCodeInput);
+
+    if (isV1ParticipantOperationBlocked()) {
+      return {
+        message: V1_PARTICIPANT_MIGRATION_MESSAGE,
+        ok: false
+      };
+    }
+
     const auth = await getParticipantEvidenceActionAuth(studyCode);
 
     if (!auth.ok) {
@@ -98,6 +107,14 @@ export async function confirmParticipantEvidenceUploadAction(
 ): Promise<ParticipantEvidenceActionResult<ParticipantEvidenceUploadConfirmation>> {
   try {
     const studyCode = normalizeStudyCode(studyCodeInput);
+
+    if (isV1ParticipantOperationBlocked()) {
+      return {
+        message: V1_PARTICIPANT_MIGRATION_MESSAGE,
+        ok: false
+      };
+    }
+
     const auth = await getParticipantEvidenceActionAuth(studyCode);
 
     if (!auth.ok) {
@@ -140,6 +157,14 @@ export async function completeParticipantEvidenceSubmissionAction(
   studyCodeInput: string
 ): Promise<ParticipantEvidenceActionResult<{ redirectTo: string }>> {
   const studyCode = normalizeStudyCode(studyCodeInput);
+
+  if (isV1ParticipantOperationBlocked()) {
+    return {
+      message: V1_PARTICIPANT_MIGRATION_MESSAGE,
+      ok: false
+    };
+  }
+
   const auth = await getParticipantEvidenceActionAuth(studyCode);
 
   if (!auth.ok) {
