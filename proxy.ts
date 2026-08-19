@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isV1ParticipantRoute, V1_PARTICIPANT_MIGRATION_PATH } from "@/modules/v1-migration";
 import { getInternalRouteDecision, isPublicCtlPath, isPublicHutParticipantPath, isPublicHutRegistrationPath } from "@/shared/auth/routes";
 
 function getSupabaseProxyConfig() {
@@ -20,6 +21,13 @@ function copyResponseCookies(source: NextResponse, target: NextResponse) {
 }
 
 export async function proxy(request: NextRequest) {
+  if (isV1ParticipantRoute(request.nextUrl.pathname) && request.nextUrl.pathname !== V1_PARTICIPANT_MIGRATION_PATH) {
+    const url = request.nextUrl.clone();
+    url.pathname = V1_PARTICIPANT_MIGRATION_PATH;
+    url.search = "";
+    return NextResponse.rewrite(url);
+  }
+
   if (
     isPublicCtlPath(request.nextUrl.pathname) ||
     isPublicHutParticipantPath(request.nextUrl.pathname) ||
